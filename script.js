@@ -1,50 +1,4 @@
-const STORAGE_DIR = "storage/";
-const CONFIG_FILE_KEY = `${STORAGE_DIR}configuration.txt`;
-const PLAYERS_FILE_KEY = `${STORAGE_DIR}players.txt`;
-const PLAYER_FILE_PREFIX = `${STORAGE_DIR}player/`;
 const CURRENT_PLAYER_KEY = "pinbowling-current-player-id";
-
-function getConfigFile() {
-  return JSON.parse(localStorage.getItem(CONFIG_FILE_KEY) || '{"frames":[]}');
-}
-
-function saveConfigFile(data) {
-  localStorage.setItem(CONFIG_FILE_KEY, JSON.stringify(data));
-}
-
-function getFrames() {
-  return (getConfigFile().frames || []).slice().sort((a, b) => a.frame - b.frame);
-}
-
-function saveFrames(frames) {
-  saveConfigFile({ frames: frames.slice().sort((a, b) => a.frame - b.frame) });
-}
-
-function getPlayersFile() {
-  return JSON.parse(localStorage.getItem(PLAYERS_FILE_KEY) || '{"players":[]}');
-}
-
-function savePlayersFile(data) {
-  localStorage.setItem(PLAYERS_FILE_KEY, JSON.stringify(data));
-}
-
-function getPlayersList() {
-  return (getPlayersFile().players || []).slice().sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function getPlayerFileKey(playerId) {
-  return `${PLAYER_FILE_PREFIX}${playerId}`;
-}
-
-function getPlayerScores(playerId) {
-  if (!playerId) return {};
-  return JSON.parse(localStorage.getItem(getPlayerFileKey(playerId)) || "{}");
-}
-
-function savePlayerScores(playerId, rolls) {
-  if (!playerId) return;
-  localStorage.setItem(getPlayerFileKey(playerId), JSON.stringify(rolls));
-}
 
 function getCurrentPlayerId() {
   return localStorage.getItem(CURRENT_PLAYER_KEY);
@@ -58,260 +12,255 @@ function setCurrentPlayerId(playerId) {
   }
 }
 
-function makeSlug(value) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
-}
-
-function makePlayerId(name) {
-  const slug = makeSlug(name) || "player";
-  return `${slug}-${Date.now()}`;
-}
-
-function makePlayerFileName(name, playerId) {
-  const slug = makeSlug(name) || "player";
-  const unique = playerId.replace(`${slug}-`, "");
-  return `${STORAGE_DIR}player/${slug}-${unique}.txt`;
-}
-
-function getRolls() {
-  return getPlayerScores(getCurrentPlayerId());
-}
-
-function saveRolls(rolls) {
-  savePlayerScores(getCurrentPlayerId(), rolls);
-}
-
-function renderPlayerSelect(playerSelect, playerFileInfo) {
-  const players = getPlayersList();
-  const currentPlayerId = getCurrentPlayerId();
-
-  playerSelect.innerHTML = "";
-
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = players.length === 0 ? "No players configured" : "Select a player";
-  playerSelect.appendChild(placeholder);
-
-  players.forEach((player) => {
-    const option = document.createElement("option");
-    option.value = player.id;
-    option.textContent = player.name;
-    playerSelect.appendChild(option);
+async function fetchJSON(url, options = {}) {
+  const response = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
   });
-
-  const selectedPlayer = players.find((player) => player.id === currentPlayerId);
-  if (selectedPlayer) {
-    playerSelect.value = selectedPlayer.id;
-    updatePlayerFileInfo(selectedPlayer, playerFileInfo);
-  } else {
-    playerSelect.value = "";
-    playerFileInfo.classList.add("hidden");
-    playerFileInfo.textContent = "";
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(error.error || response.statusText);
   }
+  return response.json();
 }
 
-function updatePlayerFileInfo(player, playerFileInfo) {
-  if (!player) {
-    playerFileInfo.classList.add("hidden");
-    playerFileInfo.textContent = "";
+async function getMachines() {
+  return fetchJSON('api/machines.php');
+}
+
+async function createMachine(machine) {
+  return fetchJSON('api/machines.php', {
+    method: 'POST',
+    body: JSON.stringify(machine),
+  });
+}
+
+async function updateMachine(id, machine) {
+  return fetchJSON(`api/machines.php?id=${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(machine),
+  });
+}
+
+async function deleteMachine(id) {
+  return fetchJSON(`api/machines.php?id=${id}`, {
+    method: 'DELETE',
+  });
+}
+
+async function getPlayers() {
+  return fetchJSON('api/players.php');
+}
+
+async function createPlayer(player_name) {
+  return fetchJSON('api/players.php', {
+    method: 'POST',
+    body: JSON.stringify({ player_name }),
+  });
+}
+
+async function getScores(playerId) {
+  return fetchJSON(`api/scores.php?playerId=${playerId}`);
+}
+
+async function saveScore(score) {
+  return fetchJSON('api/scores.php', {
+    method: 'POST',
+    body: JSON.stringify(score),
+  });
+}
+
+async function clearScores(playerId) {
+  return fetchJSON(`api/scores.php?playerId=${playerId}`, {
+    method: 'DELETE',
+  });
+}
+
+function buildFrameValues(score10, score1) {
+  const values = {};
+
+  if (score10 > 0 && score1 > 0) {
+    for (let rank = 10; rank >= 1; rank -= 1) {
+      const fraction = (rank - 1) / 9;
+      values[rank] = Math.round(score1 + (score10 - score1) * fraction);
+    }
+    return values;
+  }
+
+  if (score10 > 0) {
+    for (let rank = 10; rank >= 1; rank -= 1) {
+      values[rank] = Math.round(score10 * (rank / 10));
+    }
+    return values;
+  }
+
+  if (score1 > 0) {
+    for (let rank = 1; rank <= 10; rank += 1) {
+      values[rank] = Math.round(score1 * rank);
+    }
+    return values;
+  }
+
+  return null;
+}
+
+function renderPreview(score10Input, score1Input, previewValues) {
+  const score10 = Number(score10Input.value);
+  const score1 = Number(score1Input.value);
+  const values = buildFrameValues(score10, score1);
+
+  if (!values) {
+    previewValues.innerHTML = "<div>Enter a 10 score or a 1 score to preview values for 9–2.</div>";
     return;
   }
-  playerFileInfo.textContent = `Selected player file: ${player.fileName}`;
-  playerFileInfo.classList.remove("hidden");
+
+  previewValues.innerHTML = Object.entries(values)
+    .sort((a, b) => Number(b[0]) - Number(a[0]))
+    .map(([rank, value]) => `<div><strong>${rank}:</strong> ${value}</div>`)
+    .join("");
 }
 
-function initConfigPage() {
-  const frameSelect = document.getElementById("frame-number");
-  const form = document.getElementById("frame-form");
-  const cancelEdit = document.getElementById("cancel-edit");
-  const framesTable = document.getElementById("frames-table");
-  const listEmpty = document.getElementById("list-empty");
-  let editingFrame = null;
+async function initConfigPage() {
+  const frameSelect = document.getElementById('frame-number');
+  const form = document.getElementById('frame-form');
+  const cancelEdit = document.getElementById('cancel-edit');
+  const framesTable = document.getElementById('frames-table');
+  const listEmpty = document.getElementById('list-empty');
+  let editingMachineId = null;
 
-  const score10Input = document.getElementById("value-10");
-  const score1Input = document.getElementById("value-1");
-  const previewValues = document.getElementById("preview-values");
-
-  function buildFrameValues(score10, score1) {
-    const values = {};
-
-    if (score10 > 0 && score1 > 0) {
-      for (let rank = 10; rank >= 1; rank -= 1) {
-        const fraction = (rank - 1) / 9;
-        values[rank] = Math.round(score1 + (score10 - score1) * fraction);
-      }
-      return values;
-    }
-
-    if (score10 > 0) {
-      for (let rank = 10; rank >= 1; rank -= 1) {
-        values[rank] = Math.round(score10 * (rank / 10));
-      }
-      return values;
-    }
-
-    if (score1 > 0) {
-      for (let rank = 1; rank <= 10; rank += 1) {
-        values[rank] = Math.round(score1 * rank);
-      }
-      return values;
-    }
-
-    return null;
-  }
-
-  function renderPreview() {
-    const score10 = Number(score10Input.value);
-    const score1 = Number(score1Input.value);
-    const values = buildFrameValues(score10, score1);
-
-    if (!values) {
-      previewValues.innerHTML = "<div>Enter a 10 score or a 1 score to preview values for 9–2.</div>";
-      return;
-    }
-
-    previewValues.innerHTML = Object.entries(values)
-      .sort((a, b) => Number(b[0]) - Number(a[0]))
-      .map(([rank, value]) => `<div><strong>${rank}:</strong> ${value}</div>`)
-      .join("");
-  }
+  const score10Input = document.getElementById('value-10');
+  const score1Input = document.getElementById('value-1');
+  const previewValues = document.getElementById('preview-values');
 
   for (let i = 1; i <= 10; i += 1) {
-    const option = document.createElement("option");
+    const option = document.createElement('option');
     option.value = String(i);
     option.textContent = i;
     frameSelect.appendChild(option);
   }
 
-  score10Input.addEventListener("input", renderPreview);
-  score1Input.addEventListener("input", renderPreview);
-  renderPreview();
+  score10Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues));
+  score1Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues));
+  renderPreview(score10Input, score1Input, previewValues);
 
-  function render() {
-    const frames = getFrames();
-    const tbody = framesTable.querySelector("tbody");
-    tbody.innerHTML = "";
+  async function render() {
+    const frames = await getMachines();
+    const tbody = framesTable.querySelector('tbody');
+    tbody.innerHTML = '';
 
     if (frames.length === 0) {
-      framesTable.classList.add("hidden");
-      listEmpty.classList.remove("hidden");
+      framesTable.classList.add('hidden');
+      listEmpty.classList.remove('hidden');
       return;
     }
 
-    framesTable.classList.remove("hidden");
-    listEmpty.classList.add("hidden");
+    framesTable.classList.remove('hidden');
+    listEmpty.classList.add('hidden');
 
     frames.forEach((frame) => {
-      const row = document.createElement("tr");
+      const row = document.createElement('tr');
       row.innerHTML = `
-        <td>${frame.frame}</td>
-        <td>${frame.machine}</td>
+        <td>${frame.frame_number}</td>
+        <td>${frame.machine_name}</td>
         <td>${Object.entries(frame.values)
           .map(([key, value]) => `${key}: ${value}`)
-          .join(" \u2022 ")}</td>
+          .join(' \u2022 ')}</td>
         <td>
-          <button type="button" class="edit-button" data-frame="${frame.frame}">Edit</button>
-          <button type="button" class="delete-button" data-frame="${frame.frame}">Delete</button>
+          <button type="button" class="edit-button" data-id="${frame.id}">Edit</button>
+          <button type="button" class="delete-button" data-id="${frame.id}">Delete</button>
         </td>
       `;
       tbody.appendChild(row);
     });
 
-    framesTable.querySelectorAll(".edit-button").forEach((button) => {
-      button.addEventListener("click", () => {
-        const frameNumber = Number(button.dataset.frame);
-        const frame = getFrames().find((item) => item.frame === frameNumber);
+    tbody.querySelectorAll('.edit-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const machineId = Number(button.dataset.id);
+        const frame = (await getMachines()).find((item) => item.id === machineId);
         if (!frame) return;
-        editingFrame = frameNumber;
-        frameSelect.value = String(frame.frame);
+        editingMachineId = machineId;
+        frameSelect.value = String(frame.frame_number);
         frameSelect.disabled = true;
-        document.getElementById("machine-name").value = frame.machine;
-        score10Input.value = frame.values[10] || "";
-        score1Input.value = frame.values[1] || "";
-        renderPreview();
-        form.querySelector("button[type='submit']").textContent = "Update Frame";
-        cancelEdit.classList.remove("hidden");
+        document.getElementById('machine-name').value = frame.machine_name;
+        score10Input.value = frame.values[10] || '';
+        score1Input.value = frame.values[1] || '';
+        renderPreview(score10Input, score1Input, previewValues);
+        form.querySelector('button[type="submit"]').textContent = 'Update Frame';
+        cancelEdit.classList.remove('hidden');
       });
     });
 
-    framesTable.querySelectorAll(".delete-button").forEach((button) => {
-      button.addEventListener("click", () => {
-        const frameNumber = Number(button.dataset.frame);
-        const updated = getFrames().filter((item) => item.frame !== frameNumber);
-        saveFrames(updated);
-        render();
+    tbody.querySelectorAll('.delete-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const machineId = Number(button.dataset.id);
+        await deleteMachine(machineId);
+        await render();
       });
     });
   }
 
-  render();
+  await render();
 
   function resetForm() {
-    editingFrame = null;
+    editingMachineId = null;
     frameSelect.disabled = false;
     form.reset();
-    form.querySelector("button[type='submit']").textContent = "Add Frame";
-    cancelEdit.classList.add("hidden");
-    renderPreview();
+    form.querySelector('button[type="submit"]').textContent = 'Add Frame';
+    cancelEdit.classList.add('hidden');
+    renderPreview(score10Input, score1Input, previewValues);
   }
 
-  cancelEdit.addEventListener("click", resetForm);
+  cancelEdit.addEventListener('click', resetForm);
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const frame = Number(frameSelect.value);
-    const machine = document.getElementById("machine-name").value.trim();
+    const frame_number = Number(frameSelect.value);
+    const machine_name = document.getElementById('machine-name').value.trim();
     const score10 = Number(score10Input.value);
     const score1 = Number(score1Input.value);
-    if (!frame || !machine) return;
+    if (!frame_number || !machine_name) return;
     if (!score10 && !score1) {
-      alert("Please enter a score for 10 or a score for 1.");
+      alert('Please enter a score for 10 or a score for 1.');
       return;
     }
 
     const values = buildFrameValues(score10, score1);
     if (!values) {
-      alert("Unable to calculate frame values. Enter a valid 10 or 1 score.");
+      alert('Unable to calculate frame values. Enter a valid 10 or 1 score.');
       return;
     }
 
-    const frames = getFrames();
-    const existingIndex = frames.findIndex((item) => item.frame === frame);
-
-    if (editingFrame !== null && existingIndex >= 0) {
-      frames[existingIndex] = { frame, machine, values };
-    } else if (existingIndex >= 0) {
-      alert("That frame already exists. Edit it instead.");
-      return;
+    const payload = { machine_name, frame_number, values };
+    if (editingMachineId) {
+      await updateMachine(editingMachineId, payload);
     } else {
-      frames.push({ frame, machine, values });
+      await createMachine(payload);
     }
 
-    saveFrames(frames);
-    render();
+    await render();
     resetForm();
   });
 }
 
-function initPlayerPage() {
-  const framesInput = document.getElementById("frames-input");
-  const calculateButton = document.getElementById("calculate-button");
-  const clearButton = document.getElementById("clear-rolls");
-  const resultsPanel = document.getElementById("results-panel");
-  const resultsBody = document.getElementById("results-body");
-  const totalScore = document.getElementById("total-score");
-  const resultsEmpty = document.getElementById("results-empty");
-  const warning = document.getElementById("player-warning");
-  const playerSelect = document.getElementById("player-select");
-  const addPlayerButton = document.getElementById("add-player-button");
-  const newPlayerName = document.getElementById("new-player-name");
-  const playerFileInfo = document.getElementById("player-file-info");
+async function initPlayerPage() {
+  const framesInput = document.getElementById('frames-input');
+  const calculateButton = document.getElementById('calculate-button');
+  const clearButton = document.getElementById('clear-rolls');
+  const resultsPanel = document.getElementById('results-panel');
+  const resultsBody = document.getElementById('results-body');
+  const totalScore = document.getElementById('total-score');
+  const resultsEmpty = document.getElementById('results-empty');
+  const warning = document.getElementById('player-warning');
+  const playerSelect = document.getElementById('player-select');
+  const addPlayerButton = document.getElementById('add-player-button');
+  const newPlayerName = document.getElementById('new-player-name');
+  const playerFileInfo = document.getElementById('player-file-info');
 
-  const frames = getFrames();
-  if (frames.length === 0) {
-    warning.textContent = "Please configure frames first on the configuration page.";
-    warning.classList.remove("hidden");
-    framesInput.innerHTML = "";
+  const machines = await getMachines();
+  if (machines.length === 0) {
+    warning.textContent = 'Please configure frames first on the configuration page.';
+    warning.classList.remove('hidden');
+    framesInput.innerHTML = '';
     calculateButton.disabled = true;
     clearButton.disabled = true;
     playerSelect.disabled = true;
@@ -319,86 +268,178 @@ function initPlayerPage() {
     return;
   }
 
-  function createRollInput(frame, ball, value = "") {
-    const input = document.createElement("input");
-    input.type = "number";
-    input.min = "0";
-    input.step = "1";
+  warning.classList.add('hidden');
+  playerSelect.disabled = false;
+  addPlayerButton.disabled = false;
+
+  function createRollInput(frameNumber, ball, machineId, value = '') {
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.step = '1';
     input.placeholder = `Ball ${ball} cumulative`;
-    input.className = "roll-input";
-    input.value = value !== undefined ? value : "";
-    input.dataset.frame = frame;
+    input.className = 'roll-input';
+    input.value = value !== undefined ? value : '';
+    input.dataset.frame = frameNumber;
     input.dataset.ball = ball;
-    input.addEventListener("input", () => {
+    input.dataset.machineId = machineId;
+
+    input.addEventListener('input', async () => {
       const selectedPlayerId = getCurrentPlayerId();
       if (!selectedPlayerId) return;
+      const row = input.closest('.frame-row');
+      if (!row) return;
+      const ball1 = Number(row.querySelector('[data-ball="1"]').value) || 0;
+      const ball2 = Number(row.querySelector('[data-ball="2"]').value) || 0;
+      const ball3 = Number(row.querySelector('[data-ball="3"]').value) || 0;
+      const frameNumberValue = Number(input.dataset.frame);
+      const machineIdValue = Number(input.dataset.machineId);
 
-      const updatedRolls = getPlayerScores(selectedPlayerId);
-      updatedRolls[`f${frame}b${ball}`] = Number(input.value) || 0;
-      savePlayerScores(selectedPlayerId, updatedRolls);
+      await saveScore({
+        playerId: Number(selectedPlayerId),
+        frame: frameNumberValue,
+        machineId: machineIdValue,
+        ball1,
+        ball2,
+        ball3,
+      });
     });
+
     return input;
   }
 
-  function loadPlayerScores(playerId) {
-    const playerRolls = getPlayerScores(playerId);
-    framesInput.querySelectorAll("input").forEach((input) => {
-      const frame = Number(input.dataset.frame);
-      const ball = Number(input.dataset.ball);
-      const key = `f${frame}b${ball}`;
-      input.value = playerRolls[key] !== undefined ? playerRolls[key] : "";
+  function buildFrameRow(frame, rollValues) {
+    const row = document.createElement('div');
+    row.className = 'frame-row';
+    row.dataset.frame = frame.frame_number;
+    row.innerHTML = `
+      <div>
+        <div class="frame-label">Frame ${frame.frame_number}</div>
+        <div class="frame-machine">${frame.machine_name}</div>
+      </div>
+    `;
+
+    for (let ball = 1; ball <= 3; ball += 1) {
+      const value = rollValues?.[`ball${ball}`] ?? '';
+      row.appendChild(createRollInput(frame.frame_number, ball, frame.id, value));
+    }
+
+    return row;
+  }
+
+  async function renderPlayerSelect() {
+    const players = await getPlayers();
+    const currentPlayerId = getCurrentPlayerId();
+
+    playerSelect.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = players.length === 0 ? 'No players configured' : 'Select a player';
+    playerSelect.appendChild(placeholder);
+
+    players.forEach((player) => {
+      const option = document.createElement('option');
+      option.value = String(player.id);
+      option.textContent = player.player_name;
+      playerSelect.appendChild(option);
+    });
+
+    if (currentPlayerId && players.some((player) => String(player.id) === currentPlayerId)) {
+      playerSelect.value = currentPlayerId;
+      const selectedPlayer = players.find((player) => String(player.id) === currentPlayerId);
+      updatePlayerFileInfo(selectedPlayer);
+      return currentPlayerId;
+    }
+
+    if (players.length > 0) {
+      playerSelect.value = String(players[0].id);
+      setCurrentPlayerId(players[0].id);
+      updatePlayerFileInfo(players[0]);
+      return String(players[0].id);
+    }
+
+    updatePlayerFileInfo(null);
+    return null;
+  }
+
+  function updatePlayerFileInfo(player) {
+    if (!player) {
+      playerFileInfo.textContent = 'Add a player to begin tracking scores.';
+      playerFileInfo.classList.remove('hidden');
+      return;
+    }
+    playerFileInfo.textContent = `Selected player: ${player.player_name}`;
+    playerFileInfo.classList.remove('hidden');
+  }
+
+  function loadScoresIntoForm(scoreRows) {
+    const scoreMap = scoreRows.reduce((map, row) => {
+      map[String(row.frame)] = row;
+      return map;
+    }, {});
+
+    framesInput.innerHTML = '';
+    machines.forEach((frame) => {
+      const rollValues = scoreMap[String(frame.frame_number)];
+      framesInput.appendChild(buildFrameRow(frame, rollValues));
     });
   }
 
-  framesInput.innerHTML = "";
-  frames.forEach((frame) => {
-    const row = document.createElement("div");
-    row.className = "frame-row";
-    row.innerHTML = `
-      <div>
-        <div class="frame-label">Frame ${frame.frame}</div>
-        <div class="frame-machine">${frame.machine}</div>
-      </div>
-    `;
-    for (let ball = 1; ball <= 3; ball += 1) {
-      row.appendChild(createRollInput(frame.frame, ball));
-    }
-    framesInput.appendChild(row);
-  });
-
-  function refreshPlayerSelection() {
-    const players = getPlayersList();
-    renderPlayerSelect(playerSelect, playerFileInfo);
-    const selectedId = getCurrentPlayerId();
-    const hasSelected = players.some((player) => player.id === selectedId);
-
-    if (!hasSelected) {
-      if (players.length > 0) {
-        setCurrentPlayerId(players[0].id);
-      } else {
-        setCurrentPlayerId("");
-      }
-    }
-
-    const activePlayerId = getCurrentPlayerId();
+  async function refreshPlayerSelection() {
+    const activePlayerId = await renderPlayerSelect();
     if (!activePlayerId) {
-      warning.textContent = "Please add and select a player before entering scores.";
-      warning.classList.remove("hidden");
+      warning.textContent = 'Please add and select a player before entering scores.';
+      warning.classList.remove('hidden');
       calculateButton.disabled = true;
       clearButton.disabled = true;
-      framesInput.querySelectorAll("input").forEach((input) => (input.disabled = true));
+      framesInput.querySelectorAll('input').forEach((input) => (input.disabled = true));
       return;
     }
 
-    warning.classList.add("hidden");
+    warning.classList.add('hidden');
     calculateButton.disabled = false;
     clearButton.disabled = false;
-    framesInput.querySelectorAll("input").forEach((input) => (input.disabled = false));
-    loadPlayerScores(activePlayerId);
+    framesInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
+
+    const scores = await getScores(Number(activePlayerId));
+    loadScoresIntoForm(scores);
   }
 
+  addPlayerButton.addEventListener('click', async () => {
+    const name = newPlayerName.value.trim();
+    if (!name) {
+      alert('Enter a player name to add.');
+      return;
+    }
+
+    const player = await createPlayer(name);
+    setCurrentPlayerId(player.id);
+    newPlayerName.value = '';
+    await refreshPlayerSelection();
+  });
+
+  playerSelect.addEventListener('change', async () => {
+    const selectedId = playerSelect.value;
+    if (!selectedId) {
+      setCurrentPlayerId('');
+    } else {
+      setCurrentPlayerId(selectedId);
+    }
+    await refreshPlayerSelection();
+  });
+
+  clearButton.addEventListener('click', async () => {
+    const currentPlayerId = getCurrentPlayerId();
+    if (!currentPlayerId) return;
+    await clearScores(Number(currentPlayerId));
+    await refreshPlayerSelection();
+    resultsPanel.classList.add('hidden');
+    resultsEmpty.classList.remove('hidden');
+  });
+
   function getPinCount(frame, rawScore) {
-    if (!frame || typeof rawScore !== "number" || rawScore <= 0) return 0;
+    if (!frame || typeof rawScore !== 'number' || rawScore <= 0) return 0;
     const thresholds = Object.entries(frame.values)
       .map(([rank, score]) => ({ rank: Number(rank), score: Number(score) }))
       .sort((a, b) => a.score - b.score);
@@ -412,10 +453,10 @@ function initPlayerPage() {
   }
 
   function getFrameData(frame) {
-    const rolls = getRolls();
-    const raw1 = Number(rolls[`f${frame.frame}b1`] || 0);
-    const raw2 = Number(rolls[`f${frame.frame}b2`] || 0);
-    const raw3 = Number(rolls[`f${frame.frame}b3`] || 0);
+    const row = framesInput.querySelector(`.frame-row[data-frame="${frame.frame_number}"]`);
+    const raw1 = Number(row?.querySelector('[data-ball="1"]').value || 0);
+    const raw2 = Number(row?.querySelector('[data-ball="2"]').value || 0);
+    const raw3 = Number(row?.querySelector('[data-ball="3"]').value || 0);
     const c1 = getPinCount(frame, raw1);
     const c2 = getPinCount(frame, raw2);
     const c3 = getPinCount(frame, raw3);
@@ -426,35 +467,35 @@ function initPlayerPage() {
     let score = 0;
 
     if (c1 >= 10) {
-      type = "strike";
+      type = 'strike';
       first = 10;
       second = 0;
       score = 10;
     } else if (c2 >= 10) {
-      type = "spare2";
+      type = 'spare2';
       first = c1;
       second = 10 - c1;
       score = 10;
     } else if (c3 >= 10) {
-      type = "spare3";
+      type = 'spare3';
       first = c2;
       second = 10 - c2;
       score = 10;
     } else {
-      type = "open";
+      type = 'open';
       first = c2;
       second = Math.max(0, c3 - c2);
       score = first + second;
     }
 
-    return { frame: frame.frame, machine: frame.machine, type, first, second, score };
+    return { frame: frame.frame_number, machine: frame.machine_name, type, first, second, score };
   }
 
   function getNextBallValues(frameIndex, count, frameData) {
     const values = [];
     for (let current = frameIndex + 1; current < frameData.length && values.length < count; current += 1) {
       const next = frameData[current];
-      if (next.type === "strike") {
+      if (next.type === 'strike') {
         values.push(10);
       } else {
         values.push(next.first, next.second);
@@ -465,34 +506,27 @@ function initPlayerPage() {
   }
 
   function formatMark(frame) {
-    if (frame.type === "strike") return "X";
-    if (frame.type === "spare2" || frame.type === "spare3") return `${frame.first}/`;
+    if (frame.type === 'strike') return 'X';
+    if (frame.type === 'spare2' || frame.type === 'spare3') return `${frame.first}/`;
     return `${frame.first} ${frame.second}`;
   }
 
   function calculate() {
-    const frameData = frames.map(getFrameData);
+    const frameData = machines.map(getFrameData);
     const frameResults = [];
     let total = 0;
 
     frameData.forEach((frame, index) => {
       let frameScore = frame.score;
-
-      if (frame.type === "strike") {
+      if (frame.type === 'strike') {
         const [next1, next2] = getNextBallValues(index, 2, frameData);
         frameScore = 10 + next1 + next2;
-      } else if (frame.type === "spare2" || frame.type === "spare3") {
+      } else if (frame.type === 'spare2' || frame.type === 'spare3') {
         const [next1] = getNextBallValues(index, 1, frameData);
         frameScore = 10 + next1;
       }
-
       total += frameScore;
-      frameResults.push({
-        frame: frame.frame,
-        machine: frame.machine,
-        mark: formatMark(frame),
-        score: frameScore,
-      });
+      frameResults.push({ frame: frame.frame, machine: frame.machine, mark: formatMark(frame), score: frameScore });
     });
 
     resultsBody.innerHTML = frameResults
@@ -506,104 +540,25 @@ function initPlayerPage() {
         </tr>
       `
       )
-      .join("");
+      .join('');
 
     totalScore.textContent = total;
-    resultsEmpty.classList.add("hidden");
-    resultsPanel.classList.remove("hidden");
+    resultsEmpty.classList.add('hidden');
+    resultsPanel.classList.remove('hidden');
   }
 
-  calculateButton.addEventListener("click", calculate);
+  calculateButton.addEventListener('click', calculate);
 
-  clearButton.addEventListener("click", () => {
-    const selectedPlayerId = getCurrentPlayerId();
-    if (selectedPlayerId) {
-      localStorage.removeItem(getPlayerFileKey(selectedPlayerId));
-    }
-    framesInput.querySelectorAll("input").forEach((input) => {
-      input.value = "";
-    });
-    resultsPanel.classList.add("hidden");
-    resultsEmpty.classList.remove("hidden");
-  });
-
-  addPlayerButton.addEventListener("click", () => {
-    const name = newPlayerName.value.trim();
-    if (!name) {
-      alert("Enter a player name to add.");
-      return;
-    }
-
-    const players = getPlayersList();
-    const existing = players.find((player) => player.name.toLowerCase() === name.toLowerCase());
-    if (existing) {
-      setCurrentPlayerId(existing.id);
-      refreshPlayerSelection();
-      newPlayerName.value = "";
-      return;
-    }
-
-    const id = makePlayerId(name);
-    const fileName = makePlayerFileName(name, id);
-    const updatedPlayers = players.concat({ id, name, fileName });
-    savePlayersFile({ players: updatedPlayers });
-    setCurrentPlayerId(id);
-    refreshPlayerSelection();
-    newPlayerName.value = "";
-  });
-
-  playerSelect.addEventListener("change", () => {
-    const selectedId = playerSelect.value;
-    if (!selectedId) {
-      setCurrentPlayerId("");
-      refreshPlayerSelection();
-      return;
-    }
-    setCurrentPlayerId(selectedId);
-    refreshPlayerSelection();
-  });
-
-  function refreshPlayerSelection() {
-    const players = getPlayersList();
-    renderPlayerSelect(playerSelect, playerFileInfo);
-    const selectedId = getCurrentPlayerId();
-    const activePlayer = players.find((player) => player.id === selectedId);
-
-    if (!activePlayer) {
-      if (players.length > 0) {
-        setCurrentPlayerId(players[0].id);
-      } else {
-        setCurrentPlayerId("");
-      }
-    }
-
-    const activePlayerId = getCurrentPlayerId();
-    if (!activePlayerId) {
-      warning.textContent = "Please add and select a player before entering scores.";
-      warning.classList.remove("hidden");
-      calculateButton.disabled = true;
-      clearButton.disabled = true;
-      framesInput.querySelectorAll("input").forEach((input) => (input.disabled = true));
-      return;
-    }
-
-    warning.classList.add("hidden");
-    calculateButton.disabled = false;
-    clearButton.disabled = false;
-    framesInput.querySelectorAll("input").forEach((input) => (input.disabled = false));
-    loadPlayerScores(activePlayerId);
-  }
-
-  refreshPlayerSelection();
+  await refreshPlayerSelection();
 }
 
 function ready() {
-  if (document.getElementById("frame-form")) {
+  if (document.getElementById('frame-form')) {
     initConfigPage();
   }
-  if (document.getElementById("player-form")) {
+  if (document.getElementById('player-form')) {
     initPlayerPage();
   }
 }
 
-document.addEventListener("DOMContentLoaded", ready);
+document.addEventListener('DOMContentLoaded', ready);
