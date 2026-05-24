@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PinBowling Player Score Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="page-container">
+    <header>
+      <h1>PinBowling Player Score Tracker</h1>
+      <p>Enter your pinbowling scores for each frame and calculate your bowling-style total.</p>
+      <nav>
+        <a href="index.html">Back to Configuration</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      <h2>Player Selection</h2>
+      <p class="hint">Players are stored locally in <code>storage/players.txt</code>. Each player’s scores are kept in <code>storage/player/</code>.</p>
+      <div class="form-row">
+        <label for="player-select">Select Player</label>
+        <select id="player-select"></select>
+      </div>
+      <div class="form-row">
+        <label for="new-player-name">Add New Player</label>
+        <input id="new-player-name" type="text" placeholder="Enter player name" />
+        <button type="button" id="add-player-button">Add Player</button>
+      </div>
+      <div id="player-file-info" class="notice hidden"></div>
+    </section>
+
+    <section class="card">
+      <h2>Enter Frame Scores</h2>
+      <p class="hint">Enter the cumulative pinbowling score after each ball. Ball 1 can be a strike; ball 2 can complete a spare; ball 3 can also complete a spare.</p>
+      <div id="player-warning" class="notice hidden">Please configure frames first on the configuration page.</div>
+      <form id="player-form">
+        <div id="frames-input"></div>
+        <div class="form-actions">
+          <button type="button" id="calculate-button">Calculate Total</button>
+          <button type="button" id="clear-rolls" class="secondary">Clear Scores</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Results</h2>
+      <div id="results-empty" class="notice">Enter scores and click Calculate Total to see results.</div>
+      <div id="results-panel" class="hidden">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Frame</th>
+              <th>Machine</th>
+              <th>Mark</th>
+              <th>Frame Score</th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+        <div class="total-score">Total Score: <strong id="total-score">0</strong></div>
+      </div>
+    </section>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
