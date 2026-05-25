@@ -597,13 +597,7 @@ async function initScoresPage() {
 
     for (let ball = 1; ball <= 3; ball += 1) {
       const value = rollValues?.[`ball${ball}`] ?? '';
-      const placeholder = frame.frame_number === 10
-        ? ball === 1
-          ? 'Ball 1 score'
-          : ball === 2
-            ? 'Ball 2 target (×1.3)'
-            : 'Ball 3 target (×1.3²)'
-        : `Ball ${ball} cumulative`;
+      const placeholder = `Ball ${ball} cumulative`;
       
       const input = createRollInput(frame.frame_number, ball, frame.id, value, placeholder);
       
