@@ -1,15 +1,66 @@
 <?php
 // PinBowling PHP MySQL configuration
 // Update the values below with your hosting database credentials.
-// If your host provides environment variables, those are also supported.
+// If your host provides environment variables or a .env file, those are also supported.
 
-$DB_HOST = getenv('DB_HOST') ?: getenv('MYSQL_HOST') ?: 'localhost';
-$DB_NAME = getenv('DB_NAME') ?: getenv('MYSQL_DATABASE') ?: 'pinbowling';
-$DB_USER = getenv('DB_USER') ?: getenv('MYSQL_USER') ?: 'username';
-$DB_PASS = getenv('DB_PASS') ?: getenv('MYSQL_PASSWORD') ?: 'password';
+function loadEnvFile($envPath) {
+    $env = [];
+    if (!is_readable($envPath)) {
+        return $env;
+    }
+
+    $handle = fopen($envPath, 'r');
+    if ($handle === false) {
+        return $env;
+    }
+
+    while (($line = fgets($handle)) !== false) {
+        $line = trim($line);
+        if ($line === '' || strpos($line, '#') === 0 || strpos($line, '=') === false) {
+            continue;
+        }
+
+        list($name, $value) = explode('=', $line, 2);
+        $name = trim($name);
+        $value = trim($value);
+
+        if ($value !== '' && ((($value[0] === '"') && substr($value, -1) === '"') || (($value[0] === "'") && substr($value, -1) === "'"))) {
+            $value = substr($value, 1, -1);
+        }
+
+        $env[$name] = $value;
+        putenv("$name=$value");
+        $_ENV[$name] = $value;
+        $_SERVER[$name] = $value;
+    }
+
+    fclose($handle);
+    return $env;
+}
+
+$loadedEnv = loadEnvFile(__DIR__ . '/.env');
+
+function envValue(array $env, array $names, $default = null) {
+    foreach ($names as $name) {
+        if (isset($env[$name]) && $env[$name] !== '') {
+            return $env[$name];
+        }
+        $value = getenv($name);
+        if ($value !== false && $value !== '') {
+            return $value;
+        }
+    }
+    return $default;
+}
+
+$DB_HOST = envValue($loadedEnv, ['DB_HOST', 'MYSQL_HOST'], 'localhost');
+$DB_PORT = envValue($loadedEnv, ['DB_PORT', 'MYSQL_PORT'], '3306');
+$DB_NAME = envValue($loadedEnv, ['DB_NAME', 'MYSQL_DATABASE'], 'pinbowling');
+$DB_USER = envValue($loadedEnv, ['DB_USER', 'MYSQL_USER'], 'username');
+$DB_PASS = envValue($loadedEnv, ['DB_PASS', 'MYSQL_PASSWORD'], 'password');
 $DB_CHARSET = 'utf8mb4';
 
-$DB_DSN = "mysql:host={$DB_HOST};dbname={$DB_NAME};charset={$DB_CHARSET}";
+$DB_DSN = "mysql:host={$DB_HOST};port={$DB_PORT};dbname={$DB_NAME};charset={$DB_CHARSET}";
 
 function getDbConnection() {
     global $DB_DSN, $DB_USER, $DB_PASS;

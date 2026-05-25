@@ -9,7 +9,9 @@ This app now uses a PHP backend for MySQL persistence.
 3. Set the database hostname, name, username, and password in `config.php`.
    - If your host lists a MySQL hostname, do not use `localhost` unless it is explicitly the listed value.
    - Use the same hostname exactly as shown under MySQL Databases.
+   - If you upload a `.env` file with these values, `config.php` will also read it automatically.
 4. Make sure `config.php`, `api/machines.php`, `api/players.php`, and `api/scores.php` are on the server.
+5. Use `db-test.php` in the browser to verify the PHP-to-MySQL connection.
 
 ## PHP Backend Configuration
 

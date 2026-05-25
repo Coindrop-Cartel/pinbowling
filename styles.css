@@ -88,7 +88,8 @@ button.secondary {
   color: #0f172a;
 }
 
-button.hidden {
+button.hidden,
+.hidden {
   display: none;
 }
 
@@ -98,6 +99,16 @@ button.hidden {
   border-radius: 14px;
   padding: 14px 16px;
   color: #334155;
+}
+
+.standings-mark {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.standings-frame-score {
+  font-size: 0.9rem;
+  color: #475569;
 }
 
 .data-table {
@@ -120,6 +131,16 @@ button.hidden {
 
 .data-table tbody tr:hover {
   background: #f1f5f9;
+}
+
+.score-list div {
+  margin-bottom: 4px;
+}
+
+.frame-note {
+  margin-top: 6px;
+  font-size: 0.88rem;
+  color: #64748b;
 }
 
 .grid-values {

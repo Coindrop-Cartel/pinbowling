@@ -35,4 +35,22 @@ if ($method === 'POST') {
     sendJson($stmt->fetch());
 }
 
+if ($method === 'DELETE') {
+    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    if (!$id) {
+        sendJson(['error' => 'id query parameter is required'], 400);
+    }
+
+    $stmt = $pdo->prepare('SELECT * FROM Players WHERE id = ?');
+    $stmt->execute([$id]);
+    $player = $stmt->fetch();
+    if (!$player) {
+        sendJson(['error' => 'Player not found'], 404);
+    }
+
+    $stmt = $pdo->prepare('DELETE FROM Players WHERE id = ?');
+    $stmt->execute([$id]);
+    sendJson(['success' => true, 'deleted' => $player]);
+}
+
 sendJson(['error' => 'Unsupported request method'], 405);
