@@ -41,6 +41,7 @@ body {
   color: #ffffff;
   white-space: nowrap;
   flex-shrink: 0;
+  text-decoration: none;
 }
 
 .nav-links {
@@ -140,6 +141,12 @@ button {
   padding: 12px 18px;
   font-size: 1rem;
   cursor: pointer;
+}
+
+button:disabled {
+  background: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
 }
 
 button.secondary {

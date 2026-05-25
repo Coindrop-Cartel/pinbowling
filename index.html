@@ -3,71 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PinBowling Frame Configuration</title>
+  <title>PinBowling - Home</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <nav class="main-nav">
     <div class="nav-container">
-      <div class="nav-brand">PinBowling</div>
+      <a href="index.html" class="nav-brand">PinBowling</a>
       <div class="nav-links">
-        <a href="index.html" class="nav-link active">Machines</a>
         <a href="players.html" class="nav-link">Players</a>
         <a href="standings.html" class="nav-link">Standings</a>
+        <a href="machines.html" class="nav-link">Machines</a>
       </div>
     </div>
   </nav>
   <main class="page-container">
     <header>
-      <h1>PinBowling Frame Configuration</h1>
-      <p>Define the frame mapping and score values for your pinbowling game.</p>
+      <h1>Welcome to PinBowling</h1>
+      <p>A competitive pinball scoring system that translates high scores into bowling frames.</p>
     </header>
 
     <section class="card">
-      <h2>Add or Edit Frame</h2>
-      <form id="frame-form">
-        <div class="form-row">
-          <label for="frame-number">Frame Number</label>
-          <select id="frame-number" required>
-            <option value="">Select frame</option>
-          </select>
-        </div>
-        <div class="form-row">
-          <label for="machine-name">PinBowling Machine Name</label>
-          <input id="machine-name" type="text" placeholder="Machine name" required />
-        </div>
-
-        <fieldset>
-          <legend>Score values for this frame</legend>
-          <p class="hint">Enter a score for the 10 or the 1. Values for 9–2 will calculate automatically as percentages.</p>
-          <div class="grid-values">
-            <label><span>10:</span><input name="value-10" id="value-10" type="number" min="0" placeholder="Score for 10" /></label>
-            <label><span>1:</span><input name="value-1" id="value-1" type="number" min="0" placeholder="Score for 1" /></label>
-          </div>
-          <div id="preview-values" class="preview-grid"></div>
-        </fieldset>
-
-        <div class="form-actions">
-          <button type="submit">Add Frame</button>
-          <button type="button" id="cancel-edit" class="secondary hidden">Cancel Edit</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="card">
-      <h2>Configured Frames</h2>
-      <div id="list-empty" class="notice">No frames configured yet. Add one to get started.</div>
-      <table id="frames-table" class="data-table hidden">
-        <thead>
-          <tr>
-            <th>Frame</th>
-            <th>Machine</th>
-            <th>Scores</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <h2>About the Project</h2>
+      <p>PinBowling maps pinball performance across multiple machines into a standardized 10-frame bowling game. Organizers define scoring thresholds for each machine, and players compete to see who can bowl the perfect 300 game on pinball!</p>
+      <p>The system automatically calculates strikes, spares, and total scores following standard bowling rules based on the machine difficulty you configure.</p>
+      
+      <div style="margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <a href="machines.html" class="nav-link" style="background: #333; color: white; padding: 10px 20px; border-radius: 4px; text-decoration: none;">Configure Machines</a>
+        <a href="players.html" class="nav-link" style="background: #333; color: white; padding: 10px 20px; border-radius: 4px; text-decoration: none;">Manage Players</a>
+        <a href="standings.html" class="nav-link" style="background: #333; color: white; padding: 10px 20px; border-radius: 4px; text-decoration: none;">View Standings</a>
+      </div>
     </section>
   </main>
   <script src="script.js"></script>

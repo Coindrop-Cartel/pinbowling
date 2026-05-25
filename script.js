@@ -525,7 +525,6 @@ async function initPlayerPage() {
       input.addEventListener('input', () => {
         saveBtn.disabled = false;
         saveBtn.classList.add('is-dirty');
-        saveBtn.textContent = 'Save Changes';
       });
 
       inputsContainer.appendChild(input);
@@ -768,9 +767,10 @@ async function initStandingsPage() {
   }
 
   // Build table header with frame numbers
-  const frameHeaders = machines.map((m) => `<th>Frame ${m.frame_number}</th>`).join('');
+  const frameHeaders = machines.map((m) => `<th style="min-width: 80px;">Frame ${m.frame_number}</th>`).join('');
   standingsHeader.innerHTML = `
     <tr>
+      <th style="width: 40px; text-align: center;">#</th>
       <th style="white-space: nowrap; min-width: 150px;">Player</th>
       ${frameHeaders}
       <th>Total</th>
@@ -806,7 +806,7 @@ async function initStandingsPage() {
     .map((result, index) => `
       <tr>
         <td style="text-align: center;">${index + 1}</td>
-        <td style="white-space: nowrap; font-weight: bold;">${result.player.player_name}</td>
+        <td style="white-space: nowrap; font-weight: bold; padding: 0 10px;">${result.player.player_name}</td>
         ${result.frameResults.map((frame) => {
           const hasScore = result.framesWithScores.has(frame.frame);
           return `
