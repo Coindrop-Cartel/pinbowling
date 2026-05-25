@@ -583,10 +583,22 @@ async function initScoresPage() {
     row.className = 'frame-row';
     row.dataset.frame = frame.frame_number;
 
+    let extraTargets = '';
+    if (frame.frame_number === 10) {
+      const t1 = Math.round(frame.values[10] * 1.3);
+      const t2 = Math.round(t1 * 1.3);
+      extraTargets = `
+        <div class="strike-target" style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Target 1: <b>${formatNumber(t1)}</b></div>
+        <div class="strike-target" style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Target 2: <b>${formatNumber(t2)}</b></div>
+      `;
+    }
+
     row.innerHTML = `
       <div class="frame-info">
         <div class="frame-label">Frame ${frame.frame_number}</div>
         <div class="frame-machine">${frame.machine_name}</div>
+        <div class="strike-target" style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">Strike: <b>${formatNumber(frame.values[10])}</b></div>
+        ${extraTargets}
       </div>
       <div class="frame-inputs-container"></div>
       <button class="save-frame-button" disabled>Save</button>
