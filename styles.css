@@ -80,6 +80,10 @@ main {
   padding: 24px;
 }
 
+.page-container.standings-page {
+  max-width: 1400px;
+}
+
 header {
   margin-bottom: 24px;
 }
@@ -193,9 +197,13 @@ button.hidden,
   color: #cbd5e1;
 }
 
+#standings-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
 .standings-table {
   border-collapse: collapse;
-  table-layout: fixed;
 }
 
 .standings-table th,
@@ -225,11 +233,10 @@ button.hidden,
   text-align: center;
 }
 
-.standings-table tbody td:first-child {
+.standings-table tbody td:nth-child(2) {
   text-align: left;
   font-weight: 600;
   background: #fafbfc;
-  min-width: 200px;
 }
 
 
