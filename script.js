@@ -70,6 +70,10 @@ async function saveScore(score) {
   });
 }
 
+function formatNumber(num) {
+  return Number(num).toLocaleString();
+}
+
 function getPinCount(frame, rawScore) {
   if (!frame || typeof rawScore !== 'number' || rawScore <= 0) return 0;
   const thresholds = Object.entries(frame.values)
@@ -281,6 +285,31 @@ async function initConfigPage() {
   score1Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues));
   renderPreview(score10Input, score1Input, previewValues);
 
+  frameSelect.addEventListener('change', async () => {
+    if (editingMachineId) return; // Don't auto-populate when manually editing
+    const selectedFrameNumber = Number(frameSelect.value);
+    if (!selectedFrameNumber) {
+      resetForm();
+      return;
+    }
+
+    const machines = await getMachines();
+    const existingFrame = machines.find((m) => m.frame_number === selectedFrameNumber);
+
+    if (existingFrame) {
+      editingMachineId = existingFrame.id;
+      document.getElementById('machine-name').value = existingFrame.machine_name;
+      score10Input.value = existingFrame.values[10] || '';
+      score1Input.value = existingFrame.values[1] || '';
+      renderPreview(score10Input, score1Input, previewValues);
+      form.querySelector('button[type="submit"]').textContent = 'Update Frame';
+      cancelEdit.classList.remove('hidden');
+    } else {
+      resetForm();
+    }
+  });
+
+
   async function render() {
     const frames = await getMachines();
     const tbody = framesTable.querySelector('tbody');
@@ -301,7 +330,8 @@ async function initConfigPage() {
         <td>${frame.frame_number}</td>
         <td>${frame.machine_name}</td>
         <td><div class="score-list">${Object.entries(frame.values)
-          .map(([key, value]) => `<div>${key}: ${value}</div>`)
+          .sort((a, b) => Number(b[0]) - Number(a[0]))
+          .map(([key, value]) => `<div>${key}: ${formatNumber(value)}</div>`)
           .join('')}</div></td>
         <td>
           <button type="button" class="edit-button" data-id="${frame.id}">Edit</button>
@@ -325,6 +355,7 @@ async function initConfigPage() {
         renderPreview(score10Input, score1Input, previewValues);
         form.querySelector('button[type="submit"]').textContent = 'Update Frame';
         cancelEdit.classList.remove('hidden');
+        window.scrollTo(0, 0);
       });
     });
 
@@ -613,13 +644,13 @@ async function initPlayerPage() {
           <td>${result.frame}</td>
           <td>${result.machine}</td>
           <td>${result.mark}</td>
-          <td>${result.score}</td>
+          <td>${formatNumber(result.score)}</td>
         </tr>
       `
       )
       .join('');
 
-    totalScore.textContent = total;
+    totalScore.textContent = formatNumber(total);
     resultsEmpty.classList.add('hidden');
     resultsPanel.classList.remove('hidden');
   }
@@ -657,6 +688,7 @@ async function initPlayerPage() {
 }
 
 async function initStandingsPage() {
+  const standingsHeader = document.getElementById('standings-header');
   const standingsBody = document.getElementById('standings-body');
   const standingsEmpty = document.getElementById('standings-empty');
   const standingsWrapper = document.getElementById('standings-wrapper');
@@ -672,6 +704,16 @@ async function initStandingsPage() {
     return;
   }
 
+  // Build table header with frame numbers
+  const frameHeaders = machines.map((m) => `<th>Frame ${m.frame_number}</th>`).join('');
+  standingsHeader.innerHTML = `
+    <tr>
+      <th>Player</th>
+      ${frameHeaders}
+      <th>Total</th>
+    </tr>
+  `;
+
   const standingsRows = await Promise.all(players.map(async (player) => {
     const scores = await getScores(player.id);
     const scoreMap = scores.reduce((map, row) => {
@@ -683,8 +725,17 @@ async function initStandingsPage() {
       return map;
     }, {});
 
+    // Track which frames have actual score data entered
+    const framesWithScores = new Set();
+    scores.forEach((row) => {
+      const hasData = Number(row.ball1) > 0 || Number(row.ball2) > 0 || Number(row.ball3) > 0;
+      if (hasData) {
+        framesWithScores.add(row.frame);
+      }
+    });
+
     const { frameResults, total } = calculateFrameResults(machines, scoreMap);
-    return { player, frameResults, total };
+    return { player, frameResults, total, framesWithScores };
   }));
 
   standingsRows.sort((a, b) => b.total - a.total);
@@ -692,13 +743,16 @@ async function initStandingsPage() {
     .map((result, index) => `
       <tr>
         <td>${index + 1}. ${result.player.player_name}</td>
-        ${result.frameResults.map((frame) => `
-          <td>
-            <div class="standings-mark">${frame.mark}</div>
-            <div class="standings-frame-score">${frame.score}</div>
-          </td>
-        `).join('')}
-        <td>${result.total}</td>
+        ${result.frameResults.map((frame) => {
+          const hasScore = result.framesWithScores.has(frame.frame);
+          return `
+            <td class="standings-frame ${hasScore ? 'has-score' : 'no-score'}">
+              <div class="standings-mark">${hasScore ? frame.mark : '−'}</div>
+              <div class="standings-frame-score">${hasScore ? formatNumber(frame.score) : ''}</div>
+            </td>
+          `;
+        }).join('')}
+        <td class="standings-total">${formatNumber(result.total)}</td>
       </tr>
     `)
     .join('');

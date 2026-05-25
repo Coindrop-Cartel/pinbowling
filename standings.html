@@ -7,14 +7,20 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <nav class="main-nav">
+    <div class="nav-container">
+      <div class="nav-brand">PinBowling</div>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link">Machines</a>
+        <a href="players.html" class="nav-link">Players</a>
+        <a href="standings.html" class="nav-link active">Standings</a>
+      </div>
+    </div>
+  </nav>
   <main class="page-container">
     <header>
       <h1>PinBowling Standings</h1>
       <p>See the current player rankings and frame-by-frame scores.</p>
-      <nav>
-        <a href="index.html">Back to Configuration</a>
-        <a href="players.html">Player Scores</a>
-      </nav>
     </header>
 
     <section class="card">
@@ -22,13 +28,8 @@
       <p class="hint">Standings are calculated from the latest saved player scores. Use Update Scores on the player page to refresh the leaderboard.</p>
       <div id="standings-empty" class="notice hidden">No players or scores are available yet. Add a player and update scores first.</div>
       <div id="standings-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Player</th>
-              <th colspan="10">Frames 1–10</th>
-              <th>Total</th>
-            </tr>
+        <table class="data-table standings-table">
+          <thead id="standings-header">
           </thead>
           <tbody id="standings-body"></tbody>
         </table>
