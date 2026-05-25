@@ -526,6 +526,9 @@ async function initScoresPage() {
   const playerSelect = document.getElementById('player-select');
   const playerFileInfo = document.getElementById('player-file-info');
 
+  // Ensure selection starts empty on page initialization
+  setCurrentPlayerId('');
+
   const machines = await getMachines();
   if (machines.length === 0) {
     warning.textContent = 'Please configure frames first on the configuration page.';
@@ -641,13 +644,6 @@ async function initScoresPage() {
       return currentPlayerId;
     }
 
-    if (players.length > 0) {
-      playerSelect.value = String(players[0].id);
-      setCurrentPlayerId(players[0].id);
-      updatePlayerFileInfo(players[0]);
-      return String(players[0].id);
-    }
-
     updatePlayerFileInfo(null);
     return null;
   }
@@ -684,7 +680,7 @@ async function initScoresPage() {
   async function refreshPlayerSelection() {
     const activePlayerId = await renderPlayerSelect();
     if (!activePlayerId) {
-      warning.textContent = 'Please add and select a player before entering scores.';
+      warning.textContent = 'Please select a player before entering scores.';
       warning.classList.remove('hidden');
       framesInput.querySelectorAll('input').forEach((input) => (input.disabled = true));
       return;
