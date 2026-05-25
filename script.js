@@ -258,7 +258,7 @@ function renderPreview(score10Input, score1Input, previewValues) {
 
   previewValues.innerHTML = Object.entries(values)
     .sort((a, b) => Number(b[0]) - Number(a[0]))
-    .map(([rank, value]) => `<div><strong>${rank}:</strong> ${value}</div>`)
+    .map(([rank, value]) => `<div><strong>${rank}:</strong> ${formatNumber(value)}</div>`)
     .join("");
 }
 
@@ -461,11 +461,20 @@ async function initPlayerPage() {
     const row = document.createElement('div');
     row.className = 'frame-row';
     row.dataset.frame = frame.frame_number;
+    
+    let frameNoteHtml = '';
+    if (frame.frame_number === 10) {
+      const target1 = Number(frame.values[10] || 0);
+      const target2 = Math.round(target1 * 1.3);
+      const target3 = Math.round(target2 * 1.3);
+      frameNoteHtml = `<div class="frame-note">Frame 10 targets: Ball 1 = ${formatNumber(target1)}, Ball 2 = ${formatNumber(target2)}, Ball 3 = ${formatNumber(target3)}</div>`;
+    }
+    
     row.innerHTML = `
       <div>
         <div class="frame-label">Frame ${frame.frame_number}</div>
         <div class="frame-machine">${frame.machine_name}</div>
-        ${frame.frame_number === 10 ? '<div class="frame-note">Frame 10 uses bonus targets: Ball 2 = 1.3×, Ball 3 = 1.3²×</div>' : ''}
+        ${frameNoteHtml}
       </div>
     `;
 
