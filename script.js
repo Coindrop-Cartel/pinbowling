@@ -447,7 +447,76 @@ async function initConfigPage() {
   });
 }
 
-async function initPlayerPage() {
+async function initPlayersPage() {
+  const playerSelect = document.getElementById('player-select');
+  const addPlayerButton = document.getElementById('add-player-button');
+  const deletePlayerButton = document.getElementById('delete-player-button');
+  const newPlayerName = document.getElementById('new-player-name');
+  const playerList = document.getElementById('player-list');
+
+  async function refresh() {
+    const players = await getPlayers();
+    
+    // Update delete dropdown
+    playerSelect.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = players.length === 0 ? 'No players registered' : 'Select player to delete';
+    playerSelect.appendChild(placeholder);
+
+    players.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.player_name;
+      playerSelect.appendChild(opt);
+    });
+
+    // Update alphabetical list
+    playerList.innerHTML = '';
+    if (players.length === 0) {
+      playerList.innerHTML = '<li>No players registered yet.</li>';
+    } else {
+      players.forEach(p => {
+        const li = document.createElement('li');
+        li.style.padding = '8px 0';
+        li.style.borderBottom = '1px solid #e2e8f0';
+        li.textContent = p.player_name;
+        playerList.appendChild(li);
+      });
+      if (playerList.lastElementChild) playerList.lastElementChild.style.borderBottom = 'none';
+    }
+    
+    deletePlayerButton.disabled = players.length === 0;
+  }
+
+  addPlayerButton.addEventListener('click', async () => {
+    const name = newPlayerName.value.trim();
+    if (!name) return;
+    await createPlayer(name);
+    newPlayerName.value = '';
+    await refresh();
+  });
+
+  deletePlayerButton.addEventListener('click', async () => {
+    const selectedId = playerSelect.value;
+    if (!selectedId) {
+      alert('Select a player to delete.');
+      return;
+    }
+    const player = (await getPlayers()).find(p => String(p.id) === selectedId);
+    if (!player) return;
+    
+    const confirmation = prompt(`Type the player name to confirm deletion of ${player.player_name}:`);
+    if (confirmation !== player.player_name) return;
+
+    await fetchJSON(`api/players.php?id=${selectedId}`, { method: 'DELETE' });
+    await refresh();
+  });
+
+  await refresh();
+}
+
+async function initScoresPage() {
   const framesInput = document.getElementById('frames-input');
   const resultsPanel = document.getElementById('results-panel');
   const resultsBody = document.getElementById('results-body');
@@ -455,15 +524,7 @@ async function initPlayerPage() {
   const resultsEmpty = document.getElementById('results-empty');
   const warning = document.getElementById('player-warning');
   const playerSelect = document.getElementById('player-select');
-  const addPlayerButton = document.getElementById('add-player-button');
-  const deletePlayerButton = document.getElementById('delete-player-button');
-  const newPlayerName = document.getElementById('new-player-name');
   const playerFileInfo = document.getElementById('player-file-info');
-  const calculateButton = document.getElementById('calculate-button');
-
-  if (calculateButton) calculateButton.style.display = 'none';
-
-  let currentPlayers = [];
 
   const machines = await getMachines();
   if (machines.length === 0) {
@@ -471,14 +532,11 @@ async function initPlayerPage() {
     warning.classList.remove('hidden');
     framesInput.innerHTML = '';
     playerSelect.disabled = true;
-    addPlayerButton.disabled = true;
-    deletePlayerButton.disabled = true;
     return;
   }
 
   warning.classList.add('hidden');
   playerSelect.disabled = false;
-  addPlayerButton.disabled = false;
 
   function createRollInput(frameNumber, ball, machineId, value = '', placeholder = '') {
     const input = document.createElement('input');
@@ -560,7 +618,6 @@ async function initPlayerPage() {
 
   async function renderPlayerSelect() {
     const players = await getPlayers();
-    currentPlayers = players;
     const currentPlayerId = getCurrentPlayerId();
 
     playerSelect.innerHTML = '';
@@ -588,10 +645,8 @@ async function initPlayerPage() {
       playerSelect.value = String(players[0].id);
       setCurrentPlayerId(players[0].id);
       updatePlayerFileInfo(players[0]);
-      deletePlayerButton.disabled = false;
       return String(players[0].id);
     }
-    deletePlayerButton.disabled = true;
 
     updatePlayerFileInfo(null);
     return null;
@@ -631,57 +686,17 @@ async function initPlayerPage() {
     if (!activePlayerId) {
       warning.textContent = 'Please add and select a player before entering scores.';
       warning.classList.remove('hidden');
-      deletePlayerButton.disabled = true;
       framesInput.querySelectorAll('input').forEach((input) => (input.disabled = true));
       return;
     }
 
     warning.classList.add('hidden');
-    deletePlayerButton.disabled = false;
     framesInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
 
     const scores = await getScores(Number(activePlayerId));
     loadScoresIntoForm(scores);
     renderCurrentResults();
   }
-
-  addPlayerButton.addEventListener('click', async () => {
-    const name = newPlayerName.value.trim();
-    if (!name) {
-      alert('Enter a player name to add.');
-      return;
-    }
-
-    const player = await createPlayer(name);
-    setCurrentPlayerId(player.id);
-    newPlayerName.value = '';
-    await refreshPlayerSelection();
-  });
-
-  deletePlayerButton.addEventListener('click', async () => {
-    const selectedId = playerSelect.value;
-    if (!selectedId) {
-      alert('Select a player to delete.');
-      return;
-    }
-
-    const selectedPlayer = currentPlayers.find((player) => String(player.id) === selectedId);
-    if (!selectedPlayer) {
-      alert('Selected player not found.');
-      return;
-    }
-
-    const confirmation = prompt(`Type the player name to confirm deletion of ${selectedPlayer.player_name}:`);
-    if (confirmation !== selectedPlayer.player_name) {
-      alert('Player deletion cancelled. The name did not match.');
-      return;
-    }
-
-    await deletePlayerById(Number(selectedId));
-    setCurrentPlayerId('');
-    await refreshPlayerSelection();
-    alert(`Player ${selectedPlayer.player_name} has been deleted.`);
-  });
 
   playerSelect.addEventListener('change', async () => {
     const selectedId = playerSelect.value;
@@ -829,8 +844,11 @@ function ready() {
   if (document.getElementById('frame-form')) {
     initConfigPage();
   }
+  if (document.getElementById('player-list')) {
+    initPlayersPage();
+  }
   if (document.getElementById('player-form')) {
-    initPlayerPage();
+    initScoresPage();
   }
   if (document.getElementById('standings-body')) {
     initStandingsPage();

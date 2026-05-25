@@ -12,6 +12,7 @@
       <a href="index.html" class="nav-brand">PinBowling</a>
       <div class="nav-links">
         <a href="players.html" class="nav-link active">Players</a>
+        <a href="scores.html" class="nav-link">Scores</a>
         <a href="standings.html" class="nav-link">Standings</a>
         <a href="machines.html" class="nav-link">Machines</a>
       </div>
@@ -19,57 +20,34 @@
   </nav>
   <main class="page-container">
     <header>
-      <h1>Player Score Tracker</h1>
-      <p>Enter your scores for each frame and calculate your bowling-style total.</p>
+      <h1>Manage Players</h1>
+      <p>Add or remove players from the system.</p>
     </header>
 
     <section class="card">
-      <h2>Player Selection</h2>
-      <p class="hint">Select a player or add a new player before entering scores.</p>
-      <div class="form-row">
-        <label for="player-select">Select Player</label>
-        <select id="player-select"></select>
-      </div>
+      <h2>Add Player</h2>
       <div class="form-row">
         <label for="new-player-name">Add New Player</label>
         <input id="new-player-name" type="text" placeholder="Enter player name" />
         <button type="button" id="add-player-button">Add Player</button>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>Delete Player</h2>
       <div class="form-row">
-        <label></label>
+        <label for="player-select">Select Player</label>
+        <select id="player-select"></select>
         <button type="button" id="delete-player-button" class="secondary">Delete Player</button>
       </div>
-      <div id="player-file-info" class="notice hidden"></div>
     </section>
 
     <section class="card">
-      <h2>Enter Frame Scores</h2>
-      <p class="hint">Enter the cumulative pinbowling score after each ball. Ball 1 can be a strike; ball 2 can complete a spare; ball 3 can also complete a spare.</p>
-      <div id="player-warning" class="notice hidden">Please configure frames first on the configuration page.</div>
-      <form id="player-form">
-        <div id="frames-input"></div>
-        <div class="form-actions">
-          <button type="button" id="calculate-button">Update Scores</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="card">
-      <h2>Results</h2>
-      <div id="results-empty" class="notice">Enter scores and click Update Scores to see results.</div>
-      <div id="results-panel" class="hidden">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Frame</th>
-              <th>Machine</th>
-              <th>Mark</th>
-              <th>Frame Score</th>
-            </tr>
-          </thead>
-          <tbody id="results-body"></tbody>
-        </table>
-        <div class="total-score">Total Score: <strong id="total-score">0</strong></div>
+      <h2>Registered Players</h2>
+      <div id="player-list-container">
+        <ul id="player-list" class="notice" style="list-style: none; padding: 14px 16px; margin: 0;">
+          <li>Loading players...</li>
+        </ul>
       </div>
     </section>
   </main>
