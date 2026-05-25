@@ -21,13 +21,13 @@
   <main class="page-container">
     <header>
       <h1>Welcome to PinBowling</h1>
-      <p>A competitive pinball scoring system that translates high scores into bowling frames.</p>
+      <p>A quick attempt to put together a basic way to track pinball scores in a bowling format. This is a very rough project and only supports one tournament at a time.  If you are NOT currently playing in the Asheville Pinball League, you are in the wrong place.</p>
     </header>
 
     <section class="card">
       <h2>About the Project</h2>
-      <p>PinBowling maps pinball performance across multiple machines into a standardized 10-frame bowling game. Organizers define scoring thresholds for each machine, and players compete to see who can bowl the perfect 300 game on pinball!</p>
-      <p>The system automatically calculates strikes, spares, and total scores following standard bowling rules based on the machine difficulty you configure.</p>
+      <p>Each machine has scores that relate to the number of pins you have knocked down.  Reaching the target score on ball one is a strike.  Reaching it on ball 2 is a spare (9/), and reaching it on ball 3 is a spare with the value of your first two balls added together to calculate what your first pin pickup was (5/).</p>
+      <p>The system attempts to map pinball scoring to bowling scoring.  It calculates strikes, spares, and total scores following standard bowling rules based the target scores for each machine (its KINDA like pingolf).  I'm not gonna explain how bowling scoring works, you are already on the internet you can figure it out.</p>
       
       <div style="margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;">
         <a href="machines.html" class="nav-link" style="background: #333; color: white; padding: 10px 20px; border-radius: 4px; text-decoration: none;">Configure Machines</a>
