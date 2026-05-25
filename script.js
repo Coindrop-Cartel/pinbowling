@@ -120,29 +120,48 @@ function getFrame10Data(frame, raw1, raw2, raw3) {
   const c1 = getPinCount(frame, raw1);
   const c2 = getPinCount(frame, raw2);
   const c3 = getPinCount(frame, raw3);
-  const firstPins = hit1 ? 10 : c1;
-  const secondPins = hit1 && hit2 ? 10 : spare2 ? 10 : Math.max(0, c2 - c1);
-  const thirdPins = hit1 && hit2 && hit3 ? 10 : spare2 && hit3 ? 10 : Math.max(0, c3 - c2);
 
   let mark = '';
   let score = 0;
+  let firstPins = 0;
+  let secondPins = 0;
+  let thirdPins = 0;
 
   if (hit1) {
+    firstPins = 10;
     if (hit2) {
-      mark = `X X ${hit3 ? 'X' : thirdPins || 0}`;
+      secondPins = 10;
+      thirdPins = hit3 ? 10 : Math.max(0, c3 - c2);
+      mark = `X X ${hit3 ? 'X' : thirdPins}`;
       score = 20 + thirdPins;
     } else if (hit3) {
-      mark = 'X 9/';
+      secondPins = 8;
+      thirdPins = 2;
+      mark = 'X 8/';
       score = 20;
     } else {
-      mark = `X ${secondPins || 0} ${thirdPins || 0}`;
+      secondPins = c2; // Since hit1 was true, c1 was target. c2 is raw pins for next ball.
+      thirdPins = Math.max(0, c3 - c2);
+      mark = `X ${secondPins} ${thirdPins}`;
       score = 10 + secondPins + thirdPins;
     }
   } else if (spare2) {
-    mark = `9/ ${hit3 ? 'X' : thirdPins || 0}`;
+    firstPins = 9;
+    secondPins = 1;
+    thirdPins = hit3 ? 10 : Math.max(0, c3 - c2);
+    mark = `9/ ${hit3 ? 'X' : thirdPins}`;
     score = 10 + thirdPins;
+  } else if (hit3) {
+    firstPins = Math.min(c2, 8);
+    secondPins = 10 - firstPins;
+    thirdPins = 0;
+    mark = `${firstPins}/`;
+    score = 10;
   } else {
-    mark = `${firstPins} ${secondPins || 0}`;
+    firstPins = c2;
+    secondPins = Math.max(0, c3 - c2);
+    thirdPins = 0;
+    mark = `${firstPins} ${secondPins}`;
     score = firstPins + secondPins;
   }
 
@@ -170,13 +189,13 @@ function getFrameDataFromValues(frame, raw1, raw2, raw3) {
     score = 10;
   } else if (c2 >= 10) {
     type = 'spare2';
-    first = c1;
-    second = 10 - c1;
+    first = 9;
+    second = 1;
     score = 10;
   } else if (c3 >= 10) {
     type = 'spare3';
-    first = c2;
-    second = 10 - c2;
+    first = Math.min(c2, 8);
+    second = 10 - first;
     score = 10;
   } else {
     type = 'open';
@@ -295,7 +314,7 @@ function renderPreview(score10Input, score1Input, previewValues) {
 async function initConfigPage() {
   const frameSelect = document.getElementById('frame-number');
   const form = document.getElementById('frame-form');
-  const cancelEdit = document.getElementById('cancel-edit');
+  const submitBtn = form.querySelector('button[type="submit"]');
   const framesTable = document.getElementById('frames-table');
   const listEmpty = document.getElementById('list-empty');
   let editingMachineId = null;
@@ -311,12 +330,23 @@ async function initConfigPage() {
     frameSelect.appendChild(option);
   }
 
+  submitBtn.textContent = 'Update';
+  submitBtn.disabled = true;
+
+  const markDirty = () => {
+    if (frameSelect.value) submitBtn.disabled = false;
+  };
+
   applyScoreFormatting(score10Input);
   applyScoreFormatting(score1Input);
 
   score10Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues));
   score1Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues));
   renderPreview(score10Input, score1Input, previewValues);
+
+  document.getElementById('machine-name').addEventListener('input', markDirty);
+  score10Input.addEventListener('input', markDirty);
+  score1Input.addEventListener('input', markDirty);
 
   frameSelect.addEventListener('change', async () => {
     const selectedFrameNumber = Number(frameSelect.value);
@@ -334,17 +364,15 @@ async function initConfigPage() {
       score10Input.value = existingFrame.values[10] ? formatNumber(existingFrame.values[10]) : '';
       score1Input.value = existingFrame.values[1] ? formatNumber(existingFrame.values[1]) : '';
       renderPreview(score10Input, score1Input, previewValues);
-      form.querySelector('button[type="submit"]').textContent = 'Update Frame';
-      cancelEdit.classList.remove('hidden');
+      submitBtn.disabled = true;
     } else {
       // Placeholder mode for new frame setup
       editingMachineId = null;
       document.getElementById('machine-name').value = '';
       score10Input.value = '';
       score1Input.value = '';
-      form.querySelector('button[type="submit"]').textContent = 'Add Frame';
-      cancelEdit.classList.add('hidden');
       renderPreview(score10Input, score1Input, previewValues);
+      submitBtn.disabled = true;
     }
   });
 
@@ -397,8 +425,7 @@ async function initConfigPage() {
         score10Input.value = frame.values[10] ? formatNumber(frame.values[10]) : '';
         score1Input.value = frame.values[1] ? formatNumber(frame.values[1]) : '';
         renderPreview(score10Input, score1Input, previewValues);
-        form.querySelector('button[type="submit"]').textContent = 'Update Frame';
-        cancelEdit.classList.remove('hidden');
+        submitBtn.disabled = true;
         window.scrollTo(0, 0);
       });
     });
@@ -410,12 +437,9 @@ async function initConfigPage() {
     editingMachineId = null;
     frameSelect.disabled = false;
     form.reset();
-    form.querySelector('button[type="submit"]').textContent = 'Add Frame';
-    cancelEdit.classList.add('hidden');
+    submitBtn.disabled = true;
     renderPreview(score10Input, score1Input, previewValues);
   }
-
-  cancelEdit.addEventListener('click', resetForm);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
