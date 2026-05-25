@@ -319,7 +319,6 @@ async function initConfigPage() {
   renderPreview(score10Input, score1Input, previewValues);
 
   frameSelect.addEventListener('change', async () => {
-    if (editingMachineId) return; // Don't auto-populate when manually editing
     const selectedFrameNumber = Number(frameSelect.value);
     if (!selectedFrameNumber) {
       resetForm();
@@ -338,7 +337,14 @@ async function initConfigPage() {
       form.querySelector('button[type="submit"]').textContent = 'Update Frame';
       cancelEdit.classList.remove('hidden');
     } else {
-      resetForm();
+      // Placeholder mode for new frame setup
+      editingMachineId = null;
+      document.getElementById('machine-name').value = '';
+      score10Input.value = '';
+      score1Input.value = '';
+      form.querySelector('button[type="submit"]').textContent = 'Add Frame';
+      cancelEdit.classList.add('hidden');
+      renderPreview(score10Input, score1Input, previewValues);
     }
   });
 
@@ -358,6 +364,12 @@ async function initConfigPage() {
     listEmpty.classList.add('hidden');
 
     frames.forEach((frame) => {
+      let extraTargets = '';
+      if (frame.frame_number === 10) {
+        const t1 = Math.round(frame.values[10] * 1.3);
+        const t2 = Math.round(t1 * 1.3);
+        extraTargets = `<div style="margin-top: 8px; padding-top: 4px; border-top: 1px solid #eee; font-weight: bold;">Target 1: ${formatNumber(t1)}<br>Target 2: ${formatNumber(t2)}</div>`;
+      }
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${frame.frame_number}</td>
@@ -365,10 +377,9 @@ async function initConfigPage() {
         <td><div class="score-list">${Object.entries(frame.values)
           .sort((a, b) => Number(b[0]) - Number(a[0]))
           .map(([key, value]) => `<div>${key}: ${formatNumber(value)}</div>`)
-          .join('')}</div></td>
+          .join('')}</div>${extraTargets}</td>
         <td>
           <button type="button" class="edit-button" data-id="${frame.id}">Edit</button>
-          <button type="button" class="delete-button" data-id="${frame.id}">Delete</button>
         </td>
       `;
       tbody.appendChild(row);
@@ -381,7 +392,7 @@ async function initConfigPage() {
         if (!frame) return;
         editingMachineId = machineId;
         frameSelect.value = String(frame.frame_number);
-        frameSelect.disabled = true;
+        frameSelect.disabled = false;
         document.getElementById('machine-name').value = frame.machine_name;
         score10Input.value = frame.values[10] ? formatNumber(frame.values[10]) : '';
         score1Input.value = frame.values[1] ? formatNumber(frame.values[1]) : '';
@@ -389,14 +400,6 @@ async function initConfigPage() {
         form.querySelector('button[type="submit"]').textContent = 'Update Frame';
         cancelEdit.classList.remove('hidden');
         window.scrollTo(0, 0);
-      });
-    });
-
-    tbody.querySelectorAll('.delete-button').forEach((button) => {
-      button.addEventListener('click', async () => {
-        const machineId = Number(button.dataset.id);
-        await deleteMachine(machineId);
-        await render();
       });
     });
   }
@@ -509,14 +512,8 @@ async function initPlayerPage() {
 
     for (let ball = 1; ball <= 3; ball += 1) {
       const value = rollValues?.[`ball${ball}`] ?? '';
-      const placeholder = frame.frame_number === 10
-        ? ball === 1
-          ? 'Ball 1 score'
-          : ball === 2
-            ? 'Ball 2 target (×1.3)'
-            : 'Ball 3 target (×1.3²)'
-        : `Ball ${ball} cumulative`;
-      
+      const placeholder = `Ball ${ball} score`;
+
       const input = createRollInput(frame.frame_number, ball, frame.id, value, placeholder);
       
       input.addEventListener('input', () => {
@@ -764,12 +761,13 @@ async function initStandingsPage() {
   }
 
   // Build table header with frame numbers
-  const frameHeaders = machines.map((m) => `<th>Frame ${m.frame_number}</th>`).join('');
+  const frameHeaders = machines.map((m) => `<th style="white-space: nowrap;">Fr ${m.frame_number}</th>`).join('');
   standingsHeader.innerHTML = `
     <tr>
-      <th style="white-space: nowrap; min-width: 150px;">Player</th>
+      <th style="width: 40px; text-align: center;">#</th>
+      <th style="white-space: nowrap; min-width: 200px; text-align: left;">Player</th>
       ${frameHeaders}
-      <th>Total</th>
+      <th style="white-space: nowrap;">Total</th>
     </tr>
   `;
 
@@ -801,17 +799,18 @@ async function initStandingsPage() {
   standingsBody.innerHTML = standingsRows
     .map((result, index) => `
       <tr>
-        <td style="white-space: nowrap;">${index + 1}. ${result.player.player_name}</td>
+        <td style="text-align: center;">${index + 1}</td>
+        <td style="white-space: nowrap; font-weight: bold;">${result.player.player_name}</td>
         ${result.frameResults.map((frame) => {
           const hasScore = result.framesWithScores.has(frame.frame);
           return `
-            <td class="standings-frame ${hasScore ? 'has-score' : 'no-score'}">
+            <td class="standings-frame ${hasScore ? 'has-score' : 'no-score'}" style="white-space: nowrap;">
               <div class="standings-mark">${hasScore ? frame.mark : '−'}</div>
               <div class="standings-frame-score">${hasScore ? formatNumber(frame.score) : ''}</div>
             </td>
           `;
         }).join('')}
-        <td class="standings-total">${formatNumber(result.total)}</td>
+        <td class="standings-total" style="white-space: nowrap; font-weight: bold;">${formatNumber(result.total)}</td>
       </tr>
     `)
     .join('');
