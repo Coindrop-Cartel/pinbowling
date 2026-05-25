@@ -512,13 +512,20 @@ async function initPlayerPage() {
 
     for (let ball = 1; ball <= 3; ball += 1) {
       const value = rollValues?.[`ball${ball}`] ?? '';
-      const placeholder = `Ball ${ball} score`;
-
+      const placeholder = frame.frame_number === 10
+        ? ball === 1
+          ? 'Ball 1 score'
+          : ball === 2
+            ? 'Ball 2 target (×1.3)'
+            : 'Ball 3 target (×1.3²)'
+        : `Ball ${ball} cumulative`;
+      
       const input = createRollInput(frame.frame_number, ball, frame.id, value, placeholder);
       
       input.addEventListener('input', () => {
         saveBtn.disabled = false;
         saveBtn.classList.add('is-dirty');
+        saveBtn.textContent = 'Save Changes';
       });
 
       inputsContainer.appendChild(input);
@@ -761,13 +768,12 @@ async function initStandingsPage() {
   }
 
   // Build table header with frame numbers
-  const frameHeaders = machines.map((m) => `<th style="white-space: nowrap;">Fr ${m.frame_number}</th>`).join('');
+  const frameHeaders = machines.map((m) => `<th>Frame ${m.frame_number}</th>`).join('');
   standingsHeader.innerHTML = `
     <tr>
-      <th style="width: 40px; text-align: center;">#</th>
-      <th style="white-space: nowrap; min-width: 200px; text-align: left;">Player</th>
+      <th style="white-space: nowrap; min-width: 150px;">Player</th>
       ${frameHeaders}
-      <th style="white-space: nowrap;">Total</th>
+      <th>Total</th>
     </tr>
   `;
 
@@ -804,13 +810,13 @@ async function initStandingsPage() {
         ${result.frameResults.map((frame) => {
           const hasScore = result.framesWithScores.has(frame.frame);
           return `
-            <td class="standings-frame ${hasScore ? 'has-score' : 'no-score'}" style="white-space: nowrap;">
+            <td class="standings-frame ${hasScore ? 'has-score' : 'no-score'}" style="white-space: nowrap; padding: 0 10px;">
               <div class="standings-mark">${hasScore ? frame.mark : '−'}</div>
               <div class="standings-frame-score">${hasScore ? formatNumber(frame.score) : ''}</div>
             </td>
           `;
         }).join('')}
-        <td class="standings-total" style="white-space: nowrap; font-weight: bold;">${formatNumber(result.total)}</td>
+        <td class="standings-total">${formatNumber(result.total)}</td>
       </tr>
     `)
     .join('');
