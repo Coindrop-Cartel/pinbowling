@@ -74,6 +74,26 @@ function formatNumber(num) {
   return Number(num).toLocaleString();
 }
 
+function applyScoreFormatting(input) {
+  if (!input) return;
+  input.type = 'text';
+  input.inputMode = 'numeric';
+  input.addEventListener('input', (e) => {
+    const cursor = e.target.selectionStart;
+    const originalValue = e.target.value;
+    let rawValue = originalValue.replace(/\D/g, '');
+    
+    if (rawValue === '') {
+      e.target.value = '';
+    } else {
+      const formatted = Number(rawValue).toLocaleString();
+      e.target.value = formatted;
+      const diff = formatted.length - originalValue.length;
+      e.target.setSelectionRange(cursor + diff, cursor + diff);
+    }
+  });
+}
+
 function getPinCount(frame, rawScore) {
   if (!frame || typeof rawScore !== 'number' || rawScore <= 0) return 0;
   const thresholds = Object.entries(frame.values)
@@ -247,8 +267,8 @@ function buildFrameValues(score10, score1) {
 }
 
 function renderPreview(score10Input, score1Input, previewValues) {
-  const score10 = Number(score10Input.value);
-  const score1 = Number(score1Input.value);
+  const score10 = Number(score10Input.value.replace(/\D/g, ''));
+  const score1 = Number(score1Input.value.replace(/\D/g, ''));
   const values = buildFrameValues(score10, score1);
 
   if (!values) {
@@ -256,10 +276,20 @@ function renderPreview(score10Input, score1Input, previewValues) {
     return;
   }
 
-  previewValues.innerHTML = Object.entries(values)
+  let html = Object.entries(values)
     .sort((a, b) => Number(b[0]) - Number(a[0]))
     .map(([rank, value]) => `<div><strong>${rank}:</strong> ${formatNumber(value)}</div>`)
     .join("");
+
+  const frameSelect = document.getElementById('frame-number');
+  if (frameSelect && frameSelect.value === "10" && values[10]) {
+    const target1 = Math.round(values[10] * 1.3);
+    const target2 = Math.round(target1 * 1.3);
+    html += `<br><div><strong>Target 1:</strong> ${formatNumber(target1)}</div>`;
+    html += `<div><strong>Target 2:</strong> ${formatNumber(target2)}</div>`;
+  }
+
+  previewValues.innerHTML = html;
 }
 
 async function initConfigPage() {
@@ -281,6 +311,9 @@ async function initConfigPage() {
     frameSelect.appendChild(option);
   }
 
+  applyScoreFormatting(score10Input);
+  applyScoreFormatting(score1Input);
+
   score10Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues));
   score1Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues));
   renderPreview(score10Input, score1Input, previewValues);
@@ -299,8 +332,8 @@ async function initConfigPage() {
     if (existingFrame) {
       editingMachineId = existingFrame.id;
       document.getElementById('machine-name').value = existingFrame.machine_name;
-      score10Input.value = existingFrame.values[10] || '';
-      score1Input.value = existingFrame.values[1] || '';
+      score10Input.value = existingFrame.values[10] ? formatNumber(existingFrame.values[10]) : '';
+      score1Input.value = existingFrame.values[1] ? formatNumber(existingFrame.values[1]) : '';
       renderPreview(score10Input, score1Input, previewValues);
       form.querySelector('button[type="submit"]').textContent = 'Update Frame';
       cancelEdit.classList.remove('hidden');
@@ -350,8 +383,8 @@ async function initConfigPage() {
         frameSelect.value = String(frame.frame_number);
         frameSelect.disabled = true;
         document.getElementById('machine-name').value = frame.machine_name;
-        score10Input.value = frame.values[10] || '';
-        score1Input.value = frame.values[1] || '';
+        score10Input.value = frame.values[10] ? formatNumber(frame.values[10]) : '';
+        score1Input.value = frame.values[1] ? formatNumber(frame.values[1]) : '';
         renderPreview(score10Input, score1Input, previewValues);
         form.querySelector('button[type="submit"]').textContent = 'Update Frame';
         cancelEdit.classList.remove('hidden');
@@ -385,8 +418,8 @@ async function initConfigPage() {
     event.preventDefault();
     const frame_number = Number(frameSelect.value);
     const machine_name = document.getElementById('machine-name').value.trim();
-    const score10 = Number(score10Input.value);
-    const score1 = Number(score1Input.value);
+    const score10 = Number(score10Input.value.replace(/\D/g, ''));
+    const score1 = Number(score1Input.value.replace(/\D/g, ''));
     if (!frame_number || !machine_name) return;
     if (!score10 && !score1) {
       alert('Please enter a score for 10 or a score for 1.');
@@ -413,7 +446,6 @@ async function initConfigPage() {
 
 async function initPlayerPage() {
   const framesInput = document.getElementById('frames-input');
-  const calculateButton = document.getElementById('calculate-button');
   const resultsPanel = document.getElementById('results-panel');
   const resultsBody = document.getElementById('results-body');
   const totalScore = document.getElementById('total-score');
@@ -424,6 +456,10 @@ async function initPlayerPage() {
   const deletePlayerButton = document.getElementById('delete-player-button');
   const newPlayerName = document.getElementById('new-player-name');
   const playerFileInfo = document.getElementById('player-file-info');
+  const calculateButton = document.getElementById('calculate-button');
+
+  if (calculateButton) calculateButton.style.display = 'none';
+
   let currentPlayers = [];
 
   const machines = await getMachines();
@@ -431,7 +467,6 @@ async function initPlayerPage() {
     warning.textContent = 'Please configure frames first on the configuration page.';
     warning.classList.remove('hidden');
     framesInput.innerHTML = '';
-    calculateButton.disabled = true;
     playerSelect.disabled = true;
     addPlayerButton.disabled = true;
     deletePlayerButton.disabled = true;
@@ -444,15 +479,13 @@ async function initPlayerPage() {
 
   function createRollInput(frameNumber, ball, machineId, value = '', placeholder = '') {
     const input = document.createElement('input');
-    input.type = 'number';
-    input.min = '0';
-    input.step = '1';
     input.placeholder = placeholder || `Ball ${ball} cumulative`;
     input.className = 'roll-input';
-    input.value = value !== undefined ? value : '';
+    input.value = (value !== '' && value !== undefined) ? formatNumber(value) : '';
     input.dataset.frame = frameNumber;
     input.dataset.ball = ball;
     input.dataset.machineId = machineId;
+    applyScoreFormatting(input);
 
     return input;
   }
@@ -461,22 +494,18 @@ async function initPlayerPage() {
     const row = document.createElement('div');
     row.className = 'frame-row';
     row.dataset.frame = frame.frame_number;
-    
-    let frameNoteHtml = '';
-    if (frame.frame_number === 10) {
-      const target1 = Number(frame.values[10] || 0);
-      const target2 = Math.round(target1 * 1.3);
-      const target3 = Math.round(target2 * 1.3);
-      frameNoteHtml = `<div class="frame-note">Frame 10 targets: Ball 1 = ${formatNumber(target1)}, Ball 2 = ${formatNumber(target2)}, Ball 3 = ${formatNumber(target3)}</div>`;
-    }
-    
+
     row.innerHTML = `
-      <div>
+      <div class="frame-info">
         <div class="frame-label">Frame ${frame.frame_number}</div>
         <div class="frame-machine">${frame.machine_name}</div>
-        ${frameNoteHtml}
       </div>
+      <div class="frame-inputs-container"></div>
+      <button class="save-frame-button" disabled>Save</button>
     `;
+
+    const inputsContainer = row.querySelector('.frame-inputs-container');
+    const saveBtn = row.querySelector('.save-frame-button');
 
     for (let ball = 1; ball <= 3; ball += 1) {
       const value = rollValues?.[`ball${ball}`] ?? '';
@@ -487,8 +516,41 @@ async function initPlayerPage() {
             ? 'Ball 2 target (×1.3)'
             : 'Ball 3 target (×1.3²)'
         : `Ball ${ball} cumulative`;
-      row.appendChild(createRollInput(frame.frame_number, ball, frame.id, value, placeholder));
+      
+      const input = createRollInput(frame.frame_number, ball, frame.id, value, placeholder);
+      
+      input.addEventListener('input', () => {
+        saveBtn.disabled = false;
+        saveBtn.classList.add('is-dirty');
+      });
+
+      inputsContainer.appendChild(input);
     }
+
+    saveBtn.addEventListener('click', async () => {
+      const currentPlayerId = getCurrentPlayerId();
+      if (!currentPlayerId) return;
+
+      const ball1 = Number(row.querySelector('[data-ball="1"]').value.replace(/\D/g, '')) || 0;
+      const ball2 = Number(row.querySelector('[data-ball="2"]').value.replace(/\D/g, '')) || 0;
+      const ball3 = Number(row.querySelector('[data-ball="3"]').value.replace(/\D/g, '')) || 0;
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
+      await saveScore({
+        playerId: Number(currentPlayerId),
+        frame: frame.frame_number,
+        machineId: frame.id,
+        ball1,
+        ball2,
+        ball3,
+      });
+
+      saveBtn.textContent = 'Save';
+      saveBtn.classList.remove('is-dirty');
+      renderCurrentResults();
+    });
 
     return row;
   }
@@ -566,14 +628,12 @@ async function initPlayerPage() {
     if (!activePlayerId) {
       warning.textContent = 'Please add and select a player before entering scores.';
       warning.classList.remove('hidden');
-      calculateButton.disabled = true;
       deletePlayerButton.disabled = true;
       framesInput.querySelectorAll('input').forEach((input) => (input.disabled = true));
       return;
     }
 
     warning.classList.add('hidden');
-    calculateButton.disabled = false;
     deletePlayerButton.disabled = false;
     framesInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
 
@@ -635,9 +695,9 @@ async function initPlayerPage() {
     framesInput.querySelectorAll('.frame-row').forEach((row) => {
       const frameNumber = Number(row.dataset.frame);
       scoreMap[frameNumber] = {
-        ball1: Number(row.querySelector('[data-ball="1"]').value) || 0,
-        ball2: Number(row.querySelector('[data-ball="2"]').value) || 0,
-        ball3: Number(row.querySelector('[data-ball="3"]').value) || 0,
+        ball1: Number(row.querySelector('[data-ball="1"]').value.replace(/\D/g, '')) || 0,
+        ball2: Number(row.querySelector('[data-ball="2"]').value.replace(/\D/g, '')) || 0,
+        ball3: Number(row.querySelector('[data-ball="3"]').value.replace(/\D/g, '')) || 0,
       };
     });
     return scoreMap;
@@ -668,9 +728,9 @@ async function initPlayerPage() {
     const rows = Array.from(framesInput.querySelectorAll('.frame-row'));
     for (const row of rows) {
       const frameNumberValue = Number(row.dataset.frame);
-      const ball1 = Number(row.querySelector('[data-ball="1"]').value) || 0;
-      const ball2 = Number(row.querySelector('[data-ball="2"]').value) || 0;
-      const ball3 = Number(row.querySelector('[data-ball="3"]').value) || 0;
+      const ball1 = Number(row.querySelector('[data-ball="1"]').value.replace(/\D/g, '')) || 0;
+      const ball2 = Number(row.querySelector('[data-ball="2"]').value.replace(/\D/g, '')) || 0;
+      const ball3 = Number(row.querySelector('[data-ball="3"]').value.replace(/\D/g, '')) || 0;
       const machineIdValue = Number(row.querySelector('[data-machine-id]').dataset.machineId || row.querySelector('input').dataset.machineId);
       await saveScore({
         playerId: Number(playerId),
@@ -682,16 +742,6 @@ async function initPlayerPage() {
       });
     }
   }
-
-  calculateButton.addEventListener('click', async () => {
-    const currentPlayerId = getCurrentPlayerId();
-    if (!currentPlayerId) {
-      alert('Select a player before updating scores.');
-      return;
-    }
-    await saveAllScores(Number(currentPlayerId));
-    await refreshPlayerSelection();
-  });
 
   await refreshPlayerSelection();
 }
@@ -717,7 +767,7 @@ async function initStandingsPage() {
   const frameHeaders = machines.map((m) => `<th>Frame ${m.frame_number}</th>`).join('');
   standingsHeader.innerHTML = `
     <tr>
-      <th>Player</th>
+      <th style="white-space: nowrap; min-width: 150px;">Player</th>
       ${frameHeaders}
       <th>Total</th>
     </tr>
@@ -751,7 +801,7 @@ async function initStandingsPage() {
   standingsBody.innerHTML = standingsRows
     .map((result, index) => `
       <tr>
-        <td>${index + 1}. ${result.player.player_name}</td>
+        <td style="white-space: nowrap;">${index + 1}. ${result.player.player_name}</td>
         ${result.frameResults.map((frame) => {
           const hasScore = result.framesWithScores.has(frame.frame);
           return `
