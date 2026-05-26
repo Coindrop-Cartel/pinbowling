@@ -59,7 +59,8 @@ $DB_NAME = envValue($loadedEnv, ['DB_NAME', 'MYSQL_DATABASE'], 'pinbowling');
 $DB_USER = envValue($loadedEnv, ['DB_USER', 'MYSQL_USER'], 'username');
 $DB_PASS = envValue($loadedEnv, ['DB_PASS', 'MYSQL_PASSWORD'], 'password');
 $DB_CHARSET = 'utf8mb4';
-$API_SECRET = 'bowl-2024-secret'; // Change this to a custom string
+$API_SECRET = envValue($loadedEnv, ['API_SECRET'], 'bowl-2024-secret');
+$ADMIN_PASSWORD = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');
 
 $DB_DSN = "mysql:host={$DB_HOST};port={$DB_PORT};dbname={$DB_NAME};charset={$DB_CHARSET}";
 

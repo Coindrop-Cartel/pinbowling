@@ -1,5 +1,8 @@
 const CURRENT_PLAYER_KEY = "pinbowling-current-player-id";
-const API_SECRET = "bowl-2024-secret"; // Must match config.php
+// Dynamically loaded from js-config.php to stay in sync with .env
+const API_SECRET = window.PB_API_SECRET || "";
+// Dynamically loaded from js-config.php
+const ADMIN_PASSWORD = window.PB_ADMIN_PASSWORD || "";
 
 function getCurrentPlayerId() {
   return localStorage.getItem(CURRENT_PLAYER_KEY);
@@ -472,6 +475,12 @@ async function initConfigPage() {
       return;
     }
 
+    const confirmation = prompt(`Enter Admin Password to save changes for Frame ${frame_number}:`);
+    if (confirmation !== ADMIN_PASSWORD) {
+      if (confirmation !== null) alert('Incorrect Admin Password.');
+      return;
+    }
+
     const payload = { machine_name, frame_number, values };
     if (editingMachineId) {
       await updateMachine(editingMachineId, payload);
@@ -543,8 +552,11 @@ async function initPlayersPage() {
     const player = (await getPlayers()).find(p => String(p.id) === selectedId);
     if (!player) return;
     
-    const confirmation = prompt(`Type the player name to confirm deletion of ${player.player_name}:`);
-    if (confirmation !== player.player_name) return;
+    const confirmation = prompt(`Enter Admin Password to confirm deletion of ${player.player_name}:`);
+    if (confirmation !== ADMIN_PASSWORD) {
+      if (confirmation !== null) alert('Incorrect Admin Password.');
+      return;
+    }
 
     await fetchJSON(`api/players.php?id=${selectedId}`, { method: 'DELETE' });
     await refresh();
