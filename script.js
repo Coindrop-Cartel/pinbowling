@@ -540,6 +540,60 @@ async function initPlayersPage() {
   await refresh();
 }
 
+function printBlankScoreSheet(machines) {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Please allow popups to print the score sheet.');
+    return;
+  }
+
+  const framesHtml = machines
+    .map((m) => `
+      <div style="border: 1px solid #000; margin-bottom: 20px; padding: 15px; page-break-inside: avoid;">
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+          <span style="font-size: 1.2rem; font-weight: bold;">Frame ${m.frame_number}</span>
+          <span style="font-size: 1.1rem;">Game: <strong>${m.machine_name}</strong></span>
+          <span style="font-size: 1rem;">Target (10): <strong>${Number(m.values[10]).toLocaleString()}</strong></span>
+        </div>
+        <div style="display: flex; gap: 30px;">
+          <div style="flex: 1; border-bottom: 1px solid #000; height: 40px; display: flex; align-items: flex-end; padding-bottom: 5px; color: #666;">Ball 1:</div>
+          <div style="flex: 1; border-bottom: 1px solid #000; height: 40px; display: flex; align-items: flex-end; padding-bottom: 5px; color: #666;">Ball 2:</div>
+          <div style="flex: 1; border-bottom: 1px solid #000; height: 40px; display: flex; align-items: flex-end; padding-bottom: 5px; color: #666;">Ball 3:</div>
+        </div>
+      </div>
+    `)
+    .join('');
+
+  const html = `
+    <html>
+      <head>
+        <title>PinBowling - Blank Score Sheet</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 40px; line-height: 1.5; }
+          h1 { margin-bottom: 5px; }
+          .header-info { margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header-info">
+          <h1>PinBowling Score Sheet</h1>
+          <p>Player: ____________________________________ &nbsp;&nbsp;&nbsp; Date: _______________</p>
+        </div>
+        ${framesHtml}
+      </body>
+    </html>
+  `;
+
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 250);
+}
+
 async function initScoresPage() {
   const framesInput = document.getElementById('frames-input');
   const resultsPanel = document.getElementById('results-panel');
@@ -549,6 +603,8 @@ async function initScoresPage() {
   const warning = document.getElementById('player-warning');
   const playerSelect = document.getElementById('player-select');
   const playerFileInfo = document.getElementById('player-file-info');
+
+  const printSheetBtn = document.getElementById('print-sheet-btn');
 
   // Ensure selection starts empty on page initialization
   setCurrentPlayerId('');
@@ -560,6 +616,12 @@ async function initScoresPage() {
     framesInput.innerHTML = '';
     playerSelect.disabled = true;
     return;
+  }
+
+  if (printSheetBtn) {
+    printSheetBtn.addEventListener('click', () => {
+      printBlankScoreSheet(machines);
+    });
   }
 
   warning.classList.add('hidden');
