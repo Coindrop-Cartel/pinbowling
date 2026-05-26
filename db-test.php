@@ -1,4 +1,10 @@
 <?php
+/**
+ * Database Connectivity Diagnostic Tool.
+ * 
+ * Provides a visual summary of the connection status, environment variables, 
+ * and current database tables to assist with initial setup and troubleshooting.
+ */
 require_once __DIR__ . '/config.php';
 
 try {
@@ -6,11 +12,10 @@ try {
     $stmt = $pdo->query('SELECT DATABASE() AS dbname, @@hostname AS hostname');
     $info = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    global $DB_HOST, $DB_PORT, $DB_NAME, $DB_USER, $DB_PASS, $DB_DSN;
+    global $DB_HOST, $DB_PORT, $DB_NAME, $DB_DSN;
     $configuredHost = $DB_HOST;
     $configuredPort = $DB_PORT;
     $configuredDb = $DB_NAME;
-    $configuredUser = $DB_USER;
     $configuredDsn = $DB_DSN;
     $envFound = file_exists(__DIR__ . '/.env') ? 'found' : 'not found';
     $envPath = realpath(__DIR__ . '/.env') ?: __DIR__ . '/.env';
@@ -28,10 +33,7 @@ try {
     echo '<p><strong>Configured host:</strong> ' . htmlspecialchars($configuredHost) . '</p>';
     echo '<p><strong>Configured port:</strong> ' . htmlspecialchars($configuredPort) . '</p>';
     echo '<p><strong>Configured database:</strong> ' . htmlspecialchars($configuredDb) . '</p>';
-    echo '<p><strong>Configured user:</strong> ' . htmlspecialchars($configuredUser) . '</p>';
-    echo '<p><strong>.env file:</strong> ' . $envFound . '</p>';
-    echo '<p><strong>.env contents:</strong></p>';
-    echo '<pre>' . htmlspecialchars(file_get_contents(__DIR__ . '/.env')) . '</pre>';
+    echo '<p><strong>.env file status:</strong> ' . htmlspecialchars($envFound) . '</p>';
     echo '<p><strong>DSN:</strong> ' . htmlspecialchars($configuredDsn) . '</p>';
 
     $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_NUM);

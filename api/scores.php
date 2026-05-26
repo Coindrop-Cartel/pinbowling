@@ -1,10 +1,14 @@
 <?php
+/**
+ * REST API for recording and retrieving raw pinball scores.
+ */
 require_once __DIR__ . '/../config.php';
 initDatabase();
 $pdo = getDbConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+// GET: Retrieve all frame scores for a specific player
 if ($method === 'GET') {
     $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
     if (!$playerId) {
@@ -24,6 +28,7 @@ if ($method === 'GET') {
 
 $input = getJsonInput();
 
+// POST: Save or update a score for a specific player/frame (Protected by API Secret)
 if ($method === 'POST') {
     validateApiSecret();
     
@@ -54,6 +59,7 @@ if ($method === 'POST') {
     sendJson($stmt->fetch());
 }
 
+// DELETE: Clear all scores for a specific player (Protected by API Secret)
 if ($method === 'DELETE') {
     validateApiSecret();
     $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;

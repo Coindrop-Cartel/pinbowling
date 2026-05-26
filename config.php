@@ -1,8 +1,16 @@
 <?php
-// PinBowling PHP MySQL configuration
-// Update the values below with your hosting database credentials.
-// If your host provides environment variables or a .env file, those are also supported.
+/**
+ * Core configuration and utility functions for the PinBowling backend.
+ * Handles environment variable loading, database connection management,
+ * and security validation.
+ */
 
+/**
+ * Manually parses a .env file into PHP's environment arrays.
+ * Useful for shared hosting environments where putenv/$_ENV are required.
+ * @param string $envPath Path to the .env file.
+ * @return array Parsed environment variables.
+ */
 function loadEnvFile($envPath) {
     $env = [];
     if (!is_readable($envPath)) {
@@ -40,6 +48,13 @@ function loadEnvFile($envPath) {
 
 $loadedEnv = loadEnvFile(__DIR__ . '/.env');
 
+/**
+ * Helper to retrieve configuration values with fallbacks.
+ * Checks the parsed .env array, getenv(), and finally a default value.
+ * @param array $env The array returned by loadEnvFile.
+ * @param array $names List of potential key names (for cross-platform support).
+ * @param mixed $default Fallback value.
+ */
 function envValue(array $env, array $names, $default = null) {
     foreach ($names as $name) {
         if (isset($env[$name]) && $env[$name] !== '') {
@@ -53,6 +68,8 @@ function envValue(array $env, array $names, $default = null) {
     return $default;
 }
 
+// --- Database & Security Configuration ---
+
 $DB_HOST = envValue($loadedEnv, ['DB_HOST', 'MYSQL_HOST'], 'localhost');
 $DB_PORT = envValue($loadedEnv, ['DB_PORT', 'MYSQL_PORT'], '3306');
 $DB_NAME = envValue($loadedEnv, ['DB_NAME', 'MYSQL_DATABASE'], 'pinbowling');
@@ -64,6 +81,10 @@ $ADMIN_PASSWORD = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');
 
 $DB_DSN = "mysql:host={$DB_HOST};port={$DB_PORT};dbname={$DB_NAME};charset={$DB_CHARSET}";
 
+/**
+ * Established a singleton PDO connection to the MySQL database.
+ * @return PDO
+ */
 function getDbConnection() {
     global $DB_DSN, $DB_USER, $DB_PASS;
     static $pdo = null;
@@ -77,6 +98,10 @@ function getDbConnection() {
     return $pdo;
 }
 
+/**
+ * Ensures required database tables exist.
+ * Runs automatically on API requests to simplify initial setup.
+ */
 function initDatabase() {
     $pdo = getDbConnection();
 
@@ -117,6 +142,11 @@ function initDatabase() {
     )");
 }
 
+/**
+ * Security Gatekeeper. Verifies the custom X-PB-SECRET header against
+ * the server-side API_SECRET. Rejects unauthorized write requests.
+ * @return void
+ */
 function validateApiSecret() {
     global $API_SECRET;
     if (!isset($_SERVER['HTTP_X_PB_SECRET']) || $_SERVER['HTTP_X_PB_SECRET'] !== $API_SECRET) {
@@ -124,6 +154,11 @@ function validateApiSecret() {
     }
 }
 
+/**
+ * Standardized JSON response handler.
+ * @param mixed $data Data to encode.
+ * @param int $status HTTP status code.
+ */
 function sendJson($data, $status = 200) {
     header('Content-Type: application/json');
     http_response_code($status);
@@ -131,6 +166,10 @@ function sendJson($data, $status = 200) {
     exit;
 }
 
+/**
+ * Reads and decodes JSON data from the request body.
+ * @return array
+ */
 function getJsonInput() {
     $body = file_get_contents('php://input');
     return json_decode($body, true) ?: [];

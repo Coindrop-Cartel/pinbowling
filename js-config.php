@@ -1,4 +1,11 @@
 <?php
+/**
+ * JavaScript Configuration Bridge.
+ * 
+ * This file dynamically generates a JS script that passes server-side 
+ * environment variables (API secret, Admin Password) to the client-side 
+ * script.js, keeping them in sync with the .env file.
+ */
 require_once __DIR__ . '/config.php';
 
 // Light domain protection: Only serve if the referer matches our host

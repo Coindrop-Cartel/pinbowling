@@ -1,8 +1,17 @@
 <?php
+/**
+ * REST API for configuring PinBowling machines and their scoring thresholds.
+ */
 require_once __DIR__ . '/../config.php';
 initDatabase();
 $pdo = getDbConnection();
 
+/**
+ * Helper to transform flat database rows into a structured JSON format 
+ * where thresholds are grouped in a 'values' object.
+ * @param array $row
+ * @return array
+ */
 function serializeMachine($row) {
     return [
         'id' => (int)$row['id'],
@@ -25,6 +34,7 @@ function serializeMachine($row) {
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+// GET: Retrieve the configuration for all frames
 if ($method === 'GET') {
     $stmt = $pdo->query('SELECT * FROM Machines ORDER BY frame_number ASC');
     $machines = array_map('serializeMachine', $stmt->fetchAll());
@@ -33,6 +43,7 @@ if ($method === 'GET') {
 
 $input = getJsonInput();
 
+// POST: Add a new frame/machine configuration (Protected by API Secret)
 if ($method === 'POST') {
     validateApiSecret();
     
@@ -59,6 +70,7 @@ if ($method === 'POST') {
     sendJson(serializeMachine($stmt->fetch()));
 }
 
+// PUT: Update an existing frame configuration (Protected by API Secret)
 if ($method === 'PUT') {
     validateApiSecret();
     
@@ -86,6 +98,7 @@ if ($method === 'PUT') {
     sendJson(serializeMachine($stmt->fetch()));
 }
 
+// DELETE: Remove a frame configuration (Protected by API Secret)
 if ($method === 'DELETE') {
     validateApiSecret();
     

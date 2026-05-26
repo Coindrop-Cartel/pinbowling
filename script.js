@@ -1,13 +1,27 @@
+/**
+ * Client-side logic for the PinBowling application.
+ * Handles API communication, scoring calculations (mapping pinball to bowling),
+ * and dynamic UI rendering across different pages.
+ */
+
 const CURRENT_PLAYER_KEY = "pinbowling-current-player-id";
 // Dynamically loaded from js-config.php to stay in sync with .env
 const API_SECRET = window.PB_API_SECRET || "";
 // Dynamically loaded from js-config.php
 const ADMIN_PASSWORD = window.PB_ADMIN_PASSWORD || "";
 
+/**
+ * Retrieves the currently selected player ID from localStorage.
+ * @returns {string|null}
+ */
 function getCurrentPlayerId() {
   return localStorage.getItem(CURRENT_PLAYER_KEY);
 }
 
+/**
+ * Persists the currently selected player ID to localStorage.
+ * @param {string|null} playerId 
+ */
 function setCurrentPlayerId(playerId) {
   if (playerId) {
     localStorage.setItem(CURRENT_PLAYER_KEY, playerId);
@@ -16,20 +30,30 @@ function setCurrentPlayerId(playerId) {
   }
 }
 
+/**
+ * Wrapper for fetch API that handles JSON serialization, 
+ * adds the required security headers, and provides error handling.
+ * @param {string} url 
+ * @param {Object} options 
+ * @returns {Promise<any>}
+ */
 async function fetchJSON(url, options = {}) {
   const response = await fetch(url, {
     headers: { 
       'Content-Type': 'application/json',
-      'X-PB-SECRET': API_SECRET 
+      'X-PB-SECRET': API_SECRET // Security header required by PHP backend
     },
     ...options,
   });
   if (!response.ok) {
+    // Attempt to parse structured error from API, fallback to status text
     const error = await response.json().catch(() => ({ error: response.statusText }));
     throw new Error(error.error || response.statusText);
   }
   return response.json();
 }
+
+// --- API Call Helpers ---
 
 async function getMachines() {
   return fetchJSON('api/machines.php');
@@ -78,10 +102,20 @@ async function saveScore(score) {
   });
 }
 
+/**
+ * Standardizes number formatting for the locale (e.g., adding commas).
+ * @param {number|string} num 
+ * @returns {string}
+ */
 function formatNumber(num) {
   return Number(num).toLocaleString();
 }
 
+/**
+ * Attaches real-time locale-aware number formatting to an input field.
+ * Prevents non-numeric input and handles cursor positioning.
+ * @param {HTMLInputElement} input 
+ */
 function applyScoreFormatting(input) {
   if (!input) return;
   input.type = 'text';
@@ -102,6 +136,14 @@ function applyScoreFormatting(input) {
   });
 }
 
+// --- Scoring Logic: Mapping Pinball to Bowling ---
+
+/**
+ * Translates a raw pinball score into a "pin count" (0-10) based on machine thresholds.
+ * @param {Object} frame Machine configuration for a specific frame.
+ * @param {number} rawScore The actual points achieved on the pinball machine.
+ * @returns {number} Pins knocked down (0-10).
+ */
 function getPinCount(frame, rawScore) {
   if (!frame || typeof rawScore !== 'number' || rawScore <= 0) return 0;
   const thresholds = Object.entries(frame.values)
@@ -116,6 +158,15 @@ function getPinCount(frame, rawScore) {
   return pins;
 }
 
+/**
+ * Specialized logic for the 10th frame, which allows up to 3 balls.
+ * Implements bonus targets and standard bowling "fill ball" rules.
+ * @param {Object} frame 
+ * @param {number} raw1 
+ * @param {number} raw2 
+ * @param {number} raw3 
+ * @returns {Object} Calculated pins and display mark for the 10th frame.
+ */
 function getFrame10Data(frame, raw1, raw2, raw3) {
   const target1 = Number(frame.values[10] || 0);
   const target2 = Math.round(target1 * 1.3);
@@ -176,6 +227,14 @@ function getFrame10Data(frame, raw1, raw2, raw3) {
   return { frame: frame.frame_number, machine: frame.machine_name, type: 'tenth', mark, first: firstPins, second: secondPins, third: thirdPins, score };
 }
 
+/**
+ * Calculates the result for a single frame (1-9).
+ * @param {Object} frame Machine configuration.
+ * @param {number} raw1 
+ * @param {number} raw2 
+ * @param {number} raw3 
+ * @returns {Object} Pins, type (strike/spare/open), and base score.
+ */
 function getFrameDataFromValues(frame, raw1, raw2, raw3) {
   if (frame.frame_number === 10) {
     return getFrame10Data(frame, raw1, raw2, raw3);
@@ -215,6 +274,13 @@ function getFrameDataFromValues(frame, raw1, raw2, raw3) {
   return { frame: frame.frame_number, machine: frame.machine_name, type, first, second, score };
 }
 
+/**
+ * Lookahead function to find values of future balls for strike/spare bonuses.
+ * @param {number} frameIndex Current index in the results array.
+ * @param {number} count Number of future balls to retrieve (1 for spare, 2 for strike).
+ * @param {Array} frameData Array of calculated results for all frames.
+ * @returns {Array<number>}
+ */
 function getNextBallValues(frameIndex, count, frameData) {
   const values = [];
   for (let current = frameIndex + 1; current < frameData.length && values.length < count; current += 1) {
@@ -229,6 +295,11 @@ function getNextBallValues(frameIndex, count, frameData) {
   return values.slice(0, count);
 }
 
+/**
+ * Formats the bowling display mark (e.g., 'X', '7/', or '4 3').
+ * @param {Object} frame Result object from getFrameDataFromValues.
+ * @returns {string}
+ */
 function formatMark(frame) {
   if (frame.type === 'tenth') return frame.mark;
   if (frame.type === 'strike') return 'X';
@@ -236,6 +307,12 @@ function formatMark(frame) {
   return `${frame.first} ${frame.second}`;
 }
 
+/**
+ * Aggregates all frame data to calculate cumulative bowling score including bonuses.
+ * @param {Array} machines 
+ * @param {Object} scoreMap Map of frame numbers to raw pinball scores.
+ * @returns {Object} Calculated frame-by-frame results and final total.
+ */
 function calculateFrameResults(machines, scoreMap) {
   const frameData = machines.map((frame) => {
     const entry = scoreMap[String(frame.frame_number)] || { ball1: 0, ball2: 0, ball3: 0 };
@@ -259,12 +336,23 @@ function calculateFrameResults(machines, scoreMap) {
   return { frameResults: results, total };
 }
 
+/**
+ * Deletes all score entries for a specific player.
+ * @param {number} playerId 
+ * @returns {Promise<any>}
+ */
 async function clearScores(playerId) {
   return fetchJSON(`api/scores.php?playerId=${playerId}`, {
     method: 'DELETE',
   });
 }
 
+/**
+ * Generates a linear mapping of scores for 1-10 based on provided anchors.
+ * @param {number} score10 Required score for a 10-pin count.
+ * @param {number} score1 Required score for a 1-pin count.
+ * @returns {Object|null} Map of pin counts to pinball scores.
+ */
 function buildFrameValues(score10, score1) {
   const values = {};
 
@@ -293,6 +381,13 @@ function buildFrameValues(score10, score1) {
   return null;
 }
 
+/**
+ * Renders a preview of calculated pinball-to-pin mapping on the config page.
+ * Also displays bonus targets for Frame 10.
+ * @param {HTMLInputElement} score10Input 
+ * @param {HTMLInputElement} score1Input 
+ * @param {HTMLElement} previewValues 
+ */
 function renderPreview(score10Input, score1Input, previewValues) {
   const score10 = Number(score10Input.value.replace(/\D/g, ''));
   const score1 = Number(score1Input.value.replace(/\D/g, ''));
@@ -319,6 +414,11 @@ function renderPreview(score10Input, score1Input, previewValues) {
   previewValues.innerHTML = html;
 }
 
+// --- Page Initialization Functions ---
+
+/**
+ * Initializes the Machine Configuration page.
+ */
 async function initConfigPage() {
   const frameSelect = document.getElementById('frame-number');
   const form = document.getElementById('frame-form');
@@ -493,6 +593,9 @@ async function initConfigPage() {
   });
 }
 
+/**
+ * Initializes the Player Management page.
+ */
 async function initPlayersPage() {
   const playerSelect = document.getElementById('player-select');
   const addPlayerButton = document.getElementById('add-player-button');
@@ -565,6 +668,10 @@ async function initPlayersPage() {
   await refresh();
 }
 
+/**
+ * Generates a printable PDF-like score sheet for manual tracking.
+ * @param {Array} machines 
+ */
 function printBlankScoreSheet(machines) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
@@ -623,6 +730,10 @@ function printBlankScoreSheet(machines) {
   }, 250);
 }
 
+/**
+ * Generates large printable signs showing target scores for each machine.
+ * @param {Array} machines 
+ */
 function printMachineScores(machines) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
@@ -706,6 +817,9 @@ function printMachineScores(machines) {
   }, 250);
 }
 
+/**
+ * Initializes the Player Scoring page.
+ */
 async function initScoresPage() {
   const framesInput = document.getElementById('frames-input');
   const resultsPanel = document.getElementById('results-panel');
@@ -948,6 +1062,9 @@ async function initScoresPage() {
   await refreshPlayerSelection();
 }
 
+/**
+ * Initializes the Standings/Leaderboard page.
+ */
 async function initStandingsPage() {
   const standingsHeader = document.getElementById('standings-header');
   const standingsBody = document.getElementById('standings-body');
@@ -1029,6 +1146,9 @@ async function initStandingsPage() {
   standingsWrapper.classList.remove('hidden');
 }
 
+/**
+ * Sets the 'active' class on the navigation item matching the current URL.
+ */
 function initNavigation() {
   const currentPath = window.location.pathname.split('/').pop() || 'index.html';
   document.querySelectorAll('.nav-item').forEach(link => {
@@ -1038,6 +1158,10 @@ function initNavigation() {
   });
 }
 
+/**
+ * Main entry point. Identifies which page is currently loaded 
+ * and runs the appropriate initialization logic.
+ */
 function ready() {
   initNavigation();
   if (document.getElementById('frame-form')) {
