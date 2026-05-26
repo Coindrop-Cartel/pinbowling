@@ -907,21 +907,24 @@ async function initScoresPage() {
 
   function renderCurrentResults() {
     const scoreMap = getScoreMapFromInputs();
-    const { frameResults, total } = calculateFrameResults(machines, scoreMap);
+    const { frameResults, total: finalTotal } = calculateFrameResults(machines, scoreMap);
+    let runningTotal = 0;
     resultsBody.innerHTML = frameResults
       .map(
-        (result) => `
+        (result) => {
+          runningTotal += result.score;
+          return `
         <tr>
           <td>${result.frame}</td>
           <td>${result.machine}</td>
           <td>${result.mark}</td>
-          <td>${formatNumber(result.score)}</td>
+          <td>${formatNumber(runningTotal)}</td>
         </tr>
-      `
-      )
+          `;
+        })
       .join('');
 
-    totalScore.textContent = formatNumber(total);
+    totalScore.textContent = formatNumber(finalTotal);
     resultsEmpty.classList.add('hidden');
     resultsPanel.classList.remove('hidden');
   }
