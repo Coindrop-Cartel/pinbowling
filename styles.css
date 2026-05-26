@@ -299,3 +299,67 @@ td {
   font-size: 1.4rem;
   background-color: var(--pb-gray) !important;
 }
+
+@media (max-width: 600px) {
+  .main-header {
+    padding: 0.5rem 0;
+  }
+
+  .header-content {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .taskbar {
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 5px;
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .hero-section {
+    flex-direction: column-reverse;
+    text-align: center;
+    gap: 20px;
+  }
+
+  .hero-logo-img {
+    width: 150px;
+    margin: 0 auto;
+  }
+
+  .frame-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 15px;
+  }
+  .frame-inputs-container {
+    flex-direction: column;
+    min-width: unset;
+  }
+
+  /* Sticky Player Column for Standings */
+  .standings-table th:nth-child(2),
+  .standings-table td:nth-child(2) {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background-color: var(--pb-white);
+    border-right: 2px solid var(--pb-black);
+  }
+
+  .standings-table th:nth-child(1),
+  .standings-table td:nth-child(1) {
+    position: sticky;
+    left: -20px; /* Offset for the # column if desired, or hide it */
+    background-color: var(--pb-white);
+  }
+
+  /* Adjust table padding for mobile densitiy */
+  td, th {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+  }
+}
