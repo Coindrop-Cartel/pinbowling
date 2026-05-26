@@ -25,6 +25,8 @@ if ($method === 'GET') {
 $input = getJsonInput();
 
 if ($method === 'POST') {
+    validateApiSecret();
+    
     $playerId = isset($input['playerId']) ? (int)$input['playerId'] : 0;
     $frame = isset($input['frame']) ? (int)$input['frame'] : 0;
     $machineId = isset($input['machineId']) ? (int)$input['machineId'] : 0;
@@ -34,6 +36,11 @@ if ($method === 'POST') {
 
     if (!$playerId || !$frame || !$machineId) {
         sendJson(['error' => 'playerId, frame, and machineId are required'], 400);
+    }
+    
+    // Basic range validation
+    if ($ball1 < 0 || $ball2 < 0 || $ball3 < 0 || $ball1 > 1000000000) {
+        sendJson(['error' => 'Invalid score values'], 400);
     }
 
     $sql = 'INSERT INTO Scores (player_id, frame, machine_id, ball1, ball2, ball3)
@@ -48,6 +55,7 @@ if ($method === 'POST') {
 }
 
 if ($method === 'DELETE') {
+    validateApiSecret();
     $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
     if (!$playerId) {
         sendJson(['error' => 'playerId query parameter is required'], 400);

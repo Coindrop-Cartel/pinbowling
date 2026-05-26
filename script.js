@@ -1,4 +1,5 @@
 const CURRENT_PLAYER_KEY = "pinbowling-current-player-id";
+const API_SECRET = "bowl-2024-secret"; // Must match config.php
 
 function getCurrentPlayerId() {
   return localStorage.getItem(CURRENT_PLAYER_KEY);
@@ -14,7 +15,10 @@ function setCurrentPlayerId(playerId) {
 
 async function fetchJSON(url, options = {}) {
   const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-PB-SECRET': API_SECRET 
+    },
     ...options,
   });
   if (!response.ok) {
@@ -513,7 +517,7 @@ async function initPlayersPage() {
         const li = document.createElement('li');
         li.style.padding = '8px 0';
         li.style.borderBottom = '1px solid #000';
-        li.textContent = p.player_name;
+        li.textContent = p.player_name; // Safe from XSS
         playerList.appendChild(li);
       });
       if (playerList.lastElementChild) playerList.lastElementChild.style.borderBottom = 'none';
@@ -989,7 +993,7 @@ async function initStandingsPage() {
     .map((result, index) => `
       <tr>
         <td style="text-align: center;">${index + 1}</td>
-        <td>${result.player.player_name}</td>
+        <td class="player-name-cell"></td>
         ${result.frameResults.map((frame) => {
           const hasScore = result.framesWithScores.has(frame.frame);
           return `
@@ -1003,6 +1007,11 @@ async function initStandingsPage() {
       </tr>
     `)
     .join('');
+
+  // Securely inject player names to prevent XSS
+  standingsBody.querySelectorAll('.player-name-cell').forEach((cell, i) => {
+    cell.textContent = standingsRows[i].player.player_name;
+  });
 
   standingsEmpty.classList.add('hidden');
   standingsWrapper.classList.remove('hidden');

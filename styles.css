@@ -340,30 +340,16 @@ td {
     min-width: unset;
   }
 
-  /* Sticky Player Column for Standings */
-  .standings-table th:nth-child(1),
-  .standings-table td:nth-child(1) { /* Rank column */
-    position: sticky;
-    left: 0;
-    z-index: 12; /* Higher z-index for rank if it's the first sticky element */
-    background-color: var(--pb-white);
-    border-right: 2px solid var(--pb-black);
-    width: 40px; /* Explicitly set width in CSS */
-    min-width: 40px; /* Ensure it doesn't shrink */
-    text-align: center; /* Keep text centered */
+  /* Hide frame columns on mobile to simplify standings - show only #, Player, and Total */
+  .standings-table th:nth-child(n+3):not(:last-child),
+  .standings-table td:nth-child(n+3):not(:last-child) {
+    display: none;
   }
 
-  .standings-table th:nth-child(2),
-  .standings-table td:nth-child(2) { /* Player column */
-    position: sticky;
-    left: 40px; /* Positioned after the rank column */
-    z-index: 11; /* Slightly lower than rank, but still above scrolling content */
-    background-color: var(--pb-white);
-    border-right: 2px solid var(--pb-black);
-    white-space: nowrap; /* Prevent player names from wrapping */
-    min-width: 150px; /* Ensure player name column has enough space */
-    font-weight: bold; /* Keep player names bold */
-    padding: 0 10px; /* Adjust padding */
+  /* Reset the player name column to wrap naturally on small screens */
+  .standings-table td:nth-child(2) {
+    white-space: normal;
+    min-width: auto;
   }
 
   /* Adjust table padding for mobile densitiy */

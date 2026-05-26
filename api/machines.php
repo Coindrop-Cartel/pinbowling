@@ -34,6 +34,8 @@ if ($method === 'GET') {
 $input = getJsonInput();
 
 if ($method === 'POST') {
+    validateApiSecret();
+    
     if (empty($input['machine_name']) || empty($input['frame_number']) || empty($input['values'])) {
         sendJson(['error' => 'machine_name, frame_number, and values are required'], 400);
     }
@@ -58,6 +60,8 @@ if ($method === 'POST') {
 }
 
 if ($method === 'PUT') {
+    validateApiSecret();
+    
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if (!$id || empty($input['machine_name']) || empty($input['frame_number']) || empty($input['values'])) {
         sendJson(['error' => 'id, machine_name, frame_number, and values are required'], 400);
@@ -83,6 +87,8 @@ if ($method === 'PUT') {
 }
 
 if ($method === 'DELETE') {
+    validateApiSecret();
+    
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if (!$id) {
         sendJson(['error' => 'Invalid machine id'], 400);

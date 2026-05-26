@@ -13,6 +13,8 @@ if ($method === 'GET') {
 $input = getJsonInput();
 
 if ($method === 'POST') {
+    validateApiSecret();
+    
     if (empty($input['player_name'])) {
         sendJson(['error' => 'player_name is required'], 400);
     }
@@ -36,6 +38,8 @@ if ($method === 'POST') {
 }
 
 if ($method === 'DELETE') {
+    validateApiSecret();
+    
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if (!$id) {
         sendJson(['error' => 'id query parameter is required'], 400);

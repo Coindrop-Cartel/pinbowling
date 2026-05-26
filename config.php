@@ -59,6 +59,7 @@ $DB_NAME = envValue($loadedEnv, ['DB_NAME', 'MYSQL_DATABASE'], 'pinbowling');
 $DB_USER = envValue($loadedEnv, ['DB_USER', 'MYSQL_USER'], 'username');
 $DB_PASS = envValue($loadedEnv, ['DB_PASS', 'MYSQL_PASSWORD'], 'password');
 $DB_CHARSET = 'utf8mb4';
+$API_SECRET = 'bowl-2024-secret'; // Change this to a custom string
 
 $DB_DSN = "mysql:host={$DB_HOST};port={$DB_PORT};dbname={$DB_NAME};charset={$DB_CHARSET}";
 
@@ -113,6 +114,13 @@ function initDatabase() {
         CONSTRAINT fk_scores_player FOREIGN KEY (player_id) REFERENCES Players(id) ON DELETE CASCADE,
         CONSTRAINT fk_scores_machine FOREIGN KEY (machine_id) REFERENCES Machines(id) ON DELETE CASCADE
     )");
+}
+
+function validateApiSecret() {
+    global $API_SECRET;
+    if (!isset($_SERVER['HTTP_X_PB_SECRET']) || $_SERVER['HTTP_X_PB_SECRET'] !== $API_SECRET) {
+        sendJson(['error' => 'Unauthorized: Invalid or missing API secret'], 401);
+    }
 }
 
 function sendJson($data, $status = 200) {
