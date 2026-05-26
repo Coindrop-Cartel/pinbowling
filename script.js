@@ -318,6 +318,7 @@ async function initConfigPage() {
   const framesTable = document.getElementById('frames-table');
   const listEmpty = document.getElementById('list-empty');
   let editingMachineId = null;
+  const printMachinesBtn = document.getElementById('print-machines-btn');
 
   const score10Input = document.getElementById('value-10');
   const score1Input = document.getElementById('value-1');
@@ -328,6 +329,13 @@ async function initConfigPage() {
     option.value = String(i);
     option.textContent = i;
     frameSelect.appendChild(option);
+  }
+
+  if (printMachinesBtn) {
+    printMachinesBtn.addEventListener('click', async () => {
+      const machines = await getMachines();
+      printMachineScores(machines);
+    });
   }
 
   submitBtn.textContent = 'Update';
@@ -585,6 +593,89 @@ function printBlankScoreSheet(machines) {
           <p>Player: ____________________________________ &nbsp;&nbsp;&nbsp; Date: _______________</p>
         </div>
         ${framesHtml}
+      </body>
+    </html>
+  `;
+
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 250);
+}
+
+function printMachineScores(machines) {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Please allow popups to print.');
+    return;
+  }
+
+  const pagesHtml = machines
+    .map((m) => {
+      const ranks = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+      const scoresHtml = ranks.map((rank) => {
+        const formatted = formatNumber(m.values[rank] || 0);
+        // Dynamically adjust font size based on number length
+        let fontSize = '2.5rem';
+        if (formatted.length > 9) fontSize = '1.4rem';
+        else if (formatted.length > 7) fontSize = '1.8rem';
+        else if (formatted.length > 5) fontSize = '2.1rem';
+
+        return `
+          <div style="border: 3px solid #000; position: relative; height: 120px; display: flex; align-items: center; justify-content: center; background: #fff; overflow: hidden; min-width: 0; box-sizing: border-box;">
+            <div style="position: absolute; top: 0; right: 0; border-left: 3px solid #000; border-bottom: 3px solid #000; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; background: #f8fafc; z-index: 1;">${rank}</div>
+            <div style="font-size: ${fontSize}; font-weight: bold; text-align: center; width: 100%; padding: 0 5px; box-sizing: border-box; white-space: nowrap;">${formatted}</div>
+          </div>
+        `;
+      }).join('');
+
+      let extraTargets = '';
+      if (m.frame_number === 10) {
+        const t1 = Math.round(m.values[10] * 1.3);
+        const t2 = Math.round(t1 * 1.3);
+        extraTargets = `
+          <div style="margin-top: 40px; display: flex; justify-content: space-around; width: 100%; font-size: 2.2rem; font-weight: bold; border-top: 4px dashed #000; padding-top: 20px;">
+            <div>Target 1: ${formatNumber(t1)}</div>
+            <div>Target 2: ${formatNumber(t2)}</div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="page" style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; page-break-after: always; padding: 40px; box-sizing: border-box;">
+          <div style="border: 6px solid #000; padding: 50px; width: 100%; max-width: 1100px; background: #fff; box-shadow: 0 0 20px rgba(0,0,0,0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 40px; border-bottom: 6px solid #000; padding-bottom: 15px;">
+              <h1 style="margin: 0; font-size: 4rem; text-transform: uppercase;">Frame ${m.frame_number}</h1>
+              <h2 style="margin: 0; font-size: 4rem;">${m.machine_name}</h2>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px;">
+              ${scoresHtml}
+            </div>
+            ${extraTargets}
+          </div>
+        </div>
+      `;
+    })
+    .join('');
+
+  const html = `
+    <html>
+      <head>
+        <title>PinBowling - Machine Score Signs</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; color: #000; background: #fff; }
+          @page { size: landscape; margin: 0; }
+          @media print {
+            .page { height: 100vh; overflow: hidden; page-break-after: always; zoom: 85%; }
+            body { -webkit-print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body>
+        ${pagesHtml}
       </body>
     </html>
   `;
