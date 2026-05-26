@@ -7,34 +7,44 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <nav class="main-nav">
-    <div class="nav-container">
-      <a href="index.html" class="nav-brand">PinBowling</a>
-      <div class="nav-links">
-        <a href="players.html" class="nav-link">Players</a>
-        <a href="scores.html" class="nav-link">Scores</a>
-        <a href="standings.html" class="nav-link">Standings</a>
-        <a href="machines.html" class="nav-link">Machines</a>
-      </div>
+  <header class="main-header">
+    <div class="container header-content">
+      <a href="index.html" class="logo">
+        <img src="images/logo.png" alt="PinBowling Logo">
+      </a>
+      <nav class="taskbar">
+        <a href="players.html" class="nav-item">Players</a>
+        <a href="scores.html" class="nav-item">Scores</a>
+        <a href="standings.html" class="nav-item">Standings</a>
+        <a href="machines.html" class="nav-item">Machines</a>
+      </nav>
     </div>
-  </nav>
+  </header>
+
   <main class="page-container">
-    <header>
-      <h1>Welcome to PinBowling</h1>
-      <p>A quick attempt to put together a basic way to track pinball scores in a bowling format. This is a very rough project and only supports one tournament at a time.  If you are NOT currently playing in the Asheville Pinball League, you are in the wrong place.</p>
+    <header class="hero-section">
+      <div class="hero-text">
+        <h1>Welcome to PinBowling</h1>
+        <p>A quick attempt to put together a basic way to track pinball scores in a bowling format.</p>
+      </div>
+      <img src="images/logo.png" alt="PinBowling Logo" class="hero-logo-img">
     </header>
 
     <section class="card">
       <h2>About the Project</h2>
-      <p>Each machine has scores that relate to the number of pins you have knocked down.  Reaching the target score on ball one is a strike.  Reaching it on ball 2 is a spare (9/), and reaching it on ball 3 is a spare with the value of your first two balls added together to calculate what your first pin pickup was (with a maximum of 8/).</p>
-      <p>The system attempts to map pinball scoring to bowling scoring.  It calculates strikes, spares, and total scores following standard bowling rules based the target scores for each machine (its KINDA like pingolf).  I'm not gonna explain how bowling scoring works, you are already on the internet you can figure it out.</p>
-      
-      <div style="margin-top: 2rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-        <a href="machines.html" class="nav-link" style="background: #333; color: white; padding: 10px 20px; border-radius: 4px; text-decoration: none;">Configure Machines</a>
-        <a href="players.html" class="nav-link" style="background: #333; color: white; padding: 10px 20px; border-radius: 4px; text-decoration: none;">Manage Players</a>
-        <a href="scores.html" class="nav-link" style="background: #333; color: white; padding: 10px 20px; border-radius: 4px; text-decoration: none;">Enter Scores</a>
-        <a href="standings.html" class="nav-link" style="background: #333; color: white; padding: 10px 20px; border-radius: 4px; text-decoration: none;">View Standings</a>
+      <p>The system attempts to map pinball scoring to bowling scoring. It calculates strikes, spares, and total scores following standard bowling rules based the target scores for each machine (its KINDA like pingolf). I'm not gonna explain how bowling scoring works, you are already on the internet you can figure it out.</p>
+      <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+        <a href="machines.html" class="btn-standard">Configure Machines</a>
+        <a href="players.html" class="btn-standard">Manage Players</a>
+        <a href="scores.html" class="btn-standard">Enter Scores</a>
+        <a href="standings.html" class="btn-standard">View Standings</a>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>Scoring Logic</h2>
+      <p>Each machine has target scores corresponding to pin counts. Reaching the target on ball 1 is a strike (X). Reaching it on ball 2 is a 9-count spare (9/). Reaching it on ball 3 is a spare based on your cumulative progress from balls 1 & 2 (capped at 8/).</p>
+      <p>Total scores are calculated following standard bowling rules, including strike and spare bonuses from subsequent frames.</p>
     </section>
   </main>
   <script src="script.js"></script>

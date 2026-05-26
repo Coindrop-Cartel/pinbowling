@@ -60,6 +60,7 @@ async function createPlayer(player_name) {
 }
 
 async function getScores(playerId) {
+  if (!playerId) return [];
   return fetchJSON(`api/scores.php?playerId=${playerId}`);
 }
 
@@ -511,7 +512,7 @@ async function initPlayersPage() {
       players.forEach(p => {
         const li = document.createElement('li');
         li.style.padding = '8px 0';
-        li.style.borderBottom = '1px solid #e2e8f0';
+        li.style.borderBottom = '1px solid #000';
         li.textContent = p.player_name;
         playerList.appendChild(li);
       });
@@ -557,16 +558,16 @@ function printBlankScoreSheet(machines) {
 
   const framesHtml = machines
     .map((m) => `
-      <div style="border: 1px solid #000; margin-bottom: 8px; padding: 8px 12px; page-break-inside: avoid;">
-        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 6px;">
+      <div style="border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; page-break-inside: avoid;">
+        <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px;">
           <span style="font-size: 1rem; font-weight: bold;">Frame ${m.frame_number}</span>
           <span style="font-size: 0.95rem;">Game: <strong>${m.machine_name}</strong></span>
           <span style="font-size: 0.85rem;">Target: <strong>${Number(m.values[10]).toLocaleString()}</strong></span>
         </div>
         <div style="display: flex; gap: 20px;">
-          <div style="flex: 1;"><div style="font-size: 0.7rem; color: #666; text-transform: uppercase;">Ball 1</div><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
-          <div style="flex: 1;"><div style="font-size: 0.7rem; color: #666; text-transform: uppercase;">Ball 2</div><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
-          <div style="flex: 1;"><div style="font-size: 0.7rem; color: #666; text-transform: uppercase;">Ball 3</div><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
+          <div style="flex: 1;"><div style="font-size: 0.7rem; color: #000; text-transform: uppercase;">Ball 1</div><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
+          <div style="flex: 1;"><div style="font-size: 0.7rem; color: #000; text-transform: uppercase;">Ball 2</div><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
+          <div style="flex: 1;"><div style="font-size: 0.7rem; color: #000; text-transform: uppercase;">Ball 3</div><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
         </div>
       </div>
     `)
@@ -626,7 +627,7 @@ function printMachineScores(machines) {
 
         return `
           <div style="border: 3px solid #000; position: relative; height: 120px; display: flex; align-items: center; justify-content: center; background: #fff; overflow: hidden; min-width: 0; box-sizing: border-box;">
-            <div style="position: absolute; top: 0; right: 0; border-left: 3px solid #000; border-bottom: 3px solid #000; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; background: #f8fafc; z-index: 1;">${rank}</div>
+            <div style="position: absolute; top: 0; right: 0; border-left: 3px solid #000; border-bottom: 3px solid #000; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; background: #f0f0f0; z-index: 1;">${rank}</div>
             <div style="font-size: ${fontSize}; font-weight: bold; text-align: center; width: 100%; padding: 0 5px; box-sizing: border-box; white-space: nowrap;">${formatted}</div>
           </div>
         `;
@@ -646,7 +647,7 @@ function printMachineScores(machines) {
 
       return `
         <div class="page" style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; page-break-after: always; padding: 40px; box-sizing: border-box;">
-          <div style="border: 6px solid #000; padding: 50px; width: 100%; max-width: 1100px; background: #fff; box-shadow: 0 0 20px rgba(0,0,0,0.1);">
+          <div style="border: 6px solid #000; padding: 50px; width: 100%; max-width: 1100px; background: #fff; box-shadow: none;">
             <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 40px; border-bottom: 6px solid #000; padding-bottom: 15px;">
               <h1 style="margin: 0; font-size: 4rem; text-transform: uppercase;">Frame ${m.frame_number}</h1>
               <h2 style="margin: 0; font-size: 4rem;">${m.machine_name}</h2>
@@ -745,8 +746,8 @@ async function initScoresPage() {
       const t1 = Math.round(frame.values[10] * 1.3);
       const t2 = Math.round(t1 * 1.3);
       extraTargets = `
-        <div class="strike-target" style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Target 1: <b>${formatNumber(t1)}</b></div>
-        <div class="strike-target" style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Target 2: <b>${formatNumber(t2)}</b></div>
+          <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 2px;">Target 1: <b>${formatNumber(t1)}</b></div>
+          <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 2px;">Target 2: <b>${formatNumber(t2)}</b></div>
       `;
     }
 
@@ -754,7 +755,7 @@ async function initScoresPage() {
       <div class="frame-info">
         <div class="frame-label">Frame ${frame.frame_number}</div>
         <div class="frame-machine">${frame.machine_name}</div>
-        <div class="strike-target" style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">Strike: <b>${formatNumber(frame.values[10])}</b></div>
+        <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;">Strike: <b>${formatNumber(frame.values[10])}</b></div>
         ${extraTargets}
       </div>
       <div class="frame-inputs-container"></div>
@@ -925,25 +926,6 @@ async function initScoresPage() {
     resultsPanel.classList.remove('hidden');
   }
 
-  async function saveAllScores(playerId) {
-    const rows = Array.from(framesInput.querySelectorAll('.frame-row'));
-    for (const row of rows) {
-      const frameNumberValue = Number(row.dataset.frame);
-      const ball1 = Number(row.querySelector('[data-ball="1"]').value.replace(/\D/g, '')) || 0;
-      const ball2 = Number(row.querySelector('[data-ball="2"]').value.replace(/\D/g, '')) || 0;
-      const ball3 = Number(row.querySelector('[data-ball="3"]').value.replace(/\D/g, '')) || 0;
-      const machineIdValue = Number(row.querySelector('[data-machine-id]').dataset.machineId || row.querySelector('input').dataset.machineId);
-      await saveScore({
-        playerId: Number(playerId),
-        frame: frameNumberValue,
-        machineId: machineIdValue,
-        ball1,
-        ball2,
-        ball3,
-      });
-    }
-  }
-
   await refreshPlayerSelection();
 }
 
@@ -1023,7 +1005,17 @@ async function initStandingsPage() {
   standingsWrapper.classList.remove('hidden');
 }
 
+function initNavigation() {
+  const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+  document.querySelectorAll('.nav-item').forEach(link => {
+    if (link.getAttribute('href') === currentPath) {
+      link.classList.add('active');
+    }
+  });
+}
+
 function ready() {
+  initNavigation();
   if (document.getElementById('frame-form')) {
     initConfigPage();
   }
