@@ -549,16 +549,16 @@ function printBlankScoreSheet(machines) {
 
   const framesHtml = machines
     .map((m) => `
-      <div style="border: 1px solid #000; margin-bottom: 20px; padding: 15px; page-break-inside: avoid;">
-        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
-          <span style="font-size: 1.2rem; font-weight: bold;">Frame ${m.frame_number}</span>
-          <span style="font-size: 1.1rem;">Game: <strong>${m.machine_name}</strong></span>
-          <span style="font-size: 1rem;">Target (10): <strong>${Number(m.values[10]).toLocaleString()}</strong></span>
+      <div style="border: 1px solid #000; margin-bottom: 8px; padding: 8px 12px; page-break-inside: avoid;">
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 6px;">
+          <span style="font-size: 1rem; font-weight: bold;">Frame ${m.frame_number}</span>
+          <span style="font-size: 0.95rem;">Game: <strong>${m.machine_name}</strong></span>
+          <span style="font-size: 0.85rem;">Target: <strong>${Number(m.values[10]).toLocaleString()}</strong></span>
         </div>
-        <div style="display: flex; gap: 30px;">
-          <div style="flex: 1; border-bottom: 1px solid #000; height: 40px; display: flex; align-items: flex-end; padding-bottom: 5px; color: #666;">Ball 1:</div>
-          <div style="flex: 1; border-bottom: 1px solid #000; height: 40px; display: flex; align-items: flex-end; padding-bottom: 5px; color: #666;">Ball 2:</div>
-          <div style="flex: 1; border-bottom: 1px solid #000; height: 40px; display: flex; align-items: flex-end; padding-bottom: 5px; color: #666;">Ball 3:</div>
+        <div style="display: flex; gap: 20px;">
+          <div style="flex: 1;"><div style="font-size: 0.7rem; color: #666; text-transform: uppercase;">Ball 1</div><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
+          <div style="flex: 1;"><div style="font-size: 0.7rem; color: #666; text-transform: uppercase;">Ball 2</div><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
+          <div style="flex: 1;"><div style="font-size: 0.7rem; color: #666; text-transform: uppercase;">Ball 3</div><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
         </div>
       </div>
     `)
@@ -569,10 +569,14 @@ function printBlankScoreSheet(machines) {
       <head>
         <title>PinBowling - Blank Score Sheet</title>
         <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 40px; line-height: 1.5; }
-          h1 { margin-bottom: 5px; }
-          .header-info { margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-          @media print { body { padding: 0; } }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; line-height: 1.2; color: #000; }
+          h1 { margin: 0 0 4px 0; font-size: 1.5rem; }
+          .header-info { margin-bottom: 12px; border-bottom: 2px solid #000; padding-bottom: 6px; }
+          p { margin: 4px 0; font-size: 0.95rem; }
+          @media print { 
+            body { padding: 0; margin: 0; } 
+            @page { margin: 0.5cm; }
+          }
         </style>
       </head>
       <body>
