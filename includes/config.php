@@ -105,6 +105,11 @@ function getDbConnection() {
 function initDatabase() {
     $pdo = getDbConnection();
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS Locations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL
+    )");
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS Machines (
         id INT AUTO_INCREMENT PRIMARY KEY,
         machine_name VARCHAR(255) NOT NULL,
@@ -123,23 +128,73 @@ function initDatabase() {
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS Players (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        player_name VARCHAR(255) NOT NULL UNIQUE
+        player_name VARCHAR(255) NOT NULL UNIQUE,
+        ifpa_id VARCHAR(50) DEFAULT NULL,
+        matchplay_id VARCHAR(50) DEFAULT NULL
+    )");
+
+    // Migrate existing Players table if columns are missing
+    try {
+        $pdo->exec("ALTER TABLE Players ADD COLUMN ifpa_id VARCHAR(50) DEFAULT NULL");
+        $pdo->exec("ALTER TABLE Players ADD COLUMN matchplay_id VARCHAR(50) DEFAULT NULL");
+    } catch (PDOException $e) { /* Columns likely already exist */ }
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS Leagues (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        start_date DATE DEFAULT NULL,
+        total_events INT NOT NULL DEFAULT 1
+    )");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS Events (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        league_id INT DEFAULT NULL,
+        location_id INT DEFAULT NULL,
+        event_name VARCHAR(255) NOT NULL,
+        event_date DATE DEFAULT NULL,
+        CONSTRAINT fk_event_league FOREIGN KEY (league_id) REFERENCES Leagues(id) ON DELETE CASCADE,
+        CONSTRAINT fk_event_location FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE SET NULL
+    )");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS Target_Scores (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        event_id INT NOT NULL,
+        machine_id INT NOT NULL,
+        frame_number INT NOT NULL,
+        score1 INT NOT NULL DEFAULT 0,
+        score2 INT NOT NULL DEFAULT 0,
+        score3 INT NOT NULL DEFAULT 0,
+        score4 INT NOT NULL DEFAULT 0,
+        score5 INT NOT NULL DEFAULT 0,
+        score6 INT NOT NULL DEFAULT 0,
+        score7 INT NOT NULL DEFAULT 0,
+        score8 INT NOT NULL DEFAULT 0,
+        score9 INT NOT NULL DEFAULT 0,
+        score10 INT NOT NULL DEFAULT 0,
+        UNIQUE KEY uq_event_frame (event_id, frame_number),
+        CONSTRAINT fk_target_event FOREIGN KEY (event_id) REFERENCES Events(id) ON DELETE CASCADE,
+        CONSTRAINT fk_target_machine FOREIGN KEY (machine_id) REFERENCES Machines(id) ON DELETE CASCADE
     )");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS Scores (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        tournament_id INT DEFAULT NULL,
         player_id INT NOT NULL,
         frame INT NOT NULL,
         machine_id INT NOT NULL,
         ball1 INT NOT NULL DEFAULT 0,
         ball2 INT NOT NULL DEFAULT 0,
         ball3 INT NOT NULL DEFAULT 0,
-        UNIQUE KEY uq_player_frame (player_id, frame),
+        UNIQUE KEY uq_player_frame_tourney (player_id, frame, tournament_id),
         INDEX idx_player_id (player_id),
         INDEX idx_machine_id (machine_id),
         CONSTRAINT fk_scores_player FOREIGN KEY (player_id) REFERENCES Players(id) ON DELETE CASCADE,
         CONSTRAINT fk_scores_machine FOREIGN KEY (machine_id) REFERENCES Machines(id) ON DELETE CASCADE
     )");
+
+    try {
+        $pdo->exec("ALTER TABLE Scores ADD COLUMN tournament_id INT DEFAULT NULL");
+    } catch (PDOException $e) { /* Column likely already exists */ }
 }
 
 /**

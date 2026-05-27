@@ -35,12 +35,32 @@ async function fetchJSON(url, options = {}) {
 const PB_API = {
   getMachines: () => fetchJSON('api/machines.php'),
   getPlayers: () => fetchJSON('api/players.php'),
-  getScores: (playerId) => playerId ? fetchJSON(`api/scores.php?playerId=${playerId}`) : [],
-  saveScore: (score) => fetchJSON('api/scores.php', { method: 'POST', body: JSON.stringify(score) }),
+  getScores: (playerId, eventId) => (playerId && eventId) ? fetchJSON(`api/scores.php?playerId=${playerId}&eventId=${eventId}`) : [],
+  saveScore: (score) => fetchJSON('api/scores.php', { method: 'POST', body: JSON.stringify(score) }), // score object should contain eventId
   deletePlayer: (id) => fetchJSON(`api/players.php?id=${id}`, { method: 'DELETE' }),
   createMachine: (machine) => fetchJSON('api/machines.php', { method: 'POST', body: JSON.stringify(machine) }),
   updateMachine: (id, machine) => fetchJSON(`api/machines.php?id=${id}`, { method: 'PUT', body: JSON.stringify(machine) }),
   deleteMachine: (id) => fetchJSON(`api/machines.php?id=${id}`, { method: 'DELETE' }),
   createPlayer: (player_name) => fetchJSON('api/players.php', { method: 'POST', body: JSON.stringify({ player_name }) }),
-  clearScores: (playerId) => fetchJSON(`api/scores.php?playerId=${playerId}`, { method: 'DELETE' })
+  clearScores: (playerId) => fetchJSON(`api/scores.php?playerId=${playerId}`, { method: 'DELETE' }),
+
+  // League and Event management
+  getLeagues: () => fetchJSON('api/leagues.php'),
+  getLeague: (id) => fetchJSON(`api/leagues.php?id=${id}`),
+  createLeague: (league) => fetchJSON('api/leagues.php', { method: 'POST', body: JSON.stringify(league) }),
+  updateLeague: (id, league) => fetchJSON(`api/leagues.php?id=${id}`, { method: 'PUT', body: JSON.stringify(league) }),
+  deleteLeague: (id) => fetchJSON(`api/leagues.php?id=${id}`, { method: 'DELETE' }),
+  getEvents: (leagueId) => fetchJSON(`api/leagues.php?action=event${leagueId ? `&leagueId=${leagueId}` : ''}`),
+  createEvent: (event) => fetchJSON('api/leagues.php?action=event', { method: 'POST', body: JSON.stringify(event) }),
+  updateEvent: (id, event) => fetchJSON(`api/leagues.php?action=event&id=${id}`, { method: 'PUT', body: JSON.stringify(event) }),
+  deleteEvent: (id) => fetchJSON(`api/leagues.php?action=event&id=${id}`, { method: 'DELETE' }),
+
+  // Locations and Target Scores
+  getLocations: () => fetchJSON('api/locations.php'),
+  createLocation: (name) => fetchJSON('api/locations.php', { method: 'POST', body: JSON.stringify({ name }) }),
+  updateLocation: (id, name) => fetchJSON(`api/locations.php?id=${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),
+  deleteLocation: (id) => fetchJSON(`api/locations.php?id=${id}`, { method: 'DELETE' }),
+  getTargetScores: (eventId) => fetchJSON(`api/machines.php?eventId=${eventId}`),
+  saveTargetScore: (target) => fetchJSON('api/machines.php?action=target', { method: 'POST', body: JSON.stringify(target) }),
+  deleteTargetScore: (id) => fetchJSON(`api/machines.php?id=${id}&action=target`, { method: 'DELETE' })
 };

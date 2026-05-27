@@ -478,6 +478,9 @@ async function initScoresPage() {
   const playerSelect = document.getElementById('player-select');
   const playerFileInfo = document.getElementById('player-file-info');
 
+  // TODO: This will eventually come from a UI selector for the current event
+  let currentEventId = 1; // Placeholder for now
+
   const printSheetBtn = document.getElementById('print-sheet-btn');
 
   // Ensure selection starts empty on page initialization
@@ -571,6 +574,7 @@ async function initScoresPage() {
       await PB_API.saveScore({
         playerId: Number(currentPlayerId),
         frame: frame.frame_number,
+        eventId: currentEventId, // Pass the current event ID
         machineId: frame.id,
         ball1,
         ball2,
@@ -654,8 +658,8 @@ async function initScoresPage() {
 
     warning.classList.add('hidden');
     framesInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
-
-    const scores = await PB_API.getScores(Number(activePlayerId));
+    
+    const scores = await PB_API.getScores(Number(activePlayerId), currentEventId);
     loadScoresIntoForm(scores);
     renderCurrentResults();
   }
@@ -742,7 +746,7 @@ async function initStandingsPage() {
   `;
 
   const standingsRows = await Promise.all(players.map(async (player) => {
-    const scores = await PB_API.getScores(player.id);
+    const scores = await PB_API.getScores(player.id, 1); // TODO: Pass actual eventId
     const scoreMap = scores.reduce((map, row) => {
       map[String(row.frame)] = {
         ball1: Number(row.ball1),
