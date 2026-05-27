@@ -42,3 +42,5 @@ The PHP backend automatically creates the following tables if they do not alread
 - The frontend now calls PHP endpoints under `api/`.
 - The database is accessed through PDO, which is supported on modern PHP hosts.
 - On many shared hosts, external database connections are blocked, so the app must run on the same hosting platform as the MySQL database.
+
+Visit `index.php` to start the application.

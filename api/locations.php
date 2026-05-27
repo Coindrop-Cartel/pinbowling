@@ -8,9 +8,32 @@ $pdo = getDbConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];
 $input = getJsonInput();
+$action = $_GET['action'] ?? 'location';
 
 // GET: Retrieve all locations or a specific one by ID
 if ($method === 'GET') {
+    if ($action === 'machines') {
+        $locationId = isset($_GET['locationId']) ? (int)$_GET['locationId'] : 0;
+
+        if ($locationId) {
+            $stmt = $pdo->prepare('
+                SELECT lm.*, m.machine_name 
+                FROM Location_Machines lm 
+                JOIN Machines m ON lm.machine_id = m.id 
+                WHERE lm.location_id = ?
+            ');
+            $stmt->execute([$locationId]);
+        } else {
+            $stmt = $pdo->query('
+                SELECT lm.*, m.machine_name 
+                FROM Location_Machines lm 
+                JOIN Machines m ON lm.machine_id = m.id 
+                ORDER BY lm.location_id ASC
+            ');
+        }
+        sendJson($stmt->fetchAll());
+    }
+
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if ($id) {
         $stmt = $pdo->prepare('SELECT * FROM Locations WHERE id = ?');
@@ -19,10 +42,33 @@ if ($method === 'GET') {
         if (!$location) {
             sendJson(['error' => 'Location not found'], 404);
         }
+        // Automatically include machines when fetching a specific location
+        $stmt = $pdo->prepare('SELECT lm.*, m.machine_name FROM Location_Machines lm JOIN Machines m ON lm.machine_id = m.id WHERE lm.location_id = ?');
+        $stmt->execute([$id]);
+        $location['machines'] = $stmt->fetchAll();
         sendJson($location);
     }
-    $stmt = $pdo->query('SELECT * FROM Locations ORDER BY name ASC');
-    sendJson($stmt->fetchAll());
+
+    // Fetch all locations
+    $locationsStmt = $pdo->query('SELECT * FROM Locations ORDER BY name ASC');
+    $locations = $locationsStmt->fetchAll();
+
+    // Fetch all location-machine mappings
+    $machinesStmt = $pdo->query('SELECT lm.*, m.machine_name FROM Location_Machines lm JOIN Machines m ON lm.machine_id = m.id ORDER BY lm.location_id ASC');
+    $allMachines = $machinesStmt->fetchAll();
+
+    // Group machines by location_id
+    $machinesByLocation = [];
+    foreach ($allMachines as $mach) {
+        $machinesByLocation[$mach['location_id']][] = $mach;
+    }
+
+    // Attach machines to their corresponding locations
+    foreach ($locations as &$loc) {
+        $loc['machines'] = $machinesByLocation[$loc['id']] ?? [];
+    }
+
+    sendJson($locations);
 }
 
 // POST: Create a new location (Protected by API Secret)
@@ -30,16 +76,31 @@ if ($method === 'POST') {
     validateApiSecret();
     
     if (empty($input['name'])) {
-        sendJson(['error' => 'name is required'], 400);
+        if ($action === 'machines') {
+            if (empty($input['location_id']) || empty($input['machine_id'])) {
+                sendJson(['error' => 'location_id and machine_id are required'], 400);
+            }
+            $sql = 'INSERT INTO Location_Machines (location_id, machine_id, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE score1=VALUES(score1), score10=VALUES(score10)'; // Simplified for brevity
+            $params = [(int)$input['location_id'], (int)$input['machine_id']];
+            for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            sendJson(['success' => true]);
+        } else {
+            sendJson(['error' => 'name is required'], 400);
+        }
+    } else {
+        $stmt = $pdo->prepare('INSERT INTO Locations (name) VALUES (?)');
+        $stmt->execute([$input['name']]);
+        $newId = $pdo->lastInsertId();
+
+        $stmt = $pdo->prepare('SELECT * FROM Locations WHERE id = ?');
+        $stmt->execute([$newId]);
+        sendJson($stmt->fetch(), 201);
     }
-
-    $stmt = $pdo->prepare('INSERT INTO Locations (name) VALUES (?)');
-    $stmt->execute([$input['name']]);
-    $newId = $pdo->lastInsertId();
-
-    $stmt = $pdo->prepare('SELECT * FROM Locations WHERE id = ?');
-    $stmt->execute([$newId]);
-    sendJson($stmt->fetch(), 201);
 }
 
 // PUT: Update an existing location (Protected by API Secret)

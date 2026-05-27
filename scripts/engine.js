@@ -2,11 +2,8 @@
  * The Scoring Engine
  * Pure logic for mapping pinball to bowling.
  */
-function formatNumber(num) {
-  return Number(num).toLocaleString();
-}
 
-const BowlingEngine = {
+export const BowlingEngine = {
   getPinCount(frame, rawScore) {
     if (!frame || typeof rawScore !== 'number' || rawScore <= 0) return 0;
     const thresholds = Object.entries(frame.values)

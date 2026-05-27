@@ -99,6 +99,15 @@ function getDbConnection() {
     return $pdo;
 }
 
+// Handle CORS preflight requests globally. This is required because custom 
+// headers like X-PB-SECRET trigger an OPTIONS request for ALL method types.
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, X-PB-SECRET');
+    exit;
+}
+
 /**
  * Ensures required database tables exist.
  */
@@ -112,8 +121,26 @@ function initDatabase() {
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS Machines (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        machine_name VARCHAR(255) NOT NULL,
-        frame_number INT NOT NULL UNIQUE,
+        machine_name VARCHAR(255) NOT NULL UNIQUE
+    )");
+
+    // Migration for Machines table: remove old columns if they exist and add unique constraint
+    try {
+        $pdo->exec("ALTER TABLE Machines DROP COLUMN frame_number");
+    } catch (PDOException $e) { /* Column likely doesn't exist or other error */ }
+    for ($i = 1; $i <= 10; $i++) {
+        try {
+            $pdo->exec("ALTER TABLE Machines DROP COLUMN score{$i}");
+        } catch (PDOException $e) { /* Column likely doesn't exist or other error */ }
+    }
+    try {
+        $pdo->exec("ALTER TABLE Machines ADD UNIQUE (machine_name)");
+    } catch (PDOException $e) { /* Constraint likely already exists */ }
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS Location_Machines (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        location_id INT NOT NULL,
+        machine_id INT NOT NULL,
         score1 INT NOT NULL DEFAULT 0,
         score2 INT NOT NULL DEFAULT 0,
         score3 INT NOT NULL DEFAULT 0,
@@ -123,7 +150,10 @@ function initDatabase() {
         score7 INT NOT NULL DEFAULT 0,
         score8 INT NOT NULL DEFAULT 0,
         score9 INT NOT NULL DEFAULT 0,
-        score10 INT NOT NULL DEFAULT 0
+        score10 INT NOT NULL DEFAULT 0,
+        UNIQUE KEY uq_loc_machine (location_id, machine_id),
+        CONSTRAINT fk_loc_mach_location FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE CASCADE,
+        CONSTRAINT fk_loc_mach_machine FOREIGN KEY (machine_id) REFERENCES Machines(id) ON DELETE CASCADE
     )");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS Players (
@@ -142,8 +172,7 @@ function initDatabase() {
     $pdo->exec("CREATE TABLE IF NOT EXISTS Leagues (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
-        start_date DATE DEFAULT NULL,
-        total_events INT NOT NULL DEFAULT 1
+        start_date DATE DEFAULT NULL
     )");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS Events (
@@ -178,23 +207,33 @@ function initDatabase() {
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS Scores (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        tournament_id INT DEFAULT NULL,
+        event_id INT DEFAULT NULL,
         player_id INT NOT NULL,
         frame INT NOT NULL,
         machine_id INT NOT NULL,
         ball1 INT NOT NULL DEFAULT 0,
         ball2 INT NOT NULL DEFAULT 0,
         ball3 INT NOT NULL DEFAULT 0,
-        UNIQUE KEY uq_player_frame_tourney (player_id, frame, tournament_id),
+        UNIQUE KEY uq_player_frame_event (player_id, frame, event_id),
         INDEX idx_player_id (player_id),
         INDEX idx_machine_id (machine_id),
         CONSTRAINT fk_scores_player FOREIGN KEY (player_id) REFERENCES Players(id) ON DELETE CASCADE,
-        CONSTRAINT fk_scores_machine FOREIGN KEY (machine_id) REFERENCES Machines(id) ON DELETE CASCADE
+        CONSTRAINT fk_scores_machine FOREIGN KEY (machine_id) REFERENCES Machines(id) ON DELETE CASCADE,
+        CONSTRAINT fk_scores_event FOREIGN KEY (event_id) REFERENCES Events(id) ON DELETE CASCADE
     )");
 
     try {
-        $pdo->exec("ALTER TABLE Scores ADD COLUMN tournament_id INT DEFAULT NULL");
-    } catch (PDOException $e) { /* Column likely already exists */ }
+        // Attempt to rename tournament_id to event_id if it exists from a previous iteration
+        $pdo->exec("ALTER TABLE Scores CHANGE COLUMN tournament_id event_id INT DEFAULT NULL");
+    } catch (PDOException $e) { 
+        try {
+            $pdo->exec("ALTER TABLE Scores ADD COLUMN event_id INT DEFAULT NULL");
+        } catch (PDOException $ex) { /* Column likely already exists */ }
+    }
+    
+    try {
+        $pdo->exec("ALTER TABLE Scores ADD CONSTRAINT fk_scores_event FOREIGN KEY (event_id) REFERENCES Events(id) ON DELETE CASCADE");
+    } catch (PDOException $e) { /* Constraint likely already exists */ }
 }
 
 /**

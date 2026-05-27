@@ -1,0 +1,15 @@
+Options -MultiViews
+RewriteEngine On
+
+# 1. Redirect external requests for .html files to the clean URL version
+RewriteCond %{THE_REQUEST} \s/+(.*?)\.html[\s?] [NC]
+RewriteRule ^ /%1 [R=301,L]
+
+# 2. Redirect external requests for .php files to the clean URL version
+RewriteCond %{THE_REQUEST} \s/+(.*?)\.php[\s?] [NC]
+RewriteRule ^ /%1 [R=301,L]
+
+# 3. Internally rewrite the clean URL to the actual .php file
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^(.*)$ $1.php [L]

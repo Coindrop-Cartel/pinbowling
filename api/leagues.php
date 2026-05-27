@@ -16,11 +16,11 @@ $action = $_GET['action'] ?? 'league';
 if ($method === 'GET') {
     if ($action === 'event') {
         $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
-        if ($leagueId) {
-            $stmt = $pdo->prepare('SELECT * FROM Events WHERE league_id = ? ORDER BY event_date ASC');
+        if ($leagueId) { // Fetch events for a specific league
+            $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id WHERE e.league_id = ? ORDER BY e.event_date ASC');
             $stmt->execute([$leagueId]);
-        } else {
-            $stmt = $pdo->query('SELECT * FROM Events ORDER BY event_date ASC');
+        } else { // Fetch all events
+            $stmt = $pdo->query('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id ORDER BY e.event_date ASC');
         }
         sendJson($stmt->fetchAll());
     } else {
@@ -38,8 +38,27 @@ if ($method === 'GET') {
             }
             sendJson(['error' => 'League not found'], 404);
         }
-        $stmt = $pdo->query('SELECT * FROM Leagues ORDER BY start_date DESC');
-        sendJson($stmt->fetchAll());
+
+        // Fetch all leagues
+        $leaguesStmt = $pdo->query('SELECT * FROM Leagues ORDER BY start_date DESC');
+        $leagues = $leaguesStmt->fetchAll();
+
+        // Fetch all events joined with location names
+        $eventsStmt = $pdo->query('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id ORDER BY e.event_date ASC');
+        $allEvents = $eventsStmt->fetchAll();
+
+        // Group events by their league_id
+        $eventsByLeague = [];
+        foreach ($allEvents as $event) {
+            $eventsByLeague[$event['league_id']][] = $event;
+        }
+
+        // Attach events to their corresponding leagues
+        foreach ($leagues as &$league) {
+            $league['events'] = $eventsByLeague[$league['id']] ?? [];
+        }
+
+        sendJson($leagues);
     }
 }
 
@@ -63,8 +82,8 @@ if ($method === 'POST') {
         if (empty($input['name'])) {
             sendJson(['error' => 'name is required'], 400);
         }
-        $sql = 'INSERT INTO Leagues (name, start_date, total_events) VALUES (?, ?, ?)';
-        $params = [$input['name'], $input['start_date'] ?? null, (int)($input['total_events'] ?? 1)];
+        $sql = 'INSERT INTO Leagues (name, start_date) VALUES (?, ?)';
+        $params = [$input['name'], $input['start_date'] ?? null];
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $newId = $pdo->lastInsertId();
@@ -87,8 +106,8 @@ if ($method === 'PUT') {
         $stmt->execute($params);
         $stmt = $pdo->prepare('SELECT * FROM Events WHERE id = ?');
     } else {
-        $sql = 'UPDATE Leagues SET name = ?, start_date = ?, total_events = ? WHERE id = ?';
-        $params = [$input['name'], $input['start_date'] ?? null, (int)($input['total_events'] ?? 1), $id];
+        $sql = 'UPDATE Leagues SET name = ?, start_date = ? WHERE id = ?';
+        $params = [$input['name'], $input['start_date'] ?? null, $id];
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $stmt = $pdo->prepare('SELECT * FROM Leagues WHERE id = ?');
