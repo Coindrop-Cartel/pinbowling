@@ -5,7 +5,7 @@
  * Provides a visual summary of the connection status, environment variables, 
  * and current database tables to assist with initial setup and troubleshooting.
  */
-require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/config.php';
 
 try {
     $pdo = getDbConnection();

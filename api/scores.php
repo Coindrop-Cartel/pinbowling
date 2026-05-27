@@ -2,7 +2,7 @@
 /**
  * REST API for recording and retrieving raw pinball scores.
  */
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/config.php';
 initDatabase();
 $pdo = getDbConnection();
 

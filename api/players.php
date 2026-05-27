@@ -2,7 +2,7 @@
 /**
  * REST API for managing players.
  */
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/config.php';
 initDatabase();
 $pdo = getDbConnection();
 

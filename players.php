@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PinBowling Player Score Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="images/logo.png" />
+</head>
+<body>
+  <?php include 'includes/header.php'; ?>
+
+  <main class="page-container">
+    <header>
+      <h1>Manage Players</h1>
+      <p>Add or remove players from the system.</p>
+    </header>
+
+    <section class="card">
+      <h2>Add Player</h2>
+      <div class="form-row">
+        <label for="new-player-name">Add New Player</label>
+        <input id="new-player-name" type="text" placeholder="Enter player name" />
+        <button type="button" id="add-player-button">Add Player</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Delete Player</h2>
+      <div class="form-row">
+        <label for="player-select">Select Player</label>
+        <select id="player-select"></select>
+        <button type="button" id="delete-player-button" class="secondary">Delete Player</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Registered Players</h2>
+      <div id="player-list-container">
+        <ul id="player-list" class="notice" style="list-style: none; padding: 14px 16px; margin: 0;">
+          <li>Loading players...</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <script src="js-config.php"></script>
+  <script src="scripts/api.js"></script>
+  <script src="scripts/engine.js"></script>
+  <script src="scripts/script.js"></script>
+</body>
+</html>

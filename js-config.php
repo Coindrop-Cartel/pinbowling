@@ -6,7 +6,7 @@
  * environment variables (API secret, Admin Password) to the client-side 
  * script.js, keeping them in sync with the .env file.
  */
-require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/config.php';
 
 // Light domain protection: Only serve if the referer matches our host
 $referer = $_SERVER['HTTP_REFERER'] ?? '';

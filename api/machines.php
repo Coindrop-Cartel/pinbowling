@@ -2,7 +2,7 @@
 /**
  * REST API for configuring PinBowling machines and their scoring thresholds.
  */
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/config.php';
 initDatabase();
 $pdo = getDbConnection();
 

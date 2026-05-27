@@ -8,19 +8,7 @@
   <link rel="icon" type="image/png" href="images/logo.png" />
 </head>
 <body>
-  <header class="main-header">
-    <div class="container header-content">
-      <a href="index.html" class="logo">
-        <img src="images/logo.png" alt="PinBowling Logo">
-      </a>
-      <nav class="taskbar">
-        <a href="players.html" class="nav-item">Players</a>
-        <a href="scores.html" class="nav-item">Scores</a>
-        <a href="standings.html" class="nav-item">Standings</a>
-        <a href="machines.html" class="nav-item">Machines</a>
-      </nav>
-    </div>
-  </header>
+  <?php include 'includes/header.php'; ?>
 
   <main class="page-container">
     <div class="tournament-selector-container"></div>
@@ -78,6 +66,8 @@
     </section>
   </main>
   <script src="js-config.php"></script>
-  <script src="script.js"></script>
+  <script src="scripts/api.js"></script>
+  <script src="scripts/engine.js"></script>
+  <script src="scripts/script.js"></script>
 </body>
 </html>
