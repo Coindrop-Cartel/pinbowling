@@ -31,7 +31,7 @@
 
     <section id="scoring-card" class="card hidden">
       <h2>Enter Frame Scores</h2>
-      <p class="hint">Enter the cumulative pinbowling score after each ball. Ball 1 can be a strike; ball 2 can complete a spare; ball 3 can also complete a spare.</p>
+      <p class="hint">Enter the cumulative pinbowling score after each ball. We will do the rest.</p>
       <div id="player-warning" class="notice hidden"></div>
       <form id="player-form">
         <div id="frames-input"></div>
