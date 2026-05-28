@@ -115,13 +115,15 @@ export async function initPlayersPage() {
 
     if (!name) return;
 
-    const confirmation = prompt(`Enter Admin Password to ${id ? 'update' : 'create'} player "${name}":`);
-    if (confirmation === null) { // User cancelled
-      alert('Admin action cancelled.');
-      return;
-    } else if (confirmation !== ADMIN_PASSWORD) { // Incorrect password
-      alert('Incorrect Admin Password.');
-      return;
+    if (ADMIN_PASSWORD) {
+      const confirmation = prompt(`Enter Admin Password to ${id ? 'update' : 'create'} player "${name}":`);
+      if (confirmation === null) { // User cancelled
+        alert('Admin action cancelled.');
+        return;
+      } else if (confirmation !== ADMIN_PASSWORD) { // Incorrect password
+        alert('Incorrect Admin Password.');
+        return;
+      }
     }
 
     const payload = { player_name: name, ifpa_id: ifpaId, matchplay_id: matchplayId };
@@ -149,13 +151,15 @@ export async function initPlayersPage() {
     const player = players.find(p => String(p.id) === selectedId);
     if (!player) return;
     
-    const confirmation = prompt(`Enter Admin Password to confirm deletion of ${player.player_name} (and all their scores):`);
-    if (confirmation === null) { // User cancelled
-      alert('Admin action cancelled.');
-      return;
-    } else if (confirmation !== ADMIN_PASSWORD) { // Incorrect password
-      alert('Incorrect Admin Password.');
-      return;
+    if (ADMIN_PASSWORD) {
+      const confirmation = prompt(`Enter Admin Password to confirm deletion of ${player.player_name} (and all their scores):`);
+      if (confirmation === null) { // User cancelled
+        alert('Admin action cancelled.');
+        return;
+      } else if (confirmation !== ADMIN_PASSWORD) { // Incorrect password
+        alert('Incorrect Admin Password.');
+        return;
+      }
     }
 
     try {

@@ -165,13 +165,15 @@ export async function initConfigPage() {
     if (!frame_number || !machine_name || (!score10 && !score1) || !eventId) return;
 
     const values = BowlingEngine.buildFrameValues(score10, score1);
-    const confirmation = prompt(`Enter Admin Password to save changes for Frame ${frame_number}:`);
-    if (confirmation === null) { // User cancelled
-      alert('Admin action cancelled.');
-      return;
-    } else if (confirmation !== ADMIN_PASSWORD) { // Incorrect password
-      alert('Incorrect Admin Password.');
-      return;
+    if (ADMIN_PASSWORD) {
+      const confirmation = prompt(`Enter Admin Password to save changes for Frame ${frame_number}:`);
+      if (confirmation === null) { // User cancelled
+        alert('Admin action cancelled.');
+        return;
+      } else if (confirmation !== ADMIN_PASSWORD) { // Incorrect password
+        alert('Incorrect Admin Password.');
+        return;
+      }
     }
 
     // --- Resolving Master Machines ---

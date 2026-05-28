@@ -31,14 +31,26 @@ export function initMachinesPage() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const nameInput = document.getElementById('machine-name');
-    
+    const machineName = nameInput.value.trim();
+
+    if (!machineName) return;
+
+    if (window.PB_ADMIN_PASSWORD) {
+      const confirmation = prompt(`Enter Admin Password to add machine "${machineName}":`);
+      if (confirmation === null) return;
+      if (confirmation !== window.PB_ADMIN_PASSWORD) {
+        alert('Incorrect Admin Password.');
+        return;
+      }
+    }
+
     const res = await fetch('api.php?action=saveMachine', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'X-PB-SECRET': window.PB_API_SECRET 
       },
-      body: JSON.stringify({ machine_name: nameInput.value })
+      body: JSON.stringify({ machine_name: machineName })
     });
 
     if (res.ok) {
@@ -48,7 +60,15 @@ export function initMachinesPage() {
   });
 
   window.deleteMachine = async (id) => {
-    if (!confirm('Are you sure? This may affect historical data.')) return;
+    if (window.PB_ADMIN_PASSWORD) {
+      const confirmation = prompt('Enter Admin Password to confirm machine deletion (this may affect historical data):');
+      if (confirmation === null) return;
+      if (confirmation !== window.PB_ADMIN_PASSWORD) {
+        alert('Incorrect Admin Password.');
+        return;
+      }
+    }
+
     await fetch(`api.php?action=deleteMachine&id=${id}`, {
       method: 'DELETE',
       headers: { 'X-PB-SECRET': window.PB_API_SECRET }
