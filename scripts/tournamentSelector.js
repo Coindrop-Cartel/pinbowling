@@ -112,8 +112,8 @@ export async function initTournamentSelector(onRefresh) {
     const league = leagues.find(l => String(l.id) === String(currentLeagueId));
     if (league) {
       searchInput.value = league.name;
-      leagueSelect.value = currentLeagueId;
       updateOptions(league.name);
+      leagueSelect.value = currentLeagueId;
       populateEvents(currentLeagueId, currentEventId);
     }
   } else {
