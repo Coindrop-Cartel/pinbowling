@@ -1,6 +1,6 @@
 import { PB_API, setCurrentPlayerId, getCurrentPlayerId } from './api.js';
 import { BowlingEngine } from './engine.js';
-import { formatNumber, applyScoreFormatting, getActiveEventId, printBlankScoreSheet } from './utils.js';
+import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, printBlankScoreSheet } from './utils.js';
 import { initTournamentSelector } from './tournamentSelector.js';
 
 /**
@@ -117,8 +117,23 @@ export async function initScoresPage() {
     return row;
   }
 
+  /**
+   * Populates the player dropdown.
+   * If a league is currently selected in the header, only players 
+   * assigned to that league's roster are shown. Otherwise, the 
+   * entire global player list is displayed.
+   */
   async function renderPlayerSelect() {
-    const players = await PB_API.getPlayers();
+    const leagueId = getActiveLeagueId();
+    let players = [];
+    
+    if (leagueId) {
+        const league = await PB_API.getLeague(leagueId);
+        players = league.players || [];
+    } else {
+        players = await PB_API.getPlayers();
+    }
+
     const currentPlayerId = getCurrentPlayerId();
 
     playerSelect.innerHTML = '';

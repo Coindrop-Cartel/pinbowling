@@ -112,6 +112,37 @@ export async function initConfigPage() {
   const refresh = async () => {
     const eventId = getActiveEventId();
     masterMachines = await PB_API.getMachines();
+
+    // Find the location associated with the current event to filter machine suggestions
+    let locationId = null;
+    if (eventId) {
+      const leagues = await PB_API.getLeagues();
+      for (const league of leagues) {
+        const event = (league.events || []).find(e => String(e.id) === String(eventId));
+        if (event) {
+          locationId = event.location_id;
+          break;
+        }
+      }
+    }
+
+    // Update machine suggestions (datalist) for the machine-name input
+    const machineInput = document.getElementById('machine-name');
+    let datalist = document.getElementById('machine-suggestions');
+    if (!datalist) {
+      datalist = document.createElement('datalist');
+      datalist.id = 'machine-suggestions';
+      document.body.appendChild(datalist);
+      machineInput.setAttribute('list', 'machine-suggestions');
+    }
+    datalist.innerHTML = '';
+    const suggestedMachines = locationId ? await PB_API.getLocationMachines(locationId) : masterMachines;
+    suggestedMachines.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.machine_name;
+      datalist.appendChild(opt);
+    });
+
     eventTargets = eventId ? await PB_API.getTargetScores(eventId) : [];
     await render();
   };
@@ -143,6 +174,9 @@ export async function initConfigPage() {
       return;
     }
 
+    // --- Resolving Master Machines ---
+    // If the machine name entered doesn't exist in the master list, 
+    // we create it first to obtain a global 'machine_id'.
     let masterMachine = masterMachines.find(m => m.machine_name.toLowerCase() === machine_name.toLowerCase());
     if (!masterMachine) {
         masterMachine = await PB_API.createMachine(machine_name);

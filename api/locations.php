@@ -82,7 +82,9 @@ if ($method === 'POST') {
             }
             $sql = 'INSERT INTO Location_Machines (location_id, machine_id, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE score1=VALUES(score1), score10=VALUES(score10)'; // Simplified for brevity
+                    ON DUPLICATE KEY UPDATE 
+                        score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5), 
+                        score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
             $params = [(int)$input['location_id'], (int)$input['machine_id']];
             for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
             
@@ -93,8 +95,8 @@ if ($method === 'POST') {
             sendJson(['error' => 'name is required'], 400);
         }
     } else {
-        $stmt = $pdo->prepare('INSERT INTO Locations (name) VALUES (?)');
-        $stmt->execute([$input['name']]);
+        $stmt = $pdo->prepare('INSERT INTO Locations (name, city, state) VALUES (?, ?, ?)');
+        $stmt->execute([$input['name'], $input['city'] ?? null, $input['state'] ?? null]);
         $newId = $pdo->lastInsertId();
 
         $stmt = $pdo->prepare('SELECT * FROM Locations WHERE id = ?');
@@ -112,8 +114,8 @@ if ($method === 'PUT') {
         sendJson(['error' => 'id query parameter and name are required'], 400);
     }
 
-    $stmt = $pdo->prepare('UPDATE Locations SET name = ? WHERE id = ?');
-    $stmt->execute([$input['name'], $id]);
+    $stmt = $pdo->prepare('UPDATE Locations SET name = ?, city = ?, state = ? WHERE id = ?');
+    $stmt->execute([$input['name'], $input['city'] ?? null, $input['state'] ?? null, $id]);
 
     $stmt = $pdo->prepare('SELECT * FROM Locations WHERE id = ?');
     $stmt->execute([$id]);

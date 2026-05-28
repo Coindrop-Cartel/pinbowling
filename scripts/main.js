@@ -15,7 +15,11 @@ import { initLeaguesPage } from './leaguesPage.js';
 
 /**
  * Main entry point. Identifies which page is currently loaded 
- * and runs the appropriate initialization logic.
+ * and runs the appropriate initialization logic based on unique DOM elements.
+ * 
+ * This approach allows us to use a single 'main.js' script tag across all 
+ * PHP pages while ensuring only the necessary module logic is executed 
+ * for the current view context.
  */
 function ready() {
   initNavigation(); // From utils.js
@@ -25,7 +29,7 @@ function ready() {
   if (document.getElementById('player-list')) {
     initPlayersPage(); // From pages/playersPage.js
   }
-  if (document.getElementById('player-form')) {
+  if (document.getElementById('frames-input')) {
     initScoresPage(); // From pages/scoresPage.js
   }
   if (document.getElementById('standings-body')) {

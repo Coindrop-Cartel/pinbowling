@@ -110,6 +110,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 /**
  * Ensures required database tables exist.
+ * 
+ * This function is designed to be idempotent. It handles the initial 
+ * creation of the schema and subsequent migrations (e.g., renaming 
+ * columns or adding junction tables for leagues/players) to ensure 
+ * data continuity across application versions.
  */
 function initDatabase() {
     $pdo = getDbConnection();
@@ -124,7 +129,9 @@ function initDatabase() {
         machine_name VARCHAR(255) NOT NULL UNIQUE
     )");
 
-    // Migration for Machines table: remove old columns if they exist and add unique constraint
+    // --- Migration: Machines v2 ---
+    // Decouples frame mapping from the master machine title. 
+    // Moves scoring thresholds to Target_Scores and Location_Machines.
     try {
         $pdo->exec("ALTER TABLE Machines DROP COLUMN frame_number");
     } catch (PDOException $e) { /* Column likely doesn't exist or other error */ }
@@ -175,6 +182,17 @@ function initDatabase() {
         start_date DATE DEFAULT NULL
     )");
 
+    // Junction table for many-to-many relationship between Leagues and Players.
+    // Allows a global player registry while filtering scoring by league membership.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS League_Players (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        league_id INT NOT NULL,
+        player_id INT NOT NULL,
+        UNIQUE KEY uq_league_player (league_id, player_id),
+        CONSTRAINT fk_lp_league FOREIGN KEY (league_id) REFERENCES Leagues(id) ON DELETE CASCADE,
+        CONSTRAINT fk_lp_player FOREIGN KEY (player_id) REFERENCES Players(id) ON DELETE CASCADE
+    )");
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS Events (
         id INT AUTO_INCREMENT PRIMARY KEY,
         league_id INT DEFAULT NULL,
@@ -222,6 +240,8 @@ function initDatabase() {
         CONSTRAINT fk_scores_event FOREIGN KEY (event_id) REFERENCES Events(id) ON DELETE CASCADE
     )");
 
+    // --- Migration: Scores v2 ---
+    // Aligns terminology by renaming 'tournament_id' to 'event_id'.
     try {
         // Attempt to rename tournament_id to event_id if it exists from a previous iteration
         $pdo->exec("ALTER TABLE Scores CHANGE COLUMN tournament_id event_id INT DEFAULT NULL");

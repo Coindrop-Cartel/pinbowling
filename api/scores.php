@@ -14,13 +14,19 @@ if ($method === 'GET') {
     $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
     $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
 
+    /**
+     * GET modes:
+     * 1. leagueId: Returns all scores for all players/events in a specific league (for summary view).
+     * 2. eventId + playerId: Returns scores for a specific player session.
+     * 3. eventId: Returns all scores for a specific night (for event standings).
+     */
     if (!$eventId && !$leagueId) {
         sendJson(['error' => 'eventId or leagueId query parameter is required'], 400);
     }
 
     if ($leagueId) {
         $stmt = $pdo->prepare(
-            'SELECT s.id, s.player_id, s.event_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name, m.frame_number
+            'SELECT s.id, s.player_id, s.event_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
              FROM Scores s
              JOIN Machines m ON m.id = s.machine_id
              JOIN Events e ON s.event_id = e.id
@@ -30,7 +36,7 @@ if ($method === 'GET') {
         $stmt->execute([$leagueId]);
     } else if ($playerId) {
         $stmt = $pdo->prepare(
-            'SELECT s.id, s.player_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name, m.frame_number
+            'SELECT s.id, s.player_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
              FROM Scores s
              JOIN Machines m ON m.id = s.machine_id
              WHERE s.player_id = ? AND s.event_id = ?
@@ -39,7 +45,7 @@ if ($method === 'GET') {
         $stmt->execute([$playerId, $eventId]);
     } else {
         $stmt = $pdo->prepare(
-            'SELECT s.id, s.player_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name, m.frame_number
+            'SELECT s.id, s.player_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
              FROM Scores s
              JOIN Machines m ON m.id = s.machine_id
              WHERE s.event_id = ?

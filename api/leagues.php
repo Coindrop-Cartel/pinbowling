@@ -34,11 +34,21 @@ if ($method === 'GET') {
                 $stmt = $pdo->prepare('SELECT * FROM Events WHERE league_id = ? ORDER BY event_date ASC');
                 $stmt->execute([$id]);
                 $league['events'] = $stmt->fetchAll();
+
+                $stmt = $pdo->prepare('SELECT p.* FROM Players p JOIN League_Players lp ON p.id = lp.player_id WHERE lp.league_id = ? ORDER BY p.player_name ASC');
+                $stmt->execute([$id]);
+                $league['players'] = $stmt->fetchAll();
+
                 sendJson($league);
             }
             sendJson(['error' => 'League not found'], 404);
         }
 
+        // --- Performance Optimization: Bulk Fetching ---
+        // To prevent the "N+1" query problem on the management page, we 
+        // fetch all leagues, events, and rosters in broad queries and 
+        // group them in memory before returning the final JSON structure.
+        
         // Fetch all leagues
         $leaguesStmt = $pdo->query('SELECT * FROM Leagues ORDER BY start_date DESC');
         $leagues = $leaguesStmt->fetchAll();
@@ -47,15 +57,28 @@ if ($method === 'GET') {
         $eventsStmt = $pdo->query('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id ORDER BY e.event_date ASC');
         $allEvents = $eventsStmt->fetchAll();
 
+        // Fetch all league players
+        $lpStmt = $pdo->query('SELECT lp.league_id, p.* FROM Players p JOIN League_Players lp ON p.id = lp.player_id ORDER BY p.player_name ASC');
+        $allLeaguePlayers = $lpStmt->fetchAll();
+
         // Group events by their league_id
         $eventsByLeague = [];
         foreach ($allEvents as $event) {
             $eventsByLeague[$event['league_id']][] = $event;
         }
 
+        // Group players by league_id
+        $playersByLeague = [];
+        foreach ($allLeaguePlayers as $lp) {
+            $lId = $lp['league_id'];
+            unset($lp['league_id']);
+            $playersByLeague[$lId][] = $lp;
+        }
+
         // Attach events to their corresponding leagues
         foreach ($leagues as &$league) {
             $league['events'] = $eventsByLeague[$league['id']] ?? [];
+            $league['players'] = $playersByLeague[$league['id']] ?? [];
         }
 
         sendJson($leagues);
@@ -66,7 +89,17 @@ if ($method === 'GET') {
 if ($method === 'POST') {
     validateApiSecret();
     
-    if ($action === 'event') {
+    if ($action === 'player') {
+        if (empty($input['league_id']) || empty($input['player_id'])) {
+            sendJson(['error' => 'league_id and player_id are required'], 400);
+        }
+        $stmt = $pdo->prepare('INSERT IGNORE INTO League_Players (league_id, player_id) VALUES (?, ?)');
+        $stmt->execute([(int)$input['league_id'], (int)$input['player_id']]);
+        
+        $stmt = $pdo->prepare('SELECT * FROM Players WHERE id = ?');
+        $stmt->execute([(int)$input['player_id']]);
+        sendJson($stmt->fetch());
+    } else if ($action === 'event') {
         if (empty($input['league_id']) || empty($input['event_name'])) {
             sendJson(['error' => 'league_id and event_name are required'], 400);
         }
@@ -119,13 +152,19 @@ if ($method === 'PUT') {
 // DELETE: Remove League or Event (Protected by API Secret)
 if ($method === 'DELETE') {
     validateApiSecret();
-    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-    if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
     
-    $table = ($action === 'event') ? 'Events' : 'Leagues';
-    // Note: Deleting a league will cascade delete events due to the FOREIGN KEY constraint in initDatabase()
-    $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ?");
-    $stmt->execute([$id]);
+    if ($action === 'player') {
+        $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
+        $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
+        $stmt = $pdo->prepare("DELETE FROM League_Players WHERE league_id = ? AND player_id = ?");
+        $stmt->execute([$leagueId, $playerId]);
+    } else {
+        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
+        $table = ($action === 'event') ? 'Events' : 'Leagues';
+        $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ?");
+        $stmt->execute([$id]);
+    }
     sendJson(['success' => true]);
 }
 

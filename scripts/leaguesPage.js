@@ -11,6 +11,12 @@ export async function initLeaguesPage() {
   const leaguesListEmpty = document.getElementById('leagues-list-empty');
 
   const eventFormCard = document.getElementById('event-form-card');
+  const rosterFormCard = document.createElement('section');
+  rosterFormCard.className = 'card hidden';
+  rosterFormCard.id = 'roster-form-card';
+  // Insert the roster form before the event form using their common parent (the main container)
+  eventFormCard.parentNode.insertBefore(rosterFormCard, eventFormCard);
+
   const eventFormTitle = document.getElementById('event-form-title');
   const eventFormLeagueName = document.getElementById('event-form-league-name');
   const eventForm = document.getElementById('event-form');
@@ -52,20 +58,31 @@ export async function initLeaguesPage() {
           <h3>${league.name} <small>(${league.start_date || 'No Start Date'})</small></h3>
           <div>
             <button class="add-event-btn secondary">Add Event</button>
+            <button class="add-player-btn secondary">Add Player</button>
             <button class="edit-league-btn secondary">Edit</button>
             <button class="delete-league-btn danger">Delete</button>
           </div>
         </div>
-        <div class="events-list" id="events-for-league-${league.id}">
-          <h4>Events:</h4>
-          <div class="events-list-inner"></div>
-          <div class="notice events-empty hidden">No events for this league.</div>
+        <div class="league-details-columns" style="display: flex; gap: 2rem; flex-wrap: wrap;">
+          <div class="events-list" id="events-for-league-${league.id}" style="flex: 1; min-width: 300px;">
+            <h4>Events:</h4>
+            <div class="events-list-inner"></div>
+            <div class="notice events-empty hidden">No events for this league.</div>
+          </div>
+          <div class="roster-list" id="roster-for-league-${league.id}" style="flex: 1; min-width: 300px;">
+            <h4>Players:</h4>
+            <div class="roster-list-inner"></div>
+            <div class="notice roster-empty hidden">No players assigned to this league.</div>
+          </div>
         </div>
       `;
       leaguesListDiv.appendChild(leagueDiv);
 
       leagueDiv.querySelector('.add-event-btn').addEventListener('click', () => {
         showEventForm(league.id, league.name);
+      });
+      leagueDiv.querySelector('.add-player-btn').addEventListener('click', () => {
+        showRosterForm(league.id, league.name);
       });
       leagueDiv.querySelector('.edit-league-btn').addEventListener('click', () => {
         editLeague(league.id);
@@ -74,10 +91,16 @@ export async function initLeaguesPage() {
         deleteLeague(league.id);
       });
 
-      renderEventsForLeague(league.id, league.events);
+      // Await these calls to ensure the UI renders sequentially and handles network data correctly
+      await renderEventsForLeague(league.id, league.events);
+      await renderRosterForLeague(league.id, league.players);
     }
   }
 
+  /**
+   * Renders the list of players currently assigned to a league as removable badges.
+   * If 'players' is null, it triggers a background fetch for that league's roster.
+   */
   async function renderEventsForLeague(leagueId, events = null) {
     const eventsListInner = document.querySelector(`#events-for-league-${leagueId} .events-list-inner`);
     const eventsEmpty = document.querySelector(`#events-for-league-${leagueId} .events-empty`);
@@ -114,6 +137,39 @@ export async function initLeaguesPage() {
     });
   }
 
+  async function renderRosterForLeague(leagueId, players = null) {
+    const rosterInner = document.querySelector(`#roster-for-league-${leagueId} .roster-list-inner`);
+    const rosterEmpty = document.querySelector(`#roster-for-league-${leagueId} .roster-empty`);
+    rosterInner.innerHTML = '';
+
+    if (players === null) {
+        const league = await PB_API.getLeague(leagueId);
+        players = league.players;
+    }
+
+    if (players.length === 0) {
+      rosterEmpty.classList.remove('hidden');
+      return;
+    }
+    rosterEmpty.classList.add('hidden');
+
+    players.forEach(player => {
+      const playerDiv = document.createElement('div');
+      playerDiv.className = 'player-item';
+      playerDiv.innerHTML = `
+        <span>${player.player_name}</span>
+        <div>
+          <button class="remove-p-btn danger">Delete</button>
+        </div>`;
+      playerDiv.querySelector('.remove-p-btn').addEventListener('click', async () => {
+        if (!confirm(`Remove ${player.player_name} from this league?`)) return;
+        await PB_API.removeLeaguePlayer(leagueId, player.id);
+        renderRosterForLeague(leagueId);
+      });
+      rosterInner.appendChild(playerDiv);
+    });
+  }
+
   function showEventForm(leagueId, leagueName, event = null) {
     eventFormCard.classList.remove('hidden');
     eventFormLeagueName.textContent = leagueName;
@@ -132,6 +188,45 @@ export async function initLeaguesPage() {
       eventDateInput.value = '';
       eventLocationSelect.value = '';
     }
+  }
+
+  async function showRosterForm(leagueId, leagueName) {
+    const players = await PB_API.getPlayers();
+    rosterFormCard.innerHTML = `
+        <h2>Add Player to League: ${leagueName}</h2>
+        <div class="form-row">
+            <label for="league-player-select">Select Player</label>
+            <select id="league-player-select">
+                <option value="">Choose a player...</option>
+                ${players.map(p => `<option value="${p.id}">${p.player_name}</option>`).join('')}
+            </select>
+        </div>
+        <div class="form-actions">
+            <button id="save-league-player">Add to League</button>
+            <button id="cancel-roster" class="secondary">Cancel</button>
+        </div>
+    `;
+    rosterFormCard.classList.remove('hidden');
+    window.scrollTo(0, document.body.scrollHeight);
+
+    document.getElementById('cancel-roster').onclick = () => rosterFormCard.classList.add('hidden');
+    document.getElementById('save-league-player').onclick = async () => {
+        const playerId = document.getElementById('league-player-select').value;
+        if (!playerId) return;
+        const confirmation = prompt(`Enter Admin Password:`);
+        if (confirmation !== ADMIN_PASSWORD) return;
+
+        await PB_API.addLeaguePlayer(leagueId, playerId);
+        rosterFormCard.classList.add('hidden');
+        renderRosterForLeague(leagueId);
+    };
+  }
+
+  function hideEventForm() {
+    eventFormCard.classList.add('hidden');
+    eventForm.reset();
+    eventIdInput.value = '';
+    eventLeagueIdInput.value = '';
   }
 
   async function editLeague(leagueId) {
@@ -219,6 +314,8 @@ export async function initLeaguesPage() {
       alert("Error saving event: " + err.message);
     }
   });
+
+  cancelEventEditBtn.addEventListener('click', hideEventForm);
 
   await loadLocations();
   await renderLeagues();

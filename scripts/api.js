@@ -19,8 +19,13 @@ export function setCurrentPlayerId(playerId) {
 
 // Calculate the base application path once to ensure relative API calls resolve correctly
 // regardless of clean URL routing (e.g., /leagues vs /leagues.php)
+// This prevents 404 errors when navigating sub-directories or using .htaccess rewrites.
 const APP_BASE = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) || '';
 
+/**
+ * Wrapper for the Fetch API that automatically includes security headers 
+ * and handles standardized JSON error responses.
+ */
 export async function fetchJSON(url, options = {}) {
   // Construct a reliable absolute path for the API call
   const fullUrl = url.startsWith('http') ? url : `${APP_BASE}/${url}`;
@@ -57,6 +62,7 @@ export const PB_API = {
   saveScore: (score) => fetchJSON('api/scores.php', { method: 'POST', body: JSON.stringify(score) }), // score object should contain eventId
   deletePlayer: (id) => fetchJSON(`api/players.php?id=${id}`, { method: 'DELETE' }),
   createMachine: (machineName) => fetchJSON('api/machines.php', { method: 'POST', body: JSON.stringify({ machine_name: machineName }) }), // Create master machine
+  updatePlayer: (id, player) => fetchJSON(`api/players.php?id=${id}`, { method: 'PUT', body: JSON.stringify(player) }),
   updateMachine: (id, machineName) => fetchJSON(`api/machines.php?id=${id}`, { method: 'PUT', body: JSON.stringify({ machine_name: machineName }) }), // Update master machine
   deleteMachine: (id) => fetchJSON(`api/machines.php?id=${id}`, { method: 'DELETE' }),
   createPlayer: (player_name) => fetchJSON('api/players.php', { method: 'POST', body: JSON.stringify({ player_name }) }),
@@ -72,13 +78,17 @@ export const PB_API = {
   createEvent: (event) => fetchJSON('api/leagues.php?action=event', { method: 'POST', body: JSON.stringify(event) }),
   updateEvent: (id, event) => fetchJSON(`api/leagues.php?action=event&id=${id}`, { method: 'PUT', body: JSON.stringify(event) }),
   deleteEvent: (id) => fetchJSON(`api/leagues.php?action=event&id=${id}`, { method: 'DELETE' }),
+  addLeaguePlayer: (leagueId, playerId) => fetchJSON('api/leagues.php?action=player', { method: 'POST', body: JSON.stringify({ league_id: leagueId, player_id: playerId }) }),
+  removeLeaguePlayer: (leagueId, playerId) => fetchJSON(`api/leagues.php?action=player&leagueId=${leagueId}&playerId=${playerId}`, { method: 'DELETE' }),
 
   // Locations and Target Scores
   getLocations: () => fetchJSON('api/locations.php'),
-  createLocation: (name) => fetchJSON('api/locations.php', { method: 'POST', body: JSON.stringify({ name }) }),
-  updateLocation: (id, name) => fetchJSON(`api/locations.php?id=${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),
+  createLocation: (loc) => fetchJSON('api/locations.php', { method: 'POST', body: JSON.stringify(loc) }),
+  updateLocation: (id, loc) => fetchJSON(`api/locations.php?id=${id}`, { method: 'PUT', body: JSON.stringify(loc) }),
   deleteLocation: (id) => fetchJSON(`api/locations.php?id=${id}`, { method: 'DELETE' }),
   getLocationMachines: (locationId) => fetchJSON(`api/locations.php?action=machines${locationId ? `&locationId=${locationId}` : ''}`),
+  addLocationMachine: (locationId, machineId, values = {}) => 
+    fetchJSON('api/locations.php?action=machines', { method: 'POST', body: JSON.stringify({ location_id: locationId, machine_id: machineId, values }) }),
   getTargetScores: (eventId, leagueId) => 
     fetchJSON(`api/machines.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`),
   saveTargetScore: (target) => fetchJSON('api/machines.php?action=target', { method: 'POST', body: JSON.stringify(target) }),

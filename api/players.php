@@ -24,17 +24,51 @@ if ($method === 'POST') {
         sendJson(['error' => 'player_name is required'], 400);
     }
 
+    $ifpa_id = $input['ifpa_id'] ?? null;
+    $matchplay_id = $input['matchplay_id'] ?? null;
+
     try {
-        $stmt = $pdo->prepare('INSERT INTO Players (player_name) VALUES (?)');
-        $stmt->execute([$input['player_name']]);
+        $stmt = $pdo->prepare('INSERT INTO Players (player_name, ifpa_id, matchplay_id) VALUES (?, ?, ?)');
+        $stmt->execute([$input['player_name'], $ifpa_id, $matchplay_id]);
         $id = (int)$pdo->lastInsertId();
     } catch (PDOException $error) {
+        // Handle duplicate names gracefully by returning the existing record
         if ($error->errorInfo[1] === 1062) {
             $stmt = $pdo->prepare('SELECT * FROM Players WHERE player_name = ?');
             $stmt->execute([$input['player_name']]);
-            sendJson($stmt->fetch());
+            sendJson($stmt->fetch(), 409); // Conflict: Player name already exists
         }
-        sendJson(['error' => 'Unable to add player'], 500);
+        sendJson(['error' => 'Unable to add player: ' . $error->getMessage()], 500);
+    }
+
+    $stmt = $pdo->prepare('SELECT * FROM Players WHERE id = ?');
+    $stmt->execute([$id]);
+    sendJson($stmt->fetch());
+}
+
+// PUT: Update an existing player (Protected by API Secret)
+if ($method === 'PUT') {
+    validateApiSecret();
+    
+    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    if (!$id) {
+        sendJson(['error' => 'id query parameter is required'], 400);
+    }
+    if (empty($input['player_name'])) {
+        sendJson(['error' => 'player_name is required'], 400);
+    }
+
+    $ifpa_id = $input['ifpa_id'] ?? null;
+    $matchplay_id = $input['matchplay_id'] ?? null;
+
+    try {
+        $stmt = $pdo->prepare('UPDATE Players SET player_name = ?, ifpa_id = ?, matchplay_id = ? WHERE id = ?');
+        $stmt->execute([$input['player_name'], $ifpa_id, $matchplay_id, $id]);
+    } catch (PDOException $error) {
+        if ($error->errorInfo[1] === 1062) { // Duplicate entry
+            sendJson(['error' => 'Player name already exists'], 409);
+        }
+        sendJson(['error' => 'Unable to update player: ' . $error->getMessage()], 500);
     }
 
     $stmt = $pdo->prepare('SELECT * FROM Players WHERE id = ?');

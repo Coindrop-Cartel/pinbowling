@@ -192,6 +192,15 @@ button.secondary {
   border: 3px solid var(--pb-black);
 }
 
+button.danger {
+  background-color: #cc0000;
+  color: white;
+}
+
+button.danger:hover {
+  background-color: #990000;
+}
+
 button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -242,6 +251,18 @@ td {
   border: 3px solid var(--pb-black);
   margin-bottom: 20px;
   background-color: white;
+}
+
+.event-item, .player-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--pb-gray);
+}
+
+.event-item:last-child, .player-item:last-child {
+  border-bottom: none;
 }
 
 .frame-info {

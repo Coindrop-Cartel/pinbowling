@@ -9,6 +9,12 @@ export async function initStandingsPage() {
   const standingsEmpty = document.getElementById('standings-empty');
   const standingsWrapper = document.getElementById('standings-wrapper');
 
+  /**
+   * Logic for the 'Season Summary' view.
+   * Calculates total points for every player across every event in the league.
+   * 
+   * Uses bulk-fetching for all scores and target definitions to ensure fast rendering.
+   */
   const renderLeagueSummary = async (leagueId) => {
     const players = await PB_API.getPlayers();
     const leagues = await PB_API.getLeagues();
@@ -40,7 +46,7 @@ export async function initStandingsPage() {
         const playerEventScores = scoresByEventAndPlayer[event.id]?.[player.id] || [];
         if (playerEventScores.length > 0 && eventTargets.length > 0) {
           const scoreMap = playerEventScores.reduce((map, row) => {
-            map[String(row.frame)] = { ball1: row.ball1, ball2: row.ball2, ball3: row.ball3 };
+            map[String(row.frame)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
             return map;
           }, {});
           const { total } = BowlingEngine.calculateFrameResults(eventTargets, scoreMap);
@@ -91,7 +97,8 @@ export async function initStandingsPage() {
         map[String(row.frame)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
         return map;
       }, {});
-      const framesWithScores = new Set(scores.filter(s => s.ball1 > 0 || s.ball2 > 0).map(s => s.frame));
+      // Check all three possible balls to see if a frame has data
+      const framesWithScores = new Set(scores.filter(s => Number(s.ball1) > 0 || Number(s.ball2) > 0 || Number(s.ball3) > 0).map(s => s.frame));
       const { frameResults, total } = BowlingEngine.calculateFrameResults(machines, scoreMap);
       return { player, frameResults, total, framesWithScores };
     }).sort((a, b) => b.total - a.total);

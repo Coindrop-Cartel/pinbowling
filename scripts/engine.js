@@ -18,6 +18,13 @@ export const BowlingEngine = {
     return pins;
   },
 
+  /**
+   * Complex logic for Frame 10.
+   * Unlike frames 1-9, frame 10 allows up to 3 balls if the player achieves 
+   * a mark (strike or spare). Strikes on subsequent balls use adjusted 
+   * targets (multipliers) to simulate the difficulty of repeated strikes 
+   * on the same machine.
+   */
   getFrame10Data(frame, raw1, raw2, raw3) {
     const target1 = Number(frame.values[10] || 0);
     const target2 = Math.round(target1 * 1.3);
