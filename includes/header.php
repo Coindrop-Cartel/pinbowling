@@ -1,16 +1,27 @@
-<header class="main-header">
-  <div class="container header-content">
-    <a href="index.php" class="logo">
-      <img src="images/logo.png" alt="PinBowling Logo">
+<nav class="navbar">
+  <div class="nav-container">
+    <a href="index.php" class="nav-logo">
+      <img src="images/logo.png" alt="PinBowling Logo" height="30">
+      <span>PinBowling</span>
     </a>
-    <nav class="taskbar">
-      <?php
-      $navItems = ['players.php' => 'Players', 'scores.php' => 'Scores', 'standings.php' => 'Standings', 'machines.php' => 'Machines', 'leagues.php' => 'Leagues'];
-      foreach ($navItems as $url => $label):
-        $active = (basename($_SERVER['PHP_SELF']) == $url) ? 'active' : '';
-        echo "<a href=\"$url\" class=\"nav-item $active\">$label</a>";
-      endforeach;
-      ?>
-    </nav>
+    <ul class="nav-links">
+      <li><a href="#" class="nav-link">Lets Bowl!</a></li>
+      <li class="nav-item dropdown">
+        <a href="javascript:void(0)" class="nav-link dropbtn">Leagues</a>
+        <div class="dropdown-content">
+          <a href="leagues.php">Create/Edit</a>
+          <a href="scores.php">Play</a>
+          <a href="standings.php">Scoreboard</a>
+        </div>
+      </li>
+      <li class="nav-item dropdown">
+        <a href="javascript:void(0)" class="nav-link dropbtn">Admin</a>
+        <div class="dropdown-content">
+          <a href="config.php">Machines</a>
+          <a href="players.php">Players</a>
+          <a href="locations.php">Locations</a>
+        </div>
+      </li>
+    </ul>
   </div>
-</header>
+</nav>

@@ -24,10 +24,10 @@
       <h2>About the Project</h2>
       <p>The system attempts to map pinball scoring to bowling scoring. It calculates strikes, spares, and total scores following standard bowling rules based the target scores for each machine (its KINDA like pingolf). I'm not gonna explain how bowling scoring works, you are already on the internet you can figure it out.</p>
       <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-        <a href="leagues.php" class="btn-standard">Start a League</a>
-        <a href="scores.php" class="btn-standard">Play in a League</a>
         <a href="#" class="btn-standard">Let's Bowl</a>
-        <a href="standings.php" class="btn-standard">View Standings</a>
+        <a href="leagues.php" class="btn-standard">Manage Leagues</a>
+        <a href="scores.php" class="btn-standard">Enter Scores</a>
+        <a href="standings.php" class="btn-standard">View Scoreboard</a>
       </div>
     </section>
 
