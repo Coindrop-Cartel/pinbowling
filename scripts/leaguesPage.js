@@ -170,10 +170,15 @@ export async function initLeaguesPage() {
       if (pass === null || pass !== window.PB_ADMIN_PASSWORD) return alert('Unauthorized');
     }
 
-    await PB_API.createLeague({ name, start_date: date });
-    leagueNameInput.value = '';
-    leagueDateInput.value = '';
-    await refresh();
+    try {
+      await PB_API.createLeague({ name, start_date: date });
+      leagueNameInput.value = '';
+      leagueDateInput.value = '';
+      await refresh();
+    } catch (err) {
+      console.error('League creation failed:', err);
+      alert(`Failed to create league: ${err.message}`);
+    }
   });
 
   async function renderPlayersForLeague(leagueId, leaguePlayers, allPlayers) {
@@ -302,15 +307,20 @@ export async function initLeaguesPage() {
 
     const payload = { league_id: leagueId, event_name: name, event_date: date, location_id: locationId };
 
-    if (eventId) {
-      await PB_API.updateEvent(eventId, payload);
-    } else {
-      await PB_API.createEvent(payload);
-    }
+    try {
+      if (eventId) {
+        await PB_API.updateEvent(eventId, payload);
+      } else {
+        await PB_API.createEvent(payload);
+      }
 
-    eventFormCard.classList.add('hidden');
-    e.target.reset();
-    await refresh();
+      eventFormCard.classList.add('hidden');
+      e.target.reset();
+      await refresh();
+    } catch (err) {
+      console.error('Event save failed:', err);
+      alert(`Failed to save event: ${err.message}`);
+    }
   };
 
   await refresh();

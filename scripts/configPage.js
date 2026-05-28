@@ -305,15 +305,23 @@ export async function initConfigPage() {
         masterMachines.push(masterMachine);
     }
 
-    await PB_API.saveTargetScore({ 
+    const payload = { 
       id: editingMachineId,
       event_id: Number(eventId), 
       machine_id: masterMachine.id, 
       order_number, 
       values 
-    });
-    await refresh();
-    resetForm();
+    };
+    console.log('Saving Target Score Payload:', payload);
+
+    try {
+      await PB_API.saveTargetScore(payload);
+      await refresh();
+      resetForm();
+    } catch (err) {
+      console.error('Save failed:', err);
+      alert(`Failed to save: ${err.message}`);
+    }
   });
 
   await initReadOnlyTournamentDisplay(document.querySelector('.tournament-selector-container'), refresh);

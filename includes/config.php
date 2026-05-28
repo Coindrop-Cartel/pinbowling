@@ -287,7 +287,13 @@ function initDatabase() {
  */
 function validateApiSecret() {
     global $API_SECRET;
-    if (!isset($_SERVER['HTTP_X_PB_SECRET']) || $_SERVER['HTTP_X_PB_SECRET'] !== $API_SECRET) {
+    
+    // Hosted environments (CGI/FastCGI) often rename or strip custom headers.
+    // We check common variations and Apache-specific header arrays.
+    $headers = function_exists('getallheaders') ? getallheaders() : [];
+    $providedSecret = $_SERVER['HTTP_X_PB_SECRET'] ?? $headers['X-PB-SECRET'] ?? $headers['x-pb-secret'] ?? $_SERVER['REDIRECT_HTTP_X_PB_SECRET'] ?? null;
+
+    if (!$providedSecret || $providedSecret !== $API_SECRET) {
         sendJson(['error' => 'Unauthorized: Invalid or missing API secret'], 401);
     }
 }
