@@ -18,7 +18,6 @@
 
     <header id="scoring-header" class="hidden">
       <h1>Player Score Tracker</h1>
-      <p>Enter your scores for each frame and calculate your bowling-style total.</p>
       <button id="print-sheet-btn" class="secondary" style="margin-top: 1rem;">Print Blank Score Sheet</button>
     </header>
 
