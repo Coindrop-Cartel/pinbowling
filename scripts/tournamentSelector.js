@@ -11,18 +11,18 @@ export async function initTournamentSelector(onRefresh) {
 
   container.innerHTML = `
     <section class="card tournament-selector" style="margin-bottom: 1.5rem;">
-      <div class="form-row" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start; width: 100%;">
-        <div style="flex: 1; min-width: 250px;">
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; box-sizing: border-box;">
+        <div style="flex: 1 0 250px; display: flex; flex-direction: column;">
           <label style="display: block; margin-bottom: 5px;">League Search</label>
           <input type="text" id="league-search-global" style="width: 100%; box-sizing: border-box;" placeholder="Type to filter..." autocomplete="off">
         </div>
-        <div style="flex: 1; min-width: 250px;">
+        <div style="flex: 1 0 250px; display: flex; flex-direction: column;">
           <label for="league-select-global" style="display: block; margin-bottom: 5px;">Select League</label>
           <select id="league-select-global" style="width: 100%; box-sizing: border-box;">
             <option value="">-- Choose League --</option>
           </select>
         </div>
-        <div id="event-select-wrapper" style="flex: 1; min-width: 250px;" class="hidden">
+        <div id="event-select-wrapper" style="flex: 1 0 250px; display: flex; flex-direction: column;" class="hidden">
           <label for="event-select-global" style="display: block; margin-bottom: 5px;">Event</label>
           <select id="event-select-global" style="width: 100%; box-sizing: border-box;">
             <option value="">Select Event</option>
@@ -42,6 +42,7 @@ export async function initTournamentSelector(onRefresh) {
     leagueSelect.innerHTML = '<option value="">-- Choose League --</option>';
     const normalizedFilter = filter.toLowerCase();
     
+    let matchCount = 0;
     leagues.forEach(l => {
       if (l.name.toLowerCase().includes(normalizedFilter)) {
         const opt = document.createElement('option');
@@ -49,8 +50,10 @@ export async function initTournamentSelector(onRefresh) {
         opt.textContent = l.name;
         if (String(l.id) === String(currentVal)) opt.selected = true;
         leagueSelect.appendChild(opt);
+        matchCount++;
       }
     });
+    return matchCount;
   };
 
   const populateEvents = (leagueId, selectedEventId) => {
@@ -82,10 +85,10 @@ export async function initTournamentSelector(onRefresh) {
 
   searchInput.addEventListener('input', (e) => {
     const filter = e.target.value;
-    updateLeagueOptions(filter);
+    const matchCount = updateLeagueOptions(filter);
 
-    // Expand the dropdown list visually while typing to show matches
-    leagueSelect.size = filter.length > 0 ? 5 : 1;
+    // Dynamically set size based on results (+1 for placeholder), capped at 5
+    leagueSelect.size = filter.length > 0 ? Math.min(matchCount + 1, 5) : 1;
 
     // If they type a name that matches exactly, auto-select it to "update as they type"
     const match = leagues.find(l => l.name.toLowerCase() === filter.toLowerCase());
