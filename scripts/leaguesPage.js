@@ -1,4 +1,5 @@
 import { PB_API, ADMIN_PASSWORD } from './api.js';
+import { setActiveLeagueId, setActiveEventId } from './utils.js';
 
 /**
  * Initializes the Leagues & Events management page.
@@ -136,12 +137,18 @@ export async function initLeaguesPage() {
           <small>Location: ${event.location_name || 'No Location'}</small>
         </span>
         <div>
+          <button class="setup-event-btn secondary">Setup</button>
           <button class="edit-event-btn secondary">Edit</button>
           <button class="delete-event-btn">Delete</button>
         </div>
       `;
       eventsListInner.appendChild(eventDiv);
 
+      eventDiv.querySelector('.setup-event-btn').addEventListener('click', () => {
+        setActiveLeagueId(leagueId);
+        setActiveEventId(event.id);
+        window.location.href = 'event-setup.php';
+      });
       eventDiv.querySelector('.edit-event-btn').addEventListener('click', () => {
         editEvent(event.id, leagueId);
       });
