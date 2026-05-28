@@ -1,4 +1,5 @@
 import { PB_API } from './api.js';
+import { setupLiveFilter } from './uiComponents.js';
 
 /**
  * Initializes the Player Management page.
@@ -15,16 +16,15 @@ export async function initPlayersPage() {
   const playerList = document.getElementById('player-list');
 
   let allPlayers = []; // Cache players for editing
+  let filterInstance = null;
 
-  async function refresh() {
-    allPlayers = await PB_API.getPlayers();
-
+  const onFilterUpdate = (filtered, query) => {
     // Update alphabetical list
     playerList.innerHTML = '';
-    if (allPlayers.length === 0) {
-      playerList.innerHTML = '<li>No players registered yet.</li>';
+    if (filtered.length === 0) {
+      playerList.innerHTML = `<li>${allPlayers.length === 0 ? 'No players registered yet.' : 'No matching players found.'}</li>`;
     } else {
-      allPlayers.forEach(p => {
+      filtered.forEach(p => {
         const li = document.createElement('li');
         li.style.padding = '8px 0';
         li.style.borderBottom = '1px solid #000';
@@ -54,8 +54,27 @@ export async function initPlayersPage() {
         btn.addEventListener('click', (e) => deletePlayer(Number(e.target.dataset.playerId)));
       });
     }
+
+    // Logic to prevent duplicate player names
+    const exactMatch = allPlayers.find(p => p.player_name.trim().toLowerCase() === query);
+    const isEditingThisPlayer = exactMatch && String(exactMatch.id) === String(editingPlayerIdInput.value);
     
-    resetForm(); // Ensure form is reset after refresh
+    savePlayerButton.disabled = !query || (!!exactMatch && !isEditingThisPlayer);
+    savePlayerButton.title = (exactMatch && !isEditingThisPlayer) ? "This player name already exists." : "";
+  };
+
+  filterInstance = setupLiveFilter(playerNameInput, allPlayers, {
+    labelKey: 'player_name',
+    onFilter: onFilterUpdate
+  });
+
+  async function refresh() {
+    const data = await PB_API.getPlayers();
+    // Update array in-place to keep the filter reference valid
+    allPlayers.length = 0;
+    allPlayers.push(...data);
+    filterInstance.performFilter();
+    resetForm();
   }
 
   /**
@@ -70,6 +89,7 @@ export async function initPlayersPage() {
     playerFormTitle.textContent = 'Add New Player';
     savePlayerButton.textContent = 'Save Player';
     cancelEditButton.classList.add('hidden');
+    if (filterInstance) filterInstance.performFilter();
   }
 
   /**
