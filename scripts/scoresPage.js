@@ -55,12 +55,13 @@ export async function initScoresPage() {
   function buildRoundRow(round, turnValues, isLastRound = false) {
     const row = document.createElement('div');
     row.className = 'round-row';
+    row.style = "display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid #eee;";
     row.dataset.order = round.order_number;
 
     const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
 
     row.innerHTML = `
-      <div class="round-info" style="cursor: pointer;">
+      <div class="round-info" style="cursor: pointer; flex: 1; min-width: 200px;">
         <div class="round-label">Round ${round.order_number}</div>
         <div class="round-machine">${round.machine_name}</div>
         <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;"><b>Strike:</b> ${formatNumber(round.values[10])}</div>
@@ -75,7 +76,7 @@ export async function initScoresPage() {
           </div>
         </div>
       </div>
-      <div class="round-inputs-container"></div>
+      <div class="round-inputs-container" style="display: flex; gap: 0.5rem; align-items: center;"></div>
       <button class="save-round-button" disabled>Save</button>
     `;
 

@@ -1,5 +1,5 @@
 import { PB_API } from './api.js';
-import { setupLiveFilter, showConfirm, showPrompt } from './uiComponents.js';
+import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog } from './uiComponents.js';
 import { setActiveLeagueId, setActiveEventId } from './utils.js';
 
 /**
@@ -13,6 +13,7 @@ export async function initLeaguesPage() {
   const leaguesList = document.getElementById('leagues-list');
   const emptyNotice = document.getElementById('leagues-list-empty');
   const eventFormCard = document.getElementById('event-form-card');
+  let allPlayersCache = []; // Cache all players for selection dialogs
 
   let allLeagues = [];
   let filterInstance = null;
@@ -57,6 +58,17 @@ export async function initLeaguesPage() {
                 </li>
               `).join('') || '<li>No events scheduled.</li>'}
             </ul>
+
+            <div class="league-players-section" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h4 style="margin: 0;">Roster</h4>
+                <button class="add-player-btn secondary" data-league-id="${league.id}" data-league-name="${league.name}" style="padding: 4px 12px; font-size: 0.85rem;">Add Player</button>
+              </div>
+              <ul class="league-players-list" style="list-style: none; padding: 0;">
+                <!-- Players will be rendered here -->
+              </ul>
+              <div class="notice league-players-empty hidden">No players assigned to this league.</div>
+            </div>
           </div>
         `;
 
@@ -91,6 +103,10 @@ export async function initLeaguesPage() {
         });
 
         leaguesList.appendChild(card);
+
+        // Initial render of players if details are not hidden (e.g., after refresh)
+        const details = card.querySelector('.league-details');
+        if (!details.classList.contains('hidden')) renderPlayersForLeague(league.id, league.league_players, allPlayersCache);
       });
     }
 
@@ -120,6 +136,8 @@ export async function initLeaguesPage() {
       const data = await PB_API.getLeagues();
       allLeagues.length = 0;
       allLeagues.push(...data);
+      // Also refresh the global player cache for selection dialogs
+      allPlayersCache = await PB_API.getPlayers();
       filterInstance.performFilter();
     } catch (err) {
       console.error('Failed to load leagues:', err);
@@ -141,6 +159,79 @@ export async function initLeaguesPage() {
     leagueDateInput.value = '';
     await refresh();
   });
+
+  async function renderPlayersForLeague(leagueId, leaguePlayers, allPlayers) {
+    const playersListEl = document.querySelector(`.league-item .add-player-btn[data-league-id="${leagueId}"]`).closest('.league-players-section').querySelector('.league-players-list');
+    const emptyNoticeEl = playersListEl.nextElementSibling; // The .league-players-empty div
+
+    playersListEl.innerHTML = '';
+    if (leaguePlayers && leaguePlayers.length > 0) {
+        emptyNoticeEl.classList.add('hidden');
+        leaguePlayers.forEach(lp => {
+            const player = allPlayers.find(p => p.id === lp.player_id);
+            if (player) {
+                const li = document.createElement('li');
+                li.style = "display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;";
+                li.innerHTML = `
+                    <span>${player.player_name}</span>
+                    <button class="remove-player-btn" data-league-id="${leagueId}" data-player-id="${player.id}" data-player-name="${player.player_name}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>
+                `;
+                playersListEl.appendChild(li);
+            }
+        });
+    } else {
+        emptyNoticeEl.classList.remove('hidden');
+    }
+
+    // Attach event listeners for remove buttons
+    playersListEl.querySelectorAll('.remove-player-btn').forEach(btn => {
+        btn.onclick = (e) => removePlayerFromLeague(
+            Number(e.target.dataset.leagueId),
+            Number(e.target.dataset.playerId),
+            e.target.dataset.playerName
+        );
+    });
+  }
+
+  async function addPlayerToLeague(leagueId, leagueName) {
+    const league = allLeagues.find(l => l.id === leagueId);
+    const playersInLeague = new Set((league.league_players || []).map(lp => lp.player_id));
+    const availablePlayers = allPlayersCache.filter(p => !playersInLeague.has(p.id));
+
+    if (availablePlayers.length === 0) {
+        alert('All available players are already in this league.');
+        return;
+    }
+
+    const playerOptions = availablePlayers.map(p => ({ value: p.id, label: p.player_name }));
+
+    const selectedPlayerId = await showPlayerSelectionDialog(
+        `Add Player to ${leagueName}`,
+        'Select a player to add:',
+        playerOptions
+    );
+
+    if (selectedPlayerId) {
+        if (window.PB_ADMIN_PASSWORD) {
+            const pass = await showPrompt(`Enter Admin Password to add player to "${leagueName}":`);
+            if (pass === null || pass !== window.PB_ADMIN_PASSWORD) return alert('Unauthorized');
+        }
+        await PB_API.addLeaguePlayer(leagueId, Number(selectedPlayerId));
+        await refresh();
+    }
+  }
+
+  async function removePlayerFromLeague(leagueId, playerId, playerName) {
+    if (!await showConfirm(`Remove ${playerName} from this league? Their scores will remain, but they will no longer be associated with this league's roster.`, 'Remove Player')) return;
+
+    if (window.PB_ADMIN_PASSWORD) {
+        const pass = await showPrompt(`Enter Admin Password to remove ${playerName} from league:`);
+        if (pass === null || pass !== window.PB_ADMIN_PASSWORD) return alert('Unauthorized');
+    }
+
+    await PB_API.removeLeaguePlayer(leagueId, playerId);
+    await refresh();
+  }
 
   async function deleteLeague(id, name) {
     if (!await showConfirm(`Are you sure you want to delete the entire league "${name}"? This will delete all associated events and target scores.`, 'Delete League')) return;

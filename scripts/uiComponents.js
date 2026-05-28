@@ -207,3 +207,67 @@ export function showDialog({ title, message, showInput = false, isPassword = tru
 
 export const showConfirm = (message, title = 'Confirm Action') => showDialog({ title, message, confirmText: 'Yes, Proceed', cancelText: 'Cancel' });
 export const showPrompt = (message, title = 'Admin Password', isPassword = true) => showDialog({ title, message, showInput: true, isPassword, confirmText: 'Submit' });
+
+/**
+ * Replaces native browser confirm() and prompt() with a custom UI modal
+ * that matches the site's card-based theme, specifically for player selection.
+ * 
+ * @param {string} title Dialog title.
+ * @param {string} message Dialog message.
+ * @param {Array<{value: string|number, label: string}>} options List of players to select from.
+ * @returns {Promise<string|null>} The selected player ID or null if cancelled.
+ */
+export async function showPlayerSelectionDialog(title, message, options) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;box-sizing:border-box;backdrop-filter:blur(4px);";
+    
+    const card = document.createElement('div');
+    card.className = "card";
+    card.style = "max-width:450px;width:100%;margin:0;box-shadow: 0 10px 25px rgba(0,0,0,0.5);";
+    
+    card.innerHTML = `
+      <h2 style="margin-top:0;">${title}</h2>
+      <p style="margin-bottom:0; line-height:1.5;">${message}</p>
+      <div class="form-row" style="margin-top:20px;">
+        <input type="text" id="player-search-modal" style="width:100%;box-sizing:border-box;font-size:1.1rem;padding:12px;" placeholder="Search players...">
+        <select id="player-select-modal" style="width:100%;box-sizing:border-box;font-size:1.1rem;padding:12px;margin-top:10px;"></select>
+      </div>
+      <div class="form-actions" style="margin-top:30px; display:flex; gap:12px;">
+        <button id="modal-confirm" style="flex:1;">Add Player</button>
+        <button id="modal-cancel" class="secondary" style="flex:1;">Cancel</button>
+      </div>
+    `;
+    
+    backdrop.appendChild(card);
+    document.body.appendChild(backdrop);
+
+    const searchInput = card.querySelector('#player-search-modal');
+    const selectElement = card.querySelector('#player-select-modal');
+    const confirmBtn = card.querySelector('#modal-confirm');
+    const cancelBtn = card.querySelector('#modal-cancel');
+
+    // Populate initial options
+    selectElement.innerHTML = '<option value="">-- Select Player --</option>' + options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+
+    const searchableSelectInstance = createSearchableSelect(searchInput, selectElement, options, {
+      valueKey: 'value',
+      labelKey: 'label',
+      placeholder: '-- Select Player --',
+      onSelect: (val) => {
+        confirmBtn.disabled = !val;
+      }
+    });
+
+    const finish = (value) => {
+      document.body.removeChild(backdrop);
+      resolve(value);
+    };
+
+    confirmBtn.disabled = true; // Initially disabled until a player is selected
+    confirmBtn.onclick = () => finish(selectElement.value);
+    cancelBtn.onclick = () => finish(null);
+
+    setTimeout(() => searchInput.focus(), 50);
+  });
+}
