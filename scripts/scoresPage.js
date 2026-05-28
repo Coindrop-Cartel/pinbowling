@@ -14,7 +14,6 @@ export async function initScoresPage() {
   const resultsEmpty = document.getElementById('results-empty');
   const warning = document.getElementById('player-warning');
   const playerSelect = document.getElementById('player-select');
-  const playerFileInfo = document.getElementById('player-file-info');
   const scoringHeader = document.getElementById('scoring-header');
   const playerSelectionCard = document.getElementById('player-selection-card');
   const scoringCard = document.getElementById('scoring-card');
@@ -149,22 +148,10 @@ export async function initScoresPage() {
 
     if (currentPlayerId && players.some((player) => String(player.id) === currentPlayerId)) {
       playerSelect.value = currentPlayerId;
-      const selectedPlayer = players.find((player) => String(player.id) === currentPlayerId);
-      updatePlayerFileInfo(selectedPlayer);
       return currentPlayerId;
     }
 
-    updatePlayerFileInfo(null);
     return null;
-  }
-
-  function updatePlayerFileInfo(player) {
-    if (!player) {
-      playerFileInfo.classList.add('hidden');
-      return;
-    }
-    playerFileInfo.textContent = player.player_name;
-    playerFileInfo.classList.remove('hidden');
   }
 
   function loadScoresIntoForm(scoreRows) {

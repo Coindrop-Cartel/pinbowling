@@ -27,7 +27,6 @@
         <label for="player-select">Player</label>
         <select id="player-select"></select>
       </div>
-      <div id="player-file-info" class="notice hidden"></div>
     </section>
 
     <section id="scoring-card" class="card hidden">
