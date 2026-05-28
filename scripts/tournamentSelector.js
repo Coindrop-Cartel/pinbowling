@@ -15,7 +15,10 @@ export async function initTournamentSelector(onRefresh) {
       <div style="display: flex; flex-direction: column; gap: 1rem; width: 100%; box-sizing: border-box;" autocomplete="off">
         <div style="width: 100%;">
           <label style="display: block; margin-bottom: 5px;">League Search</label>
-          <input type="text" id="league-search-global" style="width: 100%; box-sizing: border-box;" placeholder="Type to filter...">
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="league-search-global" style="flex: 1; box-sizing: border-box; margin-bottom: 0;" placeholder="Type to filter...">
+            <button id="clear-selection-btn" class="secondary" style="padding: 10px 15px; white-space: nowrap;">Clear</button>
+          </div>
         </div>
         <div style="width: 100%;">
           <label for="league-select-global" style="display: block; margin-bottom: 5px;">Select League</label>
@@ -37,6 +40,7 @@ export async function initTournamentSelector(onRefresh) {
   const leagueSelect = document.getElementById('league-select-global');
   const eventSelect = document.getElementById('event-select-global');
   const eventWrapper = document.getElementById('event-select-wrapper');
+  const clearBtn = document.getElementById('clear-selection-btn');
 
   const populateEvents = (leagueId, selectedEventId) => {
     const isStandingsPage = !!document.getElementById('standings-body');
@@ -81,24 +85,38 @@ export async function initTournamentSelector(onRefresh) {
     if (onRefresh) onRefresh();
   });
 
-  // Init
-  if (activeLeagueId) {
-    const league = leagues.find(l => String(l.id) === String(activeLeagueId));
+  clearBtn.addEventListener('click', () => {
+    setActiveLeagueId('');
+    setActiveEventId('');
+    searchInput.value = '';
+    leagueSelect.value = '';
+    updateOptions('');
+    populateEvents('', '');
+    if (onRefresh) onRefresh();
+  });
+
+  // Init logic: Resolve League/Event relationship
+  let currentLeagueId = activeLeagueId;
+  let currentEventId = activeEventId;
+
+  // If we have an event but no league, resolve the league from the event data
+  if (!currentLeagueId && currentEventId && currentEventId !== 'summary') {
+    const foundLeague = leagues.find(l => (l.events || []).some(e => String(e.id) === String(currentEventId)));
+    if (foundLeague) {
+      currentLeagueId = String(foundLeague.id);
+      setActiveLeagueId(currentLeagueId);
+    }
+  }
+
+  if (currentLeagueId) {
+    const league = leagues.find(l => String(l.id) === String(currentLeagueId));
     if (league) {
-      searchInput.value = ''; // Ensure search field starts fresh on navigation
-      leagueSelect.value = activeLeagueId;
-      updateOptions(''); // Show all options instead of just the matched one
-      populateEvents(activeLeagueId, activeEventId);
-    } else {
-      // If the league in storage is invalid, clear everything
-      setActiveLeagueId('');
-      setActiveEventId('');
-      updateOptions('');
-      populateEvents('', '');
+      searchInput.value = league.name;
+      leagueSelect.value = currentLeagueId;
+      updateOptions(league.name);
+      populateEvents(currentLeagueId, currentEventId);
     }
   } else {
-    // No league selected - ensure event is also unselected and hidden
-    setActiveEventId('');
     updateOptions('');
     populateEvents('', '');
   }

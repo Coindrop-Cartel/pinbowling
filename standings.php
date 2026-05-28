@@ -25,7 +25,6 @@
       <h2 id="tv-title" class="hidden"></h2>
       <h2 class="no-tv">Current Standings</h2>
       <p class="hint">View specific event results or select <b>Season Summary</b> to see total bowling points accumulated across all events in the league.</p>
-      <div id="standings-empty" class="notice hidden">No players or scores are available yet. Add a player and update scores first.</div>
       <div id="standings-wrapper">
         <table class="data-table standings-table">
           <thead id="standings-header">
