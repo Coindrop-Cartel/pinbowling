@@ -67,7 +67,7 @@ export function initLocationsPage() {
           locDiv.querySelector('.add-mach-btn').onclick = () => showMachineForm(loc.id, loc.name);
           locDiv.querySelector('.delete-loc-btn').onclick = () => window.deleteLocation(loc.id);
 
-          renderMachinesForLocation(loc.id, loc.name, loc.machines);
+          renderMachinesForLocation(loc.id, loc.machines);
         }
       } else {
         emptyNotice.classList.remove('hidden');
@@ -101,14 +101,13 @@ export function initLocationsPage() {
     cancelBtn.classList.add('hidden');
   }
 
-  async function renderMachinesForLocation(locationId, locationName, machines = null) {
+  async function renderMachinesForLocation(locationId, machines = null) {
     const inner = document.querySelector(`#mach-for-loc-${locationId} .mach-list-inner`);
     const empty = document.querySelector(`#mach-for-loc-${locationId} .mach-empty`);
     inner.innerHTML = '';
 
     if (!machines) {
-      const all = await PB_API.getLocations();
-      const loc = all.find(l => l.id === locationId);
+      const loc = await PB_API.getLocations().then(all => all.find(l => l.id === locationId));
       machines = loc.machines || [];
     }
 
@@ -144,7 +143,7 @@ export function initLocationsPage() {
     });
   }
 
- async function showMachineForm(locationId, locationName, existing = null) {
+  async function showMachineForm(locationId, locationName, existing = null) {
     const allMachines = await PB_API.getMachines();
     machineFormCard.innerHTML = `
       <h2>${existing ? 'Edit' : 'Add'} Machine for ${locationName}</h2>
@@ -168,7 +167,7 @@ export function initLocationsPage() {
         <input type="text" id="target-hard" value="${existing ? formatNumber(existing.target_hard) : ''}">
       </div>
       <div class="form-actions">
-       <button id="save-loc-mach">${existing ? 'Update' : 'Add to'} Location</button>
+        <button id="save-loc-mach">${existing ? 'Update' : 'Add to'} Location</button>
         <button id="cancel-loc-mach" class="secondary">Cancel</button>
       </div>
     `;
@@ -183,6 +182,7 @@ export function initLocationsPage() {
     document.getElementById('save-loc-mach').onclick = async () => {
       const machineId = document.getElementById('loc-mach-select').value;
       if (!machineId) return;
+
       const extra = {
         target_easy: Number(document.getElementById('target-easy').value.replace(/\D/g, '')) || 0,
         target_med: Number(document.getElementById('target-med').value.replace(/\D/g, '')) || 0,
