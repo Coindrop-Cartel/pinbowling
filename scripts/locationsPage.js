@@ -67,7 +67,7 @@ export function initLocationsPage() {
           locDiv.querySelector('.add-mach-btn').onclick = () => showMachineForm(loc.id, loc.name);
           locDiv.querySelector('.delete-loc-btn').onclick = () => window.deleteLocation(loc.id);
 
-          renderMachinesForLocation(loc.id, loc.machines);
+          renderMachinesForLocation(loc.id, loc.name, loc.machines);
         }
       } else {
         emptyNotice.classList.remove('hidden');
@@ -101,14 +101,16 @@ export function initLocationsPage() {
     cancelBtn.classList.add('hidden');
   }
 
-  async function renderMachinesForLocation(locationId, machines = null) {
+  async function renderMachinesForLocation(locationId, locationName, machines = null) {
     const inner = document.querySelector(`#mach-for-loc-${locationId} .mach-list-inner`);
     const empty = document.querySelector(`#mach-for-loc-${locationId} .mach-empty`);
     inner.innerHTML = '';
 
-    if (!machines) {
-      const loc = await PB_API.getLocations().then(all => all.find(l => l.id === locationId));
+    if (machines === null) {
+      const all = await PB_API.getLocations();
+      const loc = all.find(l => l.id === locationId);
       machines = loc.machines || [];
+      locationName = loc?.name || 'Venue';
     }
 
     if (machines.length === 0) {
