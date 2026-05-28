@@ -85,8 +85,8 @@ export const BowlingEngine = {
     return { order: frame.order_number, machine: frame.machine_name, type: 'tenth', mark, first: firstPins, second: secondPins, third: thirdPins, score };
   },
 
-  getFrameDataFromValues(frame, raw1, raw2, raw3) {
-    if (frame.order_number === 10) return this.getFrame10Data(frame, raw1, raw2, raw3);
+  getFrameDataFromValues(frame, raw1, raw2, raw3, isLastFrame = false) {
+    if (isLastFrame) return this.getFrame10Data(frame, raw1, raw2, raw3);
 
     const c1 = this.getPinCount(frame, raw1);
     const c2 = this.getPinCount(frame, raw2);
@@ -125,9 +125,11 @@ export const BowlingEngine = {
   },
 
   calculateFrameResults(machines, scoreMap) {
+    const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
+
     const frameData = machines.map((frame) => {
       const entry = scoreMap[String(frame.order_number)] || { ball1: 0, ball2: 0, ball3: 0 };
-      return this.getFrameDataFromValues(frame, Number(entry.ball1), Number(entry.ball2), Number(entry.ball3));
+      return this.getFrameDataFromValues(frame, Number(entry.ball1), Number(entry.ball2), Number(entry.ball3), frame.order_number === maxOrder);
     });
 
     let total = 0;

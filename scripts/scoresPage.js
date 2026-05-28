@@ -38,7 +38,7 @@ export async function initScoresPage() {
     input.placeholder = placeholder || `Ball ${ball} cumulative`;
     input.className = 'roll-input';
     input.value = (value !== '' && value !== undefined) ? formatNumber(value) : '';
-    input.dataset.frame = frameNumber;
+    input.dataset.order = frameNumber;
     input.dataset.ball = ball;
     input.dataset.machineId = machineId;
     applyScoreFormatting(input);
@@ -46,13 +46,13 @@ export async function initScoresPage() {
     return input;
   }
 
-  function buildFrameRow(frame, rollValues) {
+  function buildFrameRow(frame, rollValues, isLastFrame = false) {
     const row = document.createElement('div');
     row.className = 'frame-row';
-    row.dataset.frame = frame.frame_number;
+    row.dataset.order = frame.order_number;
 
     let extraTargets = '';
-    if (frame.frame_number === 10) {
+    if (isLastFrame) {
       const t1 = Math.round(frame.values[10] * 1.3);
       const t2 = Math.round(t1 * 1.3);
       extraTargets = `
@@ -63,7 +63,7 @@ export async function initScoresPage() {
 
     row.innerHTML = `
       <div class="frame-info">
-        <div class="frame-label">Frame ${frame.frame_number}</div>
+        <div class="frame-label">Order ${frame.order_number}</div>
         <div class="frame-machine">${frame.machine_name}</div>
         <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;">Strike: <b>${formatNumber(frame.values[10])}</b></div>
         ${extraTargets}
@@ -81,7 +81,7 @@ export async function initScoresPage() {
       
       // Use frame.machine_id (master list ID) instead of frame.id (Target_Scores row ID)
       // to ensure database foreign key constraints pass.
-      const input = createRollInput(frame.frame_number, ball, frame.machine_id, value, placeholder);
+      const input = createRollInput(frame.order_number, ball, frame.machine_id, value, placeholder);
       
       input.addEventListener('input', () => {
         saveBtn.disabled = false;
@@ -104,7 +104,7 @@ export async function initScoresPage() {
 
       await PB_API.saveScore({
         playerId: Number(currentPlayerId),
-        frame: frame.frame_number,
+        order_number: frame.order_number,
         eventId: Number(getActiveEventId()),
         machineId: frame.machine_id, 
         ball1,
@@ -156,14 +156,16 @@ export async function initScoresPage() {
 
   function loadScoresIntoForm(scoreRows) {
     const scoreMap = scoreRows.reduce((map, row) => {
-      map[String(row.frame)] = row;
+      map[String(row.order_number)] = row;
       return map;
     }, {});
+    
+    const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
 
     framesInput.innerHTML = '';
     machines.forEach((frame) => {
-      const rollValues = scoreMap[String(frame.frame_number)];
-      framesInput.appendChild(buildFrameRow(frame, rollValues));
+      const rollValues = scoreMap[String(frame.order_number)];
+      framesInput.appendChild(buildFrameRow(frame, rollValues, frame.order_number === maxOrder));
     });
   }
 
@@ -199,8 +201,8 @@ export async function initScoresPage() {
   function getScoreMapFromInputs() {
     const scoreMap = {};
     framesInput.querySelectorAll('.frame-row').forEach((row) => {
-      const frameNumber = Number(row.dataset.frame);
-      scoreMap[frameNumber] = {
+      const orderNum = Number(row.dataset.order);
+      scoreMap[orderNum] = {
         ball1: Number(row.querySelector('[data-ball="1"]').value.replace(/\D/g, '')) || 0,
         ball2: Number(row.querySelector('[data-ball="2"]').value.replace(/\D/g, '')) || 0,
         ball3: Number(row.querySelector('[data-ball="3"]').value.replace(/\D/g, '')) || 0,

@@ -103,7 +103,7 @@ export async function initStandingsPage() {
         const playerEventScores = scoresByEventAndPlayer[event.id]?.[player.id] || [];
         if (playerEventScores.length > 0 && eventTargets.length > 0) {
           const scoreMap = playerEventScores.reduce((map, row) => {
-            map[String(row.frame)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
+            map[String(row.order_number)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
             return map;
           }, {});
           const { total } = BowlingEngine.calculateFrameResults(eventTargets, scoreMap);
@@ -163,24 +163,24 @@ export async function initStandingsPage() {
     const rows = players.map(player => {
       const scores = scoresByPlayer[player.id] || [];
       const scoreMap = scores.reduce((map, row) => {
-        map[String(row.frame)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
+        map[String(row.order_number)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
         return map;
       }, {});
       // Check all three possible balls to see if a frame has data
-      const framesWithScores = new Set(scores.filter(s => Number(s.ball1) > 0 || Number(s.ball2) > 0 || Number(s.ball3) > 0).map(s => s.frame));
+      const ordersWithScores = new Set(scores.filter(s => Number(s.ball1) > 0 || Number(s.ball2) > 0 || Number(s.ball3) > 0).map(s => s.order_number));
       const { frameResults, total } = BowlingEngine.calculateFrameResults(machines, scoreMap);
-      return { player, frameResults, total, framesWithScores };
+      return { player, frameResults, total, ordersWithScores };
     }).sort((a, b) => b.total - a.total);
 
-    standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${machines.map(m => `<th>Frame ${m.frame_number}</th>`).join('')}<th>Total</th></tr>`;
+    standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${machines.map(m => `<th>Target ${m.order_number}</th>`).join('')}<th>Total</th></tr>`;
     standingsBody.innerHTML = rows.map((res, idx) => `
       <tr>
         <td>${idx + 1}</td>
         <td class="player-name-cell"></td>
         ${res.frameResults.map(f => `
-          <td class="standings-frame ${res.framesWithScores.has(f.frame) ? 'has-score' : 'no-score'}">
-            <div class="standings-mark">${res.framesWithScores.has(f.frame) ? f.mark : '−'}</div>
-            <div class="standings-frame-score">${res.framesWithScores.has(f.frame) ? formatNumber(f.score) : ''}</div>
+          <td class="standings-frame ${res.ordersWithScores.has(f.order) ? 'has-score' : 'no-score'}">
+            <div class="standings-mark">${res.ordersWithScores.has(f.order) ? f.mark : '−'}</div>
+            <div class="standings-frame-score">${res.ordersWithScores.has(f.order) ? formatNumber(f.score) : ''}</div>
           </td>`).join('')}
         <td class="standings-total">${formatNumber(res.total)}</td>
       </tr>`).join('');

@@ -63,8 +63,9 @@ export function initNavigation() {
  * @param {HTMLInputElement} score1Input 
  * @param {HTMLElement} previewValues 
  * @param {Object} BowlingEngine
+ * @param {boolean} isLastFrame
  */
-export function renderPreview(score10Input, score1Input, previewValues, BowlingEngine) {
+export function renderPreview(score10Input, score1Input, previewValues, BowlingEngine, isLastFrame = false) {
   const score10 = Number(score10Input.value.replace(/\D/g, ''));
   const score1 = Number(score1Input.value.replace(/\D/g, ''));
   const values = BowlingEngine.buildFrameValues(score10, score1);
@@ -79,8 +80,7 @@ export function renderPreview(score10Input, score1Input, previewValues, BowlingE
     .map(([rank, value]) => `<div><strong>${rank}:</strong> ${formatNumber(value)}</div>`)
     .join("");
 
-  const frameSelect = document.getElementById('frame-number');
-  if (frameSelect && frameSelect.value === "10" && values[10]) {
+  if (isLastFrame && values[10]) {
     const target1 = Math.round(values[10] * 1.3);
     const target2 = Math.round(target1 * 1.3);
     html += `<br><div><strong>Target 1:</strong> ${formatNumber(target1)}</div>`;
@@ -97,6 +97,8 @@ export function renderPreview(score10Input, score1Input, previewValues, BowlingE
 export function printMachineScores(machines) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) return alert('Please allow popups to print.');
+
+  const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
 
   const pagesHtml = machines.map((m) => {
     const ranks = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
@@ -115,7 +117,7 @@ export function printMachineScores(machines) {
     }).join('');
 
     let extraTargets = '';
-    if (m.frame_number === 10) {
+    if (m.order_number === maxOrder) {
       const t1 = Math.round(m.values[10] * 1.3);
       const t2 = Math.round(t1 * 1.3);
       extraTargets = `
@@ -129,7 +131,7 @@ export function printMachineScores(machines) {
       <div class="page" style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; page-break-after: always; padding: 40px; box-sizing: border-box;">
         <div style="border: 6px solid #000; padding: 50px; width: 100%; max-width: 1100px;">
           <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 40px; border-bottom: 6px solid #000; padding-bottom: 15px;">
-            <h1 style="margin: 0; font-size: 4rem;">Frame ${m.frame_number}</h1>
+            <h1 style="margin: 0; font-size: 4rem;">Target ${m.order_number}</h1>
             <h2 style="margin: 0; font-size: 4rem;">${m.machine_name}</h2>
           </div>
           <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px;">${scoresHtml}</div>
@@ -154,7 +156,7 @@ export function printBlankScoreSheet(machines) {
   const framesHtml = machines.map((m) => `
     <div style="border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; page-break-inside: avoid;">
       <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px;">
-        <span style="font-weight: bold;">Frame ${m.frame_number}</span>
+        <span style="font-weight: bold;">Target ${m.order_number}</span>
         <span>Game: <strong>${m.machine_name}</strong></span>
         <span>Target: <strong>${formatNumber(m.values[10])}</strong></span>
       </div>

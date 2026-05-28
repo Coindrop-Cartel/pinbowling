@@ -19,7 +19,7 @@ function serializeTargetScore($row) {
         'event_id' => isset($row['event_id']) ? (int)$row['event_id'] : null,
         'machine_id' => (int)$row['machine_id'], // This is the ID of the master machine
         'machine_name' => $row['machine_name'], // Joined from Machines table
-        'frame_number' => (int)$row['frame_number'],
+        'order_number' => (int)$row['order_number'],
         'values' => [
             1 => (int)$row['score1'], 2 => (int)$row['score2'], 3 => (int)$row['score3'], 4 => (int)$row['score4'], 5 => (int)$row['score5'],
             6 => (int)$row['score6'], 7 => (int)$row['score7'], 8 => (int)$row['score8'], 9 => (int)$row['score9'], 10 => (int)$row['score10'],
@@ -53,7 +53,7 @@ if ($method === 'GET') {
             JOIN Machines m ON ts.machine_id = m.id 
             JOIN Events e ON ts.event_id = e.id
             WHERE e.league_id = ? 
-            ORDER BY ts.event_id ASC, ts.frame_number ASC
+            ORDER BY ts.event_id ASC, ts.order_number ASC
         ');
         $stmt->execute([$leagueId]);
         $machines = array_map('serializeTargetScore', $stmt->fetchAll());
@@ -63,7 +63,7 @@ if ($method === 'GET') {
             FROM Target_Scores ts 
             JOIN Machines m ON ts.machine_id = m.id 
             WHERE ts.event_id = ? 
-            ORDER BY ts.frame_number ASC
+            ORDER BY ts.order_number ASC
         ');
         $stmt->execute([$eventId]);
         $machines = array_map('serializeTargetScore', $stmt->fetchAll());
@@ -84,19 +84,19 @@ if ($method === 'POST') {
         if (empty($input['event_id']) || empty($input['machine_id'])) {
             sendJson(['error' => 'event_id and machine_id are required for target scores'], 400);
         }
-        $sql = 'INSERT INTO Target_Scores (event_id, machine_id, frame_number, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) 
+        $sql = 'INSERT INTO Target_Scores (event_id, machine_id, order_number, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), 
                    score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5),
                    score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
-        $params = [(int)$input['event_id'], (int)$input['machine_id'], (int)$input['frame_number']];
+        $params = [(int)$input['event_id'], (int)$input['machine_id'], (int)$input['order_number']];
         for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         
-        $stmt = $pdo->prepare('SELECT ts.*, m.machine_name FROM Target_Scores ts JOIN Machines m ON ts.machine_id = m.id WHERE ts.event_id = ? AND ts.frame_number = ?');
-        $stmt->execute([(int)$input['event_id'], (int)$input['frame_number']]);
+        $stmt = $pdo->prepare('SELECT ts.*, m.machine_name FROM Target_Scores ts JOIN Machines m ON ts.machine_id = m.id WHERE ts.event_id = ? AND ts.order_number = ?');
+        $stmt->execute([(int)$input['event_id'], (int)$input['order_number']]);
         sendJson(serializeTargetScore($stmt->fetch()));
     } else { // Create a new master machine (title only)
         if (empty($input['machine_name'])) {
@@ -123,11 +123,11 @@ if ($method === 'PUT') {
     
     // Action 'target' handles Target_Scores, default action handles master Machines
     if ($action === 'target') {
-        if (empty($input['machine_id']) || empty($input['frame_number']) || empty($input['values'])) {
-            sendJson(['error' => 'machine_id, frame_number, and values are required for target scores'], 400);
+        if (empty($input['machine_id']) || empty($input['order_number']) || empty($input['values'])) {
+            sendJson(['error' => 'machine_id, order_number, and values are required for target scores'], 400);
         }
-        $sql = 'UPDATE Target_Scores SET machine_id = ?, frame_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
-        $params = [(int)$input['machine_id'], (int)$input['frame_number']];
+        $sql = 'UPDATE Target_Scores SET machine_id = ?, order_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
+        $params = [(int)$input['machine_id'], (int)$input['order_number']];
         for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
         $params[] = $id;
         $stmt = $pdo->prepare($sql);

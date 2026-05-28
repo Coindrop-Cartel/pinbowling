@@ -39,6 +39,12 @@ export async function initConfigPage() {
     });
   }
 
+  const isCurrentTargetLast = () => {
+    const currentOrder = Number(orderInput.value);
+    const maxOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.order_number)) : 0;
+    return currentOrder >= maxOrder;
+  };
+
   document.getElementById('add-target-btn').addEventListener('click', () => {
     resetForm();
     const nextOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.order_number)) + 1 : 1;
@@ -73,8 +79,8 @@ export async function initConfigPage() {
     onSelect: () => markDirty()
   });
 
-  score10Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, BowlingEngine));
-  score1Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, BowlingEngine));
+  score10Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, BowlingEngine, isCurrentTargetLast()));
+  score1Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, BowlingEngine, isCurrentTargetLast()));
 
   document.getElementById('machine-name').addEventListener('input', (e) => {
     markDirty();
@@ -130,7 +136,7 @@ export async function initConfigPage() {
         score10Input.value = frame.values[10] ? formatNumber(frame.values[10]) : '';
         score1Input.value = frame.values[1] ? formatNumber(frame.values[1]) : '';
         machineSearch.updateOptions(frame.machine_name);
-        renderPreview(score10Input, score1Input, previewValues, BowlingEngine);
+        renderPreview(score10Input, score1Input, previewValues, BowlingEngine, isCurrentTargetLast());
         configCard.classList.remove('hidden');
         window.scrollTo(0, 0);
       });

@@ -26,30 +26,30 @@ if ($method === 'GET') {
 
     if ($leagueId) {
         $stmt = $pdo->prepare(
-            'SELECT s.id, s.player_id, s.event_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
+            'SELECT s.id, s.player_id, s.event_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
              FROM Scores s
              JOIN Machines m ON m.id = s.machine_id
              JOIN Events e ON s.event_id = e.id
              WHERE e.league_id = ?
-             ORDER BY s.event_id ASC, s.player_id ASC, s.frame ASC'
+             ORDER BY s.event_id ASC, s.player_id ASC, s.order_number ASC'
         );
         $stmt->execute([$leagueId]);
     } else if ($playerId) {
         $stmt = $pdo->prepare(
-            'SELECT s.id, s.player_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
+            'SELECT s.id, s.player_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
              FROM Scores s
              JOIN Machines m ON m.id = s.machine_id
              WHERE s.player_id = ? AND s.event_id = ?
-             ORDER BY s.frame ASC'
+             ORDER BY s.order_number ASC'
         );
         $stmt->execute([$playerId, $eventId]);
     } else {
         $stmt = $pdo->prepare(
-            'SELECT s.id, s.player_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
+            'SELECT s.id, s.player_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
              FROM Scores s
              JOIN Machines m ON m.id = s.machine_id
              WHERE s.event_id = ?
-             ORDER BY s.player_id ASC, s.frame ASC'
+             ORDER BY s.player_id ASC, s.order_number ASC'
         );
         $stmt->execute([$eventId]);
     }
@@ -65,14 +65,14 @@ if ($method === 'POST') {
     validateApiSecret();
     
     $playerId = isset($input['playerId']) ? (int)$input['playerId'] : 0;
-    $frame = isset($input['frame']) ? (int)$input['frame'] : 0;
+    $order_number = isset($input['order_number']) ? (int)$input['order_number'] : 0;
     $machineId = isset($input['machineId']) ? (int)$input['machineId'] : 0;
     $ball1 = isset($input['ball1']) ? (int)$input['ball1'] : 0;
     $ball2 = isset($input['ball2']) ? (int)$input['ball2'] : 0;
     $ball3 = isset($input['ball3']) ? (int)$input['ball3'] : 0;
 
-    if (!$eventId || !$playerId || !$frame || !$machineId) {
-        sendJson(['error' => 'eventId, playerId, frame, and machineId are required'], 400);
+    if (!$eventId || !$playerId || !$order_number || !$machineId) {
+        sendJson(['error' => 'eventId, playerId, order_number, and machineId are required'], 400);
     }
     
     // Basic range validation
@@ -80,14 +80,14 @@ if ($method === 'POST') {
         sendJson(['error' => 'Invalid score values'], 400);
     }
 
-    $sql = 'INSERT INTO Scores (event_id, player_id, frame, machine_id, ball1, ball2, ball3)
+    $sql = 'INSERT INTO Scores (event_id, player_id, order_number, machine_id, ball1, ball2, ball3)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE machine_id = ?, ball1 = ?, ball2 = ?, ball3 = ?';
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$eventId, $playerId, $frame, $machineId, $ball1, $ball2, $ball3, $machineId, $ball1, $ball2, $ball3]);
+    $stmt->execute([$eventId, $playerId, $order_number, $machineId, $ball1, $ball2, $ball3, $machineId, $ball1, $ball2, $ball3]);
 
-    $stmt = $pdo->prepare('SELECT * FROM Scores WHERE player_id = ? AND frame = ? AND event_id = ?');
-    $stmt->execute([$playerId, $frame, $eventId]);
+    $stmt = $pdo->prepare('SELECT * FROM Scores WHERE player_id = ? AND order_number = ? AND event_id = ?');
+    $stmt->execute([$playerId, $order_number, $eventId]);
     sendJson($stmt->fetch());
 }
 
