@@ -44,6 +44,7 @@ export async function initTournamentSelector(onRefresh) {
     
     if (!leagueId) {
       eventWrapper.classList.add('hidden');
+      eventSelect.value = '';
       return;
     }
 
@@ -88,8 +89,17 @@ export async function initTournamentSelector(onRefresh) {
       leagueSelect.value = activeLeagueId;
       updateOptions(''); // Show all options instead of just the matched one
       populateEvents(activeLeagueId, activeEventId);
+    } else {
+      // If the league in storage is invalid, clear everything
+      setActiveLeagueId('');
+      setActiveEventId('');
+      updateOptions('');
+      populateEvents('', '');
     }
   } else {
+    // No league selected - ensure event is also unselected and hidden
+    setActiveEventId('');
     updateOptions('');
+    populateEvents('', '');
   }
 }
