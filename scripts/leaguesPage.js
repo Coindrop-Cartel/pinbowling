@@ -213,8 +213,14 @@ export async function initLeaguesPage() {
     document.getElementById('save-league-player').onclick = async () => {
         const playerId = document.getElementById('league-player-select').value;
         if (!playerId) return;
-        const confirmation = prompt(`Enter Admin Password:`);
-        if (confirmation !== ADMIN_PASSWORD) return;
+        
+        if (ADMIN_PASSWORD) {
+          const confirmation = prompt(`Enter Admin Password:`);
+          if (confirmation === null || confirmation !== ADMIN_PASSWORD) {
+            if (confirmation !== null) alert('Incorrect Admin Password.');
+            return;
+          }
+        }
 
         await PB_API.addLeaguePlayer(leagueId, playerId);
         rosterFormCard.classList.add('hidden');
@@ -235,8 +241,13 @@ export async function initLeaguesPage() {
     const newName = prompt(`Edit name for league "${league.name}":`, league.name);
     if (!newName) return;
     
-    const confirmation = prompt(`Enter Admin Password:`);
-    if (confirmation !== ADMIN_PASSWORD) return;
+    if (ADMIN_PASSWORD) {
+      const confirmation = prompt(`Enter Admin Password:`);
+      if (confirmation === null || confirmation !== ADMIN_PASSWORD) {
+        if (confirmation !== null) alert('Incorrect Admin Password.');
+        return;
+      }
+    }
 
     await PB_API.updateLeague(leagueId, { name: newName.trim(), start_date: league.start_date });
     await renderLeagues();
@@ -244,8 +255,13 @@ export async function initLeaguesPage() {
 
   async function deleteLeague(leagueId) {
     if (!confirm(`Are you sure you want to delete this league?`)) return;
-    const confirmation = prompt(`Enter Admin Password:`);
-    if (confirmation !== ADMIN_PASSWORD) return;
+    if (ADMIN_PASSWORD) {
+      const confirmation = prompt(`Enter Admin Password:`);
+      if (confirmation === null || confirmation !== ADMIN_PASSWORD) {
+        if (confirmation !== null) alert('Incorrect Admin Password.');
+        return;
+      }
+    }
     await PB_API.deleteLeague(leagueId);
     await renderLeagues();
   }
@@ -260,8 +276,13 @@ export async function initLeaguesPage() {
 
   async function deleteEvent(eventId, leagueId) {
     if (!confirm(`Are you sure you want to delete this event?`)) return;
-    const confirmation = prompt(`Enter Admin Password:`);
-    if (confirmation !== ADMIN_PASSWORD) return;
+    if (ADMIN_PASSWORD) {
+      const confirmation = prompt(`Enter Admin Password:`);
+      if (confirmation === null || confirmation !== ADMIN_PASSWORD) {
+        if (confirmation !== null) alert('Incorrect Admin Password.');
+        return;
+      }
+    }
     await PB_API.deleteEvent(eventId);
     await renderEventsForLeague(leagueId);
   }
@@ -270,8 +291,13 @@ export async function initLeaguesPage() {
     e.preventDefault();
     const name = leagueNameInput.value.trim();
     if (!name) return;
-    const confirmation = prompt(`Enter Admin Password:`);
-    if (confirmation !== ADMIN_PASSWORD) return;
+    if (ADMIN_PASSWORD) {
+      const confirmation = prompt(`Enter Admin Password:`);
+      if (confirmation === null || confirmation !== ADMIN_PASSWORD) {
+        if (confirmation !== null) alert('Incorrect Admin Password.');
+        return;
+      }
+    }
     await PB_API.createLeague({ name, start_date: leagueStartDateInput.value || null });
     leagueForm.reset();
     await renderLeagues();
@@ -287,10 +313,12 @@ export async function initLeaguesPage() {
 
     if (!leagueId || !eventName) return;
 
-    const confirmation = prompt(`Enter Admin Password to save event "${eventName}":`);
-    if (confirmation !== ADMIN_PASSWORD) {
-      if (confirmation !== null) alert('Incorrect Admin Password.');
-      return;
+    if (ADMIN_PASSWORD) {
+      const confirmation = prompt(`Enter Admin Password to save event "${eventName}":`);
+      if (confirmation === null || confirmation !== ADMIN_PASSWORD) {
+        if (confirmation !== null) alert('Incorrect Admin Password.');
+        return;
+      }
     }
 
     const payload = {

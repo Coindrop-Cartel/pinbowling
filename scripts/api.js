@@ -65,7 +65,7 @@ export const PB_API = {
   updatePlayer: (id, player) => fetchJSON(`api/players.php?id=${id}`, { method: 'PUT', body: JSON.stringify(player) }),
   updateMachine: (id, machineName) => fetchJSON(`api/machines.php?id=${id}`, { method: 'PUT', body: JSON.stringify({ machine_name: machineName }) }), // Update master machine
   deleteMachine: (id) => fetchJSON(`api/machines.php?id=${id}`, { method: 'DELETE' }),
-  createPlayer: (player_name) => fetchJSON('api/players.php', { method: 'POST', body: JSON.stringify({ player_name }) }),
+  createPlayer: (player) => fetchJSON('api/players.php', { method: 'POST', body: JSON.stringify(player) }),
   clearScores: (playerId) => fetchJSON(`api/scores.php?playerId=${playerId}`, { method: 'DELETE' }),
 
   // League and Event management

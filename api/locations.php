@@ -95,8 +95,8 @@ if ($method === 'POST') {
             sendJson(['error' => 'name is required'], 400);
         }
     } else {
-        $stmt = $pdo->prepare('INSERT INTO Locations (name, city, state) VALUES (?, ?, ?)');
-        $stmt->execute([$input['name'], $input['city'] ?? null, $input['state'] ?? null]);
+        $stmt = $pdo->prepare('INSERT INTO Locations (name) VALUES (?)');
+        $stmt->execute([$input['name']]);
         $newId = $pdo->lastInsertId();
 
         $stmt = $pdo->prepare('SELECT * FROM Locations WHERE id = ?');
