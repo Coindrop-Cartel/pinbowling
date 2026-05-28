@@ -78,7 +78,11 @@ export async function initLeaguesPage() {
         // Toggle expansion
         card.querySelector('.league-header').onclick = (e) => {
           if (e.target.closest('button')) return;
-          card.querySelector('.league-details').classList.toggle('hidden');
+          const details = card.querySelector('.league-details');
+          details.classList.toggle('hidden');
+          if (!details.classList.contains('hidden')) {
+            renderPlayersForLeague(league.id, league.players, allPlayersCache);
+          }
         };
 
         // Action listeners
