@@ -1,7 +1,7 @@
 import { PB_API } from './api.js';
 import { BowlingEngine } from './engine.js';
 import { getActiveEventId, renderPreview, applyScoreFormatting, formatNumber, printMachineScores } from './utils.js';
-import { createSearchableSelect } from './uiComponents.js';
+import { createSearchableSelect, showPrompt } from './uiComponents.js';
 import { initReadOnlyTournamentDisplay } from './uiComponents.js';
 
 export async function initConfigPage() {
@@ -245,8 +245,8 @@ export async function initConfigPage() {
 
     const values = BowlingEngine.buildFrameValues(score10, score1);
     if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = prompt(`Enter Admin Password to save changes for Target ${order_number}:`);
-      if (confirmation === null) { // User cancelled
+      const confirmation = await showPrompt(`Enter Admin Password to save changes for Target ${order_number}:`);
+      if (confirmation === null) {
         alert('Admin action cancelled.');
         return;
       } else if (confirmation !== window.PB_ADMIN_PASSWORD) { // Incorrect password

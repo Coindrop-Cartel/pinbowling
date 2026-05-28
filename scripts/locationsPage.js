@@ -1,5 +1,6 @@
 import { PB_API } from './api.js';
 import { applyScoreFormatting, formatNumber } from './utils.js';
+import { showConfirm, showPrompt } from './uiComponents.js';
 
 /**
  * Logic for managing league locations/venues.
@@ -253,8 +254,8 @@ export function initLocationsPage() {
     if (!locationName) return;
 
     if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = prompt(`Enter Admin Password to ${id ? 'update' : 'create'} location "${locationName}":`);
-      if (confirmation === null) return;
+      const confirmation = await showPrompt(`Enter Admin Password to ${id ? 'update' : 'create'} location "${locationName}":`);
+      if (confirmation === null) return; 
       if (confirmation !== window.PB_ADMIN_PASSWORD) {
         alert('Incorrect Admin Password.');
         return;
@@ -276,9 +277,16 @@ export function initLocationsPage() {
   });
 
   window.deleteLocation = async (id) => {
+    const loc = allLocations.find(l => l.id === id);
+    const locName = loc ? loc.name : 'this location';
+
+    if (!await showConfirm(`Are you sure you want to delete the location "${locName}"?`, 'Delete Location')) {
+      return;
+    }
+
     if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = prompt('Enter Admin Password to confirm location deletion:');
-      if (confirmation === null) return;
+      const confirmation = await showPrompt('Enter Admin Password to confirm location deletion:');
+      if (confirmation === null) return; 
       if (confirmation !== window.PB_ADMIN_PASSWORD) {
         alert('Incorrect Admin Password.');
         return;

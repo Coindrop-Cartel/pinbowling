@@ -1,5 +1,5 @@
 import { PB_API } from './api.js';
-import { setupLiveFilter } from './uiComponents.js';
+import { setupLiveFilter, showConfirm, showPrompt } from './uiComponents.js';
 
 /**
  * Initializes the Player Management page.
@@ -124,8 +124,8 @@ export async function initPlayersPage() {
     if (!name) return;
 
     if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = prompt(`Enter Admin Password to ${id ? 'update' : 'create'} player "${name}":`);
-      if (confirmation === null) { // User cancelled
+      const confirmation = await showPrompt(`Enter Admin Password to ${id ? 'update' : 'create'} player "${name}":`);
+      if (confirmation === null) { 
         alert('Admin action cancelled.');
         return;
       } else if (confirmation !== window.PB_ADMIN_PASSWORD) { // Incorrect password
@@ -153,9 +153,13 @@ export async function initPlayersPage() {
     const player = allPlayers.find(p => p.id === playerId);
     if (!player) return;
     
+    if (!await showConfirm(`Are you sure you want to delete player "${player.player_name}"? This action cannot be undone and will remove all their associated scores.`, 'Delete Player')) {
+      return;
+    }
+
     if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = prompt(`Enter Admin Password to confirm deletion of ${player.player_name} (and all their scores):`);
-      if (confirmation === null) { // User cancelled
+      const confirmation = await showPrompt(`Enter Admin Password to confirm deletion of ${player.player_name} (and all their scores):`);
+      if (confirmation === null) {
         alert('Admin action cancelled.');
         return;
       } else if (confirmation !== window.PB_ADMIN_PASSWORD) { // Incorrect password

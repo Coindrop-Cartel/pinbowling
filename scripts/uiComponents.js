@@ -148,3 +148,62 @@ export function setupLiveFilter(inputElement, data, { labelKey = 'name', onFilte
   inputElement.addEventListener('input', performFilter);
   return { performFilter };
 }
+
+/**
+ * Replaces native browser confirm() and prompt() with a custom UI modal
+ * that matches the site's card-based theme.
+ * 
+ * @param {Object} params
+ * @returns {Promise<string|boolean|null>}
+ */
+export function showDialog({ title, message, showInput = false, isPassword = true, confirmText = 'Confirm', cancelText = 'Cancel' }) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;box-sizing:border-box;backdrop-filter:blur(4px);";
+    
+    const card = document.createElement('div');
+    card.className = "card";
+    card.style = "max-width:450px;width:100%;margin:0;box-shadow: 0 10px 25px rgba(0,0,0,0.5);";
+    
+    let inputHtml = '';
+    if (showInput) {
+      inputHtml = `<div class="form-row" style="margin-top:20px;"><input type="${isPassword ? 'password' : 'text'}" id="modal-input" style="width:100%;box-sizing:border-box;font-size:1.1rem;padding:12px;" /></div>`;
+    }
+
+    card.innerHTML = `
+      <h2 style="margin-top:0;">${title}</h2>
+      <p style="margin-bottom:0; line-height:1.5;">${message}</p>
+      ${inputHtml}
+      <div class="form-actions" style="margin-top:30px; display:flex; gap:12px;">
+        <button id="modal-confirm" style="flex:1;">${confirmText}</button>
+        <button id="modal-cancel" class="secondary" style="flex:1;">${cancelText}</button>
+      </div>
+    `;
+    
+    backdrop.appendChild(card);
+    document.body.appendChild(backdrop);
+
+    const input = card.querySelector('#modal-input');
+    const confirmBtn = card.querySelector('#modal-confirm');
+    const cancelBtn = card.querySelector('#modal-cancel');
+
+    const finish = (value) => {
+      document.body.removeChild(backdrop);
+      resolve(value);
+    };
+
+    if (input) {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') finish(input.value);
+        if (e.key === 'Escape') finish(null);
+      });
+      setTimeout(() => input.focus(), 50);
+    }
+
+    confirmBtn.onclick = () => finish(input ? input.value : true);
+    cancelBtn.onclick = () => finish(showInput ? null : false);
+  });
+}
+
+export const showConfirm = (message, title = 'Confirm Action') => showDialog({ title, message, confirmText: 'Yes, Proceed', cancelText: 'Cancel' });
+export const showPrompt = (message, title = 'Admin Password', isPassword = true) => showDialog({ title, message, showInput: true, isPassword, confirmText: 'Submit' });

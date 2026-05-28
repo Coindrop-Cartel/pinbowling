@@ -1,5 +1,5 @@
 import { PB_API } from './api.js';
-import { setupLiveFilter } from './uiComponents.js';
+import { setupLiveFilter, showConfirm, showPrompt } from './uiComponents.js';
 import { setActiveLeagueId, setActiveEventId } from './utils.js';
 
 /**
@@ -132,8 +132,8 @@ export async function initLeaguesPage() {
     const date = leagueDateInput.value;
 
     if (window.PB_ADMIN_PASSWORD) {
-      const pass = prompt(`Enter Admin Password to create league "${name}":`);
-      if (pass !== window.PB_ADMIN_PASSWORD) return alert('Unauthorized');
+      const pass = await showPrompt(`Enter Admin Password to create league "${name}":`);
+      if (pass === null || pass !== window.PB_ADMIN_PASSWORD) return alert('Unauthorized');
     }
 
     await PB_API.createLeague({ name, start_date: date });
@@ -143,13 +143,13 @@ export async function initLeaguesPage() {
   });
 
   async function deleteLeague(id, name) {
-    if (!confirm(`Are you sure you want to delete the entire league "${name}"? This will delete all associated events and target scores.`)) return;
+    if (!await showConfirm(`Are you sure you want to delete the entire league "${name}"? This will delete all associated events and target scores.`, 'Delete League')) return;
     await PB_API.deleteLeague(id);
     await refresh();
   }
 
   async function deleteEvent(id, leagueName) {
-    if (!confirm(`Delete this event from ${leagueName}?`)) return;
+    if (!await showConfirm(`Delete this event from ${leagueName}?`, 'Delete Event')) return;
     await PB_API.deleteEvent(id);
     await refresh();
   }
