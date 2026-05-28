@@ -148,7 +148,6 @@ export function initLocationsPage() {
   async function showMachineForm(locationId, locationName, existing = null) {
     // Show the card and scroll immediately so the user sees something is happening
     machineFormCard.classList.remove('hidden');
-    window.scrollTo(0, document.body.scrollHeight);
     machineFormCard.innerHTML = `<h2>Loading Machine Details...</h2>`;
 
     const allMachines = await PB_API.getMachines();
@@ -182,6 +181,14 @@ export function initLocationsPage() {
     applyScoreFormatting(document.getElementById('target-easy'));
     applyScoreFormatting(document.getElementById('target-med'));
     applyScoreFormatting(document.getElementById('target-hard'));
+
+    machineFormCard.scrollIntoView({ behavior: 'smooth' });
+
+    if (existing) {
+      document.getElementById('target-easy').focus();
+    } else {
+      document.getElementById('loc-mach-select').focus();
+    }
 
     document.getElementById('cancel-loc-mach').onclick = () => machineFormCard.classList.add('hidden');
     document.getElementById('save-loc-mach').onclick = async () => {
