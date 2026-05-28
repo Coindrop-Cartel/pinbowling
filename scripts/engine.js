@@ -19,6 +19,17 @@ export const BowlingEngine = {
   },
 
   /**
+   * Calculates Target 1 (1.3x strike) and Target 2 (1.3x Target 1) for the last frame.
+   * @param {Object} frame The frame object containing scoring values.
+   * @returns {{t1: number, t2: number}} An object with calculated Target 1 and Target 2 scores.
+   */
+  getBonusTargets(frame) {
+    const t1 = Math.round(frame.values[10] * 1.3);
+    const t2 = Math.round(t1 * 1.3);
+    return { t1, t2 };
+  },
+
+  /**
    * Complex logic for Frame 10.
    * Unlike frames 1-9, frame 10 allows up to 3 balls if the player achieves 
    * a mark (strike or spare). Strikes on subsequent balls use adjusted 

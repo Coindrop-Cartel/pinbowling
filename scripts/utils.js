@@ -81,10 +81,9 @@ export function renderPreview(score10Input, score1Input, previewValues, BowlingE
     .join("");
 
   if (isLastFrame && values[10]) {
-    const target1 = Math.round(values[10] * 1.3);
-    const target2 = Math.round(target1 * 1.3);
-    html += `<br><div><strong>Target 1:</strong> ${formatNumber(target1)}</div>`;
-    html += `<div><strong>Target 2:</strong> ${formatNumber(target2)}</div>`;
+    const { t1, t2 } = BowlingEngine.getBonusTargets({ values }); // Pass values in an object to match frame structure
+    html += `<br><div><strong>Target 1:</strong> ${formatNumber(t1)}</div>`;
+    html += `<div><strong>Target 2:</strong> ${formatNumber(t2)}</div>`;
   }
 
   previewValues.innerHTML = html;
@@ -118,8 +117,7 @@ export function printMachineScores(machines) {
 
     let extraTargets = '';
     if (m.order_number === maxOrder) {
-      const t1 = Math.round(m.values[10] * 1.3);
-      const t2 = Math.round(t1 * 1.3);
+      const { t1, t2 } = BowlingEngine.getBonusTargets(m);
       extraTargets = `
         <div style="margin-top: 40px; display: flex; justify-content: space-around; width: 100%; font-size: 2.2rem; font-weight: bold; border-top: 4px dashed #000; padding-top: 20px;">
           <div>Target 1: ${formatNumber(t1)}</div>

@@ -107,8 +107,20 @@ export async function initConfigPage() {
     listEmpty.classList.add('hidden');
 
     eventTargets.sort((a, b) => a.order_number - b.order_number);
+    const maxOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.order_number)) : 0;
 
     eventTargets.forEach((frame) => {
+      let bonusHtml = '';
+      if (frame.order_number === maxOrder && frame.values[10]) {
+        const { t1, t2 } = BowlingEngine.getBonusTargets(frame);
+        bonusHtml = `
+          <div style="margin-top: 8px; border-top: 1px dashed #bbb; padding-top: 4px; color: #b71c1c; font-weight: bold;">
+            <div>Target 1: ${formatNumber(t1)}</div>
+            <div>Target 2: ${formatNumber(t2)}</div>
+          </div>
+        `;
+      }
+
       const row = document.createElement('tr');
       row.draggable = true;
       row.dataset.id = frame.id;
@@ -123,6 +135,7 @@ export async function initConfigPage() {
               .sort((a, b) => Number(b[0]) - Number(a[0]))
               .map(([key, value]) => `<div>${key}: ${formatNumber(value)}</div>`)
               .join('')}
+            ${bonusHtml}
           </div>
         </td>
         <td><button type="button" class="edit-button" data-id="${frame.id}">Edit</button></td>

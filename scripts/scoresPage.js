@@ -56,8 +56,7 @@ export async function initScoresPage() {
 
     let extraTargets = '';
     if (isLastFrame) {
-      const t1 = Math.round(frame.values[10] * 1.3);
-      const t2 = Math.round(t1 * 1.3);
+      const { t1, t2 } = BowlingEngine.getBonusTargets(frame);
       extraTargets = `
           <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 2px;">Target 1: <b>${formatNumber(t1)}</b></div>
           <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 2px;">Target 2: <b>${formatNumber(t2)}</b></div>
