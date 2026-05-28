@@ -44,7 +44,7 @@ $action = $_GET['action'] ?? 'machine';
 $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
 $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
 
-// GET: Retrieve the configuration for all frames
+// GET: Retrieve the configuration for all rounds
 if ($method === 'GET') {
     if ($leagueId) { // Fetch all target scores for all events in a league
         $stmt = $pdo->prepare('
@@ -187,11 +187,11 @@ if ($method === 'POST') {
     }
 }
 
-// PUT: Update an existing frame configuration (Protected by API Secret)
+// PUT: Update an existing round configuration (Protected by API Secret)
 if ($method === 'PUT') {
     validateApiSecret();
     
-    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0; // ID of the entity being updated
+    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0; // ID of the round or master machine being updated
     if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
     
     // Action 'target' handles Target_Scores, default action handles master Machines
@@ -223,7 +223,7 @@ if ($method === 'PUT') {
     }
 }
 
-// DELETE: Remove a frame configuration (Protected by API Secret)
+// DELETE: Remove a round configuration (Protected by API Secret)
 if ($method === 'DELETE') {
     validateApiSecret();
     

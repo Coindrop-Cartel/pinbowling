@@ -39,12 +39,12 @@ export async function initScoresPage() {
   warning.classList.add('hidden');
   playerSelect.disabled = false;
 
-  function createRollInput(frameNumber, ball, machineId, value = '', placeholder = '') {
+  function createRollInput(roundNumber, ball, machineId, value = '', placeholder = '') {
     const input = document.createElement('input');
     input.placeholder = placeholder || `Ball ${ball} cumulative`;
     input.className = 'roll-input';
     input.value = (value !== '' && value !== undefined) ? formatNumber(value) : '';
-    input.dataset.order = frameNumber;
+    input.dataset.order = roundNumber;
     input.dataset.ball = ball;
     input.dataset.machineId = machineId;
     applyScoreFormatting(input);
@@ -52,30 +52,23 @@ export async function initScoresPage() {
     return input;
   }
 
-  function buildFrameRow(frame, rollValues, isLastFrame = false) {
+  function buildRoundRow(round, turnValues, isLastRound = false) {
     const row = document.createElement('div');
     row.className = 'frame-row';
-    row.dataset.order = frame.order_number;
+    row.dataset.order = round.order_number;
 
-    let extraTargets = '';
-    if (isLastFrame) {
-      const { t1, t2 } = Engine.getBonusTargets(frame);
-      extraTargets = `
-          <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 2px;">Target 1: <b>${formatNumber(t1)}</b></div>
-          <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 2px;">Target 2: <b>${formatNumber(t2)}</b></div>
-      `;
-    }
+    const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
 
     row.innerHTML = `
       <div class="frame-info" style="cursor: pointer;">
-        <div class="frame-label">Frame ${frame.order_number}</div>
-        <div class="frame-machine">${frame.machine_name}</div>
-        <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;">Strike: <b>${formatNumber(frame.values[10])}</b></div>
-        ${extraTargets}
+        <div class="frame-label">Round ${round.order_number}</div>
+        <div class="frame-machine">${round.machine_name}</div>
+        <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;">Strike: <b>${formatNumber(round.values[10])}</b></div>
+        ${bonusHtml}
         <div class="target-details hidden" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;">
           <div style="font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; color: #666;">Scoring Thresholds</div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
-            ${Object.entries(frame.values)
+            ${Object.entries(round.values)
               .sort((a, b) => Number(b[0]) - Number(a[0]))
               .map(([rank, val]) => `<div style="font-size: 0.8rem;"><b>${rank}:</b> ${formatNumber(val)}</div>`)
               .join('')}
@@ -122,9 +115,9 @@ export async function initScoresPage() {
 
       await PB_API.saveScore({
         playerId: Number(currentPlayerId),
-        order_number: frame.order_number,
+        order_number: round.order_number,
         eventId: Number(getActiveEventId()),
-        machineId: frame.machine_id, 
+        machineId: round.machine_id, 
         ball1,
         ball2,
         ball3,
@@ -200,9 +193,9 @@ export async function initScoresPage() {
     const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
 
     framesInput.innerHTML = '';
-    machines.forEach((frame) => {
-      const rollValues = scoreMap[String(frame.order_number)];
-      framesInput.appendChild(buildFrameRow(frame, rollValues, frame.order_number === maxOrder));
+    machines.forEach((round) => {
+      const turnValues = scoreMap[String(round.order_number)];
+      framesInput.appendChild(buildRoundRow(round, turnValues, round.order_number === maxOrder));
     });
   }
 
@@ -240,9 +233,9 @@ export async function initScoresPage() {
 
   function renderCurrentResults() {
     const scoreMap = getScoreMapFromInputs();
-    const { frameResults, total: finalTotal } = Engine.calculateFrameResults(machines, scoreMap);
+    const { turnResults, total: finalTotal } = Engine.calculateTurnResults(machines, scoreMap);
     let runningTotal = 0;
-    resultsBody.innerHTML = frameResults
+    resultsBody.innerHTML = turnResults
       .map(
         (result) => {
           runningTotal += result.score;
@@ -293,9 +286,9 @@ export async function initScoresPage() {
     // Update the results table header to use "Frame" (mapping data from order_number)
     const resultsTableHeader = resultsPanel.querySelector('thead tr');
     if (resultsTableHeader) {
-      const frameHeader = resultsTableHeader.querySelector('th:first-child');
-      if (frameHeader) {
-        frameHeader.textContent = 'Frame';
+      const roundHeader = resultsTableHeader.querySelector('th:first-child');
+      if (roundHeader) {
+        roundHeader.textContent = 'Round';
       }
     }
 

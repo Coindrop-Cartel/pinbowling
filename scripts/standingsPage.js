@@ -108,7 +108,7 @@ export async function initStandingsPage() {
             map[String(row.order_number)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
             return map;
           }, {});
-          const { total } = Engine.calculateFrameResults(eventTargets, scoreMap);
+          const { total } = Engine.calculateTurnResults(eventTargets, scoreMap);
           eventTotals[event.id] = total;
           totalSeasonPoints += total;
         } else { eventTotals[event.id] = null; }
@@ -170,8 +170,8 @@ export async function initStandingsPage() {
       }, {});
       // Check all three possible balls to see if a frame has data
       const ordersWithScores = new Set(scores.filter(s => Number(s.ball1) > 0 || Number(s.ball2) > 0 || Number(s.ball3) > 0).map(s => s.order_number));
-      const { frameResults, total } = Engine.calculateFrameResults(machines, scoreMap);
-      return { player, frameResults, total, ordersWithScores };
+      const { turnResults, total } = Engine.calculateTurnResults(machines, scoreMap);
+      return { player, turnResults, total, ordersWithScores };
     }).sort((a, b) => b.total - a.total);
 
     standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${machines.map(m => `<th>Target ${m.order_number}</th>`).join('')}<th>Total</th></tr>`;
@@ -179,10 +179,10 @@ export async function initStandingsPage() {
       <tr>
         <td>${idx + 1}</td>
         <td class="player-name-cell"></td>
-        ${res.frameResults.map(f => `
-          <td class="standings-frame ${res.ordersWithScores.has(f.order) ? 'has-score' : 'no-score'}">
-            <div class="standings-mark">${res.ordersWithScores.has(f.order) ? f.mark : '−'}</div>
-            <div class="standings-frame-score">${res.ordersWithScores.has(f.order) ? formatNumber(f.score) : ''}</div>
+        ${res.turnResults.map(t => `
+          <td class="standings-round ${res.ordersWithScores.has(t.order) ? 'has-score' : 'no-score'}">
+            <div class="standings-mark">${res.ordersWithScores.has(t.order) ? t.mark : '−'}</div>
+            <div class="standings-round-score">${res.ordersWithScores.has(t.order) ? formatNumber(t.score) : ''}</div>
           </td>`).join('')}
         <td class="standings-total">${formatNumber(res.total)}</td>
       </tr>`).join('');

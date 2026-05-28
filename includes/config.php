@@ -136,7 +136,7 @@ function initDatabase() {
     )");
 
     // --- Migration: Machines v2 ---
-    // Decouples frame mapping from the master machine title. 
+    // Decouples round mapping from the master machine title. 
     // Moves scoring thresholds to Target_Scores and Location_Machines.
     try {
         $pdo->exec("ALTER TABLE Machines DROP COLUMN frame_number");
@@ -253,7 +253,7 @@ function initDatabase() {
         CONSTRAINT fk_scores_event FOREIGN KEY (event_id) REFERENCES Events(id) ON DELETE CASCADE
     )");
 
-    // --- Migration: Frame to Order ---
+    // --- Migration: Round to Order ---
     try {
         $pdo->exec("ALTER TABLE Target_Scores CHANGE COLUMN frame_number order_number INT NOT NULL");
         $pdo->exec("ALTER TABLE Target_Scores DROP INDEX uq_event_frame, ADD UNIQUE KEY uq_event_order (event_id, order_number)");

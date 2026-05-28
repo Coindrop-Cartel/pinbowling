@@ -65,9 +65,9 @@ export function initNavigation() {
  * @param {HTMLInputElement} score1Input 
  * @param {HTMLElement} previewValues 
  * @param {Object} Engine
- * @param {boolean} isLastFrame
+ * @param {boolean} isLastRound
  */
-export function renderPreview(score10Input, score1Input, previewValues, Engine, isLastFrame = false) {
+export function renderPreview(score10Input, score1Input, previewValues, Engine, isLastRound = false) {
   const score10 = Number(score10Input.value.replace(/\D/g, ''));
   const score1 = Number(score1Input.value.replace(/\D/g, ''));
   const values = Engine.buildFrameValues(score10, score1);
@@ -82,7 +82,7 @@ export function renderPreview(score10Input, score1Input, previewValues, Engine, 
     .map(([rank, value]) => `<div><strong>${rank}:</strong> ${formatNumber(value)}</div>`)
     .join("");
 
-  if (isLastFrame && values[10]) {
+  if (isLastRound && values[10]) {
     const { t1, t2 } = Engine.getBonusTargets({ values }); // Pass values in an object to match frame structure
     html += `<br><div><strong>Target 1:</strong> ${formatNumber(t1)}</div>`;
     html += `<div><strong>Target 2:</strong> ${formatNumber(t2)}</div>`;

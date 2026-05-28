@@ -3,9 +3,9 @@
  */
 
 const BowlingEngine = {
-  getPinCount(frame, rawScore) {
-    if (!frame || typeof rawScore !== 'number' || rawScore <= 0) return 0;
-    const thresholds = Object.entries(frame.values)
+  getPinCount(round, rawScore) {
+    if (!round || typeof rawScore !== 'number' || rawScore <= 0) return 0;
+    const thresholds = Object.entries(round.values)
       .map(([rank, score]) => ({ rank: Number(rank), score: Number(score) }))
       .sort((a, b) => a.score - b.score);
     let pins = 0;
@@ -22,10 +22,28 @@ const BowlingEngine = {
    * @param {Object} frame The frame object containing scoring values.
    * @returns {{t1: number, t2: number}} An object with calculated Target 1 and Target 2 scores.
    */
-  getBonusTargets(frame) {
-    const t1 = Math.round(frame.values[10] * 1.3);
+  getBonusTargets(round) {
+    const t1 = Math.round(round.values[10] * 1.3);
     const t2 = Math.round(t1 * 1.3);
     return { t1, t2 };
+  },
+
+  /**
+   * Generates format-specific HTML for bonus targets (e.g., Frame 10 Targets).
+   * @param {Object} frame 
+   * @param {boolean} isLastFrame 
+   * @param {Function} formatFn Number formatting utility
+   * @returns {string} HTML string
+   */
+  getBonusTargetHtml(round, isLastRound, formatFn) {
+    if (!isLastRound || !round.values || !round.values[10]) return '';
+    const { t1, t2 } = this.getBonusTargets(round);
+    return `
+      <div style="margin-top: 8px; border-top: 1px dashed #bbb; padding-top: 4px;">
+        <div>Target 1: ${formatFn(t1)}</div>
+        <div>Target 2: ${formatFn(t2)}</div>
+      </div>
+    `;
   },
 
   /**
@@ -35,8 +53,8 @@ const BowlingEngine = {
    * targets (multipliers) to simulate the difficulty of repeated strikes 
    * on the same machine.
    */
-  getFrame10Data(frame, raw1, raw2, raw3) {
-    const target1 = Number(frame.values[10] || 0);
+  getRound10Data(round, raw1, raw2, raw3) {
+    const target1 = Number(round.values[10] || 0);
     const target2 = Math.round(target1 * 1.3);
     const target3 = Math.round(target2 * 1.3);
     const hit1 = raw1 >= target1;
@@ -44,9 +62,9 @@ const BowlingEngine = {
     const hit3 = raw3 >= target3;
     const spare2 = !hit1 && raw2 >= target1;
 
-    const c1 = this.getPinCount(frame, raw1);
-    const c2 = this.getPinCount(frame, raw2);
-    const c3 = this.getPinCount(frame, raw3);
+    const c1 = this.getPinCount(round, raw1);
+    const c2 = this.getPinCount(round, raw2);
+    const c3 = this.getPinCount(round, raw3);
 
     let mark = '';
     let score = 0;
@@ -92,15 +110,15 @@ const BowlingEngine = {
       score = firstPins + secondPins;
     }
 
-    return { order: frame.order_number, machine: frame.machine_name, type: 'tenth', mark, first: firstPins, second: secondPins, third: thirdPins, score };
+    return { order: round.order_number, machine: round.machine_name, type: 'tenth', mark, first: firstPins, second: secondPins, third: thirdPins, score };
   },
 
-  getFrameDataFromValues(frame, raw1, raw2, raw3, isLastFrame = false) {
-    if (isLastFrame) return this.getFrame10Data(frame, raw1, raw2, raw3);
+  getTurnDataFromValues(round, raw1, raw2, raw3, isLastRound = false) {
+    if (isLastRound) return this.getRound10Data(round, raw1, raw2, raw3);
 
-    const c1 = this.getPinCount(frame, raw1);
-    const c2 = this.getPinCount(frame, raw2);
-    const c3 = this.getPinCount(frame, raw3);
+    const c1 = this.getPinCount(round, raw1);
+    const c2 = this.getPinCount(round, raw2);
+    const c3 = this.getPinCount(round, raw3);
 
     let type, first = 0, second = 0, score = 0;
 
@@ -113,13 +131,13 @@ const BowlingEngine = {
     } else {
       type = 'open'; first = c2; second = Math.max(0, c3 - c2); score = first + second;
     }
-    return { order: frame.order_number, machine: frame.machine_name, type, first, second, score };
+    return { order: round.order_number, machine: round.machine_name, type, first, second, score };
   },
 
-  getNextBallValues(frameIndex, count, frameData) {
+  getNextBallValues(roundIndex, count, turnData) {
     const values = [];
-    for (let current = frameIndex + 1; current < frameData.length && values.length < count; current += 1) {
-      const next = frameData[current];
+    for (let current = roundIndex + 1; current < turnData.length && values.length < count; current += 1) {
+      const next = turnData[current];
       if (next.type === 'strike') values.push(10);
       else values.push(next.first, next.second);
     }
@@ -127,35 +145,35 @@ const BowlingEngine = {
     return values.slice(0, count);
   },
 
-  formatMark(frame) {
-    if (frame.type === 'tenth') return frame.mark;
-    if (frame.type === 'strike') return 'X';
-    if (frame.type === 'spare2' || frame.type === 'spare3') return `${frame.first}/`;
-    return `${frame.first} ${frame.second}`;
+  formatMark(turn) {
+    if (turn.type === 'tenth') return turn.mark;
+    if (turn.type === 'strike') return 'X';
+    if (turn.type === 'spare2' || turn.type === 'spare3') return `${turn.first}/`;
+    return `${turn.first} ${turn.second}`;
   },
 
-  calculateFrameResults(machines, scoreMap) {
+  calculateTurnResults(machines, scoreMap) {
     const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
 
-    const frameData = machines.map((frame) => {
-      const entry = scoreMap[String(frame.order_number)] || { ball1: 0, ball2: 0, ball3: 0 };
-      return this.getFrameDataFromValues(frame, Number(entry.ball1), Number(entry.ball2), Number(entry.ball3), frame.order_number === maxOrder);
+    const turnData = machines.map((round) => {
+      const entry = scoreMap[String(round.order_number)] || { ball1: 0, ball2: 0, ball3: 0 };
+      return this.getTurnDataFromValues(round, Number(entry.ball1), Number(entry.ball2), Number(entry.ball3), round.order_number === maxOrder);
     });
 
     let total = 0;
-    const results = frameData.map((frame, index) => {
-      let frameScore = frame.score;
-      if (frame.type === 'strike') {
-        const [next1, next2] = this.getNextBallValues(index, 2, frameData);
-        frameScore = 10 + next1 + next2;
-      } else if (frame.type === 'spare2' || frame.type === 'spare3') {
-        const [next1] = this.getNextBallValues(index, 1, frameData);
-        frameScore = 10 + next1;
+    const results = turnData.map((turn, index) => {
+      let turnScore = turn.score;
+      if (turn.type === 'strike') {
+        const [next1, next2] = this.getNextBallValues(index, 2, turnData);
+        turnScore = 10 + next1 + next2;
+      } else if (turn.type === 'spare2' || turn.type === 'spare3') {
+        const [next1] = this.getNextBallValues(index, 1, turnData);
+        turnScore = 10 + next1;
       }
-      total += frameScore;
-      return { order: frame.order, machine: frame.machine, mark: this.formatMark(frame), score: frameScore };
+      total += turnScore;
+      return { order: turn.order, machine: turn.machine, mark: this.formatMark(turn), score: turnScore };
     });
-    return { frameResults: results, total };
+    return { turnResults: results, total };
   },
 
   buildFrameValues(score10, score1) {
@@ -185,6 +203,7 @@ const GolfEngine = {
     return {};
   },
   getBonusTargets() { return { t1: 0, t2: 0 }; },
+  getBonusTargetHtml() { return ''; },
   formatMark(frame) { return ''; }
 };
 
