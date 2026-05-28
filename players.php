@@ -13,11 +13,9 @@
   <main class="page-container">
     <header>
       <h1>Manage Players</h1>
-      <p>Add or remove players from the system.</p>
     </header>
 
     <section class="card">
-      <h2 id="player-form-title">Add New Player</h2>
       <form id="player-form" autocomplete="off">
         <input type="hidden" id="editing-player-id" value="" />
         <div class="form-row">
@@ -40,7 +38,7 @@
     </section>
 
     <section class="card">
-      <h2>Registered Players</h2>
+      <h2>Players</h2>
       <div id="player-list-container">
         <ul id="player-list" class="notice" style="list-style: none; padding: 14px 16px; margin: 0;">
           <li>Loading players...</li>

@@ -16,7 +16,6 @@
     </header>
 
     <section class="card">
-      <h2 id="location-form-title">Add New Location</h2>
       <form id="location-form" autocomplete="off">
         <input type="hidden" id="editing-location-id" value="" />
         <div class="form-row">

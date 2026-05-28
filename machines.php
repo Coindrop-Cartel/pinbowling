@@ -13,11 +13,9 @@
   <main class="page-container">
     <header>
       <h1>Manage Machines</h1>
-      <p>Add or remove pinball machines from the global database.</p>
     </header>
 
     <section class="card">
-      <h2>Add New Machine</h2>
       <form id="machine-form" autocomplete="off">
         <div class="form-row">
           <label for="machine-name">Machine Name</label>

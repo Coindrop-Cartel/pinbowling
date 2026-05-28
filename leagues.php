@@ -13,11 +13,9 @@
   <main class="page-container">
     <header>
       <h1>Leagues & Events Management</h1>
-      <p>Create and manage your PinBowling leagues and their weekly events.</p>
     </header>
 
     <section class="card">
-      <h2>Create New League</h2>
       <form id="league-form" autocomplete="off">
         <div class="form-row">
           <label for="league-name">League Name</label>
