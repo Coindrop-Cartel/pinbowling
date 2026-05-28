@@ -1,5 +1,5 @@
 import { PB_API, setCurrentPlayerId, getCurrentPlayerId } from './api.js';
-import { BowlingEngine } from './engine.js';
+import { getScoringEngine } from './engine.js';
 import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, printBlankScoreSheet } from './utils.js';
 import { initTournamentSelector } from './tournamentSelector.js';
 import { createSearchableSelect } from './uiComponents.js';
@@ -24,6 +24,9 @@ export async function initScoresPage() {
   let allPlayersCache = [];
   let machines = [];
   const printSheetBtn = document.getElementById('print-sheet-btn');
+
+  // Prepare for multiple scoring formats; default to bowling for now.
+  const Engine = getScoringEngine('bowling');
 
   // Ensure selection starts empty on page initialization
   setCurrentPlayerId('');
@@ -56,7 +59,7 @@ export async function initScoresPage() {
 
     let extraTargets = '';
     if (isLastFrame) {
-      const { t1, t2 } = BowlingEngine.getBonusTargets(frame);
+      const { t1, t2 } = Engine.getBonusTargets(frame);
       extraTargets = `
           <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 2px;">Target 1: <b>${formatNumber(t1)}</b></div>
           <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 2px;">Target 2: <b>${formatNumber(t2)}</b></div>
@@ -237,7 +240,7 @@ export async function initScoresPage() {
 
   function renderCurrentResults() {
     const scoreMap = getScoreMapFromInputs();
-    const { frameResults, total: finalTotal } = BowlingEngine.calculateFrameResults(machines, scoreMap);
+    const { frameResults, total: finalTotal } = Engine.calculateFrameResults(machines, scoreMap);
     let runningTotal = 0;
     resultsBody.innerHTML = frameResults
       .map(

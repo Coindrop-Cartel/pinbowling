@@ -1,5 +1,5 @@
 import { PB_API } from './api.js';
-import { BowlingEngine } from './engine.js';
+import { getScoringEngine } from './engine.js';
 import { getActiveEventId, renderPreview, applyScoreFormatting, formatNumber, printMachineScores } from './utils.js';
 import { createSearchableSelect, showPrompt } from './uiComponents.js';
 import { initReadOnlyTournamentDisplay } from './uiComponents.js';
@@ -23,6 +23,8 @@ export async function initConfigPage() {
   let masterMachines = [];
   let eventTargets = [];
   let currentSuggestedMachines = [];
+
+  const Engine = getScoringEngine('bowling');
 
   if (printMachinesBtn) {
     printMachinesBtn.addEventListener('click', async () => {
@@ -79,8 +81,8 @@ export async function initConfigPage() {
     onSelect: () => markDirty()
   });
 
-  score10Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, BowlingEngine, isCurrentTargetLast()));
-  score1Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, BowlingEngine, isCurrentTargetLast()));
+  score10Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast()));
+  score1Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast()));
 
   document.getElementById('machine-name').addEventListener('input', (e) => {
     markDirty();
@@ -112,7 +114,7 @@ export async function initConfigPage() {
     eventTargets.forEach((frame) => {
       let bonusHtml = '';
       if (frame.order_number === maxOrder && frame.values[10]) {
-        const { t1, t2 } = BowlingEngine.getBonusTargets(frame);
+        const { t1, t2 } = Engine.getBonusTargets(frame);
         bonusHtml = `
           <div style="margin-top: 8px; border-top: 1px dashed #bbb; padding-top: 4px; color: #b71c1c; font-weight: bold;">
             <div>Target 1: ${formatNumber(t1)}</div>
@@ -157,7 +159,7 @@ export async function initConfigPage() {
         score10Input.value = frame.values[10] ? formatNumber(frame.values[10]) : '';
         score1Input.value = frame.values[1] ? formatNumber(frame.values[1]) : '';
         machineSearch.updateOptions(frame.machine_name);
-        renderPreview(score10Input, score1Input, previewValues, BowlingEngine, isCurrentTargetLast());
+        renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast());
         configCard.classList.remove('hidden');
         window.scrollTo(0, 0);
       });
@@ -242,7 +244,7 @@ export async function initConfigPage() {
     form.reset();
     submitBtn.disabled = true;
     machineSearch.updateOptions('');
-    renderPreview(score10Input, score1Input, previewValues, BowlingEngine);
+    renderPreview(score10Input, score1Input, previewValues, Engine);
   }
   document.getElementById('cancel-config-btn').onclick = resetForm;
 
@@ -256,7 +258,7 @@ export async function initConfigPage() {
 
     if (!order_number || !machine_name || (!score10 && !score1) || !eventId) return;
 
-    const values = BowlingEngine.buildFrameValues(score10, score1);
+    const values = Engine.buildFrameValues(score10, score1);
     if (window.PB_ADMIN_PASSWORD) {
       const confirmation = await showPrompt(`Enter Admin Password to save changes for Target ${order_number}:`);
       if (confirmation === null) {

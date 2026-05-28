@@ -1,5 +1,5 @@
 import { PB_API } from './api.js';
-import { BowlingEngine } from './engine.js'; 
+import { getScoringEngine } from './engine.js'; 
 import { getActiveEventId, getActiveLeagueId, formatNumber } from './utils.js';
 import { initTournamentSelector } from './tournamentSelector.js';
 
@@ -14,6 +14,8 @@ export async function initStandingsPage() {
   let isTvMode = false;
   let refreshInterval = null;
   let scrollInterval = null;
+
+  const Engine = getScoringEngine('bowling');
 
   if (tvBtn) {
     tvBtn.addEventListener('click', toggleTvMode);
@@ -106,7 +108,7 @@ export async function initStandingsPage() {
             map[String(row.order_number)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
             return map;
           }, {});
-          const { total } = BowlingEngine.calculateFrameResults(eventTargets, scoreMap);
+          const { total } = Engine.calculateFrameResults(eventTargets, scoreMap);
           eventTotals[event.id] = total;
           totalSeasonPoints += total;
         } else { eventTotals[event.id] = null; }
@@ -168,7 +170,7 @@ export async function initStandingsPage() {
       }, {});
       // Check all three possible balls to see if a frame has data
       const ordersWithScores = new Set(scores.filter(s => Number(s.ball1) > 0 || Number(s.ball2) > 0 || Number(s.ball3) > 0).map(s => s.order_number));
-      const { frameResults, total } = BowlingEngine.calculateFrameResults(machines, scoreMap);
+      const { frameResults, total } = Engine.calculateFrameResults(machines, scoreMap);
       return { player, frameResults, total, ordersWithScores };
     }).sort((a, b) => b.total - a.total);
 

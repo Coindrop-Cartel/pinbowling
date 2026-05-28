@@ -1,3 +1,5 @@
+import { getScoringEngine } from './engine.js';
+
 /**
  * Utility functions and state management helpers.
  */
@@ -62,13 +64,13 @@ export function initNavigation() {
  * @param {HTMLInputElement} score10Input 
  * @param {HTMLInputElement} score1Input 
  * @param {HTMLElement} previewValues 
- * @param {Object} BowlingEngine
+ * @param {Object} Engine
  * @param {boolean} isLastFrame
  */
-export function renderPreview(score10Input, score1Input, previewValues, BowlingEngine, isLastFrame = false) {
+export function renderPreview(score10Input, score1Input, previewValues, Engine, isLastFrame = false) {
   const score10 = Number(score10Input.value.replace(/\D/g, ''));
   const score1 = Number(score1Input.value.replace(/\D/g, ''));
-  const values = BowlingEngine.buildFrameValues(score10, score1);
+  const values = Engine.buildFrameValues(score10, score1);
 
   if (!values) {
     previewValues.innerHTML = "<div>Enter a 10 score or a 1 score to preview values for 9–2.</div>";
@@ -81,7 +83,7 @@ export function renderPreview(score10Input, score1Input, previewValues, BowlingE
     .join("");
 
   if (isLastFrame && values[10]) {
-    const { t1, t2 } = BowlingEngine.getBonusTargets({ values }); // Pass values in an object to match frame structure
+    const { t1, t2 } = Engine.getBonusTargets({ values }); // Pass values in an object to match frame structure
     html += `<br><div><strong>Target 1:</strong> ${formatNumber(t1)}</div>`;
     html += `<div><strong>Target 2:</strong> ${formatNumber(t2)}</div>`;
   }
@@ -98,6 +100,7 @@ export function printMachineScores(machines) {
   if (!printWindow) return alert('Please allow popups to print.');
 
   const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
+  const Engine = getScoringEngine('bowling');
 
   const pagesHtml = machines.map((m) => {
     const ranks = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
@@ -117,7 +120,7 @@ export function printMachineScores(machines) {
 
     let extraTargets = '';
     if (m.order_number === maxOrder) {
-      const { t1, t2 } = BowlingEngine.getBonusTargets(m);
+      const { t1, t2 } = Engine.getBonusTargets(m);
       extraTargets = `
         <div style="margin-top: 40px; display: flex; justify-content: space-around; width: 100%; font-size: 2.2rem; font-weight: bold; border-top: 4px dashed #000; padding-top: 20px;">
           <div>Target 1: ${formatNumber(t1)}</div>

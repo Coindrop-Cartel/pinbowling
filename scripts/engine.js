@@ -1,9 +1,8 @@
 /**
- * The Scoring Engine
- * Pure logic for mapping pinball to bowling.
+ * Scoring Provider
  */
 
-export const BowlingEngine = {
+const BowlingEngine = {
   getPinCount(frame, rawScore) {
     if (!frame || typeof rawScore !== 'number' || rawScore <= 0) return 0;
     const thresholds = Object.entries(frame.values)
@@ -172,3 +171,37 @@ export const BowlingEngine = {
     return null;
   }
 };
+
+/**
+ * Placeholder for future Golf scoring format.
+ */
+const GolfEngine = {
+  calculateFrameResults(machines, scoreMap) {
+    // Implementation for Pingolf: Strokes vs Par
+    return { frameResults: [], total: 0 };
+  },
+  buildFrameValues(target, par) {
+    // Implementation for defining hole-in-one vs par thresholds
+    return {};
+  },
+  getBonusTargets() { return { t1: 0, t2: 0 }; },
+  formatMark(frame) { return ''; }
+};
+
+const ENGINES = {
+  'bowling': BowlingEngine,
+  'golf': GolfEngine
+};
+
+/**
+ * Factory to retrieve the correct scoring logic based on the event format.
+ * Defaults to 'bowling' for backward compatibility.
+ * 
+ * @param {string} format 
+ * @returns {Object} The engine implementation
+ */
+export const getScoringEngine = (format = 'bowling') => {
+  return ENGINES[format] || BowlingEngine;
+};
+
+export { BowlingEngine };
