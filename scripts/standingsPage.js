@@ -8,6 +8,62 @@ export async function initStandingsPage() {
   const standingsBody = document.getElementById('standings-body');
   const standingsEmpty = document.getElementById('standings-empty');
   const standingsWrapper = document.getElementById('standings-wrapper');
+  const tvBtn = document.getElementById('tv-mode-btn');
+
+  let isTvMode = false;
+  let refreshInterval = null;
+  let scrollInterval = null;
+
+  if (tvBtn) {
+    tvBtn.addEventListener('click', toggleTvMode);
+  }
+
+  function toggleTvMode() {
+    isTvMode = !isTvMode;
+    document.body.classList.toggle('tv-mode', isTvMode);
+    
+    if (isTvMode) {
+      tvBtn.textContent = 'Exit TV Mode (Esc)';
+      // Update scores every 15 seconds
+      refreshInterval = setInterval(refresh, 15000);
+      startAutoScroll();
+      // Enter browser fullscreen if possible
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen();
+      }
+    } else {
+      tvBtn.textContent = '📺 TV Mode';
+      clearInterval(refreshInterval);
+      clearInterval(scrollInterval);
+      window.scrollTo(0, 0);
+      if (document.fullscreenElement) document.exitFullscreen();
+    }
+  }
+
+  // Exit TV mode on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isTvMode) toggleTvMode();
+  });
+
+  function startAutoScroll() {
+    clearInterval(scrollInterval);
+    scrollInterval = setInterval(() => {
+      if (!isTvMode) return;
+      
+      const scrollSpeed = 1; // Pixels per tick
+      window.scrollBy(0, scrollSpeed);
+
+      // Check if we reached the bottom
+      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 2) {
+        // Stay at bottom for 5 seconds then reset to top
+        clearInterval(scrollInterval);
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          setTimeout(startAutoScroll, 2000);
+        }, 5000);
+      }
+    }, 50); // ~20fps scroll
+  }
 
   /**
    * Logic for the 'Season Summary' view.
