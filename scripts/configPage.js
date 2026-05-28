@@ -36,6 +36,13 @@ export async function initConfigPage() {
     });
   }
 
+  const doneBtn = document.getElementById('done-setup-btn');
+  if (doneBtn) {
+    doneBtn.addEventListener('click', () => {
+      window.location.href = 'leagues.php';
+    });
+  }
+
   const markDirty = () => { if (frameSelect.value) submitBtn.disabled = false; };
 
   applyScoreFormatting(score10Input);

@@ -70,6 +70,10 @@
         <tbody></tbody>
       </table>
     </section>
+
+    <div class="form-actions" style="margin-top: 20px; display: flex; justify-content: center;">
+      <button type="button" id="done-setup-btn">DONE - Back to Leagues</button>
+    </div>
   </main>
 
   <script src="js-config.php"></script>
