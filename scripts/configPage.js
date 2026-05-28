@@ -17,6 +17,7 @@ export async function initConfigPage() {
   const previewValues = document.getElementById('preview-values');
   let masterMachines = [];
   let eventTargets = [];
+  let currentSuggestedMachines = [];
 
   for (let i = 1; i <= 10; i += 1) {
     const option = document.createElement('option');
@@ -42,10 +43,49 @@ export async function initConfigPage() {
   // immediately see the full suggestion list or replace the value.
   document.getElementById('machine-name').addEventListener('focus', (e) => e.target.select());
 
+  // Ensure the machine-select dropdown exists to provide the dual-field interaction.
+  let machineSelect = document.getElementById('machine-select');
+  if (!machineSelect) {
+    const nameInput = document.getElementById('machine-name');
+    machineSelect = document.createElement('select');
+    machineSelect.id = 'machine-select';
+    nameInput.after(machineSelect);
+  }
+
+  function updateMachineSelect(filterText = '') {
+    const select = document.getElementById('machine-select');
+    if (!select) return;
+    
+    const filter = filterText.toLowerCase();
+    select.innerHTML = '<option value="">-- Choose machine --</option>';
+    
+    currentSuggestedMachines.forEach(m => {
+      if (m.machine_name.toLowerCase().includes(filter)) {
+        const opt = document.createElement('option');
+        opt.value = m.machine_name;
+        opt.textContent = m.machine_name;
+        if (m.machine_name === filterText) opt.selected = true;
+        select.appendChild(opt);
+      }
+    });
+  }
+
   score10Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, BowlingEngine));
   score1Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, BowlingEngine));
 
-  document.getElementById('machine-name').addEventListener('input', markDirty);
+  document.getElementById('machine-name').addEventListener('input', (e) => {
+    updateMachineSelect(e.target.value);
+    markDirty();
+  });
+
+  machineSelect.addEventListener('change', () => {
+    if (machineSelect.value) {
+      document.getElementById('machine-name').value = machineSelect.value;
+      updateMachineSelect(machineSelect.value);
+      markDirty();
+    }
+  });
+
   score10Input.addEventListener('input', markDirty);
   score1Input.addEventListener('input', markDirty);
 
@@ -65,6 +105,7 @@ export async function initConfigPage() {
       score10Input.value = '';
       score1Input.value = '';
     }
+    updateMachineSelect(document.getElementById('machine-name').value);
     renderPreview(score10Input, score1Input, previewValues, BowlingEngine);
     submitBtn.disabled = true;
   });
@@ -107,6 +148,7 @@ export async function initConfigPage() {
         document.getElementById('machine-name').value = frame.machine_name;
         score10Input.value = frame.values[10] ? formatNumber(frame.values[10]) : '';
         score1Input.value = frame.values[1] ? formatNumber(frame.values[1]) : '';
+        updateMachineSelect(frame.machine_name);
         renderPreview(score10Input, score1Input, previewValues, BowlingEngine);
         window.scrollTo(0, 0);
       });
@@ -130,24 +172,9 @@ export async function initConfigPage() {
       }
     }
 
-    // Update machine suggestions (datalist) for the machine-name input
-    const machineInput = document.getElementById('machine-name');
-    let datalist = document.getElementById('machine-suggestions');
-    if (!datalist) {
-      datalist = document.createElement('datalist');
-      datalist.id = 'machine-suggestions';
-      document.body.appendChild(datalist);
-    }
-    // Ensure the input is always associated with the datalist
-    machineInput.setAttribute('list', 'machine-suggestions');
-
-    datalist.innerHTML = '';
-    const suggestedMachines = locationId ? await PB_API.getLocationMachines(locationId) : masterMachines;
-    suggestedMachines.sort((a, b) => a.machine_name.localeCompare(b.machine_name)).forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.machine_name;
-      datalist.appendChild(opt);
-    });
+    currentSuggestedMachines = locationId ? await PB_API.getLocationMachines(locationId) : masterMachines;
+    currentSuggestedMachines.sort((a, b) => a.machine_name.localeCompare(b.machine_name));
+    updateMachineSelect(document.getElementById('machine-name').value);
 
     eventTargets = eventId ? await PB_API.getTargetScores(eventId) : [];
     await render();
@@ -157,6 +184,7 @@ export async function initConfigPage() {
     editingMachineId = null;
     form.reset();
     submitBtn.disabled = true;
+    updateMachineSelect('');
     renderPreview(score10Input, score1Input, previewValues, BowlingEngine);
   }
 
