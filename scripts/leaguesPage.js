@@ -37,15 +37,14 @@ export async function initLeaguesPage() {
           <div class="league-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
             <div>
               <h3 style="margin: 0;">${league.name}</h3>
-              <small>Started: ${league.start_date || 'N/A'} | Events: ${league.events?.length || 0}</small>
-            </div>
-            <div style="display: flex; gap: 8px;">
-              <button class="add-event-btn secondary">Add Event</button>
-              <button class="delete-league-btn">Delete</button>
+              <small>Started: ${league.start_date || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
             </div>
           </div>
           <div class="league-details hidden" style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 15px;">
-            <h4>Events</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <h4 style="margin: 0;">Events</h4>
+              <button class="add-event-btn secondary" style="padding: 4px 12px; font-size: 0.85rem;">Add Event</button>
+            </div>
             <ul style="list-style: none; padding: 0;">
               ${(league.events || []).map(e => `
                 <li style="display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
@@ -69,6 +68,10 @@ export async function initLeaguesPage() {
               </ul>
               <div class="notice league-players-empty hidden">No players assigned to this league.</div>
             </div>
+
+            <div class="league-management-section" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px; text-align: right;">
+              <button class="delete-league-btn" style="padding: 8px 16px; font-size: 0.85rem;">Delete League</button>
+            </div>
           </div>
         `;
 
@@ -81,6 +84,7 @@ export async function initLeaguesPage() {
         // Action listeners
         card.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
         card.querySelector('.delete-league-btn').onclick = () => deleteLeague(league.id, league.name);
+        card.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
         
         card.querySelectorAll('.setup-event-btn').forEach(btn => {
           btn.onclick = () => {
@@ -106,7 +110,7 @@ export async function initLeaguesPage() {
 
         // Initial render of players if details are not hidden (e.g., after refresh)
         const details = card.querySelector('.league-details');
-        if (!details.classList.contains('hidden')) renderPlayersForLeague(league.id, league.league_players, allPlayersCache);
+        if (!details.classList.contains('hidden')) renderPlayersForLeague(league.id, league.players, allPlayersCache);
       });
     }
 
@@ -168,13 +172,12 @@ export async function initLeaguesPage() {
     if (leaguePlayers && leaguePlayers.length > 0) {
         emptyNoticeEl.classList.add('hidden');
         leaguePlayers.forEach(lp => {
-            const player = allPlayers.find(p => p.id === lp.player_id);
-            if (player) {
+            if (lp && lp.id) {
                 const li = document.createElement('li');
                 li.style = "display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;";
                 li.innerHTML = `
-                    <span>${player.player_name}</span>
-                    <button class="remove-player-btn" data-league-id="${leagueId}" data-player-id="${player.id}" data-player-name="${player.player_name}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>
+                    <span>${lp.player_name}</span>
+                    <button class="remove-player-btn" data-league-id="${leagueId}" data-player-id="${lp.id}" data-player-name="${lp.player_name}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>
                 `;
                 playersListEl.appendChild(li);
             }
@@ -195,7 +198,7 @@ export async function initLeaguesPage() {
 
   async function addPlayerToLeague(leagueId, leagueName) {
     const league = allLeagues.find(l => l.id === leagueId);
-    const playersInLeague = new Set((league.league_players || []).map(lp => lp.player_id));
+    const playersInLeague = new Set((league.players || []).map(p => p.id));
     const availablePlayers = allPlayersCache.filter(p => !playersInLeague.has(p.id));
 
     if (availablePlayers.length === 0) {
