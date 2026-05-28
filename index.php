@@ -26,7 +26,6 @@
       <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
         <a href="#" class="btn-standard">Let's Bowl</a>
         <a href="leagues.php" class="btn-standard">Manage Leagues</a>
-        <a href="event-setup.php" class="btn-standard">Setup Events</a>
         <a href="scores.php" class="btn-standard">Enter Scores</a>
         <a href="standings.php" class="btn-standard">View Scoreboard</a>
       </div>

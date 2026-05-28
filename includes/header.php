@@ -9,9 +9,8 @@
       <li class="nav-item dropdown">
         <a href="javascript:void(0)" class="nav-link dropbtn">Leagues</a>
         <div class="dropdown-content">
-          <a href="leagues.php">Create/Edit</a>
-          <a href="event-setup.php">Setup</a>
           <a href="scores.php">Play</a>
+          <a href="leagues.php">Manage</a>
           <a href="standings.php">Scoreboard</a>
         </div>
       </li>
