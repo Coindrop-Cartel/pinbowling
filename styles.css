@@ -50,17 +50,20 @@ body {
   text-transform: uppercase;
   font-size: 1.5rem;
   letter-spacing: -1px;
+  white-space: nowrap;
 }
 
 .nav-logo img {
-  height: 50px;
+  height: 60px;
   width: auto;
+  display: block;
 }
 
 .nav-links {
   list-style: none;
-  display: flex !important;
-  flex-direction: row !important;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   gap: 10px;
   margin: 0;
   padding: 0;

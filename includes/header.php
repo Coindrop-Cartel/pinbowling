@@ -1,7 +1,7 @@
 <nav class="navbar">
   <div class="nav-container">
     <a href="index.php" class="nav-logo">
-      <img src="images/logo.png" alt="PinBowling Logo" height="50">
+      <img src="images/logo.png" alt="PinBowling Logo">
       <span>PinBowling</span>
     </a>
     <ul class="nav-links">
