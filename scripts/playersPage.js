@@ -12,29 +12,12 @@ export async function initPlayersPage() {
   const matchplayIdInput = document.getElementById('matchplay-id');
   const savePlayerButton = document.getElementById('save-player-button');
   const cancelEditButton = document.getElementById('cancel-edit-button');
-
-  const playerSelect = document.getElementById('player-select');
-  const deletePlayerButton = document.getElementById('delete-player-button');
   const playerList = document.getElementById('player-list');
 
   let allPlayers = []; // Cache players for editing
 
   async function refresh() {
     allPlayers = await PB_API.getPlayers();
-    
-    // Update delete dropdown
-    playerSelect.innerHTML = '';
-    playerSelect.appendChild(Object.assign(document.createElement('option'), {
-      value: '',
-      textContent: allPlayers.length === 0 ? 'No players registered' : 'Select player to delete'
-    }));
-
-    allPlayers.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.player_name;
-      playerSelect.appendChild(opt);
-    });
 
     // Update alphabetical list
     playerList.innerHTML = '';
@@ -54,19 +37,24 @@ export async function initPlayersPage() {
             ${p.ifpa_id ? `<small>(IFPA: ${p.ifpa_id})</small>` : ''}
             ${p.matchplay_id ? `<small>(Matchplay: ${p.matchplay_id})</small>` : ''}
           </span>
-          <button type="button" class="edit-player-btn secondary" data-player-id="${p.id}">Edit</button>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="edit-player-btn secondary" data-player-id="${p.id}">Edit</button>
+            <button type="button" class="delete-player-btn-inline" data-player-id="${p.id}">Delete</button>
+          </div>
         `;
         playerList.appendChild(li);
       });
       if (playerList.lastElementChild) playerList.lastElementChild.style.borderBottom = 'none';
 
-      // Attach edit listeners
+      // Attach row action listeners
       playerList.querySelectorAll('.edit-player-btn').forEach(btn => {
         btn.addEventListener('click', (e) => editPlayer(Number(e.target.dataset.playerId)));
       });
+      playerList.querySelectorAll('.delete-player-btn-inline').forEach(btn => {
+        btn.addEventListener('click', (e) => deletePlayer(Number(e.target.dataset.playerId)));
+      });
     }
     
-    deletePlayerButton.disabled = allPlayers.length === 0;
     resetForm(); // Ensure form is reset after refresh
   }
 
@@ -141,14 +129,8 @@ export async function initPlayersPage() {
     }
   });
 
-  deletePlayerButton.addEventListener('click', async () => {
-    const selectedId = playerSelect.value;
-    if (!selectedId) {
-      alert('Select a player to delete.');
-      return;
-    }
-    const players = await PB_API.getPlayers();
-    const player = players.find(p => String(p.id) === selectedId);
+  async function deletePlayer(playerId) {
+    const player = allPlayers.find(p => p.id === playerId);
     if (!player) return;
     
     if (window.PB_ADMIN_PASSWORD) {
@@ -163,12 +145,12 @@ export async function initPlayersPage() {
     }
 
     try {
-      await PB_API.deletePlayer(selectedId);
+      await PB_API.deletePlayer(playerId);
       await refresh();
     } catch (error) {
       alert(`Error deleting player: ${error.message}`);
     }
-  });
+  }
 
   cancelEditButton.addEventListener('click', cancelEdit);
 
