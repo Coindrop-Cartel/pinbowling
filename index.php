@@ -27,7 +27,6 @@
         <a href="#" class="btn-standard">Let's Bowl</a>
         <a href="leagues.php" class="btn-standard">Manage Leagues</a>
         <a href="scores.php" class="btn-standard">Enter Scores</a>
-        <a href="standings.php" class="btn-standard">View Scoreboard</a>
       </div>
     </section>
 

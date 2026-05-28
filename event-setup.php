@@ -31,7 +31,6 @@
         <div class="form-row">
           <label for="machine-name">Machine Name</label>
           <input type="text" id="machine-name" placeholder="Start typing machine name..." required autocomplete="off" />
-          <small class="hint">Type to search existing machines or enter a new one to override.</small>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
           <div class="form-row">
