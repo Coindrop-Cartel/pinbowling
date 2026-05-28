@@ -1,3 +1,5 @@
+import { PB_API } from './api.js';
+
 /**
  * Logic for managing league locations/venues.
  */
@@ -8,8 +10,7 @@ export function initLocationsPage() {
 
   const fetchLocations = async () => {
     try {
-      const res = await fetch('api.php?action=getLocations');
-      const locations = await res.json();
+      const locations = await PB_API.getLocations();
       
       if (locations && locations.length > 0) {
         emptyNotice.classList.add('hidden');
@@ -44,18 +45,12 @@ export function initLocationsPage() {
       }
     }
 
-    const res = await fetch('api.php?action=saveLocation', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-PB-SECRET': window.PB_API_SECRET 
-      },
-      body: JSON.stringify({ name: locationName })
-    });
-
-    if (res.ok) {
+    try {
+      await PB_API.createLocation({ name: locationName });
       nameInput.value = '';
       fetchLocations();
+    } catch (err) {
+      alert(`Failed to save location: ${err.message}`);
     }
   });
 
@@ -69,11 +64,12 @@ export function initLocationsPage() {
       }
     }
 
-    await fetch(`api.php?action=deleteLocation&id=${id}`, {
-      method: 'DELETE',
-      headers: { 'X-PB-SECRET': window.PB_API_SECRET }
-    });
-    fetchLocations();
+    try {
+      await PB_API.deleteLocation(id);
+      fetchLocations();
+    } catch (err) {
+      alert(`Failed to delete location: ${err.message}`);
+    }
   };
 
   fetchLocations();

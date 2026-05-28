@@ -1,3 +1,5 @@
+import { PB_API } from './api.js';
+
 /**
  * Logic for managing the global machine registry.
  */
@@ -8,8 +10,7 @@ export function initMachinesPage() {
 
   const fetchMachines = async () => {
     try {
-      const res = await fetch('api.php?action=getMachines');
-      const machines = await res.json();
+      const machines = await PB_API.getMachines();
       
       if (machines && machines.length > 0) {
         emptyNotice.classList.add('hidden');
@@ -44,18 +45,12 @@ export function initMachinesPage() {
       }
     }
 
-    const res = await fetch('api.php?action=saveMachine', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-PB-SECRET': window.PB_API_SECRET 
-      },
-      body: JSON.stringify({ machine_name: machineName })
-    });
-
-    if (res.ok) {
+    try {
+      await PB_API.createMachine(machineName);
       nameInput.value = '';
       fetchMachines();
+    } catch (err) {
+      alert(`Failed to save machine: ${err.message}`);
     }
   });
 
@@ -69,11 +64,12 @@ export function initMachinesPage() {
       }
     }
 
-    await fetch(`api.php?action=deleteMachine&id=${id}`, {
-      method: 'DELETE',
-      headers: { 'X-PB-SECRET': window.PB_API_SECRET }
-    });
-    fetchMachines();
+    try {
+      await PB_API.deleteMachine(id);
+      fetchMachines();
+    } catch (err) {
+      alert(`Failed to delete machine: ${err.message}`);
+    }
   };
 
   fetchMachines();
