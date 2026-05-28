@@ -121,8 +121,8 @@ export async function initStandingsPage() {
       tvTitle.textContent = `${league?.name || 'League'} - Season Summary`;
     }
 
-    standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${events.map(e => `<th>${e.event_name}</th>`).join('')}<th>Total</th></tr>`;
-    standingsBody.innerHTML = rows.map((row, idx) => `
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${events.map(e => `<th>${e.event_name}</th>`).join('')}<th>Total</th></tr>`;
+    if (standingsBody) standingsBody.innerHTML = rows.map((row, idx) => `
       <tr>
         <td style="text-align: center;">${idx + 1}</td>
         <td class="player-name-cell"></td>
@@ -131,16 +131,18 @@ export async function initStandingsPage() {
       </tr>
     `).join('');
 
-    standingsBody.querySelectorAll('.player-name-cell').forEach((cell, i) => { cell.textContent = rows[i].player.player_name; });
-    standingsEmpty.classList.add('hidden');
-    standingsWrapper.classList.remove('hidden');
+    if (standingsBody) {
+      standingsBody.querySelectorAll('.player-name-cell').forEach((cell, i) => { cell.textContent = rows[i].player.player_name; });
+    }
+    if (standingsEmpty) standingsEmpty.classList.add('hidden');
+    if (standingsWrapper) standingsWrapper.classList.remove('hidden');
   };
 
   const refresh = async () => {
     const eventId = getActiveEventId();
     if (!eventId) {
-      standingsWrapper.classList.add('hidden');
-      standingsEmpty.classList.remove('hidden');
+      if (standingsWrapper) standingsWrapper.classList.add('hidden');
+      if (standingsEmpty) standingsEmpty.classList.remove('hidden');
       return;
     }
     if (eventId === 'summary') return renderLeagueSummary(getActiveLeagueId());
@@ -174,8 +176,8 @@ export async function initStandingsPage() {
       return { player, turnResults, total, ordersWithScores };
     }).sort((a, b) => b.total - a.total);
 
-    standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${machines.map(m => `<th>Target ${m.order_number}</th>`).join('')}<th>Total</th></tr>`;
-    standingsBody.innerHTML = rows.map((res, idx) => `
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${machines.map(m => `<th>Target ${m.order_number}</th>`).join('')}<th>Total</th></tr>`;
+    if (standingsBody) standingsBody.innerHTML = rows.map((res, idx) => `
       <tr>
         <td>${idx + 1}</td>
         <td class="player-name-cell"></td>
@@ -187,9 +189,11 @@ export async function initStandingsPage() {
         <td class="standings-total">${formatNumber(res.total)}</td>
       </tr>`).join('');
 
-    standingsBody.querySelectorAll('.player-name-cell').forEach((cell, i) => { cell.textContent = rows[i].player.player_name; });
-    standingsEmpty.classList.add('hidden');
-    standingsWrapper.classList.remove('hidden');
+    if (standingsBody) {
+      standingsBody.querySelectorAll('.player-name-cell').forEach((cell, i) => { cell.textContent = rows[i].player.player_name; });
+    }
+    if (standingsEmpty) standingsEmpty.classList.add('hidden');
+    if (standingsWrapper) standingsWrapper.classList.remove('hidden');
   };
 
   initTournamentSelector(refresh);
