@@ -26,7 +26,7 @@
           <input id="league-start-date" type="date" />
         </div>
         <div class="form-actions">
-          <button type="submit">Create League</button>
+          <button type="submit" id="create-league-btn" disabled>Create League</button>
         </div>
       </form>
     </section>
