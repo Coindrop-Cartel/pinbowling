@@ -82,11 +82,11 @@ export const BowlingEngine = {
       score = firstPins + secondPins;
     }
 
-    return { frame: frame.frame_number, machine: frame.machine_name, type: 'tenth', mark, first: firstPins, second: secondPins, third: thirdPins, score };
+    return { order: frame.order_number, machine: frame.machine_name, type: 'tenth', mark, first: firstPins, second: secondPins, third: thirdPins, score };
   },
 
   getFrameDataFromValues(frame, raw1, raw2, raw3) {
-    if (frame.frame_number === 10) return this.getFrame10Data(frame, raw1, raw2, raw3);
+    if (frame.order_number === 10) return this.getFrame10Data(frame, raw1, raw2, raw3);
 
     const c1 = this.getPinCount(frame, raw1);
     const c2 = this.getPinCount(frame, raw2);
@@ -103,7 +103,7 @@ export const BowlingEngine = {
     } else {
       type = 'open'; first = c2; second = Math.max(0, c3 - c2); score = first + second;
     }
-    return { frame: frame.frame_number, machine: frame.machine_name, type, first, second, score };
+    return { order: frame.order_number, machine: frame.machine_name, type, first, second, score };
   },
 
   getNextBallValues(frameIndex, count, frameData) {
@@ -126,7 +126,7 @@ export const BowlingEngine = {
 
   calculateFrameResults(machines, scoreMap) {
     const frameData = machines.map((frame) => {
-      const entry = scoreMap[String(frame.frame_number)] || { ball1: 0, ball2: 0, ball3: 0 };
+      const entry = scoreMap[String(frame.order_number)] || { ball1: 0, ball2: 0, ball3: 0 };
       return this.getFrameDataFromValues(frame, Number(entry.ball1), Number(entry.ball2), Number(entry.ball3));
     });
 
@@ -141,7 +141,7 @@ export const BowlingEngine = {
         frameScore = 10 + next1;
       }
       total += frameScore;
-      return { frame: frame.frame, machine: frame.machine, mark: this.formatMark(frame), score: frameScore };
+      return { order: frame.order, machine: frame.machine, mark: this.formatMark(frame), score: frameScore };
     });
     return { frameResults: results, total };
   },

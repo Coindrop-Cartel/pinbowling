@@ -220,7 +220,7 @@ function initDatabase() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         event_id INT NOT NULL,
         machine_id INT NOT NULL,
-        frame_number INT NOT NULL,
+        order_number INT NOT NULL,
         score1 INT NOT NULL DEFAULT 0,
         score2 INT NOT NULL DEFAULT 0,
         score3 INT NOT NULL DEFAULT 0,
@@ -231,7 +231,7 @@ function initDatabase() {
         score8 INT NOT NULL DEFAULT 0,
         score9 INT NOT NULL DEFAULT 0,
         score10 INT NOT NULL DEFAULT 0,
-        UNIQUE KEY uq_event_frame (event_id, frame_number),
+        UNIQUE KEY uq_event_order (event_id, order_number),
         CONSTRAINT fk_target_event FOREIGN KEY (event_id) REFERENCES Events(id) ON DELETE CASCADE,
         CONSTRAINT fk_target_machine FOREIGN KEY (machine_id) REFERENCES Machines(id) ON DELETE CASCADE
     )");
@@ -240,18 +240,29 @@ function initDatabase() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         event_id INT DEFAULT NULL,
         player_id INT NOT NULL,
-        frame INT NOT NULL,
+        order_number INT NOT NULL,
         machine_id INT NOT NULL,
         ball1 INT NOT NULL DEFAULT 0,
         ball2 INT NOT NULL DEFAULT 0,
         ball3 INT NOT NULL DEFAULT 0,
-        UNIQUE KEY uq_player_frame_event (player_id, frame, event_id),
+        UNIQUE KEY uq_player_order_event (player_id, order_number, event_id),
         INDEX idx_player_id (player_id),
         INDEX idx_machine_id (machine_id),
         CONSTRAINT fk_scores_player FOREIGN KEY (player_id) REFERENCES Players(id) ON DELETE CASCADE,
         CONSTRAINT fk_scores_machine FOREIGN KEY (machine_id) REFERENCES Machines(id) ON DELETE CASCADE,
         CONSTRAINT fk_scores_event FOREIGN KEY (event_id) REFERENCES Events(id) ON DELETE CASCADE
     )");
+
+    // --- Migration: Frame to Order ---
+    try {
+        $pdo->exec("ALTER TABLE Target_Scores CHANGE COLUMN frame_number order_number INT NOT NULL");
+        $pdo->exec("ALTER TABLE Target_Scores DROP INDEX uq_event_frame, ADD UNIQUE KEY uq_event_order (event_id, order_number)");
+    } catch (PDOException $e) {}
+
+    try {
+        $pdo->exec("ALTER TABLE Scores CHANGE COLUMN frame order_number INT NOT NULL");
+        $pdo->exec("ALTER TABLE Scores DROP INDEX uq_player_frame_event, ADD UNIQUE KEY uq_player_order_event (player_id, order_number, event_id)");
+    } catch (PDOException $e) {}
 
     // --- Migration: Scores v2 ---
     // Aligns terminology by renaming 'tournament_id' to 'event_id'.

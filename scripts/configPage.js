@@ -5,10 +5,13 @@ import { createSearchableSelect } from './uiComponents.js';
 import { initReadOnlyTournamentDisplay } from './uiComponents.js';
 
 export async function initConfigPage() {
-  const frameSelect = document.getElementById('frame-number');
+  const configCard = document.getElementById('config-card');
+  const orderInput = document.getElementById('order-number');
+  const displayOrder = document.getElementById('display-order');
   const form = document.getElementById('frame-form');
   const submitBtn = form.querySelector('button[type="submit"]');
   const framesTable = document.getElementById('frames-table');
+  const reorderActions = document.getElementById('reorder-actions');
   const listEmpty = document.getElementById('list-empty');
   let editingMachineId = null;
   const printMachinesBtn = document.getElementById('print-machines-btn');
@@ -20,13 +23,6 @@ export async function initConfigPage() {
   let masterMachines = [];
   let eventTargets = [];
   let currentSuggestedMachines = [];
-
-  for (let i = 1; i <= 10; i += 1) {
-    const option = document.createElement('option');
-    option.value = String(i);
-    option.textContent = i;
-    frameSelect.appendChild(option);
-  }
 
   if (printMachinesBtn) {
     printMachinesBtn.addEventListener('click', async () => {
@@ -43,7 +39,16 @@ export async function initConfigPage() {
     });
   }
 
-  const markDirty = () => { if (frameSelect.value) submitBtn.disabled = false; };
+  document.getElementById('add-target-btn').addEventListener('click', () => {
+    resetForm();
+    const nextOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.order_number)) + 1 : 1;
+    orderInput.value = nextOrder;
+    displayOrder.textContent = nextOrder;
+    configCard.classList.remove('hidden');
+    configCard.scrollIntoView({ behavior: 'smooth' });
+  });
+
+  const markDirty = () => { if (orderInput.value) submitBtn.disabled = false; };
 
   applyScoreFormatting(score10Input);
   applyScoreFormatting(score1Input);
@@ -78,27 +83,6 @@ export async function initConfigPage() {
   score10Input.addEventListener('input', markDirty);
   score1Input.addEventListener('input', markDirty);
 
-  frameSelect.addEventListener('change', () => {
-    const selectedFrameNumber = Number(frameSelect.value);
-    if (!selectedFrameNumber) { resetForm(); return; }
-
-    const existingFrame = eventTargets.find((m) => m.frame_number === selectedFrameNumber);
-    if (existingFrame) {
-      editingMachineId = existingFrame.id;
-      document.getElementById('machine-name').value = existingFrame.machine_name;
-      score10Input.value = existingFrame.values[10] ? formatNumber(existingFrame.values[10]) : '';
-      score1Input.value = existingFrame.values[1] ? formatNumber(existingFrame.values[1]) : '';
-    } else {
-      editingMachineId = null;
-      document.getElementById('machine-name').value = '';
-      score10Input.value = '';
-      score1Input.value = '';
-    }
-    machineSearch.updateOptions(document.getElementById('machine-name').value);
-    renderPreview(score10Input, score1Input, previewValues, BowlingEngine);
-    submitBtn.disabled = true;
-  });
-
   async function render() {
     const eventId = getActiveEventId();
     const tbody = framesTable.querySelector('tbody');
@@ -106,18 +90,25 @@ export async function initConfigPage() {
 
     if (!eventId || eventTargets.length === 0) {
       framesTable.classList.add('hidden');
+      reorderActions.classList.add('hidden');
       listEmpty.classList.remove('hidden');
-      listEmpty.textContent = eventId ? 'No frames configured for this event.' : 'Select a league and event to manage target scores.';
+      listEmpty.textContent = eventId ? 'No targets defined for this event.' : 'Select a league and event to manage target scores.';
       return;
     }
 
     framesTable.classList.remove('hidden');
+    reorderActions.classList.remove('hidden');
     listEmpty.classList.add('hidden');
+
+    eventTargets.sort((a, b) => a.order_number - b.order_number);
 
     eventTargets.forEach((frame) => {
       const row = document.createElement('tr');
+      row.draggable = true;
+      row.dataset.id = frame.id;
       row.innerHTML = `
-        <td>${frame.frame_number}</td>
+        <td class="drag-handle" style="cursor: grab; color: #888;">☰</td>
+        <td>${frame.order_number}</td>
         <td>${frame.machine_name}</td>
         <td><div class="score-list">${Object.entries(frame.values)
           .sort((a, b) => Number(b[0]) - Number(a[0]))
@@ -133,16 +124,59 @@ export async function initConfigPage() {
         const frame = eventTargets.find(item => item.id === Number(btn.dataset.id));
         if (!frame) return;
         editingMachineId = frame.id;
-        frameSelect.value = String(frame.frame_number);
+        orderInput.value = frame.order_number;
+        displayOrder.textContent = frame.order_number;
         document.getElementById('machine-name').value = frame.machine_name;
         score10Input.value = frame.values[10] ? formatNumber(frame.values[10]) : '';
         score1Input.value = frame.values[1] ? formatNumber(frame.values[1]) : '';
         machineSearch.updateOptions(frame.machine_name);
         renderPreview(score10Input, score1Input, previewValues, BowlingEngine);
+        configCard.classList.remove('hidden');
         window.scrollTo(0, 0);
       });
     });
+
+    setupDragging(tbody);
   }
+
+  function setupDragging(tbody) {
+    let draggedRow = null;
+    tbody.addEventListener('dragstart', (e) => {
+      draggedRow = e.target.closest('tr');
+      e.target.style.opacity = '0.5';
+    });
+    tbody.addEventListener('dragend', (e) => {
+      e.target.style.opacity = '';
+    });
+    tbody.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const overRow = e.target.closest('tr');
+      if (overRow && overRow !== draggedRow) {
+        const rect = overRow.getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        if (e.clientY < midpoint) {
+          tbody.insertBefore(draggedRow, overRow);
+        } else {
+          tbody.insertBefore(draggedRow, overRow.nextSibling);
+        }
+      }
+    });
+  }
+
+  document.getElementById('save-order-btn').addEventListener('click', async () => {
+    const rows = Array.from(framesTable.querySelectorAll('tbody tr'));
+    const newOrder = rows.map((row, index) => ({
+      id: Number(row.dataset.id),
+      order_number: index + 1
+    }));
+
+    try {
+      await Promise.all(newOrder.map(item => PB_API.saveTargetScore({ id: item.id, order_number: item.order_number })));
+      await refresh();
+    } catch (err) {
+      alert('Failed to update order: ' + err.message);
+    }
+  });
 
   const refresh = async () => {
     const eventId = getActiveEventId();
@@ -177,25 +211,27 @@ export async function initConfigPage() {
 
   function resetForm() {
     editingMachineId = null;
+    configCard.classList.add('hidden');
     form.reset();
     submitBtn.disabled = true;
     machineSearch.updateOptions('');
     renderPreview(score10Input, score1Input, previewValues, BowlingEngine);
   }
+  document.getElementById('cancel-config-btn').onclick = resetForm;
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const frame_number = Number(frameSelect.value);
+    const order_number = Number(orderInput.value);
     const machine_name = document.getElementById('machine-name').value.trim();
     const score10 = Number(score10Input.value.replace(/\D/g, ''));
     const score1 = Number(score1Input.value.replace(/\D/g, ''));
     const eventId = getActiveEventId();
 
-    if (!frame_number || !machine_name || (!score10 && !score1) || !eventId) return;
+    if (!order_number || !machine_name || (!score10 && !score1) || !eventId) return;
 
     const values = BowlingEngine.buildFrameValues(score10, score1);
     if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = prompt(`Enter Admin Password to save changes for Frame ${frame_number}:`);
+      const confirmation = prompt(`Enter Admin Password to save changes for Target ${order_number}:`);
       if (confirmation === null) { // User cancelled
         alert('Admin action cancelled.');
         return;
@@ -218,7 +254,7 @@ export async function initConfigPage() {
       id: editingMachineId,
       event_id: Number(eventId), 
       machine_id: masterMachine.id, 
-      frame_number, 
+      order_number, 
       values 
     });
     await refresh();

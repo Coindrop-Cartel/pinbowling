@@ -16,17 +16,16 @@
 
     <header>
       <h1>Event Configuration</h1>
-      <p>Assign machines to frames 1-10 and set the target scores for the selected event.</p>
+      <p>Define the machine sequence and target scores for this event.</p>
     </header>
 
-    <section class="card">
-      <h2>Configure Frame</h2>
+    <section id="config-card" class="card hidden">
+      <h2 id="config-title">Add New Target</h2>
       <form id="frame-form" autocomplete="off">
+        <input type="hidden" id="order-number" />
         <div class="form-row">
-          <label for="frame-number">Select Frame</label>
-          <select id="frame-number" required>
-            <option value="">Choose Frame...</option>
-          </select>
+          <label>Sequence Order</label>
+          <div id="display-order" style="font-weight: bold; font-size: 1.2rem;"></div>
         </div>
         <div class="form-row">
           <label for="machine-name">Machine Name</label>
@@ -49,19 +48,23 @@
           </div>
         </div>
         <div class="form-actions" style="margin-top: 20px;">
-          <button type="submit" id="save-frame-btn" disabled>Save Frame Configuration</button>
-          <button type="button" id="print-machines-btn" class="secondary">Print Machine Signs</button>
+          <button type="submit" id="save-frame-btn" disabled>Save Configuration</button>
+          <button type="button" id="cancel-config-btn" class="secondary">Cancel</button>
         </div>
       </form>
     </section>
 
     <section class="card">
-      <h2>Event Layout</h2>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Event Layout</h2>
+        <button type="button" id="add-target-btn" class="btn-standard">+ Add New Target</button>
+      </div>
       <div id="list-empty" class="notice">Select a league and event to manage target scores.</div>
       <table id="frames-table" class="data-table hidden">
         <thead>
           <tr>
-            <th style="width: 80px;">Frame</th>
+            <th style="width: 50px;"></th>
+            <th style="width: 80px;">Order</th>
             <th>Machine</th>
             <th>Target Scores</th>
             <th style="width: 100px;">Actions</th>
@@ -69,6 +72,10 @@
         </thead>
         <tbody></tbody>
       </table>
+      <div id="reorder-actions" class="form-actions hidden" style="margin-top: 1rem; justify-content: flex-end;">
+        <span class="hint" style="margin-right: 10px;">Drag rows to reorder.</span>
+        <button type="button" id="save-order-btn">Save New Order</button>
+      </div>
     </section>
 
     <div class="form-actions" style="margin-top: 20px; display: flex; justify-content: center;">
