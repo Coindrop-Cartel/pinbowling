@@ -32,7 +32,7 @@
     </section>
 
     <section class="card">
-      <h2>Existing Leagues</h2>
+      <h2>Leagues</h2>
       <div id="leagues-list-empty" class="notice">No leagues created yet.</div>
       <div id="leagues-list">
         <!-- Leagues will be rendered here -->

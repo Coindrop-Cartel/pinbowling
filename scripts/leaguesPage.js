@@ -48,7 +48,10 @@ export async function initLeaguesPage() {
               ${(league.events || []).map(e => `
                 <li style="display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
                   <span>${e.event_name} <small>(${e.event_date || 'No Date'})</small></span>
-                  <button class="delete-event-btn" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>
+                  <div style="display: flex; gap: 4px;">
+                    <button class="edit-event-btn secondary" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>
+                    <button class="delete-event-btn" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>
+                  </div>
                 </li>
               `).join('') || '<li>No events scheduled.</li>'}
             </ul>
@@ -65,6 +68,13 @@ export async function initLeaguesPage() {
         card.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
         card.querySelector('.delete-league-btn').onclick = () => deleteLeague(league.id, league.name);
         
+        card.querySelectorAll('.edit-event-btn').forEach(btn => {
+          btn.onclick = () => {
+            const eventObj = league.events.find(ev => ev.id === Number(btn.dataset.id));
+            showEventForm(league.id, league.name, eventObj);
+          };
+        });
+
         card.querySelectorAll('.delete-event-btn').forEach(btn => {
           btn.onclick = (e) => deleteEvent(Number(e.target.dataset.id), league.name);
         });
@@ -133,21 +143,49 @@ export async function initLeaguesPage() {
     await refresh();
   }
 
-  function showEventForm(leagueId, leagueName) {
+  async function showEventForm(leagueId, leagueName, event = null) {
     eventFormCard.classList.remove('hidden');
-    document.getElementById('event-form-league-name').textContent = leagueName;
+    const titleEl = document.getElementById('event-form-title');
+    titleEl.innerHTML = event ? `Edit Event: ${event.event_name}` : `Add Event to League: <span id="event-form-league-name">${leagueName}</span>`;
+    
     document.getElementById('event-league-id').value = leagueId;
+    document.getElementById('event-id').value = event ? event.id : '';
+    document.getElementById('event-name').value = event ? event.event_name : '';
+    document.getElementById('event-date').value = event ? (event.event_date || '') : '';
+
+    // Populate location dropdown
+    const locationSelect = document.getElementById('event-location');
+    const locations = await PB_API.getLocations();
+    locationSelect.innerHTML = '<option value="">Select Location (Optional)</option>';
+    locations.forEach(loc => {
+      const opt = document.createElement('option');
+      opt.value = loc.id;
+      opt.textContent = loc.name;
+      if (event && event.location_id == loc.id) opt.selected = true;
+      locationSelect.appendChild(opt);
+    });
+
     eventFormCard.scrollIntoView({ behavior: 'smooth' });
   }
+
+  document.getElementById('cancel-event-edit').onclick = () => eventFormCard.classList.add('hidden');
 
   document.getElementById('event-form').onsubmit = async (e) => {
     e.preventDefault();
     const leagueId = document.getElementById('event-league-id').value;
+    const eventId = document.getElementById('event-id').value;
     const name = document.getElementById('event-name').value.trim();
     const date = document.getElementById('event-date').value;
     const locationId = document.getElementById('event-location').value;
 
-    await PB_API.createEvent({ league_id: leagueId, event_name: name, event_date: date, location_id: locationId });
+    const payload = { league_id: leagueId, event_name: name, event_date: date, location_id: locationId };
+
+    if (eventId) {
+      await PB_API.updateEvent(eventId, payload);
+    } else {
+      await PB_API.createEvent(payload);
+    }
+
     eventFormCard.classList.add('hidden');
     e.target.reset();
     await refresh();
