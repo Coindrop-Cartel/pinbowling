@@ -76,7 +76,7 @@ if ($method === 'GET') {
 
 $input = getJsonInput();
 
-// POST: Add a new frame/machine configuration (Protected by API Secret)
+// POST: Add a new round/machine configuration (Protected by API Secret)
 if ($method === 'POST') {
     validateApiSecret();
     

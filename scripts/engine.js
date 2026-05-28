@@ -18,8 +18,8 @@ const BowlingEngine = {
   },
 
   /**
-   * Calculates Target 1 (1.3x strike) and Target 2 (1.3x Target 1) for the last frame.
-   * @param {Object} frame The frame object containing scoring values.
+   * Calculates Target 1 (1.3x strike) and Target 2 (1.3x Target 1) for the last round.
+   * @param {Object} round The round object containing scoring values.
    * @returns {{t1: number, t2: number}} An object with calculated Target 1 and Target 2 scores.
    */
   getBonusTargets(round) {
@@ -29,7 +29,7 @@ const BowlingEngine = {
   },
 
   /**
-   * Generates format-specific HTML for bonus targets (e.g., Frame 10 Targets).
+   * Generates format-specific HTML for bonus targets (e.g., Round 10 Targets).
    * @param {Object} frame 
    * @param {boolean} isLastFrame 
    * @param {Function} formatFn Number formatting utility
@@ -47,8 +47,8 @@ const BowlingEngine = {
   },
 
   /**
-   * Complex logic for Frame 10.
-   * Unlike frames 1-9, frame 10 allows up to 3 balls if the player achieves 
+   * Complex logic for Round 10.
+   * Unlike rounds 1-9, round 10 allows up to 3 balls if the player achieves 
    * a mark (strike or spare). Strikes on subsequent balls use adjusted 
    * targets (multipliers) to simulate the difficulty of repeated strikes 
    * on the same machine.

@@ -251,7 +251,7 @@ export async function initConfigPage() {
 
     const values = Engine.buildFrameValues(score10, score1);
     if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = await showPrompt(`Enter Admin Password to save changes for Target ${order_number}:`);
+      const confirmation = await showPrompt(`Enter Admin Password to save changes for Round ${order_number}:`);
       if (confirmation === null) {
         alert('Admin action cancelled.');
         return;

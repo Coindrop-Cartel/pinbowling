@@ -132,7 +132,7 @@ export function printMachineScores(machines) {
       <div class="page" style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; page-break-after: always; padding: 40px; box-sizing: border-box;">
         <div style="border: 6px solid #000; padding: 50px; width: 100%; max-width: 1100px;">
           <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 40px; border-bottom: 6px solid #000; padding-bottom: 15px;">
-            <h1 style="margin: 0; font-size: 4rem;">Target ${m.order_number}</h1>
+            <h1 style="margin: 0; font-size: 4rem;">Round ${m.order_number}</h1>
             <h2 style="margin: 0; font-size: 4rem;">${m.machine_name}</h2>
           </div>
           <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px;">${scoresHtml}</div>
@@ -157,7 +157,7 @@ export function printBlankScoreSheet(machines) {
   const framesHtml = machines.map((m) => `
     <div style="border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; page-break-inside: avoid;">
       <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px;">
-        <span style="font-weight: bold;">Target ${m.order_number}</span>
+        <span style="font-weight: bold;">Round ${m.order_number}</span>
         <span>Game: <strong>${m.machine_name}</strong></span>
         <span>Target: <strong>${formatNumber(m.values[10])}</strong></span>
       </div>

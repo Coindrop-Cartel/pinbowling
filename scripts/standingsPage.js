@@ -168,7 +168,7 @@ export async function initStandingsPage() {
         map[String(row.order_number)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
         return map;
       }, {});
-      // Check all three possible balls to see if a frame has data
+      // Check all three possible balls to see if a turn has data
       const ordersWithScores = new Set(scores.filter(s => Number(s.ball1) > 0 || Number(s.ball2) > 0 || Number(s.ball3) > 0).map(s => s.order_number));
       const { turnResults, total } = Engine.calculateTurnResults(machines, scoreMap);
       return { player, turnResults, total, ordersWithScores };
