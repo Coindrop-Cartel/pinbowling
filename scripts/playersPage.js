@@ -86,7 +86,7 @@ export async function initPlayersPage() {
     playerNameInput.value = '';
     ifpaIdInput.value = '';
     matchplayIdInput.value = '';
-    playerFormTitle.textContent = 'Add New Player';
+    if (playerFormTitle) playerFormTitle.textContent = 'Add New Player';
     savePlayerButton.textContent = 'Save Player';
     cancelEditButton.classList.add('hidden');
     if (filterInstance) filterInstance.performFilter();
@@ -104,7 +104,7 @@ export async function initPlayersPage() {
     playerNameInput.value = player.player_name;
     ifpaIdInput.value = player.ifpa_id || '';
     matchplayIdInput.value = player.matchplay_id || '';
-    playerFormTitle.textContent = `Edit Player: ${player.player_name}`;
+    if (playerFormTitle) playerFormTitle.textContent = `Edit Player: ${player.player_name}`;
     savePlayerButton.textContent = 'Update Player';
     cancelEditButton.classList.remove('hidden');
     window.scrollTo(0, 0); // Scroll to the form

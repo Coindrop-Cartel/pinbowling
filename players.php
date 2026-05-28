@@ -16,6 +16,7 @@
     </header>
 
     <section class="card">
+      <h2 id="player-form-title">Add New Player</h2>
       <form id="player-form" autocomplete="off">
         <input type="hidden" id="editing-player-id" value="" />
         <div class="form-row">
