@@ -84,15 +84,45 @@ if ($method === 'POST') {
         if (!is_array($input)) {
             sendJson(['error' => 'Input must be an array of updates'], 400);
         }
+
+        // Fetch the event_id for the targets we are reordering.
+        // We assume all targets in the input belong to the same event.
+        $stmtEvent = $pdo->prepare('SELECT event_id FROM Target_Scores WHERE id = ?');
+        $stmtEvent->execute([(int)$input[0]['id']]);
+        $eventId = $stmtEvent->fetchColumn();
+        if (!$eventId) sendJson(['error' => 'Invalid target ID'], 400);
+
         $pdo->beginTransaction();
         try {
-            // Step 1: Temporarily shift to high order numbers to clear unique key constraints
-            $stmtShift = $pdo->prepare('UPDATE Target_Scores SET order_number = order_number + 1000 WHERE id = ?');
-            foreach ($input as $item) $stmtShift->execute([(int)$item['id']]);
+            // To safely reorder across both Target_Scores and Scores tables without unique key
+            // violations, we use a two-step "high-number shift" approach.
+            
+            // Step 1: Shift existing order_numbers to a high range (current + 1000)
+            // We fetch current numbers first to ensure we can map the Scores table correctly.
+            $stmtMap = $pdo->prepare('SELECT id, order_number FROM Target_Scores WHERE event_id = ?');
+            $stmtMap->execute([$eventId]);
+            $currentMapping = $stmtMap->fetchAll(PDO::FETCH_KEY_PAIR); // [id => old_order]
 
-            // Step 2: Set the final intended order numbers
-            $stmtFinal = $pdo->prepare('UPDATE Target_Scores SET order_number = ? WHERE id = ?');
-            foreach ($input as $item) $stmtFinal->execute([(int)$item['order_number'], (int)$item['id']]);
+            $stmtShiftTarget = $pdo->prepare('UPDATE Target_Scores SET order_number = order_number + 1000 WHERE event_id = ?');
+            $stmtShiftTarget->execute([$eventId]);
+            
+            $stmtShiftScores = $pdo->prepare('UPDATE Scores SET order_number = order_number + 1000 WHERE event_id = ?');
+            $stmtShiftScores->execute([$eventId]);
+
+            // Step 2: Apply the new normalized incremental order numbers
+            $stmtUpdateTarget = $pdo->prepare('UPDATE Target_Scores SET order_number = ? WHERE id = ?');
+            $stmtUpdateScores = $pdo->prepare('UPDATE Scores SET order_number = ? WHERE event_id = ? AND order_number = ?');
+
+            foreach ($input as $item) {
+                $id = (int)$item['id'];
+                $newOrder = (int)$item['order_number'];
+                $oldOrderShifted = (int)($currentMapping[$id] ?? 0) + 1000;
+
+                $stmtUpdateTarget->execute([$newOrder, $id]);
+                if ($oldOrderShifted > 1000) {
+                    $stmtUpdateScores->execute([$newOrder, $eventId, $oldOrderShifted]);
+                }
+            }
 
             $pdo->commit();
             sendJson(['success' => true]);
@@ -107,13 +137,33 @@ if ($method === 'POST') {
         if (empty($input['event_id']) || empty($input['machine_id'])) {
             sendJson(['error' => 'event_id and machine_id are required for target scores'], 400);
         }
-        $sql = 'INSERT INTO Target_Scores (event_id, machine_id, order_number, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), 
-                   score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5),
-                   score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
-        $params = [(int)$input['event_id'], (int)$input['machine_id'], (int)$input['order_number']];
-        for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
+
+        $id = isset($input['id']) ? (int)$input['id'] : 0;
+        
+        if ($id) {
+            // Capture original order to move scores if it changes manually
+            $stmtOrig = $pdo->prepare('SELECT order_number, event_id FROM Target_Scores WHERE id = ?');
+            $stmtOrig->execute([$id]);
+            $orig = $stmtOrig->fetch();
+
+            $sql = 'UPDATE Target_Scores SET machine_id = ?, order_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
+            $params = [(int)$input['machine_id'], (int)$input['order_number']];
+            for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
+            $params[] = $id;
+
+            if ($orig && (int)$orig['order_number'] !== (int)$input['order_number']) {
+                $stmtScores = $pdo->prepare('UPDATE Scores SET order_number = ? WHERE event_id = ? AND order_number = ?');
+                $stmtScores->execute([(int)$input['order_number'], (int)$orig['event_id'], (int)$orig['order_number']]);
+            }
+        } else {
+            $sql = 'INSERT INTO Target_Scores (event_id, machine_id, order_number, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), 
+                       score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5),
+                       score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
+            $params = [(int)$input['event_id'], (int)$input['machine_id'], (int)$input['order_number']];
+            for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
+        }
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
