@@ -84,9 +84,9 @@ export async function initTournamentSelector(onRefresh) {
   if (activeLeagueId) {
     const league = leagues.find(l => String(l.id) === String(activeLeagueId));
     if (league) {
-      searchInput.value = league.name;
+      searchInput.value = ''; // Ensure search field starts fresh on navigation
       leagueSelect.value = activeLeagueId;
-      updateOptions(league.name);
+      updateOptions(''); // Show all options instead of just the matched one
       populateEvents(activeLeagueId, activeEventId);
     }
   } else {

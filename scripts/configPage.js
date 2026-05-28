@@ -174,7 +174,10 @@ export async function initConfigPage() {
 
     currentSuggestedMachines = locationId ? await PB_API.getLocationMachines(locationId) : masterMachines;
     currentSuggestedMachines.sort((a, b) => a.machine_name.localeCompare(b.machine_name));
-    updateMachineSelect(document.getElementById('machine-name').value);
+    
+    // Clear search text on fresh load/navigation
+    document.getElementById('machine-name').value = '';
+    updateMachineSelect('');
 
     eventTargets = eventId ? await PB_API.getTargetScores(eventId) : [];
     await render();
