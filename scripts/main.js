@@ -7,6 +7,8 @@
 import { 
   initNavigation
 } from './utils.js';
+import { initMachinesPage } from './machinesPage.js';
+import { initLocationsPage } from './locationsPage.js';
 import { initConfigPage } from './configPage.js';
 import { initPlayersPage } from './playersPage.js';
 import { initScoresPage } from './scoresPage.js';
@@ -23,6 +25,12 @@ import { initLeaguesPage } from './leaguesPage.js';
  */
 function ready() {
   initNavigation(); // From utils.js
+  if (document.getElementById('machine-form')) {
+    initMachinesPage();
+  }
+  if (document.getElementById('location-form')) {
+    initLocationsPage();
+  }
   if (document.getElementById('frame-form')) {
     initConfigPage(); // From pages/configPage.js
   }
