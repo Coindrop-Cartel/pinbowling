@@ -32,7 +32,10 @@ export function initLocationsPage() {
           locDiv.className = 'card league-item'; 
           locDiv.innerHTML = `
             <div class="location-header" style="display: flex; justify-content: space-between; align-items: center;">
-              <h3 style="margin: 0;">${loc.name}${cityState} Machines: <span class="mach-count-pill">(${loc.machines?.length || 0})</span></h3>
+              <h3 style="margin: 0;">
+                ${loc.name}${cityState}<br>
+                <small>Machines: (${loc.machines?.length || 0})</small>
+              </h3>
               <div>
                 <button class="edit-loc-btn secondary">Edit</button>
                 <button class="delete-loc-btn">Delete</button>

@@ -131,7 +131,10 @@ export async function initLeaguesPage() {
       const eventDiv = document.createElement('div');
       eventDiv.className = 'event-item';
       eventDiv.innerHTML = `
-        <span>${event.event_name} (${event.event_date || 'No Date'}) - ${event.location_name || 'No Location'}</span>
+        <span>
+          ${event.event_name} (${event.event_date || 'No Date'})<br>
+          <small>Location: ${event.location_name || 'No Location'}</small>
+        </span>
         <div>
           <button class="edit-event-btn secondary">Edit</button>
           <button class="delete-event-btn">Delete</button>

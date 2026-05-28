@@ -124,15 +124,8 @@ export async function initScoresPage() {
    * entire global player list is displayed.
    */
   async function renderPlayerSelect() {
-    const leagueId = getActiveLeagueId();
-    let players = [];
-    
-    if (leagueId) {
-        const league = await PB_API.getLeague(leagueId);
-        players = league.players || [];
-    } else {
-        players = await PB_API.getPlayers();
-    }
+    // Fetch the global player registry to ensure consistency with the scoreboard
+    const players = await PB_API.getPlayers();
 
     const currentPlayerId = getCurrentPlayerId();
 
