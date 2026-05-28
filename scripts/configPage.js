@@ -9,7 +9,7 @@ export async function initConfigPage() {
   const orderInput = document.getElementById('order-number');
   const displayOrder = document.getElementById('display-order');
   const form = document.getElementById('round-form');
-  const submitBtn = form.querySelector('button[type="submit"]');
+  const submitBtn = document.getElementById('save-round-btn');
   const roundsTable = document.getElementById('rounds-table');
   const reorderActions = document.getElementById('reorder-actions');
   const listEmpty = document.getElementById('list-empty');
@@ -58,8 +58,8 @@ export async function initConfigPage() {
 
   const markDirty = () => { if (orderInput.value) submitBtn.disabled = false; };
 
-  applyScoreFormatting(score10Input);
-  applyScoreFormatting(score1Input);
+  if (score10Input) applyScoreFormatting(score10Input);
+  if (score1Input) applyScoreFormatting(score1Input);
 
   // Helps mobile users: tapping the field selects all text so they can 
   // immediately see the full suggestion list or replace the value.
@@ -96,17 +96,19 @@ export async function initConfigPage() {
     const tbody = roundsTable.querySelector('tbody');
     tbody.innerHTML = '';
 
-    if (!eventId || eventTargets.length === 0) {
+    if (!eventId) {
       roundsTable.classList.add('hidden');
       reorderActions.classList.add('hidden');
       listEmpty.classList.remove('hidden');
-      listEmpty.textContent = eventId ? 'No targets defined for this event.' : 'Select a league and event to manage target scores.';
+      listEmpty.textContent = 'Select a league and event to manage target scores.';
       return;
     }
 
-    roundsTable.classList.remove('hidden');
-    reorderActions.classList.remove('hidden');
-    listEmpty.classList.add('hidden');
+    // Show management actions even if the list is empty (for new setups)
+    listEmpty.classList.toggle('hidden', eventTargets.length > 0);
+    listEmpty.textContent = 'No targets defined for this event yet.';
+    roundsTable.classList.toggle('hidden', eventTargets.length === 0);
+    reorderActions.classList.toggle('hidden', eventTargets.length === 0);
 
     eventTargets.sort((a, b) => a.order_number - b.order_number);
     const maxOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.order_number)) : 0;

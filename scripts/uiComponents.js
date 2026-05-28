@@ -81,38 +81,37 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
   if (activeEventId) {
     try {
       // Fetch all leagues to find the specific one and its events
-      const leagues = await PB_API.getLeagues(); 
-      let activeLeague = leagues.find(l => String(l.id) === String(activeLeagueId));
+      const leagues = await PB_API.getLeagues();
+      let activeLeague = null;
+      let activeEvent = null;
 
-      // Self-healing: If league is missing but we have an event, find the league containing the event
-      if (!activeLeague && activeEventId !== 'summary') {
-        activeLeague = leagues.find(l => (l.events || []).some(e => String(e.id) === String(activeEventId)));
-        if (activeLeague) {
-          setActiveLeagueId(activeLeague.id);
+      // Find the event and its parent league first to ensure consistency
+      if (activeEventId !== 'summary') {
+        for (const l of leagues) {
+          const e = (l.events || []).find(evt => String(evt.id) === String(activeEventId));
+          if (e) {
+            activeLeague = l;
+            activeEvent = e;
+            break;
+          }
         }
       }
 
+      // If the event exists, ensure the league selection is synced
       if (activeLeague) {
-        leagueName = activeLeague.name;
-        const activeEvent = (activeLeague.events || []).find(e => String(e.id) === String(activeEventId));
-        
-        if (activeEvent) {
-          eventName = `${activeEvent.event_name} (${activeEvent.event_date || 'No Date'})`;
-        } else if (activeEventId !== 'summary') {
-          // Only clear if we are sure this event doesn't exist anywhere
-          const eventExistsAnywhere = leagues.some(l => (l.events || []).some(e => String(e.id) === String(activeEventId)));
-          if (!eventExistsAnywhere) {
-            console.warn(`Event ID ${activeEventId} not found in any league. Clearing selection.`);
-            setActiveEventId('');
-            eventName = 'Invalid Event Selected';
-          } else {
-            eventName = 'Loading Event Details...';
-          }
+        if (String(activeLeague.id) !== String(activeLeagueId)) {
+          setActiveLeagueId(activeLeague.id);
         }
-      } else if (activeLeagueId && !activeEventId) {
-        // If league not found, clear both
-        setActiveLeagueId('');
-        leagueName = 'Invalid League Selected';
+        leagueName = activeLeague.name;
+        eventName = `${activeEvent.event_name} (${activeEvent.event_date || 'No Date'})`;
+      } else if (activeEventId === 'summary') {
+        activeLeague = leagues.find(l => String(l.id) === String(activeLeagueId));
+        leagueName = activeLeague ? activeLeague.name : 'Invalid League';
+        eventName = 'Season Summary';
+      } else {
+        console.warn(`Event ID ${activeEventId} not found in any league. Clearing selection.`);
+        setActiveEventId('');
+        eventName = 'Invalid Event Selected';
       }
     } catch (error) {
       console.error('Error fetching league/event details for read-only display:', error);

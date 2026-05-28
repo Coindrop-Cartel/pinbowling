@@ -11,8 +11,11 @@
   <?php include 'includes/header.php'; ?>
 
   <main class="page-container">
-    <!-- Tournament selector (League & Event pickers) -->
-    <div class="tournament-selector-container"></div>
+    <!-- Current Selection Display -->
+    <section class="card">
+      <h2>Selection</h2>
+      <div class="tournament-selector-container"></div>
+    </section>
 
     <header>
       <h1>Event Configuration</h1>
@@ -21,7 +24,7 @@
 
     <section id="config-card" class="card hidden">
       <h2 id="config-title">Add New Target</h2>
-      <form id="frame-form" autocomplete="off">
+      <form id="round-form" autocomplete="off">
         <input type="hidden" id="order-number" />
         <div class="form-row">
           <label>Sequence Order</label>
@@ -48,7 +51,7 @@
           </div>
         </div>
         <div class="form-actions" style="margin-top: 20px;">
-          <button type="submit" id="save-frame-btn" disabled>Save</button>
+          <button type="submit" id="save-round-btn" disabled>Save</button>
           <button type="button" id="cancel-config-btn" class="secondary">Cancel</button>
         </div>
       </form>
@@ -60,7 +63,7 @@
         <button type="button" id="add-target-btn" class="btn-standard">+ Add New Target</button>
       </div>
       <div id="list-empty" class="notice">Select a league and event to manage target scores.</div>
-      <table id="frames-table" class="data-table hidden">
+      <table id="rounds-table" class="data-table hidden">
         <thead>
           <tr>
             <th style="width: 50px;"></th>
