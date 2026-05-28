@@ -1,11 +1,11 @@
 <nav class="navbar">
   <div class="nav-container">
     <a href="index.php" class="nav-logo">
-      <img src="images/logo.png" alt="PinBowling Logo" height="30">
+      <img src="images/logo.png" alt="PinBowling Logo" height="50">
       <span>PinBowling</span>
     </a>
     <ul class="nav-links">
-      <li><a href="#" class="nav-link">Lets Bowl!</a></li>
+      <li class="nav-item"><a href="#" class="nav-link">Lets Bowl!</a></li>
       <li class="nav-item dropdown">
         <a href="javascript:void(0)" class="nav-link dropbtn">Leagues</a>
         <div class="dropdown-content">
