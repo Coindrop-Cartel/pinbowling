@@ -17,7 +17,7 @@
       <li class="nav-item dropdown">
         <a href="javascript:void(0)" class="nav-link dropbtn">Admin</a>
         <div class="dropdown-content">
-          <a href="config.php">Machines</a>
+          <a href="machines.php">Machines</a>
           <a href="players.php">Players</a>
           <a href="locations.php">Locations</a>
         </div>
