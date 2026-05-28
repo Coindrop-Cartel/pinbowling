@@ -18,7 +18,7 @@
 
     <section class="card">
       <h2>Create New League</h2>
-      <form id="league-form">
+      <form id="league-form" autocomplete="off">
         <div class="form-row">
           <label for="league-name">League Name</label>
           <input id="league-name" type="text" placeholder="e.g., Summer 2024 League" required />

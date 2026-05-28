@@ -17,7 +17,7 @@
 
     <section class="card">
       <h2 id="location-form-title">Add New Location</h2>
-      <form id="location-form">
+      <form id="location-form" autocomplete="off">
         <input type="hidden" id="editing-location-id" value="" />
         <div class="form-row">
           <label for="location-name">Location Name</label>

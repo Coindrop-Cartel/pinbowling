@@ -18,11 +18,11 @@
 
     <section class="card">
       <h2 id="player-form-title">Add New Player</h2>
-      <form id="player-form">
+      <form id="player-form" autocomplete="off">
         <input type="hidden" id="editing-player-id" value="" />
         <div class="form-row">
           <label for="player-name">Player Name</label>
-          <input id="player-name" type="text" placeholder="Enter player name" required autocomplete="off" />
+          <input id="player-name" type="text" placeholder="Enter player name" required />
         </div>
         <div class="form-row">
           <label for="ifpa-id">IFPA ID (Optional)</label>

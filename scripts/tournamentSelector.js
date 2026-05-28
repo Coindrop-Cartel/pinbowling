@@ -12,10 +12,10 @@ export async function initTournamentSelector(onRefresh) {
 
   container.innerHTML = `
     <section class="card tournament-selector" style="margin-bottom: 1.5rem;">
-      <div style="display: flex; flex-direction: column; gap: 1rem; width: 100%; box-sizing: border-box;">
+      <div style="display: flex; flex-direction: column; gap: 1rem; width: 100%; box-sizing: border-box;" autocomplete="off">
         <div style="width: 100%;">
           <label style="display: block; margin-bottom: 5px;">League Search</label>
-          <input type="text" id="league-search-global" style="width: 100%; box-sizing: border-box;" placeholder="Type to filter..." autocomplete="off">
+          <input type="text" id="league-search-global" style="width: 100%; box-sizing: border-box;" placeholder="Type to filter...">
         </div>
         <div style="width: 100%;">
           <label for="league-select-global" style="display: block; margin-bottom: 5px;">Select League</label>

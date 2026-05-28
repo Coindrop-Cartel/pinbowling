@@ -21,7 +21,7 @@
 
     <section class="card">
       <h2>Configure Frame</h2>
-      <form id="frame-form">
+      <form id="frame-form" autocomplete="off">
         <div class="form-row">
           <label for="frame-number">Select Frame</label>
           <select id="frame-number" required>
@@ -30,7 +30,7 @@
         </div>
         <div class="form-row">
           <label for="machine-name">Machine Name</label>
-          <input type="text" id="machine-name" placeholder="Start typing machine name..." required autocomplete="off" />
+          <input type="text" id="machine-name" placeholder="Start typing machine name..." required />
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
           <div class="form-row">

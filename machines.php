@@ -18,10 +18,10 @@
 
     <section class="card">
       <h2>Add New Machine</h2>
-      <form id="machine-form">
+      <form id="machine-form" autocomplete="off">
         <div class="form-row">
           <label for="machine-name">Machine Name</label>
-          <input id="machine-name" type="text" placeholder="Filter registry or enter new name..." required autocomplete="off" />
+          <input id="machine-name" type="text" placeholder="Filter registry or enter new name..." required />
         </div>
         <div class="form-actions">
           <button type="submit" id="add-machine-btn" disabled>Add Machine</button>
