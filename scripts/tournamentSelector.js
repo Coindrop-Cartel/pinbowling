@@ -11,18 +11,18 @@ export async function initTournamentSelector(onRefresh) {
 
   container.innerHTML = `
     <section class="card tournament-selector" style="margin-bottom: 1.5rem;">
-      <div style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%; box-sizing: border-box;">
-        <div style="flex: 1 0 250px; display: flex; flex-direction: column;">
+      <div style="display: flex; flex-direction: column; gap: 1rem; width: 100%; box-sizing: border-box;">
+        <div style="width: 100%;">
           <label style="display: block; margin-bottom: 5px;">League Search</label>
           <input type="text" id="league-search-global" style="width: 100%; box-sizing: border-box;" placeholder="Type to filter..." autocomplete="off">
         </div>
-        <div style="flex: 1 0 250px; display: flex; flex-direction: column;">
+        <div style="width: 100%;">
           <label for="league-select-global" style="display: block; margin-bottom: 5px;">Select League</label>
           <select id="league-select-global" style="width: 100%; box-sizing: border-box;">
             <option value="">-- Choose League --</option>
           </select>
         </div>
-        <div id="event-select-wrapper" style="flex: 1 0 250px; display: flex; flex-direction: column;" class="hidden">
+        <div id="event-select-wrapper" style="width: 100%;" class="hidden">
           <label for="event-select-global" style="display: block; margin-bottom: 5px;">Event</label>
           <select id="event-select-global" style="width: 100%; box-sizing: border-box;">
             <option value="">Select Event</option>
