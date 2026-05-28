@@ -38,6 +38,10 @@ export async function initConfigPage() {
   applyScoreFormatting(score10Input);
   applyScoreFormatting(score1Input);
 
+  // Helps mobile users: tapping the field selects all text so they can 
+  // immediately see the full suggestion list or replace the value.
+  document.getElementById('machine-name').addEventListener('focus', (e) => e.target.select());
+
   score10Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, BowlingEngine));
   score1Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, BowlingEngine));
 
@@ -133,11 +137,13 @@ export async function initConfigPage() {
       datalist = document.createElement('datalist');
       datalist.id = 'machine-suggestions';
       document.body.appendChild(datalist);
-      machineInput.setAttribute('list', 'machine-suggestions');
     }
+    // Ensure the input is always associated with the datalist
+    machineInput.setAttribute('list', 'machine-suggestions');
+
     datalist.innerHTML = '';
     const suggestedMachines = locationId ? await PB_API.getLocationMachines(locationId) : masterMachines;
-    suggestedMachines.forEach(m => {
+    suggestedMachines.sort((a, b) => a.machine_name.localeCompare(b.machine_name)).forEach(m => {
       const opt = document.createElement('option');
       opt.value = m.machine_name;
       datalist.appendChild(opt);
