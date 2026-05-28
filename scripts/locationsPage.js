@@ -18,24 +18,34 @@ export function initLocationsPage() {
         emptyNotice.classList.add('hidden');
         for (const loc of locations) {
           const locDiv = document.createElement('div');
-          locDiv.className = 'card league-item'; // Reuse league styling
+          locDiv.className = 'card league-item'; 
           locDiv.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <h3>${loc.name}</h3>
+            <div class="location-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="margin: 0;">${loc.name} <span class="mach-count-pill">(${loc.machines?.length || 0})</span></h3>
               <div>
-                <button class="add-mach-btn secondary">Add Machine</button>
                 <button class="delete-loc-btn">Delete</button>
               </div>
             </div>
-            <div class="league-details-columns" style="display: flex; gap: 2rem; flex-wrap: wrap;">
-              <div class="machines-list" id="mach-for-loc-${loc.id}" style="flex: 1; min-width: 300px;">
-                <h4>Assigned Machines:</h4>
-                <div class="mach-list-inner"></div>
-                <div class="notice mach-empty hidden">No machines at this venue.</div>
+            <div class="location-details hidden" style="margin-top: 20px; border-top: 2px solid var(--pb-black); padding-top: 20px;">
+              <div style="margin-bottom: 20px;">
+                <button class="add-mach-btn secondary">Add Machine to Venue</button>
+              </div>
+              <div class="league-details-columns" style="display: flex; gap: 2rem; flex-wrap: wrap;">
+                <div class="machines-list" id="mach-for-loc-${loc.id}" style="flex: 1; min-width: 300px;">
+                  <div class="mach-list-inner"></div>
+                  <div class="notice mach-empty hidden">No machines at this venue.</div>
+                </div>
               </div>
             </div>
           `;
           list.appendChild(locDiv);
+
+          // Toggle logic: Click the header (but not the delete button) to expand
+          locDiv.querySelector('.location-header').onclick = (e) => {
+            if (e.target.classList.contains('delete-loc-btn')) return;
+            const details = locDiv.querySelector('.location-details');
+            details.classList.toggle('hidden');
+          };
 
           locDiv.querySelector('.add-mach-btn').onclick = () => showMachineForm(loc.id, loc.name);
           locDiv.querySelector('.delete-loc-btn').onclick = () => window.deleteLocation(loc.id);
@@ -65,6 +75,8 @@ export function initLocationsPage() {
       return;
     }
     empty.classList.add('hidden');
+
+    machines.sort((a, b) => a.machine_name.localeCompare(b.machine_name));
 
     machines.forEach(m => {
       const item = document.createElement('div');

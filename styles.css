@@ -295,6 +295,11 @@ td {
   border-bottom: 1px solid var(--pb-gray);
 }
 
+.location-header {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
 .event-item:last-child, .player-item:last-child {
   border-bottom: none;
 }
