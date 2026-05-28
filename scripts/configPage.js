@@ -1,6 +1,6 @@
 import { PB_API } from './api.js';
 import { getScoringEngine } from './engine.js';
-import { getActiveEventId, renderPreview, applyScoreFormatting, formatNumber, printMachineScores } from './utils.js';
+import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormatting, formatNumber, printMachineScores } from './utils.js';
 import { createSearchableSelect, showPrompt } from './uiComponents.js';
 import { initReadOnlyTournamentDisplay } from './uiComponents.js';
 
@@ -37,7 +37,8 @@ export async function initConfigPage() {
   const doneBtn = document.getElementById('done-setup-btn');
   if (doneBtn) {
     doneBtn.addEventListener('click', () => {
-      window.location.href = 'leagues.php';
+      const leagueId = getActiveLeagueId();
+      window.location.href = leagueId ? `leagues.php?leagueId=${leagueId}` : 'leagues.php';
     });
   }
 

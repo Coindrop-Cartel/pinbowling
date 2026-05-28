@@ -1,6 +1,6 @@
 import { PB_API } from './api.js';
 import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog } from './uiComponents.js';
-import { setActiveLeagueId, setActiveEventId } from './utils.js';
+import { setActiveLeagueId, setActiveEventId, getActiveLeagueId } from './utils.js';
 
 /**
  * Logic for managing Leagues and Events.
@@ -23,6 +23,7 @@ export async function initLeaguesPage() {
    * Handles the "X matches found" logic and duplicate prevention.
    */
   const onFilterUpdate = (filtered, query) => {
+    const activeLeagueId = getActiveLeagueId();
     leaguesList.innerHTML = '';
 
     if (filtered.length === 0) {
@@ -31,6 +32,8 @@ export async function initLeaguesPage() {
     } else {
       emptyNotice.classList.add('hidden');
       filtered.forEach(league => {
+        const shouldExpand = activeLeagueId && String(league.id) === String(activeLeagueId);
+
         const card = document.createElement('div');
         card.className = 'card league-item';
         card.innerHTML = `
@@ -39,8 +42,11 @@ export async function initLeaguesPage() {
               <h3 style="margin: 0;">${league.name}</h3>
               <small>Started: ${league.start_date || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
             </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="delete-league-btn">Delete</button>
+            </div>
           </div>
-          <div class="league-details hidden" style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 15px;">
+          <div class="league-details ${shouldExpand ? '' : 'hidden'}" style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 15px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
               <h4 style="margin: 0;">Events</h4>
               <button class="add-event-btn secondary" style="padding: 4px 12px; font-size: 0.85rem;">Add Event</button>
@@ -68,21 +74,13 @@ export async function initLeaguesPage() {
               </ul>
               <div class="notice league-players-empty hidden">No players assigned to this league.</div>
             </div>
-
-            <div class="league-management-section" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px; text-align: right;">
-              <button class="delete-league-btn" style="padding: 8px 16px; font-size: 0.85rem;">Delete League</button>
-            </div>
           </div>
         `;
 
         // Toggle expansion
         card.querySelector('.league-header').onclick = (e) => {
           if (e.target.closest('button')) return;
-          const details = card.querySelector('.league-details');
-          details.classList.toggle('hidden');
-          if (!details.classList.contains('hidden')) {
-            renderPlayersForLeague(league.id, league.players, allPlayersCache);
-          }
+          card.querySelector('.league-details').classList.toggle('hidden');
         };
 
         // Action listeners
@@ -96,7 +94,7 @@ export async function initLeaguesPage() {
             const eventId = Number(btn.dataset.eventId);
             setActiveLeagueId(leagueId);
             setActiveEventId(eventId);
-            window.location.href = `event-setup.php?leagueId=${leagueId}&eventId=${eventId}`;
+            window.location.href = 'event-setup.php'; // Redirect to the config page
           };
         });
         card.querySelectorAll('.edit-event-btn').forEach(btn => {
@@ -115,6 +113,11 @@ export async function initLeaguesPage() {
         // Initial render of players if details are not hidden (e.g., after refresh)
         const details = card.querySelector('.league-details');
         if (!details.classList.contains('hidden')) renderPlayersForLeague(league.id, league.players, allPlayersCache);
+
+        // Smooth scroll to the expanded league if we just came from setup
+        if (shouldExpand && !query) {
+          setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+        }
       });
     }
 
