@@ -1,5 +1,6 @@
 import { PB_API } from './api.js';
 import { setupLiveFilter } from './uiComponents.js';
+import { setActiveLeagueId, setActiveEventId } from './utils.js';
 
 /**
  * Logic for managing Leagues and Events.
@@ -49,6 +50,7 @@ export async function initLeaguesPage() {
                 <li style="display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
                   <span>${e.event_name} <small>(${e.event_date || 'No Date'})</small></span>
                   <div style="display: flex; gap: 4px;">
+                    <button class="setup-event-btn secondary" data-league-id="${league.id}" data-event-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Setup</button>
                     <button class="edit-event-btn secondary" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>
                     <button class="delete-event-btn" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>
                   </div>
@@ -68,6 +70,15 @@ export async function initLeaguesPage() {
         card.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
         card.querySelector('.delete-league-btn').onclick = () => deleteLeague(league.id, league.name);
         
+        card.querySelectorAll('.setup-event-btn').forEach(btn => {
+          btn.onclick = () => {
+            const leagueId = Number(btn.dataset.leagueId);
+            const eventId = Number(btn.dataset.eventId);
+            setActiveLeagueId(leagueId);
+            setActiveEventId(eventId);
+            window.location.href = 'event-setup.php'; // Redirect to the config page
+          };
+        });
         card.querySelectorAll('.edit-event-btn').forEach(btn => {
           btn.onclick = () => {
             const eventObj = league.events.find(ev => ev.id === Number(btn.dataset.id));
