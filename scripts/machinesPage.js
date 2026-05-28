@@ -1,76 +1,97 @@
 import { PB_API } from './api.js';
+import { setupLiveFilter } from './uiComponents.js';
 
 /**
- * Logic for managing the global machine registry.
+ * Logic for the Global Machine Registry page.
  */
-export function initMachinesPage() {
+export async function initMachinesPage() {
   const form = document.getElementById('machine-form');
+  const nameInput = document.getElementById('machine-name');
   const list = document.getElementById('machines-list');
   const emptyNotice = document.getElementById('machines-list-empty');
+  const submitBtn = document.getElementById('add-machine-btn');
 
-  const fetchMachines = async () => {
+  let allMachines = [];
+  let filterInstance = null;
+
+  /**
+   * Renders the machine registry list based on the current filter text.
+   * Also handles the validation of the "Add Machine" button.
+   */
+  const onFilterUpdate = (filtered, query) => {
+    list.innerHTML = '';
+    if (filtered.length === 0) {
+      emptyNotice.classList.remove('hidden');
+      emptyNotice.textContent = allMachines.length === 0 ? 'No machines registered yet.' : 'No matching machines found.';
+    } else {
+      emptyNotice.classList.add('hidden');
+      filtered.forEach(m => {
+        const item = document.createElement('div');
+        item.className = 'card league-item';
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
+        item.style.padding = '10px 15px';
+        item.style.marginBottom = '10px';
+        
+        item.innerHTML = `
+          <span style="font-weight: bold;">${m.machine_name}</span>
+          <button class="delete-mach-btn">Delete</button>
+        `;
+
+        item.querySelector('.delete-mach-btn').onclick = async () => {
+          if (window.PB_ADMIN_PASSWORD) {
+            const confirmPass = prompt(`Enter Admin Password to delete "${m.machine_name}":`);
+            if (confirmPass === null) return;
+            if (confirmPass !== window.PB_ADMIN_PASSWORD) return alert('Incorrect Password');
+          }
+          if (confirm(`Are you sure you want to remove "${m.machine_name}"? This will remove it from all locations and events.`)) {
+            await PB_API.deleteMachine(m.id);
+            await load();
+          }
+        };
+        list.appendChild(item);
+      });
+    }
+
+    // Disable button if input is empty OR if an exact match already exists
+    const exactMatch = allMachines.find(m => m.machine_name.trim().toLowerCase() === query);
+    submitBtn.disabled = !query || !!exactMatch;
+    submitBtn.title = exactMatch ? "This machine name already exists in the registry." : "";
+  };
+
+  filterInstance = setupLiveFilter(nameInput, allMachines, {
+    labelKey: 'machine_name',
+    onFilter: onFilterUpdate
+  });
+
+  const load = async () => {
     try {
-      const machines = await PB_API.getMachines();
-      
-      if (machines && machines.length > 0) {
-        emptyNotice.classList.add('hidden');
-        list.innerHTML = machines.map(m => `
-          <div class="event-item">
-            <span>${m.machine_name}</span>
-            <button class="secondary" onclick="window.deleteMachine(${m.id})">Delete</button>
-          </div>
-        `).join('');
-      } else {
-        emptyNotice.classList.remove('hidden');
-        list.innerHTML = '';
-      }
+      const data = await PB_API.getMachines();
+      // Update array in-place so the filterInstance reference stays valid
+      allMachines.length = 0;
+      allMachines.push(...data);
+      filterInstance.performFilter();
     } catch (err) {
-      console.error('Failed to load machines:', err);
+      console.error('Failed to load machine registry:', err);
     }
   };
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const nameInput = document.getElementById('machine-name');
-    const machineName = nameInput.value.trim();
-
-    if (!machineName) return;
+    const name = nameInput.value.trim();
+    if (!name) return;
 
     if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = prompt(`Enter Admin Password to add machine "${machineName}":`);
-      if (confirmation === null) return;
-      if (confirmation !== window.PB_ADMIN_PASSWORD) {
-        alert('Incorrect Admin Password.');
-        return;
-      }
+      const confirmPass = prompt(`Enter Admin Password to register "${name}":`);
+      if (confirmPass === null) return;
+      if (confirmPass !== window.PB_ADMIN_PASSWORD) return alert('Incorrect Password');
     }
 
-    try {
-      await PB_API.createMachine(machineName);
-      nameInput.value = '';
-      fetchMachines();
-    } catch (err) {
-      alert(`Failed to save machine: ${err.message}`);
-    }
+    await PB_API.createMachine(name);
+    nameInput.value = '';
+    await load();
   });
 
-  window.deleteMachine = async (id) => {
-    if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = prompt('Enter Admin Password to confirm machine deletion (this may affect historical data):');
-      if (confirmation === null) return;
-      if (confirmation !== window.PB_ADMIN_PASSWORD) {
-        alert('Incorrect Admin Password.');
-        return;
-      }
-    }
-
-    try {
-      await PB_API.deleteMachine(id);
-      fetchMachines();
-    } catch (err) {
-      alert(`Failed to delete machine: ${err.message}`);
-    }
-  };
-
-  fetchMachines();
+  await load();
 }

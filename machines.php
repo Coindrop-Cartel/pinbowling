@@ -21,10 +21,10 @@
       <form id="machine-form">
         <div class="form-row">
           <label for="machine-name">Machine Name</label>
-          <input id="machine-name" type="text" placeholder="e.g. Medieval Madness" required />
+          <input id="machine-name" type="text" placeholder="Filter registry or enter new name..." required autocomplete="off" />
         </div>
         <div class="form-actions">
-          <button type="submit">Add Machine</button>
+          <button type="submit" id="add-machine-btn" disabled>Add Machine</button>
         </div>
       </form>
     </section>

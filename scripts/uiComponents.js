@@ -59,3 +59,24 @@ export function createSearchableSelect(searchInput, selectElement, data, {
 
   return { updateOptions };
 }
+
+/**
+ * Sets up a live search/filter on an input field against a data array.
+ * Useful for filtering lists that are rendered manually (e.g., div lists, tables).
+ * 
+ * @param {HTMLInputElement} inputElement The input field to watch.
+ * @param {Array} data The source data (should be updated in-place to maintain reference).
+ * @param {Object} options Configuration.
+ */
+export function setupLiveFilter(inputElement, data, { labelKey = 'name', onFilter = null } = {}) {
+  const performFilter = () => {
+    const query = inputElement.value.trim().toLowerCase();
+    const filtered = data.filter(item =>
+      String(item[labelKey]).toLowerCase().includes(query)
+    );
+    if (onFilter) onFilter(filtered, query);
+  };
+
+  inputElement.addEventListener('input', performFilter);
+  return { performFilter };
+}
