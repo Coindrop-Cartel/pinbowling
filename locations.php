@@ -13,7 +13,6 @@
   <main class="page-container">
     <header>
       <h1>Manage Locations</h1>
-      <p>Define the venues where your leagues and events take place.</p>
     </header>
 
     <section class="card">

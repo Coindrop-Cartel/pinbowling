@@ -80,14 +80,19 @@ if ($method === 'POST') {
             if (empty($input['location_id']) || empty($input['machine_id'])) {
                 sendJson(['error' => 'location_id and machine_id are required'], 400);
             }
-            $sql = 'INSERT INTO Location_Machines (location_id, machine_id, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            $sql = 'INSERT INTO Location_Machines (location_id, machine_id, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10, target_easy, target_med, target_hard) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE 
                         score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5), 
-                        score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
+                        score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10),
+                        target_easy=VALUES(target_easy), target_med=VALUES(target_med), target_hard=VALUES(target_hard)';
             $params = [(int)$input['location_id'], (int)$input['machine_id']];
             for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
             
+            $params[] = (int)($input['target_easy'] ?? 0);
+            $params[] = (int)($input['target_med'] ?? 0);
+            $params[] = (int)($input['target_hard'] ?? 0);
+
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             sendJson(['success' => true]);

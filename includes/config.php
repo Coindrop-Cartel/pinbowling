@@ -164,10 +164,17 @@ function initDatabase() {
         score8 INT NOT NULL DEFAULT 0,
         score9 INT NOT NULL DEFAULT 0,
         score10 INT NOT NULL DEFAULT 0,
+        target_easy INT NOT NULL DEFAULT 0,
+        target_med INT NOT NULL DEFAULT 0,
+        target_hard INT NOT NULL DEFAULT 0,
         UNIQUE KEY uq_loc_machine (location_id, machine_id),
         CONSTRAINT fk_loc_mach_location FOREIGN KEY (location_id) REFERENCES Locations(id) ON DELETE CASCADE,
         CONSTRAINT fk_loc_mach_machine FOREIGN KEY (machine_id) REFERENCES Machines(id) ON DELETE CASCADE
     )");
+
+    try {
+        $pdo->exec("ALTER TABLE Location_Machines ADD COLUMN target_easy INT NOT NULL DEFAULT 0, ADD COLUMN target_med INT NOT NULL DEFAULT 0, ADD COLUMN target_hard INT NOT NULL DEFAULT 0");
+    } catch (PDOException $e) { /* Columns likely already exist */ }
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS Players (
         id INT AUTO_INCREMENT PRIMARY KEY,

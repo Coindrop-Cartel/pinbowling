@@ -87,8 +87,8 @@ export const PB_API = {
   updateLocation: (id, loc) => fetchJSON(`api/locations.php?id=${id}`, { method: 'PUT', body: JSON.stringify(loc) }),
   deleteLocation: (id) => fetchJSON(`api/locations.php?id=${id}`, { method: 'DELETE' }),
   getLocationMachines: (locationId) => fetchJSON(`api/locations.php?action=machines${locationId ? `&locationId=${locationId}` : ''}`),
-  addLocationMachine: (locationId, machineId, values = {}) => 
-    fetchJSON('api/locations.php?action=machines', { method: 'POST', body: JSON.stringify({ location_id: locationId, machine_id: machineId, values }) }),
+  addLocationMachine: (locationId, machineId, extra = {}) => 
+    fetchJSON('api/locations.php?action=machines', { method: 'POST', body: JSON.stringify({ location_id: locationId, machine_id: machineId, ...extra }) }),
   removeLocationMachine: (locationId, machineId) => fetchJSON(`api/locations.php?action=machines&locationId=${locationId}&machineId=${machineId}`, { method: 'DELETE' }),
   getTargetScores: (eventId, leagueId) => 
     fetchJSON(`api/machines.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`),
