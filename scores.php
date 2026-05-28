@@ -42,7 +42,7 @@
       </form>
     </section>
 
-    <section class="card">
+    <section id="results-card" class="card hidden">
       <h2>Results</h2>
       <div id="results-empty" class="notice hidden"></div>
       <div id="results-panel" class="hidden">

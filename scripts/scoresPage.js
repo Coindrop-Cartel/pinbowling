@@ -18,6 +18,7 @@ export async function initScoresPage() {
   const scoringHeader = document.getElementById('scoring-header');
   const playerSelectionCard = document.getElementById('player-selection-card');
   const scoringCard = document.getElementById('scoring-card');
+  const resultsCard = document.getElementById('results-card');
 
   let machines = [];
   const printSheetBtn = document.getElementById('print-sheet-btn');
@@ -184,6 +185,7 @@ export async function initScoresPage() {
     if (!activePlayerId) {
       framesInput.querySelectorAll('input').forEach((input) => (input.disabled = true));
       scoringCard.classList.add('hidden');
+      resultsCard.classList.add('hidden');
       resultsPanel.classList.add('hidden');
       resultsEmpty.classList.add('hidden');
       return;
@@ -191,6 +193,7 @@ export async function initScoresPage() {
 
     warning.classList.add('hidden');
     scoringCard.classList.remove('hidden');
+    resultsCard.classList.remove('hidden');
     resultsPanel.classList.remove('hidden');
     framesInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
     
@@ -253,6 +256,7 @@ export async function initScoresPage() {
       scoringHeader.classList.add('hidden');
       playerSelectionCard.classList.add('hidden');
       scoringCard.classList.add('hidden');
+      resultsCard.classList.add('hidden');
       resultsPanel.classList.add('hidden');
       return;
     }
