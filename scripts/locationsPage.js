@@ -58,7 +58,7 @@ export function initLocationsPage() {
 
           // Toggle logic: Click the header (but not the delete button) to expand
           locDiv.querySelector('.location-header').onclick = (e) => {
-            if (e.target.classList.contains('delete-loc-btn')) return;
+            if (e.target.closest('button')) return;
             const details = locDiv.querySelector('.location-details');
             details.classList.toggle('hidden');
           };
@@ -146,6 +146,11 @@ export function initLocationsPage() {
   }
 
   async function showMachineForm(locationId, locationName, existing = null) {
+    // Show the card and scroll immediately so the user sees something is happening
+    machineFormCard.classList.remove('hidden');
+    window.scrollTo(0, document.body.scrollHeight);
+    machineFormCard.innerHTML = `<h2>Loading Machine Details...</h2>`;
+
     const allMachines = await PB_API.getMachines();
     machineFormCard.innerHTML = `
       <h2>${existing ? 'Edit' : 'Add'} Machine for ${locationName}</h2>
@@ -173,8 +178,6 @@ export function initLocationsPage() {
         <button id="cancel-loc-mach" class="secondary">Cancel</button>
       </div>
     `;
-    machineFormCard.classList.remove('hidden');
-    window.scrollTo(0, document.body.scrollHeight);
 
     applyScoreFormatting(document.getElementById('target-easy'));
     applyScoreFormatting(document.getElementById('target-med'));
@@ -182,7 +185,7 @@ export function initLocationsPage() {
 
     document.getElementById('cancel-loc-mach').onclick = () => machineFormCard.classList.add('hidden');
     document.getElementById('save-loc-mach').onclick = async () => {
-      const machineId = document.getElementById('loc-mach-select').value;
+      const machineId = existing ? existing.machine_id : document.getElementById('loc-mach-select').value;
       if (!machineId) return;
 
       const extra = {
