@@ -22,7 +22,7 @@
         <input type="hidden" id="editing-player-id" value="" />
         <div class="form-row">
           <label for="player-name">Player Name</label>
-          <input id="player-name" type="text" placeholder="Enter player name" required />
+          <input id="player-name" type="text" placeholder="Enter player name" required autocomplete="off" />
         </div>
         <div class="form-row">
           <label for="ifpa-id">IFPA ID (Optional)</label>
