@@ -6,7 +6,7 @@ require_once __DIR__ . '/../includes/config.php';
 initDatabase();
 $pdo = getDbConnection();
 
-$method = getRequestMethod();
+$method = $_SERVER['REQUEST_METHOD'];
 $input = getJsonInput();
 $action = $_GET['action'] ?? 'location';
 

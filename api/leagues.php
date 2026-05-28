@@ -7,7 +7,7 @@ require_once __DIR__ . '/../includes/config.php';
 initDatabase();
 $pdo = getDbConnection();
 
-$method = getRequestMethod();
+$method = $_SERVER['REQUEST_METHOD'];
 $input = getJsonInput();
 // Use 'action' parameter to distinguish between league and event operations
 $action = $_GET['action'] ?? 'league'; 
