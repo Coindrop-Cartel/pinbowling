@@ -420,6 +420,22 @@ body.tv-mode .standings-total {
 }
 
 @media (max-width: 600px) {
+  .nav-container {
+    flex-direction: column;
+    min-height: auto;
+    padding: 15px 10px;
+    gap: 10px;
+  }
+
+  .nav-logo {
+    font-size: 0;
+    gap: 0;
+  }
+
+  .nav-logo img {
+    height: 50px;
+  }
+
   .page-container {
     margin: 20px auto;
     padding: 0 10px;
@@ -432,6 +448,8 @@ body.tv-mode .standings-total {
 
   .nav-links {
     gap: 5px;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
   .nav-link {
