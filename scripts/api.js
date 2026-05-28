@@ -27,17 +27,17 @@ const APP_BASE = window.location.pathname.substring(0, window.location.pathname.
  * and handles standardized JSON error responses.
  */
 export async function fetchJSON(url, options = {}) {
+  const finalHeaders = {
+    'Content-Type': 'application/json',
+    'X-PB-SECRET': API_SECRET,
+    ...options.headers
+  };
+
   // Construct a reliable absolute path for the API call
   const fullUrl = url.startsWith('http') ? url : `${APP_BASE}/${url}`;
   
   try {
-    const response = await fetch(fullUrl, {
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-PB-SECRET': API_SECRET 
-      },
-      ...options,
-    });
+    const response = await fetch(fullUrl, { ...options, headers: finalHeaders });
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: response.statusText }));
       throw new Error(error.error || response.statusText);
@@ -92,10 +92,10 @@ export const PB_API = {
   removeLocationMachine: (locationId, machineId) => fetchJSON(`api/locations.php?action=machines&locationId=${locationId}&machineId=${machineId}`, { method: 'DELETE' }),
   getTargetScores: (eventId, leagueId) => 
     fetchJSON(`api/machines.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`),
+  bulkUpdateTargetOrder: (updates) => fetchJSON('api/machines.php?action=reorder', { method: 'POST', body: JSON.stringify(updates) }),
   saveTargetScore: (target) => {
-    const method = target.id ? 'PUT' : 'POST';
-    const url = `api/machines.php?action=target${target.id ? `&id=${target.id}` : ''}`;
-    return fetchJSON(url, { method, body: JSON.stringify(target) });
+    const url = `api/machines.php?action=target`;
+    return fetchJSON(url, { method: 'POST', body: JSON.stringify(target) });
   },
   deleteTargetScore: (id) => fetchJSON(`api/machines.php?id=${id}&action=target`, { method: 'DELETE' })
 };

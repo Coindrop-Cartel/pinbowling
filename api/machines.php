@@ -79,6 +79,29 @@ $input = getJsonInput();
 // POST: Add a new frame/machine configuration (Protected by API Secret)
 if ($method === 'POST') {
     validateApiSecret();
+    
+    if ($action === 'reorder') {
+        if (!is_array($input)) {
+            sendJson(['error' => 'Input must be an array of updates'], 400);
+        }
+        $pdo->beginTransaction();
+        try {
+            // Step 1: Temporarily shift to high order numbers to clear unique key constraints
+            $stmtShift = $pdo->prepare('UPDATE Target_Scores SET order_number = order_number + 1000 WHERE id = ?');
+            foreach ($input as $item) $stmtShift->execute([(int)$item['id']]);
+
+            // Step 2: Set the final intended order numbers
+            $stmtFinal = $pdo->prepare('UPDATE Target_Scores SET order_number = ? WHERE id = ?');
+            foreach ($input as $item) $stmtFinal->execute([(int)$item['order_number'], (int)$item['id']]);
+
+            $pdo->commit();
+            sendJson(['success' => true]);
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            sendJson(['error' => $e->getMessage()], 500);
+        }
+    }
+
     // Action 'target' handles Target_Scores, default action handles master Machines
     if ($action === 'target') {
         if (empty($input['event_id']) || empty($input['machine_id'])) {
