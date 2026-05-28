@@ -295,5 +295,4 @@ export async function initScoresPage() {
   };
 
   await initTournamentSelector(refresh);
-  await refresh();
 }

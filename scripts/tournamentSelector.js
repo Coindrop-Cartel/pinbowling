@@ -76,7 +76,7 @@ export async function initTournamentSelector(onRefresh) {
       setActiveLeagueId(leagueId);
     setActiveEventId('');
     populateEvents(leagueId);
-    if (onRefresh) onRefresh();
+    if (onRefresh) onRefresh(); // UI interaction - keep as standard call
     }
   });
 
@@ -114,10 +114,14 @@ export async function initTournamentSelector(onRefresh) {
       searchInput.value = league.name;
       updateOptions(league.name);
       leagueSelect.value = currentLeagueId;
-      populateEvents(currentLeagueId, currentEventId);
+      await populateEvents(currentLeagueId, currentEventId);
     }
   } else {
     updateOptions('');
-    populateEvents('', '');
+    await populateEvents('', '');
+  }
+
+  if (onRefresh) {
+    await onRefresh();
   }
 }

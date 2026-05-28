@@ -197,5 +197,4 @@ export async function initStandingsPage() {
   };
 
   initTournamentSelector(refresh);
-  refresh();
 }

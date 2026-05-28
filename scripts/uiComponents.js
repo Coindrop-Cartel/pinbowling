@@ -89,12 +89,12 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
         const activeEvent = (activeLeague.events || []).find(e => String(e.id) === String(activeEventId));
         if (activeEvent) {
           eventName = `${activeEvent.event_name} (${activeEvent.event_date || 'No Date'})`;
-        } else {
+        } else if (activeEventId !== 'summary') {
           // If event not found in the active league, clear event ID
           setActiveEventId('');
           eventName = 'Invalid Event Selected';
         }
-      } else {
+      } else if (activeLeagueId) {
         // If league not found, clear both
         setActiveLeagueId('');
         setActiveEventId('');
@@ -124,7 +124,7 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
 
   // Trigger the page's refresh logic
   if (onRefresh) {
-    onRefresh();
+    await onRefresh();
   }
 }
 

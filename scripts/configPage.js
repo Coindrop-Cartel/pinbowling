@@ -282,5 +282,4 @@ export async function initConfigPage() {
   });
 
   await initReadOnlyTournamentDisplay(document.querySelector('.tournament-selector-container'), refresh);
-  await refresh();
 }
