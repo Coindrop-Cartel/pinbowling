@@ -15,6 +15,9 @@ export async function initScoresPage() {
   const warning = document.getElementById('player-warning');
   const playerSelect = document.getElementById('player-select');
   const playerFileInfo = document.getElementById('player-file-info');
+  const scoringHeader = document.getElementById('scoring-header');
+  const playerSelectionCard = document.getElementById('player-selection-card');
+  const scoringCard = document.getElementById('scoring-card');
 
   let machines = [];
   const printSheetBtn = document.getElementById('print-sheet-btn');
@@ -156,8 +159,7 @@ export async function initScoresPage() {
 
   function updatePlayerFileInfo(player) {
     if (!player) {
-      playerFileInfo.textContent = 'Add a player to begin tracking scores.';
-      playerFileInfo.classList.remove('hidden');
+      playerFileInfo.classList.add('hidden');
       return;
     }
     playerFileInfo.textContent = `Selected player: ${player.player_name}`;
@@ -180,13 +182,16 @@ export async function initScoresPage() {
   async function refreshPlayerSelection() {
     const activePlayerId = await renderPlayerSelect();
     if (!activePlayerId) {
-      warning.textContent = 'Please select a player before entering scores.';
-      warning.classList.remove('hidden');
       framesInput.querySelectorAll('input').forEach((input) => (input.disabled = true));
+      scoringCard.classList.add('hidden');
+      resultsPanel.classList.add('hidden');
+      resultsEmpty.classList.add('hidden');
       return;
     }
 
     warning.classList.add('hidden');
+    scoringCard.classList.remove('hidden');
+    resultsPanel.classList.remove('hidden');
     framesInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
     
     const scores = await PB_API.getScores(Number(activePlayerId), Number(getActiveEventId()));
@@ -244,12 +249,19 @@ export async function initScoresPage() {
   const refresh = async () => {
     const eventId = getActiveEventId();
     if (!eventId) {
-      warning.textContent = 'Please select a league and event above to begin scoring.';
-      warning.classList.remove('hidden');
       framesInput.innerHTML = '';
+      scoringHeader.classList.add('hidden');
+      playerSelectionCard.classList.add('hidden');
+      scoringCard.classList.add('hidden');
+      resultsPanel.classList.add('hidden');
       return;
     }
+
     machines = await PB_API.getTargetScores(eventId);
+
+    scoringHeader.classList.remove('hidden');
+    playerSelectionCard.classList.remove('hidden');
+
     if (machines.length === 0) {
       warning.textContent = 'No target scores have been configured for the selected event.';
       warning.classList.remove('hidden');

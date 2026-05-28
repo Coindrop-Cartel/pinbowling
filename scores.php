@@ -11,15 +11,19 @@
   <?php include 'includes/header.php'; ?>
 
   <main class="page-container">
-    <div class="tournament-selector-container"></div>
+    <section class="card">
+      <h2>LEAGUE SELECTION</h2>
+      <p class="hint">Select a league and event to play</p>
+      <div class="tournament-selector-container"></div>
+    </section>
 
-    <header>
+    <header id="scoring-header" class="hidden">
       <h1>Player Score Tracker</h1>
       <p>Enter your scores for each frame and calculate your bowling-style total.</p>
       <button id="print-sheet-btn" class="secondary" style="margin-top: 1rem;">Print Blank Score Sheet</button>
     </header>
 
-    <section class="card">
+    <section id="player-selection-card" class="card hidden">
       <h2>Player Selection</h2>
       <p class="hint">Select a player to enter or update scores.</p>
       <div class="form-row">
@@ -29,10 +33,10 @@
       <div id="player-file-info" class="notice hidden"></div>
     </section>
 
-    <section class="card">
+    <section id="scoring-card" class="card hidden">
       <h2>Enter Frame Scores</h2>
       <p class="hint">Enter the cumulative pinbowling score after each ball. Ball 1 can be a strike; ball 2 can complete a spare; ball 3 can also complete a spare.</p>
-      <div id="player-warning" class="notice hidden">Please configure frames first on the configuration page.</div>
+      <div id="player-warning" class="notice hidden"></div>
       <form id="player-form">
         <div id="frames-input"></div>
       </form>
@@ -40,7 +44,7 @@
 
     <section class="card">
       <h2>Results</h2>
-      <div id="results-empty" class="notice">Select a player to see their current scores.</div>
+      <div id="results-empty" class="notice hidden"></div>
       <div id="results-panel" class="hidden">
         <table class="data-table">
           <thead>
