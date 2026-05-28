@@ -80,8 +80,16 @@ export async function initTournamentSelector(onRefresh) {
     }
   });
 
+  // Helper to update URL without reloading to reflect current selection
+  const updateUrl = (lId, eId) => {
+    const newUrl = `${window.location.pathname}?leagueId=${lId || ''}&eventId=${eId || ''}`;
+    window.history.replaceState({ path: newUrl }, '', newUrl);
+  };
+
   eventSelect.addEventListener('change', () => {
-    setActiveEventId(eventSelect.value);
+    const val = eventSelect.value;
+    setActiveEventId(val);
+    updateUrl(getActiveLeagueId(), val);
     if (onRefresh) onRefresh();
   });
 
@@ -92,6 +100,7 @@ export async function initTournamentSelector(onRefresh) {
     leagueSelect.value = '';
     updateOptions('');
     populateEvents('', '');
+    updateUrl('', '');
     if (onRefresh) onRefresh();
   });
 

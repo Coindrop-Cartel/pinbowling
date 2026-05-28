@@ -78,11 +78,19 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
   let leagueName = 'No League Selected';
   let eventName = 'No Event Selected';
 
-  if (activeLeagueId && activeEventId) {
+  if (activeEventId) {
     try {
       // Fetch all leagues to find the specific one and its events
       const leagues = await PB_API.getLeagues(); 
-      const activeLeague = leagues.find(l => String(l.id) === String(activeLeagueId));
+      let activeLeague = leagues.find(l => String(l.id) === String(activeLeagueId));
+
+      // Self-healing: If league is missing but we have an event, find the league containing the event
+      if (!activeLeague && activeEventId !== 'summary') {
+        activeLeague = leagues.find(l => (l.events || []).some(e => String(e.id) === String(activeEventId)));
+        if (activeLeague) {
+          setActiveLeagueId(activeLeague.id);
+        }
+      }
 
       if (activeLeague) {
         leagueName = activeLeague.name;

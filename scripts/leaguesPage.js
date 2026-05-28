@@ -96,7 +96,7 @@ export async function initLeaguesPage() {
             const eventId = Number(btn.dataset.eventId);
             setActiveLeagueId(leagueId);
             setActiveEventId(eventId);
-            window.location.href = 'event-setup.php'; // Redirect to the config page
+            window.location.href = `event-setup.php?leagueId=${leagueId}&eventId=${eventId}`;
           };
         });
         card.querySelectorAll('.edit-event-btn').forEach(btn => {

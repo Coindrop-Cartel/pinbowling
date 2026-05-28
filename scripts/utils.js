@@ -13,6 +13,19 @@ export const getActiveEventId = () => localStorage.getItem(ACTIVE_EVENT_KEY);
 export const setActiveEventId = (id) => id ? localStorage.setItem(ACTIVE_EVENT_KEY, id) : localStorage.removeItem(ACTIVE_EVENT_KEY);
 
 /**
+ * Synchronizes leagueId and eventId from URL parameters into local storage.
+ * This ensures deep links or shared URLs correctly set the application state.
+ */
+export function syncUrlParams() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const leagueId = urlParams.get('leagueId');
+  const eventId = urlParams.get('eventId');
+
+  if (leagueId) setActiveLeagueId(leagueId);
+  if (eventId) setActiveEventId(eventId);
+}
+
+/**
  * Formats a number with locale-specific thousands separators.
  * @param {number} num 
  * @returns {string}
