@@ -1,5 +1,6 @@
 import { PB_API } from './api.js';
 import { getActiveLeagueId, setActiveLeagueId, getActiveEventId, setActiveEventId } from './utils.js';
+import { createSearchableSelect } from './uiComponents.js';
 
 export async function initTournamentSelector(onRefresh) {
   const container = document.querySelector('.tournament-selector-container');
@@ -37,25 +38,6 @@ export async function initTournamentSelector(onRefresh) {
   const eventSelect = document.getElementById('event-select-global');
   const eventWrapper = document.getElementById('event-select-wrapper');
 
-  const updateLeagueOptions = (filter = '') => {
-    const currentVal = leagueSelect.value;
-    leagueSelect.innerHTML = '<option value="">-- Choose League --</option>';
-    const normalizedFilter = filter.toLowerCase();
-    
-    let matchCount = 0;
-    leagues.forEach(l => {
-      if (l.name.toLowerCase().includes(normalizedFilter)) {
-        const opt = document.createElement('option');
-        opt.value = l.id;
-        opt.textContent = l.name;
-        if (String(l.id) === String(currentVal)) opt.selected = true;
-        leagueSelect.appendChild(opt);
-        matchCount++;
-      }
-    });
-    return matchCount;
-  };
-
   const populateEvents = (leagueId, selectedEventId) => {
     const isStandingsPage = !!document.getElementById('standings-body');
     eventSelect.innerHTML = `<option value="">Select Event</option>${isStandingsPage && leagueId ? '<option value="summary">Season Summary</option>' : ''}`;
@@ -83,40 +65,14 @@ export async function initTournamentSelector(onRefresh) {
     });
   };
 
-  searchInput.addEventListener('input', (e) => {
-    const filter = e.target.value;
-    const matchCount = updateLeagueOptions(filter);
-
-    // Dynamically set size based on results (+1 for placeholder), capped at 5
-    leagueSelect.size = filter.length > 0 ? Math.min(matchCount + 1, 5) : 1;
-
-    // If they type a name that matches exactly, auto-select it to "update as they type"
-    const match = leagues.find(l => l.name.toLowerCase() === filter.toLowerCase());
-    if (match && String(leagueSelect.value) !== String(match.id)) {
-      leagueSelect.value = match.id;
-      leagueSelect.size = 1; // Collapse once an exact match is found/selected
-      setActiveLeagueId(match.id);
-      setActiveEventId('');
-      populateEvents(match.id);
-      updateLeagueOptions(filter);
-      if (onRefresh) onRefresh();
-    }
-  });
-
-  // Ensure the list collapses if the user clicks away
-  searchInput.addEventListener('blur', () => { setTimeout(() => { leagueSelect.size = 1; }, 200); });
-
-  leagueSelect.addEventListener('change', () => {
-    const leagueId = leagueSelect.value;
-    const league = leagues.find(l => String(l.id) === String(leagueId));
-    leagueSelect.size = 1; // Collapse after selection
-    searchInput.value = league ? league.name : '';
-    
-    setActiveLeagueId(leagueId);
+  const { updateOptions } = createSearchableSelect(searchInput, leagueSelect, leagues, {
+    placeholder: '-- Choose League --',
+    onSelect: (leagueId) => {
+      setActiveLeagueId(leagueId);
     setActiveEventId('');
     populateEvents(leagueId);
-    updateLeagueOptions(searchInput.value);
     if (onRefresh) onRefresh();
+    }
   });
 
   eventSelect.addEventListener('change', () => {
@@ -130,10 +86,10 @@ export async function initTournamentSelector(onRefresh) {
     if (league) {
       searchInput.value = league.name;
       leagueSelect.value = activeLeagueId;
-      updateLeagueOptions(league.name);
+      updateOptions(league.name);
       populateEvents(activeLeagueId, activeEventId);
     }
   } else {
-    updateLeagueOptions('');
+    updateOptions('');
   }
 }
