@@ -10,14 +10,14 @@ export async function initTournamentSelector(onChange) {
     <section class="card tournament-selector" style="margin-bottom: 1.5rem;">
       <div class="form-row" style="display: flex; gap: 1rem; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 200px;">
-          <label for="league-select-global">Active League</label>
+          <label for="league-select-global">League</label>
           <select id="league-select-global">
             <option value="">Select League</option>
             ${leagues.map(l => `<option value="${l.id}" ${getActiveLeagueId() == l.id ? 'selected' : ''}>${l.name}</option>`).join('')}
           </select>
         </div>
         <div style="flex: 1; min-width: 200px;">
-          <label for="event-select-global">Active Event</label>
+          <label for="event-select-global">Event</label>
           <select id="event-select-global" disabled>
             <option value="">Select Event</option>
           </select>

@@ -13,7 +13,6 @@
   <main class="page-container">
     <section class="card">
       <h2>LEAGUE SELECTION</h2>
-      <p class="hint">Select a league and event to play</p>
       <div class="tournament-selector-container"></div>
     </section>
 
@@ -26,7 +25,7 @@
     <section id="player-selection-card" class="card hidden">
       <h2>Player Selection</h2>
       <div class="form-row">
-        <label for="player-select">Select Player</label>
+        <label for="player-select">Player</label>
         <select id="player-select"></select>
       </div>
       <div id="player-file-info" class="notice hidden"></div>
