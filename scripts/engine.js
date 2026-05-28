@@ -176,7 +176,7 @@ const BowlingEngine = {
     return { turnResults: results, total };
   },
 
-  buildFrameValues(score10, score1) {
+  buildRoundValues(score10, score1) {
     const values = {};
     if (score10 > 0 && score1 > 0) {
       for (let rank = 10; rank >= 1; rank -= 1) {
@@ -194,11 +194,11 @@ const BowlingEngine = {
  * Placeholder for future Golf scoring format.
  */
 const GolfEngine = {
-  calculateFrameResults(machines, scoreMap) {
+  calculateTurnResults(machines, scoreMap) {
     // Implementation for Pingolf: Strokes vs Par
     return { frameResults: [], total: 0 };
   },
-  buildFrameValues(target, par) {
+  buildRoundValues(target, par) {
     // Implementation for defining hole-in-one vs par thresholds
     return {};
   },

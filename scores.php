@@ -30,11 +30,11 @@
     </section>
 
     <section id="scoring-card" class="card hidden">
-      <h2>Enter Frame Scores</h2>
+      <h2>Enter Round Scores</h2>
       <p class="hint">Enter the cumulative pinbowling score after each ball. We will do the rest.</p>
       <div id="player-warning" class="notice hidden"></div>
       <form id="player-form">
-        <div id="frames-input"></div>
+        <div id="rounds-input"></div>
       </form>
     </section>
 
@@ -45,7 +45,7 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Frame</th>
+              <th>Round</th>
               <th>Machine</th>
               <th>Score</th>
               <th>Total</th>

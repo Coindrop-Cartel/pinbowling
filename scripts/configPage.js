@@ -249,7 +249,7 @@ export async function initConfigPage() {
 
     if (!order_number || !machine_name || (!score10 && !score1) || !eventId) return;
 
-    const values = Engine.buildFrameValues(score10, score1);
+    const values = Engine.buildRoundValues(score10, score1);
     if (window.PB_ADMIN_PASSWORD) {
       const confirmation = await showPrompt(`Enter Admin Password to save changes for Round ${order_number}:`);
       if (confirmation === null) {

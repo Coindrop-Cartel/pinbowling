@@ -70,7 +70,7 @@ export function initNavigation() {
 export function renderPreview(score10Input, score1Input, previewValues, Engine, isLastRound = false) {
   const score10 = Number(score10Input.value.replace(/\D/g, ''));
   const score1 = Number(score1Input.value.replace(/\D/g, ''));
-  const values = Engine.buildFrameValues(score10, score1);
+  const values = Engine.buildRoundValues(score10, score1);
 
   if (!values) {
     previewValues.innerHTML = "<div>Enter a 10 score or a 1 score to preview values for 9–2.</div>";
