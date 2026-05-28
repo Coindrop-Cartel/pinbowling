@@ -16,13 +16,14 @@
     <header>
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <h1>Standings</h1>
-        <button id="tv-mode-btn" class="btn-standard secondary no-print">📺 TV Mode</button>
+        <button id="tv-mode-btn" class="btn-standard secondary no-print">TV Mode</button>
       </div>
       <p class="no-print">See the current player rankings and frame-by-frame scores.</p>
     </header>
 
     <section class="card">
-      <h2>Current Standings</h2>
+      <h2 id="tv-title" class="hidden"></h2>
+      <h2 class="no-tv">Current Standings</h2>
       <p class="hint">View specific event results or select <b>Season Summary</b> to see total bowling points accumulated across all events in the league.</p>
       <div id="standings-empty" class="notice hidden">No players or scores are available yet. Add a player and update scores first.</div>
       <div id="standings-wrapper">

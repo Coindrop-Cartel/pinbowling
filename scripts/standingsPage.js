@@ -9,6 +9,7 @@ export async function initStandingsPage() {
   const standingsEmpty = document.getElementById('standings-empty');
   const standingsWrapper = document.getElementById('standings-wrapper');
   const tvBtn = document.getElementById('tv-mode-btn');
+  const tvTitle = document.getElementById('tv-title');
 
   let isTvMode = false;
   let refreshInterval = null;
@@ -23,7 +24,7 @@ export async function initStandingsPage() {
     document.body.classList.toggle('tv-mode', isTvMode);
     
     if (isTvMode) {
-      tvBtn.textContent = 'Exit TV Mode (Esc)';
+      tvBtn.textContent = 'Exit (Esc)';
       // Update scores every 15 seconds
       refreshInterval = setInterval(refresh, 15000);
       startAutoScroll();
@@ -32,7 +33,7 @@ export async function initStandingsPage() {
         document.documentElement.requestFullscreen();
       }
     } else {
-      tvBtn.textContent = '📺 TV Mode';
+      tvBtn.textContent = 'TV Mode';
       clearInterval(refreshInterval);
       clearInterval(scrollInterval);
       window.scrollTo(0, 0);
@@ -113,6 +114,11 @@ export async function initStandingsPage() {
       return { player, eventTotals, totalSeasonPoints };
     }).sort((a, b) => b.totalSeasonPoints - a.totalSeasonPoints);
 
+    if (tvTitle) {
+      const league = leagues.find(l => String(l.id) === String(leagueId));
+      tvTitle.textContent = `${league?.name || 'League'} - Season Summary`;
+    }
+
     standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${events.map(e => `<th>${e.event_name}</th>`).join('')}<th>Total</th></tr>`;
     standingsBody.innerHTML = rows.map((row, idx) => `
       <tr>
@@ -146,6 +152,13 @@ export async function initStandingsPage() {
       acc[s.player_id].push(s);
       return acc;
     }, {});
+
+    if (tvTitle) {
+      const leagues = await PB_API.getLeagues();
+      const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
+      const event = league?.events.find(e => String(e.id) === String(eventId));
+      tvTitle.textContent = `${league?.name || 'League'} - ${event?.event_name || 'Event'}`;
+    }
 
     const rows = players.map(player => {
       const scores = scoresByPlayer[player.id] || [];
