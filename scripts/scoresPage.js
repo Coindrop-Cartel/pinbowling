@@ -87,12 +87,12 @@ export async function initScoresPage() {
     });
 
     for (let ball = 1; ball <= 3; ball += 1) {
-      const value = rollValues?.[`ball${ball}`] ?? '';
+      const value = turnValues?.[`ball${ball}`] ?? '';
       const placeholder = `Ball ${ball} cumulative`;
       
-      // Use frame.machine_id (master list ID) instead of frame.id (Target_Scores row ID)
+      // Use round.machine_id (master list ID) instead of round.id (Target_Scores row ID)
       // to ensure database foreign key constraints pass.
-      const input = createRollInput(frame.order_number, ball, frame.machine_id, value, placeholder);
+      const input = createRollInput(round.order_number, ball, round.machine_id, value, placeholder);
       
       input.addEventListener('input', () => {
         saveBtn.disabled = false;
