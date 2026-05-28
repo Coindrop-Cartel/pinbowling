@@ -179,13 +179,23 @@ export async function initConfigPage() {
 
   document.getElementById('save-order-btn').addEventListener('click', async () => {
     const rows = Array.from(framesTable.querySelectorAll('tbody tr'));
-    const newOrder = rows.map((row, index) => ({
-      id: Number(row.dataset.id),
-      order_number: index + 1
-    }));
+    // Map the new table order to full target objects from our cache
+    const updates = rows.map((row, index) => {
+      const id = Number(row.dataset.id);
+      const original = eventTargets.find(t => t.id === id);
+      // Include all original data but with the new order_number
+      return { ...original, order_number: index + 1 };
+    });
 
     try {
-      await Promise.all(newOrder.map(item => PB_API.saveTargetScore({ id: item.id, order_number: item.order_number })));
+      // Step 1: Temporarily shift to high order numbers to clear unique key constraints (event_id, order_number)
+      for (const item of updates) {
+        await PB_API.saveTargetScore({ ...item, order_number: item.order_number + 1000 });
+      }
+      // Step 2: Set the final intended order numbers
+      for (const item of updates) {
+        await PB_API.saveTargetScore(item);
+      }
       await refresh();
     } catch (err) {
       alert('Failed to update order: ' + err.message);

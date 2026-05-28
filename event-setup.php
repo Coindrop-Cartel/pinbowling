@@ -48,7 +48,7 @@
           </div>
         </div>
         <div class="form-actions" style="margin-top: 20px;">
-          <button type="submit" id="save-frame-btn" disabled>Save Configuration</button>
+          <button type="submit" id="save-frame-btn" disabled>Save</button>
           <button type="button" id="cancel-config-btn" class="secondary">Cancel</button>
         </div>
       </form>
@@ -73,13 +73,12 @@
         <tbody></tbody>
       </table>
       <div id="reorder-actions" class="form-actions hidden" style="margin-top: 1rem; justify-content: flex-end;">
-        <span class="hint" style="margin-right: 10px;">Drag rows to reorder.</span>
-        <button type="button" id="save-order-btn">Save New Order</button>
+        <button type="button" id="save-order-btn">Save</button>
       </div>
     </section>
 
     <div class="form-actions" style="margin-top: 20px; display: flex; justify-content: center;">
-      <button type="button" id="done-setup-btn">DONE - Back to Leagues</button>
+      <button type="button" id="done-setup-btn">DONE</button>
     </div>
   </main>
 

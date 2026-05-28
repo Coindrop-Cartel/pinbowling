@@ -92,6 +92,10 @@ export const PB_API = {
   removeLocationMachine: (locationId, machineId) => fetchJSON(`api/locations.php?action=machines&locationId=${locationId}&machineId=${machineId}`, { method: 'DELETE' }),
   getTargetScores: (eventId, leagueId) => 
     fetchJSON(`api/machines.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`),
-  saveTargetScore: (target) => fetchJSON('api/machines.php?action=target', { method: 'POST', body: JSON.stringify(target) }),
+  saveTargetScore: (target) => {
+    const method = target.id ? 'PUT' : 'POST';
+    const url = `api/machines.php?action=target${target.id ? `&id=${target.id}` : ''}`;
+    return fetchJSON(url, { method, body: JSON.stringify(target) });
+  },
   deleteTargetScore: (id) => fetchJSON(`api/machines.php?id=${id}&action=target`, { method: 'DELETE' })
 };
