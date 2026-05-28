@@ -192,15 +192,6 @@ button.secondary {
   border: 3px solid var(--pb-black);
 }
 
-button.danger {
-  background-color: #cc0000;
-  color: white;
-}
-
-button.danger:hover {
-  background-color: #990000;
-}
-
 button:disabled {
   opacity: 0.4;
   cursor: not-allowed;

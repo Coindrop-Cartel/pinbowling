@@ -60,7 +60,7 @@ export async function initLeaguesPage() {
             <button class="add-event-btn secondary">Add Event</button>
             <button class="add-player-btn secondary">Add Player</button>
             <button class="edit-league-btn secondary">Edit</button>
-            <button class="delete-league-btn danger">Delete</button>
+            <button class="delete-league-btn">Delete</button>
           </div>
         </div>
         <div class="league-details-columns" style="display: flex; gap: 2rem; flex-wrap: wrap;">
@@ -123,7 +123,7 @@ export async function initLeaguesPage() {
         <span>${event.event_name} (${event.event_date || 'No Date'}) - ${event.location_name || 'No Location'}</span>
         <div>
           <button class="edit-event-btn secondary">Edit</button>
-          <button class="delete-event-btn danger">Delete</button>
+          <button class="delete-event-btn">Delete</button>
         </div>
       `;
       eventsListInner.appendChild(eventDiv);
@@ -159,7 +159,7 @@ export async function initLeaguesPage() {
       playerDiv.innerHTML = `
         <span>${player.player_name}</span>
         <div>
-          <button class="remove-p-btn danger">Delete</button>
+          <button class="remove-p-btn">Delete</button>
         </div>`;
       playerDiv.querySelector('.remove-p-btn').addEventListener('click', async () => {
         if (!confirm(`Remove ${player.player_name} from this league?`)) return;

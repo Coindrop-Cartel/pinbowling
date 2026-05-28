@@ -41,7 +41,7 @@ export async function initLocationsPage() {
           <div>
             <button class="add-machine-btn secondary">Add Machine</button>
             <button class="edit-location-btn secondary">Edit</button>
-            <button class="delete-location-btn danger">Delete</button>
+            <button class="delete-location-btn">Delete</button>
           </div>
         </div>
         <div class="machines-list" id="machines-for-location-${loc.id}">
