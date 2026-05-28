@@ -427,11 +427,6 @@ body.tv-mode .standings-total {
     gap: 10px;
   }
 
-  .nav-logo {
-    font-size: 0;
-    gap: 0;
-  }
-
   .nav-logo img {
     height: 50px;
   }
@@ -447,21 +442,27 @@ body.tv-mode .standings-total {
   }
 
   .nav-links {
-    gap: 5px;
-    flex-wrap: wrap;
-    justify-content: center;
+    gap: 0;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
   }
+
+  .nav-links::-webkit-scrollbar { display: none; }
 
   .nav-link {
     padding: 10px;
     font-size: 0.85rem;
+    white-space: nowrap;
   }
 
   .dropdown-content {
     position: fixed;
     left: 0;
     right: 0;
-    top: 60px;
+    top: 115px;
     width: 100%;
   }
 
