@@ -2,6 +2,7 @@ import { PB_API } from './api.js';
 import { BowlingEngine } from './engine.js';
 import { getActiveEventId, renderPreview, applyScoreFormatting, formatNumber, printMachineScores } from './utils.js';
 import { initTournamentSelector } from './tournamentSelector.js';
+import { createSearchableSelect } from './uiComponents.js';
 
 export async function initConfigPage() {
   const frameSelect = document.getElementById('frame-number');
@@ -11,6 +12,7 @@ export async function initConfigPage() {
   const listEmpty = document.getElementById('list-empty');
   let editingMachineId = null;
   const printMachinesBtn = document.getElementById('print-machines-btn');
+  let machineSearch;
 
   const score10Input = document.getElementById('value-10');
   const score1Input = document.getElementById('value-1');
@@ -52,38 +54,18 @@ export async function initConfigPage() {
     nameInput.after(machineSelect);
   }
 
-  function updateMachineSelect(filterText = '') {
-    const select = document.getElementById('machine-select');
-    if (!select) return;
-    
-    const filter = filterText.toLowerCase();
-    select.innerHTML = '<option value="">-- Choose machine --</option>';
-    
-    currentSuggestedMachines.forEach(m => {
-      if (m.machine_name.toLowerCase().includes(filter)) {
-        const opt = document.createElement('option');
-        opt.value = m.machine_name;
-        opt.textContent = m.machine_name;
-        if (m.machine_name === filterText) opt.selected = true;
-        select.appendChild(opt);
-      }
-    });
-  }
+  machineSearch = createSearchableSelect(document.getElementById('machine-name'), machineSelect, currentSuggestedMachines, {
+    valueKey: 'machine_name',
+    labelKey: 'machine_name',
+    placeholder: '-- Choose machine --',
+    onSelect: () => markDirty()
+  });
 
   score10Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, BowlingEngine));
   score1Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, BowlingEngine));
 
   document.getElementById('machine-name').addEventListener('input', (e) => {
-    updateMachineSelect(e.target.value);
     markDirty();
-  });
-
-  machineSelect.addEventListener('change', () => {
-    if (machineSelect.value) {
-      document.getElementById('machine-name').value = machineSelect.value;
-      updateMachineSelect(machineSelect.value);
-      markDirty();
-    }
   });
 
   score10Input.addEventListener('input', markDirty);
@@ -105,7 +87,7 @@ export async function initConfigPage() {
       score10Input.value = '';
       score1Input.value = '';
     }
-    updateMachineSelect(document.getElementById('machine-name').value);
+    machineSearch.updateOptions(document.getElementById('machine-name').value);
     renderPreview(score10Input, score1Input, previewValues, BowlingEngine);
     submitBtn.disabled = true;
   });
@@ -148,7 +130,7 @@ export async function initConfigPage() {
         document.getElementById('machine-name').value = frame.machine_name;
         score10Input.value = frame.values[10] ? formatNumber(frame.values[10]) : '';
         score1Input.value = frame.values[1] ? formatNumber(frame.values[1]) : '';
-        updateMachineSelect(frame.machine_name);
+        machineSearch.updateOptions(frame.machine_name);
         renderPreview(score10Input, score1Input, previewValues, BowlingEngine);
         window.scrollTo(0, 0);
       });
@@ -172,12 +154,15 @@ export async function initConfigPage() {
       }
     }
 
-    currentSuggestedMachines = locationId ? await PB_API.getLocationMachines(locationId) : masterMachines;
+    const newData = locationId ? await PB_API.getLocationMachines(locationId) : masterMachines;
+    // Update the array in-place so the searchable select component sees the new data
+    currentSuggestedMachines.length = 0;
+    currentSuggestedMachines.push(...newData);
     currentSuggestedMachines.sort((a, b) => a.machine_name.localeCompare(b.machine_name));
     
     // Clear search text on fresh load/navigation
     document.getElementById('machine-name').value = '';
-    updateMachineSelect('');
+    machineSearch.updateOptions('');
 
     eventTargets = eventId ? await PB_API.getTargetScores(eventId) : [];
     await render();
@@ -187,7 +172,7 @@ export async function initConfigPage() {
     editingMachineId = null;
     form.reset();
     submitBtn.disabled = true;
-    updateMachineSelect('');
+    machineSearch.updateOptions('');
     renderPreview(score10Input, score1Input, previewValues, BowlingEngine);
   }
 
