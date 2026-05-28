@@ -2,11 +2,8 @@
  * The Scoring Engine
  * Pure logic for mapping pinball to bowling.
  */
-function formatNumber(num) {
-  return Number(num).toLocaleString();
-}
 
-const BowlingEngine = {
+export const BowlingEngine = {
   getPinCount(frame, rawScore) {
     if (!frame || typeof rawScore !== 'number' || rawScore <= 0) return 0;
     const thresholds = Object.entries(frame.values)
@@ -21,6 +18,13 @@ const BowlingEngine = {
     return pins;
   },
 
+  /**
+   * Complex logic for Frame 10.
+   * Unlike frames 1-9, frame 10 allows up to 3 balls if the player achieves 
+   * a mark (strike or spare). Strikes on subsequent balls use adjusted 
+   * targets (multipliers) to simulate the difficulty of repeated strikes 
+   * on the same machine.
+   */
   getFrame10Data(frame, raw1, raw2, raw3) {
     const target1 = Number(frame.values[10] || 0);
     const target2 = Math.round(target1 * 1.3);

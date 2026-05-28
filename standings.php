@@ -20,7 +20,7 @@
 
     <section class="card">
       <h2>Current Standings</h2>
-      <p class="hint">Standings are calculated from the latest saved player scores. Use Update Scores on the player page to refresh the leaderboard.</p>
+      <p class="hint">View specific event results or select <b>Season Summary</b> to see total bowling points accumulated across all events in the league.</p>
       <div id="standings-empty" class="notice hidden">No players or scores are available yet. Add a player and update scores first.</div>
       <div id="standings-wrapper">
         <table class="data-table standings-table">
@@ -32,8 +32,6 @@
     </section>
   </main>
   <script src="js-config.php"></script>
-  <script src="scripts/api.js"></script>
-  <script src="scripts/engine.js"></script>
-  <script src="scripts/script.js"></script>
+  <script type="module" src="scripts/main.js"></script>
 </body>
 </html>

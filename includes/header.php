@@ -5,7 +5,7 @@
     </a>
     <nav class="taskbar">
       <?php
-      $navItems = ['players.php' => 'Players', 'scores.php' => 'Scores', 'standings.php' => 'Standings', 'machines.php' => 'Machines'];
+      $navItems = ['players.php' => 'Players', 'scores.php' => 'Scores', 'standings.php' => 'Standings', 'machines.php' => 'Machines', 'leagues.php' => 'Leagues'];
       foreach ($navItems as $url => $label):
         $active = (basename($_SERVER['PHP_SELF']) == $url) ? 'active' : '';
         echo "<a href=\"$url\" class=\"nav-item $active\">$label</a>";

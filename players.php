@@ -17,12 +17,26 @@
     </header>
 
     <section class="card">
-      <h2>Add Player</h2>
-      <div class="form-row">
-        <label for="new-player-name">Add New Player</label>
-        <input id="new-player-name" type="text" placeholder="Enter player name" />
-        <button type="button" id="add-player-button">Add Player</button>
-      </div>
+      <h2 id="player-form-title">Add New Player</h2>
+      <form id="player-form">
+        <input type="hidden" id="editing-player-id" value="" />
+        <div class="form-row">
+          <label for="player-name">Player Name</label>
+          <input id="player-name" type="text" placeholder="Enter player name" required />
+        </div>
+        <div class="form-row">
+          <label for="ifpa-id">IFPA ID (Optional)</label>
+          <input id="ifpa-id" type="text" placeholder="e.g., 12345" />
+        </div>
+        <div class="form-row">
+          <label for="matchplay-id">Matchplay ID (Optional)</label>
+          <input id="matchplay-id" type="text" placeholder="e.g., 67890" />
+        </div>
+        <div class="form-actions">
+          <button type="submit" id="save-player-button">Save Player</button>
+          <button type="button" id="cancel-edit-button" class="secondary hidden">Cancel Edit</button>
+        </div>
+      </form>
     </section>
 
     <section class="card">
@@ -44,8 +58,6 @@
     </section>
   </main>
   <script src="js-config.php"></script>
-  <script src="scripts/api.js"></script>
-  <script src="scripts/engine.js"></script>
-  <script src="scripts/script.js"></script>
+  <script type="module" src="scripts/main.js"></script>
 </body>
 </html>

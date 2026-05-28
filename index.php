@@ -15,7 +15,7 @@
       <div class="hero-text">
         <h1>Welcome to PinBowling</h1>
         <p>A quick attempt to put together a basic way to track pinball scores in a bowling format. </p> 
-        <p> This site currently only supports one tournament at a time.  If you aren't playing in the Asheville Pinball league you are in the wrong spot.  Check back later, who knows maybe I'll get around to adding support for multiple tournaments.</p>
+        <p>This site is in ACTIVE DEVELOPMENT.  Use at your own risk.</p>
       </div>
       <img src="images/logo.png" alt="PinBowling Logo" class="hero-logo-img">
     </header>
@@ -24,9 +24,9 @@
       <h2>About the Project</h2>
       <p>The system attempts to map pinball scoring to bowling scoring. It calculates strikes, spares, and total scores following standard bowling rules based the target scores for each machine (its KINDA like pingolf). I'm not gonna explain how bowling scoring works, you are already on the internet you can figure it out.</p>
       <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-        <a href="machines.php" class="btn-standard">Configure Machines</a>
-        <a href="players.php" class="btn-standard">Manage Players</a>
-        <a href="scores.php" class="btn-standard">Enter Scores</a>
+        <a href="leagues.php" class="btn-standard">Start a League</a>
+        <a href="scores.php" class="btn-standard">Play in a League</a>
+        <a href="#" class="btn-standard">Let's Bowl</a>
         <a href="standings.php" class="btn-standard">View Standings</a>
       </div>
     </section>
@@ -38,8 +38,6 @@
     </section>
   </main>
   <script src="js-config.php"></script>
-  <script src="scripts/api.js"></script>
-  <script src="scripts/engine.js"></script>
-  <script src="scripts/script.js"></script>
+<script type="module" src="scripts/main.js"></script>
 </body>
 </html>

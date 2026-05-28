@@ -58,8 +58,6 @@
     </section>
   </main>
   <script src="js-config.php"></script>
-  <script src="scripts/api.js"></script>
-  <script src="scripts/engine.js"></script>
-  <script src="scripts/script.js"></script>
+  <script type="module" src="scripts/main.js"></script>
 </body>
 </html>

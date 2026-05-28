@@ -10,19 +10,50 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 // GET: Retrieve all frame scores for a specific player
 if ($method === 'GET') {
+    $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
     $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
-    if (!$playerId) {
-        sendJson(['error' => 'playerId query parameter is required'], 400);
+    $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
+
+    /**
+     * GET modes:
+     * 1. leagueId: Returns all scores for all players/events in a specific league (for summary view).
+     * 2. eventId + playerId: Returns scores for a specific player session.
+     * 3. eventId: Returns all scores for a specific night (for event standings).
+     */
+    if (!$eventId && !$leagueId) {
+        sendJson(['error' => 'eventId or leagueId query parameter is required'], 400);
     }
 
-    $stmt = $pdo->prepare(
-        'SELECT s.id, s.player_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name, m.frame_number
-         FROM Scores s
-         JOIN Machines m ON m.id = s.machine_id
-         WHERE s.player_id = ?
-         ORDER BY s.frame ASC'
-    );
-    $stmt->execute([$playerId]);
+    if ($leagueId) {
+        $stmt = $pdo->prepare(
+            'SELECT s.id, s.player_id, s.event_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
+             FROM Scores s
+             JOIN Machines m ON m.id = s.machine_id
+             JOIN Events e ON s.event_id = e.id
+             WHERE e.league_id = ?
+             ORDER BY s.event_id ASC, s.player_id ASC, s.frame ASC'
+        );
+        $stmt->execute([$leagueId]);
+    } else if ($playerId) {
+        $stmt = $pdo->prepare(
+            'SELECT s.id, s.player_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
+             FROM Scores s
+             JOIN Machines m ON m.id = s.machine_id
+             WHERE s.player_id = ? AND s.event_id = ?
+             ORDER BY s.frame ASC'
+        );
+        $stmt->execute([$playerId, $eventId]);
+    } else {
+        $stmt = $pdo->prepare(
+            'SELECT s.id, s.player_id, s.frame, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
+             FROM Scores s
+             JOIN Machines m ON m.id = s.machine_id
+             WHERE s.event_id = ?
+             ORDER BY s.player_id ASC, s.frame ASC'
+        );
+        $stmt->execute([$eventId]);
+    }
+
     sendJson($stmt->fetchAll());
 }
 
@@ -30,6 +61,7 @@ $input = getJsonInput();
 
 // POST: Save or update a score for a specific player/frame (Protected by API Secret)
 if ($method === 'POST') {
+    $eventId = isset($input['eventId']) ? (int)$input['eventId'] : 0;
     validateApiSecret();
     
     $playerId = isset($input['playerId']) ? (int)$input['playerId'] : 0;
@@ -39,8 +71,8 @@ if ($method === 'POST') {
     $ball2 = isset($input['ball2']) ? (int)$input['ball2'] : 0;
     $ball3 = isset($input['ball3']) ? (int)$input['ball3'] : 0;
 
-    if (!$playerId || !$frame || !$machineId) {
-        sendJson(['error' => 'playerId, frame, and machineId are required'], 400);
+    if (!$eventId || !$playerId || !$frame || !$machineId) {
+        sendJson(['error' => 'eventId, playerId, frame, and machineId are required'], 400);
     }
     
     // Basic range validation
@@ -48,14 +80,14 @@ if ($method === 'POST') {
         sendJson(['error' => 'Invalid score values'], 400);
     }
 
-    $sql = 'INSERT INTO Scores (player_id, frame, machine_id, ball1, ball2, ball3)
-            VALUES (?, ?, ?, ?, ?, ?)
+    $sql = 'INSERT INTO Scores (event_id, player_id, frame, machine_id, ball1, ball2, ball3)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE machine_id = ?, ball1 = ?, ball2 = ?, ball3 = ?';
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$playerId, $frame, $machineId, $ball1, $ball2, $ball3, $machineId, $ball1, $ball2, $ball3]);
+    $stmt->execute([$eventId, $playerId, $frame, $machineId, $ball1, $ball2, $ball3, $machineId, $ball1, $ball2, $ball3]);
 
-    $stmt = $pdo->prepare('SELECT * FROM Scores WHERE player_id = ? AND frame = ?');
-    $stmt->execute([$playerId, $frame]);
+    $stmt = $pdo->prepare('SELECT * FROM Scores WHERE player_id = ? AND frame = ? AND event_id = ?');
+    $stmt->execute([$playerId, $frame, $eventId]);
     sendJson($stmt->fetch());
 }
 
