@@ -25,7 +25,6 @@
 
     <section id="player-selection-card" class="card hidden">
       <h2>Player Selection</h2>
-      <p class="hint">Select a player to enter or update scores.</p>
       <div class="form-row">
         <label for="player-select">Select Player</label>
         <select id="player-select"></select>

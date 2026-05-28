@@ -163,7 +163,7 @@ export async function initScoresPage() {
       playerFileInfo.classList.add('hidden');
       return;
     }
-    playerFileInfo.textContent = `Selected player: ${player.player_name}`;
+    playerFileInfo.textContent = player.player_name;
     playerFileInfo.classList.remove('hidden');
   }
 
@@ -186,15 +186,12 @@ export async function initScoresPage() {
       framesInput.querySelectorAll('input').forEach((input) => (input.disabled = true));
       scoringCard.classList.add('hidden');
       resultsCard.classList.add('hidden');
-      resultsPanel.classList.add('hidden');
-      resultsEmpty.classList.add('hidden');
       return;
     }
 
     warning.classList.add('hidden');
     scoringCard.classList.remove('hidden');
     resultsCard.classList.remove('hidden');
-    resultsPanel.classList.remove('hidden');
     framesInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
     
     const scores = await PB_API.getScores(Number(activePlayerId), Number(getActiveEventId()));
@@ -257,9 +254,12 @@ export async function initScoresPage() {
       playerSelectionCard.classList.add('hidden');
       scoringCard.classList.add('hidden');
       resultsCard.classList.add('hidden');
-      resultsPanel.classList.add('hidden');
       return;
     }
+
+    // Reset visibility of lower cards while we load the new event context
+    scoringCard.classList.add('hidden');
+    resultsCard.classList.add('hidden');
 
     machines = await PB_API.getTargetScores(eventId);
 
