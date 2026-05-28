@@ -1,4 +1,4 @@
-import { PB_API, ADMIN_PASSWORD } from './api.js';
+import { PB_API } from './api.js';
 
 /**
  * Initializes the Player Management page.
@@ -115,12 +115,12 @@ export async function initPlayersPage() {
 
     if (!name) return;
 
-    if (ADMIN_PASSWORD) {
+    if (window.PB_ADMIN_PASSWORD) {
       const confirmation = prompt(`Enter Admin Password to ${id ? 'update' : 'create'} player "${name}":`);
       if (confirmation === null) { // User cancelled
         alert('Admin action cancelled.');
         return;
-      } else if (confirmation !== ADMIN_PASSWORD) { // Incorrect password
+      } else if (confirmation !== window.PB_ADMIN_PASSWORD) { // Incorrect password
         alert('Incorrect Admin Password.');
         return;
       }
@@ -151,12 +151,12 @@ export async function initPlayersPage() {
     const player = players.find(p => String(p.id) === selectedId);
     if (!player) return;
     
-    if (ADMIN_PASSWORD) {
+    if (window.PB_ADMIN_PASSWORD) {
       const confirmation = prompt(`Enter Admin Password to confirm deletion of ${player.player_name} (and all their scores):`);
       if (confirmation === null) { // User cancelled
         alert('Admin action cancelled.');
         return;
-      } else if (confirmation !== ADMIN_PASSWORD) { // Incorrect password
+      } else if (confirmation !== window.PB_ADMIN_PASSWORD) { // Incorrect password
         alert('Incorrect Admin Password.');
         return;
       }

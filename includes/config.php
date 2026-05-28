@@ -58,11 +58,11 @@ $loadedEnv = loadEnvFile(__DIR__ . '/../.env');
  */
 function envValue(array $env, array $names, $default = null) {
     foreach ($names as $name) {
-        if (isset($env[$name]) && $env[$name] !== '') {
+        if (array_key_exists($name, $env)) {
             return $env[$name];
         }
         $value = getenv($name);
-        if ($value !== false && $value !== '') {
+        if ($value !== false) {
             return $value;
         }
     }

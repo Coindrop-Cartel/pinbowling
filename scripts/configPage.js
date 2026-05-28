@@ -1,4 +1,4 @@
-import { PB_API, ADMIN_PASSWORD } from './api.js';
+import { PB_API } from './api.js';
 import { BowlingEngine } from './engine.js';
 import { getActiveEventId, renderPreview, applyScoreFormatting, formatNumber, printMachineScores } from './utils.js';
 import { initTournamentSelector } from './tournamentSelector.js';
@@ -165,12 +165,12 @@ export async function initConfigPage() {
     if (!frame_number || !machine_name || (!score10 && !score1) || !eventId) return;
 
     const values = BowlingEngine.buildFrameValues(score10, score1);
-    if (ADMIN_PASSWORD) {
+    if (window.PB_ADMIN_PASSWORD) {
       const confirmation = prompt(`Enter Admin Password to save changes for Frame ${frame_number}:`);
       if (confirmation === null) { // User cancelled
         alert('Admin action cancelled.');
         return;
-      } else if (confirmation !== ADMIN_PASSWORD) { // Incorrect password
+      } else if (confirmation !== window.PB_ADMIN_PASSWORD) { // Incorrect password
         alert('Incorrect Admin Password.');
         return;
       }
