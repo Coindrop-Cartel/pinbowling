@@ -4,26 +4,45 @@ import { getScoringEngine } from './engine.js';
  * Utility functions and state management helpers.
  */
 
-export const ACTIVE_LEAGUE_KEY = "pinbowling-active-league-id";
-export const ACTIVE_EVENT_KEY = "pinbowling-active-event-id";
-
-export const getActiveLeagueId = () => localStorage.getItem(ACTIVE_LEAGUE_KEY);
-export const setActiveLeagueId = (id) => id ? localStorage.setItem(ACTIVE_LEAGUE_KEY, id) : localStorage.removeItem(ACTIVE_LEAGUE_KEY);
-export const getActiveEventId = () => localStorage.getItem(ACTIVE_EVENT_KEY);
-export const setActiveEventId = (id) => id ? localStorage.setItem(ACTIVE_EVENT_KEY, id) : localStorage.removeItem(ACTIVE_EVENT_KEY);
-
 /**
- * Synchronizes leagueId and eventId from URL parameters into local storage.
- * This ensures deep links or shared URLs correctly set the application state.
+ * State helpers that prioritize URL parameters for sharing and consistency.
  */
-export function syncUrlParams() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const leagueId = urlParams.get('leagueId');
-  const eventId = urlParams.get('eventId');
-
-  if (leagueId) setActiveLeagueId(leagueId);
-  if (eventId) setActiveEventId(eventId);
+export function getActiveLeagueId() {
+  return new URLSearchParams(window.location.search).get('leagueId');
 }
+
+export function setActiveLeagueId(id) {
+  const url = new URL(window.location);
+  if (id) url.searchParams.set('leagueId', id);
+  else url.searchParams.delete('leagueId');
+  window.history.replaceState({}, '', url);
+  initNavigation();
+}
+
+export function getActiveEventId() {
+  return new URLSearchParams(window.location.search).get('eventId');
+}
+
+export function setActiveEventId(id) {
+  const url = new URL(window.location);
+  if (id) url.searchParams.set('eventId', id);
+  else url.searchParams.delete('eventId');
+  window.history.replaceState({}, '', url);
+  initNavigation();
+}
+
+export function getCurrentPlayerId() {
+  return new URLSearchParams(window.location.search).get('playerId');
+}
+
+export function setCurrentPlayerId(playerId) {
+  const url = new URL(window.location);
+  if (playerId) url.searchParams.set('playerId', playerId);
+  else url.searchParams.delete('playerId');
+  window.history.replaceState({}, '', url);
+  initNavigation();
+}
+
 
 /**
  * Formats a number with locale-specific thousands separators.
@@ -64,8 +83,26 @@ export function applyScoreFormatting(input) {
  */
 export function initNavigation() {
   const currentPath = window.location.pathname.split('/').pop() || 'index.php';
+  const urlParams = new URLSearchParams(window.location.search);
+
   document.querySelectorAll('.nav-item').forEach(link => {
-    if (link.getAttribute('href') === currentPath) {
+    const href = link.getAttribute('href');
+    if (href && !href.startsWith('http') && !href.startsWith('#')) {
+      const [path, existingQuery] = href.split('?');
+      const targetParams = new URLSearchParams(existingQuery);
+      
+      // Carry over global state params to navigation links
+      ['leagueId', 'eventId', 'playerId'].forEach(key => {
+        if (urlParams.has(key) && !targetParams.has(key)) {
+          targetParams.set(key, urlParams.get(key));
+        }
+      });
+      
+      const newQuery = targetParams.toString();
+      link.setAttribute('href', path + (newQuery ? '?' + newQuery : ''));
+    }
+
+    if (href === currentPath) {
       link.classList.add('active');
     }
   });

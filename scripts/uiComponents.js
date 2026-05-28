@@ -95,19 +95,24 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
       if (activeLeague) {
         leagueName = activeLeague.name;
         const activeEvent = (activeLeague.events || []).find(e => String(e.id) === String(activeEventId));
+        
         if (activeEvent) {
           eventName = `${activeEvent.event_name} (${activeEvent.event_date || 'No Date'})`;
         } else if (activeEventId !== 'summary') {
-          // If event not found in the active league, clear event ID
-          setActiveEventId('');
-          eventName = 'Invalid Event Selected';
+          // Only clear if we are sure this event doesn't exist anywhere
+          const eventExistsAnywhere = leagues.some(l => (l.events || []).some(e => String(e.id) === String(activeEventId)));
+          if (!eventExistsAnywhere) {
+            console.warn(`Event ID ${activeEventId} not found in any league. Clearing selection.`);
+            setActiveEventId('');
+            eventName = 'Invalid Event Selected';
+          } else {
+            eventName = 'Loading Event Details...';
+          }
         }
-      } else if (activeLeagueId) {
+      } else if (activeLeagueId && !activeEventId) {
         // If league not found, clear both
         setActiveLeagueId('');
-        setActiveEventId('');
         leagueName = 'Invalid League Selected';
-        eventName = 'No Event Selected';
       }
     } catch (error) {
       console.error('Error fetching league/event details for read-only display:', error);

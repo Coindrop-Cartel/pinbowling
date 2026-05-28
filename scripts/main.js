@@ -5,8 +5,7 @@
  */
 
 import { 
-  initNavigation,
-  syncUrlParams
+  initNavigation
 } from './utils.js';
 import { initMachinesPage } from './machinesPage.js';
 import { initLocationsPage } from './locationsPage.js';
@@ -25,7 +24,6 @@ import { initLeaguesPage } from './leaguesPage.js';
  * for the current view context.
  */
 function ready() {
-  syncUrlParams(); // Process URL parameters first to set state
   initNavigation(); // From utils.js
   if (document.getElementById('machine-form')) {
     initMachinesPage();

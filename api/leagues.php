@@ -64,7 +64,7 @@ if ($method === 'GET') {
         // Group events by their league_id
         $eventsByLeague = [];
         foreach ($allEvents as $event) {
-            $eventsByLeague[$event['league_id']][] = $event;
+            $eventsByLeague[(int)$event['league_id']][] = $event;
         }
 
         // Group players by league_id
@@ -77,8 +77,8 @@ if ($method === 'GET') {
 
         // Attach events to their corresponding leagues
         foreach ($leagues as &$league) {
-            $league['events'] = $eventsByLeague[$league['id']] ?? [];
-            $league['players'] = $playersByLeague[$league['id']] ?? [];
+            $league['events'] = $eventsByLeague[(int)$league['id']] ?? [];
+            $league['players'] = $playersByLeague[(int)$league['id']] ?? [];
         }
 
         sendJson($leagues);

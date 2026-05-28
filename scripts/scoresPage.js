@@ -1,6 +1,6 @@
-import { PB_API, setCurrentPlayerId, getCurrentPlayerId } from './api.js';
+import { PB_API } from './api.js';
 import { getScoringEngine } from './engine.js';
-import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, printBlankScoreSheet } from './utils.js';
+import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, printBlankScoreSheet, setCurrentPlayerId, getCurrentPlayerId } from './utils.js';
 import { initTournamentSelector } from './tournamentSelector.js';
 import { createSearchableSelect } from './uiComponents.js';
 
@@ -28,8 +28,6 @@ export async function initScoresPage() {
   // Prepare for multiple scoring formats; default to bowling for now.
   const Engine = getScoringEngine('bowling');
 
-  // Ensure selection starts empty on page initialization
-  setCurrentPlayerId('');
   if (printSheetBtn) {
     printSheetBtn.addEventListener('click', () => {
       printBlankScoreSheet(machines);

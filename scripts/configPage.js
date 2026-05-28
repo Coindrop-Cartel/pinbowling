@@ -205,11 +205,11 @@ export async function initConfigPage() {
     // Find the location associated with the current event to filter machine suggestions
     let locationId = null;
     if (eventId) {
-      const leagues = await PB_API.getLeagues();
-      for (const league of leagues) {
-        const event = (league.events || []).find(e => String(e.id) === String(eventId));
-        if (event) {
-          locationId = event.location_id;
+      const leaguesData = await PB_API.getLeagues();
+      for (const league of leaguesData) {
+        const eventMatch = (league.events || []).find(e => String(e.id) === String(eventId));
+        if (eventMatch) {
+          locationId = eventMatch.location_id;
           break;
         }
       }
