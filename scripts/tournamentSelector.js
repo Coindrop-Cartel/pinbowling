@@ -11,20 +11,20 @@ export async function initTournamentSelector(onRefresh) {
 
   container.innerHTML = `
     <section class="card tournament-selector" style="margin-bottom: 1.5rem;">
-      <div class="form-row" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+      <div class="form-row" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; width: 100%;">
         <div style="flex: 1; min-width: 200px;">
-          <label>League Search</label>
-          <input type="text" id="league-search-global" placeholder="Type to filter..." autocomplete="off">
+          <label style="display: block; margin-bottom: 5px;">League Search</label>
+          <input type="text" id="league-search-global" style="width: 100%; box-sizing: border-box;" placeholder="Type to filter..." autocomplete="off">
         </div>
         <div style="flex: 1; min-width: 200px;">
-          <label for="league-select-global">Select League</label>
-          <select id="league-select-global">
+          <label for="league-select-global" style="display: block; margin-bottom: 5px;">Select League</label>
+          <select id="league-select-global" style="width: 100%; box-sizing: border-box;">
             <option value="">-- Choose League --</option>
           </select>
         </div>
-        <div id="event-select-wrapper" style="flex: 1; min-width: 200px;" class="hidden">
-          <label for="event-select-global">Event</label>
-          <select id="event-select-global">
+        <div id="event-select-wrapper" style="flex: 1; min-width: 200px; width: 100%;" class="hidden">
+          <label for="event-select-global" style="display: block; margin-bottom: 5px;">Event</label>
+          <select id="event-select-global" style="width: 100%; box-sizing: border-box;">
             <option value="">Select Event</option>
           </select>
         </div>
@@ -80,7 +80,21 @@ export async function initTournamentSelector(onRefresh) {
     });
   };
 
-  searchInput.addEventListener('input', (e) => updateLeagueOptions(e.target.value));
+  searchInput.addEventListener('input', (e) => {
+    const filter = e.target.value;
+    updateLeagueOptions(filter);
+
+    // If they type a name that matches exactly, auto-select it to "update as they type"
+    const match = leagues.find(l => l.name.toLowerCase() === filter.toLowerCase());
+    if (match && String(leagueSelect.value) !== String(match.id)) {
+      leagueSelect.value = match.id;
+      setActiveLeagueId(match.id);
+      setActiveEventId('');
+      populateEvents(match.id);
+      updateLeagueOptions(filter);
+      if (onRefresh) onRefresh();
+    }
+  });
 
   leagueSelect.addEventListener('change', () => {
     const leagueId = leagueSelect.value;
