@@ -44,6 +44,14 @@
             <input type="text" id="value-1" placeholder="e.g. 5,000,000" />
           </div>
         </div>
+        <div class="form-row" id="quick-fill-row" style="margin-top: -10px; margin-bottom: 20px;">
+          <label>Quick Fill Strike Target (Venue Defaults)</label>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" id="fill-easy" class="secondary" style="flex: 1; padding: 8px; font-size: 0.8rem;" disabled>Easy</button>
+            <button type="button" id="fill-med" class="secondary" style="flex: 1; padding: 8px; font-size: 0.8rem;" disabled>Medium</button>
+            <button type="button" id="fill-hard" class="secondary" style="flex: 1; padding: 8px; font-size: 0.8rem;" disabled>Hard</button>
+          </div>
+        </div>
         <div id="preview-container" style="margin-top: 10px;">
           <label>Calculated Thresholds Preview:</label>
           <div id="preview-values" class="notice">

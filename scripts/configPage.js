@@ -17,6 +17,11 @@ export async function initConfigPage() {
   const printMachinesBtn = document.getElementById('print-machines-btn');
   let machineSearch;
 
+  const btnEasy = document.getElementById('fill-easy');
+  const btnMed = document.getElementById('fill-med');
+  const btnHard = document.getElementById('fill-hard');
+  let selectedMachineTargets = null;
+
   const score10Input = document.getElementById('value-10');
   const score1Input = document.getElementById('value-1');
   const previewValues = document.getElementById('preview-values');
@@ -75,11 +80,35 @@ export async function initConfigPage() {
     nameInput.after(machineSelect);
   }
 
+  const updateQuickFillState = (machineName) => {
+    const match = currentSuggestedMachines.find(m => m.machine_name === machineName);
+    selectedMachineTargets = match ? { easy: match.target_easy, med: match.target_med, hard: match.target_hard } : null;
+    
+    btnEasy.disabled = !selectedMachineTargets?.easy;
+    btnMed.disabled = !selectedMachineTargets?.med;
+    btnHard.disabled = !selectedMachineTargets?.hard;
+  };
+
   machineSearch = createSearchableSelect(document.getElementById('machine-name'), machineSelect, currentSuggestedMachines, {
     valueKey: 'machine_name',
     labelKey: 'machine_name',
     placeholder: '-- Choose machine --',
-    onSelect: () => markDirty()
+    onSelect: (val) => {
+      updateQuickFillState(val);
+      markDirty();
+    }
+  });
+
+  [btnEasy, btnMed, btnHard].forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.id.replace('fill-', '');
+      const val = selectedMachineTargets?.[type];
+      if (val) {
+        score10Input.value = formatNumber(val);
+        renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast());
+        markDirty();
+      }
+    });
   });
 
   score10Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast()));
@@ -153,6 +182,7 @@ export async function initConfigPage() {
         score10Input.value = round.values[10] ? formatNumber(round.values[10]) : '';
         score1Input.value = round.values[1] ? formatNumber(round.values[1]) : '';
         machineSearch.updateOptions(round.machine_name);
+        updateQuickFillState(round.machine_name);
         renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast());
         configCard.classList.remove('hidden');
         window.scrollTo(0, 0);
@@ -227,6 +257,7 @@ export async function initConfigPage() {
     // Clear search text on fresh load/navigation
     document.getElementById('machine-name').value = '';
     machineSearch.updateOptions('');
+    updateQuickFillState('');
 
     eventTargets = eventId ? await PB_API.getTargetScores(eventId) : [];
     await render();
@@ -238,6 +269,7 @@ export async function initConfigPage() {
     form.reset();
     submitBtn.disabled = true;
     machineSearch.updateOptions('');
+    updateQuickFillState('');
     renderPreview(score10Input, score1Input, previewValues, Engine);
   }
   document.getElementById('cancel-config-btn').onclick = resetForm;
