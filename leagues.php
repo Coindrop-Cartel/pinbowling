@@ -23,7 +23,7 @@
         </div>
         <div class="form-row">
           <label for="league-start-date">Start Date</label>
-          <input id="league-start-date" type="date" />
+          <input id="league-start-date" type="date" required />
         </div>
         <div class="form-actions">
           <button type="submit" id="create-league-btn" disabled>Create League</button>

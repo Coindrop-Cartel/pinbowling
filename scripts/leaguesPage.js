@@ -75,14 +75,24 @@ export async function initLeaguesPage() {
 
     // Duplicate Name Prevention
     const exactMatch = allLeagues.find(l => l.name.trim().toLowerCase() === query);
-    createBtn.disabled = !query || !!exactMatch;
-    createBtn.title = exactMatch ? "A league with this name already exists." : "";
+    const dateVal = leagueDateInput.value;
+    createBtn.disabled = !query || !dateVal || !!exactMatch;
+    
+    if (exactMatch) {
+      createBtn.title = "A league with this name already exists.";
+    } else if (query && !dateVal) {
+      createBtn.title = "Start date is required.";
+    } else {
+      createBtn.title = "";
+    }
   };
 
   filterInstance = setupLiveFilter(leagueNameInput, allLeagues, {
     labelKey: 'name',
     onFilter: onFilterUpdate
   });
+
+  leagueDateInput.addEventListener('input', () => filterInstance.performFilter());
 
   const refresh = async () => {
     try {
