@@ -1,4 +1,5 @@
 import { PB_API } from './api.js';
+import { applyScoreFormatting, formatNumber } from './utils.js';
 
 /**
  * Logic for managing league locations/venues.
@@ -66,7 +67,7 @@ export function initLocationsPage() {
           locDiv.querySelector('.add-mach-btn').onclick = () => showMachineForm(loc.id, loc.name);
           locDiv.querySelector('.delete-loc-btn').onclick = () => window.deleteLocation(loc.id);
 
-          renderMachinesForLocation(loc.id, loc.machines);
+          renderMachinesForLocation(loc.id, loc.name, loc.machines);
         }
       } else {
         emptyNotice.classList.remove('hidden');
@@ -100,13 +101,14 @@ export function initLocationsPage() {
     cancelBtn.classList.add('hidden');
   }
 
-  async function renderMachinesForLocation(locationId, machines = null) {
+  async function renderMachinesForLocation(locationId, locationName, machines = null) {
     const inner = document.querySelector(`#mach-for-loc-${locationId} .mach-list-inner`);
     const empty = document.querySelector(`#mach-for-loc-${locationId} .mach-empty`);
     inner.innerHTML = '';
 
     if (!machines) {
-      const loc = await PB_API.getLocations().then(all => all.find(l => l.id === locationId));
+      const all = await PB_API.getLocations();
+      const loc = all.find(l => l.id === locationId);
       machines = loc.machines || [];
     }
 
@@ -122,44 +124,78 @@ export function initLocationsPage() {
       const item = document.createElement('div');
       item.className = 'event-item';
       item.innerHTML = `
-        <span>${m.machine_name}</span>
-        <button class="secondary">Remove</button>
+        <span>
+          ${m.machine_name}<br>
+          <small>E: ${formatNumber(m.target_easy)} | M: ${formatNumber(m.target_med)} | H: ${formatNumber(m.target_hard)}</small>
+        </span>
+        <div>
+          <button class="edit-mach-btn secondary">Edit</button>
+          <button class="remove-mach-btn">Remove</button>
+        </div>
       `;
-      item.querySelector('button').onclick = async () => {
-        if (!confirm(`Remove ${m.machine_name} from this location?`)) return;
-        await PB_API.removeLocationMachine(locationId, m.machine_id);
-        renderLocations();
+      item.querySelector('.edit-mach-btn').onclick = () => showMachineForm(locationId, locationName, m);
+      item.querySelector('.remove-mach-btn').onclick = async () => {
+        if (confirm(`Remove ${m.machine_name} from this location?`)) {
+          await PB_API.removeLocationMachine(locationId, m.machine_id);
+          renderLocations();
+        }
       };
       inner.appendChild(item);
     });
   }
 
-  async function showMachineForm(locationId, locationName) {
+ async function showMachineForm(locationId, locationName, existing = null) {
     const allMachines = await PB_API.getMachines();
     machineFormCard.innerHTML = `
-      <h2>Add Machine to ${locationName}</h2>
+      <h2>${existing ? 'Edit' : 'Add'} Machine for ${locationName}</h2>
       <div class="form-row">
         <label>Select Machine</label>
-        <select id="loc-mach-select">
+        <select id="loc-mach-select" ${existing ? 'disabled' : ''}>
           <option value="">Choose machine...</option>
-          ${allMachines.map(m => `<option value="${m.id}">${m.machine_name}</option>`).join('')}
+          ${allMachines.map(m => `<option value="${m.id}" ${existing?.machine_id == m.id ? 'selected' : ''}>${m.machine_name}</option>`).join('')}
         </select>
       </div>
+      <div class="form-row">
+        <label>Target Score: Easy</label>
+        <input type="text" id="target-easy" value="${existing ? formatNumber(existing.target_easy) : ''}">
+      </div>
+      <div class="form-row">
+        <label>Target Score: Medium</label>
+        <input type="text" id="target-med" value="${existing ? formatNumber(existing.target_med) : ''}">
+      </div>
+      <div class="form-row">
+        <label>Target Score: Hard</label>
+        <input type="text" id="target-hard" value="${existing ? formatNumber(existing.target_hard) : ''}">
+      </div>
       <div class="form-actions">
-        <button id="save-loc-mach">Add to Location</button>
+       <button id="save-loc-mach">${existing ? 'Update' : 'Add to'} Location</button>
         <button id="cancel-loc-mach" class="secondary">Cancel</button>
       </div>
     `;
     machineFormCard.classList.remove('hidden');
     window.scrollTo(0, document.body.scrollHeight);
 
+    applyScoreFormatting(document.getElementById('target-easy'));
+    applyScoreFormatting(document.getElementById('target-med'));
+    applyScoreFormatting(document.getElementById('target-hard'));
+
     document.getElementById('cancel-loc-mach').onclick = () => machineFormCard.classList.add('hidden');
     document.getElementById('save-loc-mach').onclick = async () => {
       const machineId = document.getElementById('loc-mach-select').value;
       if (!machineId) return;
-      await PB_API.addLocationMachine(locationId, machineId);
-      machineFormCard.classList.add('hidden');
-      renderLocations();
+      const extra = {
+        target_easy: Number(document.getElementById('target-easy').value.replace(/\D/g, '')) || 0,
+        target_med: Number(document.getElementById('target-med').value.replace(/\D/g, '')) || 0,
+        target_hard: Number(document.getElementById('target-hard').value.replace(/\D/g, '')) || 0,
+      };
+
+      try {
+        await PB_API.addLocationMachine(locationId, machineId, extra);
+        machineFormCard.classList.add('hidden');
+        renderLocations();
+      } catch (err) {
+        alert(`Failed to save machine: ${err.message}`);
+      }
     };
   }
 
