@@ -176,6 +176,7 @@ export async function initScoresPage() {
           await refreshPlayerSelection();
         }
       });
+      playerSearchInstance.updateOptions('');
     } else {
       playerSearchInstance.updateOptions('');
     }
