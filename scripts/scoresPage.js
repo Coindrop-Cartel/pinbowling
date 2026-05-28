@@ -192,10 +192,10 @@ export async function initScoresPage() {
     
     const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
 
-    framesInput.innerHTML = '';
+    roundsInput.innerHTML = '';
     machines.forEach((round) => {
       const turnValues = scoreMap[String(round.order_number)];
-      framesInput.appendChild(buildRoundRow(round, turnValues, round.order_number === maxOrder));
+      roundsInput.appendChild(buildRoundRow(round, turnValues, round.order_number === maxOrder));
     });
   }
 
