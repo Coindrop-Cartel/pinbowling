@@ -2,6 +2,7 @@ import { PB_API, setCurrentPlayerId, getCurrentPlayerId } from './api.js';
 import { BowlingEngine } from './engine.js';
 import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, printBlankScoreSheet } from './utils.js';
 import { initTournamentSelector } from './tournamentSelector.js';
+import { createSearchableSelect } from './uiComponents.js';
 
 /**
  * Initializes the Player Scoring page.
@@ -19,6 +20,8 @@ export async function initScoresPage() {
   const scoringCard = document.getElementById('scoring-card');
   const resultsCard = document.getElementById('results-card');
 
+  let playerSearchInstance = null;
+  let allPlayersCache = [];
   let machines = [];
   const printSheetBtn = document.getElementById('print-sheet-btn');
 
@@ -62,11 +65,20 @@ export async function initScoresPage() {
     }
 
     row.innerHTML = `
-      <div class="frame-info">
-        <div class="frame-label">Order ${frame.order_number}</div>
+      <div class="frame-info" style="cursor: pointer;">
+        <div class="frame-label">Frame ${frame.order_number}</div>
         <div class="frame-machine">${frame.machine_name}</div>
         <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;">Strike: <b>${formatNumber(frame.values[10])}</b></div>
         ${extraTargets}
+        <div class="target-details hidden" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;">
+          <div style="font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; color: #666;">Scoring Thresholds</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+            ${Object.entries(frame.values)
+              .sort((a, b) => Number(b[0]) - Number(a[0]))
+              .map(([rank, val]) => `<div style="font-size: 0.8rem;"><b>${rank}:</b> ${formatNumber(val)}</div>`)
+              .join('')}
+          </div>
+        </div>
       </div>
       <div class="frame-inputs-container"></div>
       <button class="save-frame-button" disabled>Save</button>
@@ -74,6 +86,10 @@ export async function initScoresPage() {
 
     const inputsContainer = row.querySelector('.frame-inputs-container');
     const saveBtn = row.querySelector('.save-frame-button');
+
+    row.querySelector('.frame-info').addEventListener('click', () => {
+      row.querySelector('.target-details').classList.toggle('hidden');
+    });
 
     for (let ball = 1; ball <= 3; ball += 1) {
       const value = rollValues?.[`ball${ball}`] ?? '';
@@ -129,22 +145,40 @@ export async function initScoresPage() {
   async function renderPlayerSelect() {
     // Fetch the global player registry to ensure consistency with the scoreboard
     const players = await PB_API.getPlayers();
+    allPlayersCache.length = 0;
+    allPlayersCache.push(...players);
 
     const currentPlayerId = getCurrentPlayerId();
 
-    playerSelect.innerHTML = '';
+    if (!playerSearchInstance) {
+      let searchInput = document.getElementById('player-search');
+      if (!searchInput) {
+        searchInput = document.createElement('input');
+        searchInput.id = 'player-search';
+        searchInput.type = 'text';
+        searchInput.placeholder = 'Type to search player...';
+        searchInput.style.width = '100%';
+        searchInput.style.marginBottom = '10px';
+        searchInput.style.boxSizing = 'border-box';
+        playerSelect.before(searchInput);
+      }
 
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = players.length === 0 ? 'No players configured' : 'Select a player';
-    playerSelect.appendChild(placeholder);
-
-    players.forEach((player) => {
-      const option = document.createElement('option');
-      option.value = String(player.id);
-      option.textContent = player.player_name;
-      playerSelect.appendChild(option);
-    });
+      playerSearchInstance = createSearchableSelect(searchInput, playerSelect, allPlayersCache, {
+        valueKey: 'id',
+        labelKey: 'player_name',
+        placeholder: players.length === 0 ? 'No players configured' : 'Select a player',
+        onSelect: async (val) => {
+          if (!val) {
+            setCurrentPlayerId('');
+          } else {
+            setCurrentPlayerId(val);
+          }
+          await refreshPlayerSelection();
+        }
+      });
+    } else {
+      playerSearchInstance.updateOptions('');
+    }
 
     if (currentPlayerId && players.some((player) => String(player.id) === currentPlayerId)) {
       playerSelect.value = currentPlayerId;
@@ -188,16 +222,6 @@ export async function initScoresPage() {
     renderCurrentResults();
   }
 
-  playerSelect.addEventListener('change', async () => {
-    const selectedId = playerSelect.value;
-    if (!selectedId) {
-      setCurrentPlayerId('');
-    } else {
-      setCurrentPlayerId(selectedId);
-    }
-    await refreshPlayerSelection();
-  });
-
   function getScoreMapFromInputs() {
     const scoreMap = {};
     framesInput.querySelectorAll('.frame-row').forEach((row) => {
@@ -221,7 +245,7 @@ export async function initScoresPage() {
           runningTotal += result.score;
           return `
         <tr>
-          <td>${result.frame}</td>
+          <td>${result.order}</td>
           <td>${result.machine}</td>
           <td>${result.mark}</td>
           <td>${formatNumber(runningTotal)}</td>
@@ -245,7 +269,7 @@ export async function initScoresPage() {
       resultsCard.classList.add('hidden');
       return;
     }
-
+    
     // Reset visibility of lower cards while we load the new event context
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
@@ -262,6 +286,16 @@ export async function initScoresPage() {
       return;
     }
     await refreshPlayerSelection();
+
+    // Update the results table header to use "Frame" (mapping data from order_number)
+    const resultsTableHeader = resultsPanel.querySelector('thead tr');
+    if (resultsTableHeader) {
+      const frameHeader = resultsTableHeader.querySelector('th:first-child');
+      if (frameHeader) {
+        frameHeader.textContent = 'Frame';
+      }
+    }
+
   };
 
   await initTournamentSelector(refresh);
