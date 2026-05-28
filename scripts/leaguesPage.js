@@ -54,29 +54,40 @@ export async function initLeaguesPage() {
       const leagueDiv = document.createElement('div');
       leagueDiv.className = 'card league-item';
       leagueDiv.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <h3>${league.name} <small>(${league.start_date || 'No Start Date'})</small></h3>
+        <div class="league-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0;">${league.name} <small>(${league.start_date || 'No Start Date'})</small></h3>
           <div>
-            <button class="add-event-btn secondary">Add Event</button>
-            <button class="add-player-btn secondary">Add Player</button>
             <button class="edit-league-btn secondary">Edit</button>
             <button class="delete-league-btn">Delete</button>
           </div>
         </div>
-        <div class="league-details-columns" style="display: flex; gap: 2rem; flex-wrap: wrap;">
-          <div class="events-list" id="events-for-league-${league.id}" style="flex: 1; min-width: 300px;">
-            <h4>Events:</h4>
-            <div class="events-list-inner"></div>
-            <div class="notice events-empty hidden">No events for this league.</div>
+        <div class="league-details hidden" style="margin-top: 20px; border-top: 2px solid var(--pb-black); padding-top: 20px;">
+          <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <button class="add-event-btn secondary">Add Event</button>
+            <button class="add-player-btn secondary">Add Player</button>
           </div>
-          <div class="roster-list" id="roster-for-league-${league.id}" style="flex: 1; min-width: 300px;">
-            <h4>Players:</h4>
-            <div class="roster-list-inner"></div>
-            <div class="notice roster-empty hidden">No players assigned to this league.</div>
+          <div class="league-details-columns" style="display: flex; gap: 2rem; flex-wrap: wrap;">
+            <div class="events-list" id="events-for-league-${league.id}" style="flex: 1; min-width: 300px;">
+              <h4>Events:</h4>
+              <div class="events-list-inner"></div>
+              <div class="notice events-empty hidden">No events for this league.</div>
+            </div>
+            <div class="roster-list" id="roster-for-league-${league.id}" style="flex: 1; min-width: 300px;">
+              <h4>Players:</h4>
+              <div class="roster-list-inner"></div>
+              <div class="notice roster-empty hidden">No players assigned to this league.</div>
+            </div>
           </div>
         </div>
       `;
       leaguesListDiv.appendChild(leagueDiv);
+
+      // Toggle logic: Click the header (but not the buttons) to expand
+      leagueDiv.querySelector('.league-header').onclick = (e) => {
+        if (e.target.closest('button')) return;
+        const details = leagueDiv.querySelector('.league-details');
+        details.classList.toggle('hidden');
+      };
 
       leagueDiv.querySelector('.add-event-btn').addEventListener('click', () => {
         showEventForm(league.id, league.name);
@@ -188,6 +199,8 @@ export async function initLeaguesPage() {
       eventDateInput.value = '';
       eventLocationSelect.value = '';
     }
+
+    eventFormCard.scrollIntoView({ behavior: 'smooth' });
   }
 
   async function showRosterForm(leagueId, leagueName) {
@@ -207,7 +220,7 @@ export async function initLeaguesPage() {
         </div>
     `;
     rosterFormCard.classList.remove('hidden');
-    window.scrollTo(0, document.body.scrollHeight);
+    rosterFormCard.scrollIntoView({ behavior: 'smooth' });
 
     document.getElementById('cancel-roster').onclick = () => rosterFormCard.classList.add('hidden');
     document.getElementById('save-league-player').onclick = async () => {

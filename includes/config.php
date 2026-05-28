@@ -121,8 +121,14 @@ function initDatabase() {
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS Locations (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL
+        name VARCHAR(255) NOT NULL,
+        city VARCHAR(100) DEFAULT NULL,
+        state VARCHAR(50) DEFAULT NULL
     )");
+
+    try {
+        $pdo->exec("ALTER TABLE Locations ADD COLUMN city VARCHAR(100) DEFAULT NULL, ADD COLUMN state VARCHAR(50) DEFAULT NULL");
+    } catch (PDOException $e) { /* Columns likely already exist */ }
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS Machines (
         id INT AUTO_INCREMENT PRIMARY KEY,

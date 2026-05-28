@@ -5,24 +5,36 @@ import { PB_API } from './api.js';
  */
 export function initLocationsPage() {
   const form = document.getElementById('location-form');
+  const formTitle = document.getElementById('location-form-title');
+  const editingIdInput = document.getElementById('editing-location-id');
   const list = document.getElementById('locations-list');
   const emptyNotice = document.getElementById('locations-list-empty');
   const machineFormCard = document.getElementById('location-machine-form-card');
 
+  const nameInput = document.getElementById('location-name');
+  const cityInput = document.getElementById('location-city');
+  const stateInput = document.getElementById('location-state');
+  const saveBtn = document.getElementById('save-location-button');
+  const cancelBtn = document.getElementById('cancel-loc-edit-button');
+
+  let allLocations = [];
+
   const renderLocations = async () => {
     try {
-      const locations = await PB_API.getLocations();
+      allLocations = await PB_API.getLocations();
       list.innerHTML = '';
 
-      if (locations && locations.length > 0) {
+      if (allLocations && allLocations.length > 0) {
         emptyNotice.classList.add('hidden');
-        for (const loc of locations) {
+        for (const loc of allLocations) {
+          const cityState = (loc.city && loc.state) ? ` (${loc.city}, ${loc.state})` : '';
           const locDiv = document.createElement('div');
           locDiv.className = 'card league-item'; 
           locDiv.innerHTML = `
             <div class="location-header" style="display: flex; justify-content: space-between; align-items: center;">
-              <h3 style="margin: 0;">${loc.name} <span class="mach-count-pill">(${loc.machines?.length || 0})</span></h3>
+              <h3 style="margin: 0;">${loc.name}${cityState} Machines: <span class="mach-count-pill">(${loc.machines?.length || 0})</span></h3>
               <div>
+                <button class="edit-loc-btn secondary">Edit</button>
                 <button class="delete-loc-btn">Delete</button>
               </div>
             </div>
@@ -47,6 +59,7 @@ export function initLocationsPage() {
             details.classList.toggle('hidden');
           };
 
+          locDiv.querySelector('.edit-loc-btn').onclick = () => editLocation(loc.id);
           locDiv.querySelector('.add-mach-btn').onclick = () => showMachineForm(loc.id, loc.name);
           locDiv.querySelector('.delete-loc-btn').onclick = () => window.deleteLocation(loc.id);
 
@@ -55,10 +68,34 @@ export function initLocationsPage() {
       } else {
         emptyNotice.classList.remove('hidden');
       }
+      resetForm();
     } catch (err) {
       console.error('Failed to load locations:', err);
     }
   };
+
+  function editLocation(locId) {
+    const loc = allLocations.find(l => l.id === locId);
+    if (!loc) return;
+
+    editingIdInput.value = loc.id;
+    nameInput.value = loc.name;
+    cityInput.value = loc.city || '';
+    stateInput.value = loc.state || '';
+
+    formTitle.textContent = `Edit Location: ${loc.name}`;
+    saveBtn.textContent = 'Update Location';
+    cancelBtn.classList.remove('hidden');
+    window.scrollTo(0, 0);
+  }
+
+  function resetForm() {
+    editingIdInput.value = '';
+    form.reset();
+    formTitle.textContent = 'Add New Location';
+    saveBtn.textContent = 'Add Location';
+    cancelBtn.classList.add('hidden');
+  }
 
   async function renderMachinesForLocation(locationId, machines = null) {
     const inner = document.querySelector(`#mach-for-loc-${locationId} .mach-list-inner`);
@@ -125,13 +162,16 @@ export function initLocationsPage() {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const nameInput = document.getElementById('location-name');
+    
+    const id = editingIdInput.value ? Number(editingIdInput.value) : null;
     const locationName = nameInput.value.trim();
+    const city = cityInput.value.trim();
+    const state = stateInput.value.trim();
 
     if (!locationName) return;
 
     if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = prompt(`Enter Admin Password to add location "${locationName}":`);
+      const confirmation = prompt(`Enter Admin Password to ${id ? 'update' : 'create'} location "${locationName}":`);
       if (confirmation === null) return;
       if (confirmation !== window.PB_ADMIN_PASSWORD) {
         alert('Incorrect Admin Password.');
@@ -139,9 +179,14 @@ export function initLocationsPage() {
       }
     }
 
+    const payload = { name: locationName, city, state };
+
     try {
-      await PB_API.createLocation({ name: locationName });
-      nameInput.value = '';
+      if (id) {
+        await PB_API.updateLocation(id, payload);
+      } else {
+        await PB_API.createLocation(payload);
+      }
       renderLocations();
     } catch (err) {
       alert(`Failed to save location: ${err.message}`);
@@ -165,6 +210,8 @@ export function initLocationsPage() {
       alert(`Failed to delete location: ${err.message}`);
     }
   };
+
+  cancelBtn.onclick = resetForm;
 
   renderLocations();
 }
