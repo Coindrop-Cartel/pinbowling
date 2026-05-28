@@ -284,7 +284,9 @@ body.tv-mode {
 
 body.tv-mode .navbar, 
 body.tv-mode .no-print,
+body.tv-mode header h1,
 body.tv-mode header p,
+body.tv-mode .hint,
 body.tv-mode .no-tv {
   display: none !important;
 }
