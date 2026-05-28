@@ -1,8 +1,8 @@
 import { PB_API } from './api.js';
 import { BowlingEngine } from './engine.js';
 import { getActiveEventId, renderPreview, applyScoreFormatting, formatNumber, printMachineScores } from './utils.js';
-import { initTournamentSelector } from './tournamentSelector.js';
 import { createSearchableSelect } from './uiComponents.js';
+import { initReadOnlyTournamentDisplay } from './uiComponents.js';
 
 export async function initConfigPage() {
   const frameSelect = document.getElementById('frame-number');
@@ -218,6 +218,6 @@ export async function initConfigPage() {
     resetForm();
   });
 
-  await initTournamentSelector(refresh);
+  await initReadOnlyTournamentDisplay(document.querySelector('.tournament-selector-container'), refresh);
   await refresh();
 }

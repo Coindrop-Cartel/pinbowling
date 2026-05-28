@@ -1,3 +1,5 @@
+import { PB_API } from './api.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId } from './utils.js';
 /**
  * Creates a searchable selection interaction between a text input and a select dropdown.
  * 
@@ -58,6 +60,72 @@ export function createSearchableSelect(searchInput, selectElement, data, {
   });
 
   return { updateOptions };
+}
+
+/**
+ * Initializes a read-only display for the active League and Event.
+ * Used on pages where the selection is expected to be pre-determined (e.g., event-setup).
+ * 
+ * @param {HTMLElement} container The DOM element to render the display into.
+ * @param {Function} onRefresh Callback to execute after the display is rendered.
+ */
+export async function initReadOnlyTournamentDisplay(container, onRefresh) {
+  if (!container) return;
+
+  const activeLeagueId = getActiveLeagueId();
+  const activeEventId = getActiveEventId();
+
+  let leagueName = 'No League Selected';
+  let eventName = 'No Event Selected';
+
+  if (activeLeagueId && activeEventId) {
+    try {
+      // Fetch all leagues to find the specific one and its events
+      const leagues = await PB_API.getLeagues(); 
+      const activeLeague = leagues.find(l => String(l.id) === String(activeLeagueId));
+
+      if (activeLeague) {
+        leagueName = activeLeague.name;
+        const activeEvent = (activeLeague.events || []).find(e => String(e.id) === String(activeEventId));
+        if (activeEvent) {
+          eventName = `${activeEvent.event_name} (${activeEvent.event_date || 'No Date'})`;
+        } else {
+          // If event not found in the active league, clear event ID
+          setActiveEventId('');
+          eventName = 'Invalid Event Selected';
+        }
+      } else {
+        // If league not found, clear both
+        setActiveLeagueId('');
+        setActiveEventId('');
+        leagueName = 'Invalid League Selected';
+        eventName = 'No Event Selected';
+      }
+    } catch (error) {
+      console.error('Error fetching league/event details for read-only display:', error);
+      leagueName = 'Error Loading League';
+      eventName = 'Error Loading Event';
+    }
+  } else {
+    // If no league or event is active, ensure both are cleared
+    setActiveLeagueId('');
+    setActiveEventId('');
+  }
+
+  container.innerHTML = `
+    <section class="card tournament-display" style="margin-bottom: 1.5rem;">
+      <div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%; box-sizing: border-box;">
+        <h2 style="margin: 0;">Current Selection:</h2>
+        <p style="margin: 0;"><strong>League:</strong> ${leagueName}</p>
+        <p style="margin: 0;"><strong>Event:</strong> ${eventName}</p>
+      </div>
+    </section>
+  `;
+
+  // Trigger the page's refresh logic
+  if (onRefresh) {
+    onRefresh();
+  }
 }
 
 /**

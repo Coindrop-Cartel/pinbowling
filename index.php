@@ -15,7 +15,7 @@
       <div class="hero-text">
         <h1>Welcome to PinBowling</h1>
         <p>A quick attempt to put together a basic way to track pinball scores in a bowling format. </p> 
-        <p>This site is in ACTIVE DEVELOPMENT.  Use at your own risk.</p>
+        <p>This site is in ACTIVE DEVELOPMENT.  Use at your own risk (What is here today might not be here tomorrow).</p>
       </div>
       <img src="images/logo.png" alt="PinBowling Logo" class="hero-logo-img">
     </header>
