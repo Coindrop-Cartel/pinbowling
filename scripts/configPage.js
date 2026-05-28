@@ -116,12 +116,20 @@ export async function initConfigPage() {
         <td class="drag-handle" style="cursor: grab; color: #888;">☰</td>
         <td>${frame.order_number}</td>
         <td>${frame.machine_name}</td>
-        <td><div class="score-list">${Object.entries(frame.values)
-          .sort((a, b) => Number(b[0]) - Number(a[0]))
-          .map(([key, value]) => `<div>${key}: ${formatNumber(value)}</div>`)
-          .join('')}</div></td>
+        <td class="targets-cell" style="cursor: pointer;">
+          <div class="targets-summary">10: <strong>${formatNumber(frame.values[10])}</strong> <small>▾</small></div>
+          <div class="score-list hidden" style="margin-top: 5px; font-size: 0.9em;">
+            ${Object.entries(frame.values)
+              .sort((a, b) => Number(b[0]) - Number(a[0]))
+              .map(([key, value]) => `<div>${key}: ${formatNumber(value)}</div>`)
+              .join('')}
+          </div>
+        </td>
         <td><button type="button" class="edit-button" data-id="${frame.id}">Edit</button></td>
       `;
+      row.querySelector('.targets-cell').addEventListener('click', () => {
+        row.querySelector('.score-list').classList.toggle('hidden');
+      });
       tbody.appendChild(row);
     });
 
