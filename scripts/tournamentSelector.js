@@ -11,12 +11,12 @@ export async function initTournamentSelector(onRefresh) {
 
   container.innerHTML = `
     <section class="card tournament-selector" style="margin-bottom: 1.5rem;">
-      <div class="form-row" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; width: 100%;">
-        <div style="flex: 1; min-width: 200px;">
+      <div class="form-row" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; width: 100%; justify-content: flex-start;">
+        <div style="flex: 1; min-width: 200px; width: 100%;">
           <label style="display: block; margin-bottom: 5px;">League Search</label>
           <input type="text" id="league-search-global" style="width: 100%; box-sizing: border-box;" placeholder="Type to filter..." autocomplete="off">
         </div>
-        <div style="flex: 1; min-width: 200px;">
+        <div style="flex: 1; min-width: 200px; width: 100%;">
           <label for="league-select-global" style="display: block; margin-bottom: 5px;">Select League</label>
           <select id="league-select-global" style="width: 100%; box-sizing: border-box;">
             <option value="">-- Choose League --</option>
