@@ -80,7 +80,12 @@ export async function initLeaguesPage() {
         // Toggle expansion
         card.querySelector('.league-header').onclick = (e) => {
           if (e.target.closest('button')) return;
-          card.querySelector('.league-details').classList.toggle('hidden');
+          const details = card.querySelector('.league-details');
+          const isExpanding = details.classList.contains('hidden');
+          details.classList.toggle('hidden');
+          if (isExpanding) {
+            renderPlayersForLeague(league.id, league.players, allPlayersCache);
+          }
         };
 
         // Action listeners
@@ -94,7 +99,7 @@ export async function initLeaguesPage() {
             const eventId = Number(btn.dataset.eventId);
             setActiveLeagueId(leagueId);
             setActiveEventId(eventId);
-            window.location.href = 'event-setup.php'; // Redirect to the config page
+            window.location.href = `event-setup.php?leagueId=${leagueId}&eventId=${eventId}`;
           };
         });
         card.querySelectorAll('.edit-event-btn').forEach(btn => {
@@ -172,8 +177,13 @@ export async function initLeaguesPage() {
   });
 
   async function renderPlayersForLeague(leagueId, leaguePlayers, allPlayers) {
-    const playersListEl = document.querySelector(`.league-item .add-player-btn[data-league-id="${leagueId}"]`).closest('.league-players-section').querySelector('.league-players-list');
-    const emptyNoticeEl = playersListEl.nextElementSibling; // The .league-players-empty div
+    // Find the roster list specifically for this league card
+    const addBtn = document.querySelector(`.league-item .add-player-btn[data-league-id="${leagueId}"]`);
+    if (!addBtn) return;
+
+    const section = addBtn.closest('.league-players-section');
+    const playersListEl = section.querySelector('.league-players-list');
+    const emptyNoticeEl = section.querySelector('.league-players-empty');
 
     playersListEl.innerHTML = '';
     if (leaguePlayers && leaguePlayers.length > 0) {
