@@ -20,58 +20,83 @@ export function initLocationsPage() {
 
   let allLocations = [];
 
+  const onFilterUpdate = () => {
+    const n = nameInput.value.trim().toLowerCase();
+    const c = cityInput.value.trim().toLowerCase();
+    const s = stateInput.value.trim().toLowerCase();
+
+    const filtered = allLocations.filter(loc => {
+      const matchN = !n || loc.name.toLowerCase().includes(n);
+      const matchC = !c || (loc.city || '').toLowerCase().includes(c);
+      const matchS = !s || (loc.state || '').toLowerCase().includes(s);
+      return matchN && matchC && matchS;
+    });
+
+    list.innerHTML = '';
+    if (filtered.length > 0) {
+      emptyNotice.classList.add('hidden');
+      filtered.forEach(loc => {
+        const cityState = (loc.city && loc.state) ? ` (${loc.city}, ${loc.state})` : '';
+        const locDiv = document.createElement('div');
+        locDiv.className = 'card league-item'; 
+        locDiv.innerHTML = `
+          <div class="location-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0;">
+              ${loc.name}${cityState}<br>
+              <small>Machines: (${loc.machines?.length || 0})</small>
+            </h3>
+            <div>
+              <button class="edit-loc-btn secondary">Edit</button>
+              <button class="delete-loc-btn">Delete</button>
+            </div>
+          </div>
+          <div class="location-details hidden" style="margin-top: 20px; border-top: 2px solid var(--pb-black); padding-top: 20px;">
+            <div style="margin-bottom: 20px;">
+              <button class="add-mach-btn secondary">Add Machine to Venue</button>
+            </div>
+            <div class="league-details-columns" style="display: flex; gap: 2rem; flex-wrap: wrap;">
+              <div class="machines-list" id="mach-for-loc-${loc.id}" style="flex: 1; min-width: 300px;">
+                <div class="mach-list-inner"></div>
+                <div class="notice mach-empty hidden">No machines at this venue.</div>
+              </div>
+            </div>
+          </div>
+        `;
+        list.appendChild(locDiv);
+
+        locDiv.querySelector('.location-header').onclick = (e) => {
+          if (e.target.closest('button')) return;
+          const details = locDiv.querySelector('.location-details');
+          details.classList.toggle('hidden');
+        };
+
+        locDiv.querySelector('.edit-loc-btn').onclick = () => editLocation(loc.id);
+        locDiv.querySelector('.add-mach-btn').onclick = () => showMachineForm(loc.id, loc.name);
+        locDiv.querySelector('.delete-loc-btn').onclick = () => window.deleteLocation(loc.id);
+
+        renderMachinesForLocation(loc.id, loc.name, loc.machines);
+      });
+    } else {
+      emptyNotice.classList.remove('hidden');
+      emptyNotice.textContent = allLocations.length === 0 ? 'No locations registered yet.' : 'No matching locations found.';
+    }
+
+    // Validation logic for duplicates
+    const exactMatch = allLocations.find(l => 
+      l.name.toLowerCase() === n &&
+      (l.city || '').toLowerCase() === c &&
+      (l.state || '').toLowerCase() === s
+    );
+    const isEditingThis = exactMatch && String(exactMatch.id) === String(editingIdInput.value);
+    
+    saveBtn.disabled = !n || (!!exactMatch && !isEditingThis);
+    saveBtn.title = (exactMatch && !isEditingThis) ? "A venue with this name, city, and state already exists." : "";
+  };
+
   const renderLocations = async () => {
     try {
       allLocations = await PB_API.getLocations();
-      list.innerHTML = '';
-
-      if (allLocations && allLocations.length > 0) {
-        emptyNotice.classList.add('hidden');
-        for (const loc of allLocations) {
-          const cityState = (loc.city && loc.state) ? ` (${loc.city}, ${loc.state})` : '';
-          const locDiv = document.createElement('div');
-          locDiv.className = 'card league-item'; 
-          locDiv.innerHTML = `
-            <div class="location-header" style="display: flex; justify-content: space-between; align-items: center;">
-              <h3 style="margin: 0;">
-                ${loc.name}${cityState}<br>
-                <small>Machines: (${loc.machines?.length || 0})</small>
-              </h3>
-              <div>
-                <button class="edit-loc-btn secondary">Edit</button>
-                <button class="delete-loc-btn">Delete</button>
-              </div>
-            </div>
-            <div class="location-details hidden" style="margin-top: 20px; border-top: 2px solid var(--pb-black); padding-top: 20px;">
-              <div style="margin-bottom: 20px;">
-                <button class="add-mach-btn secondary">Add Machine to Venue</button>
-              </div>
-              <div class="league-details-columns" style="display: flex; gap: 2rem; flex-wrap: wrap;">
-                <div class="machines-list" id="mach-for-loc-${loc.id}" style="flex: 1; min-width: 300px;">
-                  <div class="mach-list-inner"></div>
-                  <div class="notice mach-empty hidden">No machines at this venue.</div>
-                </div>
-              </div>
-            </div>
-          `;
-          list.appendChild(locDiv);
-
-          // Toggle logic: Click the header (but not the delete button) to expand
-          locDiv.querySelector('.location-header').onclick = (e) => {
-            if (e.target.closest('button')) return;
-            const details = locDiv.querySelector('.location-details');
-            details.classList.toggle('hidden');
-          };
-
-          locDiv.querySelector('.edit-loc-btn').onclick = () => editLocation(loc.id);
-          locDiv.querySelector('.add-mach-btn').onclick = () => showMachineForm(loc.id, loc.name);
-          locDiv.querySelector('.delete-loc-btn').onclick = () => window.deleteLocation(loc.id);
-
-          renderMachinesForLocation(loc.id, loc.name, loc.machines);
-        }
-      } else {
-        emptyNotice.classList.remove('hidden');
-      }
+      onFilterUpdate();
       resetForm();
     } catch (err) {
       console.error('Failed to load locations:', err);
@@ -90,6 +115,7 @@ export function initLocationsPage() {
     formTitle.textContent = `Edit Location: ${loc.name}`;
     saveBtn.textContent = 'Update Location';
     cancelBtn.classList.remove('hidden');
+    onFilterUpdate();
     window.scrollTo(0, 0);
   }
 
@@ -99,7 +125,12 @@ export function initLocationsPage() {
     formTitle.textContent = 'Add New Location';
     saveBtn.textContent = 'Add Location';
     cancelBtn.classList.add('hidden');
+    onFilterUpdate();
   }
+
+  nameInput.addEventListener('input', onFilterUpdate);
+  cityInput.addEventListener('input', onFilterUpdate);
+  stateInput.addEventListener('input', onFilterUpdate);
 
   async function renderMachinesForLocation(locationId, locationName, machines = null) {
     const inner = document.querySelector(`#mach-for-loc-${locationId} .mach-list-inner`);
