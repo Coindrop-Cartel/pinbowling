@@ -7,7 +7,6 @@ import { showConfirm, showPrompt } from './uiComponents.js';
  */
 export function initLocationsPage() {
   const form = document.getElementById('location-form');
-  const formTitle = document.getElementById('location-form-title');
   const editingIdInput = document.getElementById('editing-location-id');
   const list = document.getElementById('locations-list');
   const emptyNotice = document.getElementById('locations-list-empty');
@@ -113,7 +112,6 @@ export function initLocationsPage() {
     cityInput.value = loc.city || '';
     stateInput.value = loc.state || '';
 
-    formTitle.textContent = `Edit Location: ${loc.name}`;
     saveBtn.textContent = 'Update Location';
     cancelBtn.classList.remove('hidden');
     onFilterUpdate();
@@ -123,7 +121,6 @@ export function initLocationsPage() {
   function resetForm() {
     editingIdInput.value = '';
     form.reset();
-    formTitle.textContent = 'Add New Location';
     saveBtn.textContent = 'Add Location';
     cancelBtn.classList.add('hidden');
     onFilterUpdate();

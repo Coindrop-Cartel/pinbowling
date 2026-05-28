@@ -8,7 +8,7 @@ import { createSearchableSelect } from './uiComponents.js';
  * Initializes the Player Scoring page.
  */
 export async function initScoresPage() {
-  const framesInput = document.getElementById('frames-input');
+  const roundsInput = document.getElementById('rounds-input');
   const resultsPanel = document.getElementById('results-panel');
   const resultsBody = document.getElementById('results-body');
   const totalScore = document.getElementById('total-score');
@@ -54,16 +54,16 @@ export async function initScoresPage() {
 
   function buildRoundRow(round, turnValues, isLastRound = false) {
     const row = document.createElement('div');
-    row.className = 'frame-row';
+    row.className = 'round-row';
     row.dataset.order = round.order_number;
 
     const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
 
     row.innerHTML = `
-      <div class="frame-info" style="cursor: pointer;">
-        <div class="frame-label">Round ${round.order_number}</div>
-        <div class="frame-machine">${round.machine_name}</div>
-        <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;">Strike: <b>${formatNumber(round.values[10])}</b></div>
+      <div class="round-info" style="cursor: pointer;">
+        <div class="round-label">Round ${round.order_number}</div>
+        <div class="round-machine">${round.machine_name}</div>
+        <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;"><b>Strike:</b> ${formatNumber(round.values[10])}</div>
         ${bonusHtml}
         <div class="target-details hidden" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;">
           <div style="font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; color: #666;">Scoring Thresholds</div>
@@ -75,14 +75,14 @@ export async function initScoresPage() {
           </div>
         </div>
       </div>
-      <div class="frame-inputs-container"></div>
-      <button class="save-frame-button" disabled>Save</button>
+      <div class="round-inputs-container"></div>
+      <button class="save-round-button" disabled>Save</button>
     `;
 
-    const inputsContainer = row.querySelector('.frame-inputs-container');
-    const saveBtn = row.querySelector('.save-frame-button');
+    const inputsContainer = row.querySelector('.round-inputs-container');
+    const saveBtn = row.querySelector('.save-round-button');
 
-    row.querySelector('.frame-info').addEventListener('click', () => {
+    row.querySelector('.round-info').addEventListener('click', () => {
       row.querySelector('.target-details').classList.toggle('hidden');
     });
 
@@ -202,7 +202,7 @@ export async function initScoresPage() {
   async function refreshPlayerSelection() {
     const activePlayerId = await renderPlayerSelect();
     if (!activePlayerId) {
-      framesInput.querySelectorAll('input').forEach((input) => (input.disabled = true));
+      roundsInput.querySelectorAll('input').forEach((input) => (input.disabled = true));
       scoringCard.classList.add('hidden');
       resultsCard.classList.add('hidden');
       return;
@@ -211,7 +211,7 @@ export async function initScoresPage() {
     warning.classList.add('hidden');
     scoringCard.classList.remove('hidden');
     resultsCard.classList.remove('hidden');
-    framesInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
+    roundsInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
     
     const scores = await PB_API.getScores(Number(activePlayerId), Number(getActiveEventId()));
     loadScoresIntoForm(scores);
@@ -220,7 +220,7 @@ export async function initScoresPage() {
 
   function getScoreMapFromInputs() {
     const scoreMap = {};
-    framesInput.querySelectorAll('.frame-row').forEach((row) => {
+    roundsInput.querySelectorAll('.round-row').forEach((row) => {
       const orderNum = Number(row.dataset.order);
       scoreMap[orderNum] = {
         ball1: Number(row.querySelector('[data-ball="1"]').value.replace(/\D/g, '')) || 0,
@@ -258,7 +258,7 @@ export async function initScoresPage() {
   const refresh = async () => {
     const eventId = getActiveEventId();
     if (!eventId) {
-      framesInput.innerHTML = '';
+      roundsInput.innerHTML = '';
       scoringHeader.classList.add('hidden');
       playerSelectionCard.classList.add('hidden');
       scoringCard.classList.add('hidden');
@@ -278,7 +278,7 @@ export async function initScoresPage() {
     if (machines.length === 0) {
       warning.textContent = 'No target scores have been configured for the selected event.';
       warning.classList.remove('hidden');
-      framesInput.innerHTML = '';
+      roundsInput.innerHTML = '';
       return;
     }
     await refreshPlayerSelection();

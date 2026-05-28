@@ -31,13 +31,13 @@ function ready() {
   if (document.getElementById('location-form')) {
     initLocationsPage();
   }
-  if (document.getElementById('frame-form')) {
+  if (document.getElementById('round-form')) {
     initConfigPage(); // From pages/configPage.js
   }
   if (document.getElementById('player-list')) {
     initPlayersPage(); // From pages/playersPage.js
   }
-  if (document.getElementById('frames-input')) {
+  if (document.getElementById('rounds-input')) {
     initScoresPage(); // From pages/scoresPage.js
   }
   if (document.getElementById('standings-body')) {

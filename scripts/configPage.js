@@ -8,9 +8,9 @@ export async function initConfigPage() {
   const configCard = document.getElementById('config-card');
   const orderInput = document.getElementById('order-number');
   const displayOrder = document.getElementById('display-order');
-  const form = document.getElementById('frame-form');
+  const form = document.getElementById('round-form');
   const submitBtn = form.querySelector('button[type="submit"]');
-  const framesTable = document.getElementById('frames-table');
+  const roundsTable = document.getElementById('rounds-table');
   const reorderActions = document.getElementById('reorder-actions');
   const listEmpty = document.getElementById('list-empty');
   let editingMachineId = null;
@@ -93,18 +93,18 @@ export async function initConfigPage() {
 
   async function render() {
     const eventId = getActiveEventId();
-    const tbody = framesTable.querySelector('tbody');
+    const tbody = roundsTable.querySelector('tbody');
     tbody.innerHTML = '';
 
     if (!eventId || eventTargets.length === 0) {
-      framesTable.classList.add('hidden');
+      roundsTable.classList.add('hidden');
       reorderActions.classList.add('hidden');
       listEmpty.classList.remove('hidden');
       listEmpty.textContent = eventId ? 'No targets defined for this event.' : 'Select a league and event to manage target scores.';
       return;
     }
 
-    framesTable.classList.remove('hidden');
+    roundsTable.classList.remove('hidden');
     reorderActions.classList.remove('hidden');
     listEmpty.classList.add('hidden');
 
@@ -184,7 +184,7 @@ export async function initConfigPage() {
   }
 
   document.getElementById('save-order-btn').addEventListener('click', async () => {
-    const rows = Array.from(framesTable.querySelectorAll('tbody tr'));
+    const rows = Array.from(roundsTable.querySelectorAll('tbody tr'));
     const updates = rows.map((row, index) => ({
       id: Number(row.dataset.id),
       order_number: index + 1

@@ -30,8 +30,8 @@ const BowlingEngine = {
 
   /**
    * Generates format-specific HTML for bonus targets (e.g., Round 10 Targets).
-   * @param {Object} frame 
-   * @param {boolean} isLastFrame 
+   * @param {Object} round 
+   * @param {boolean} isLastRound 
    * @param {Function} formatFn Number formatting utility
    * @returns {string} HTML string
    */
@@ -39,9 +39,9 @@ const BowlingEngine = {
     if (!isLastRound || !round.values || !round.values[10]) return '';
     const { t1, t2 } = this.getBonusTargets(round);
     return `
-      <div style="margin-top: 8px; border-top: 1px dashed #bbb; padding-top: 4px;">
-        <div>Target 1: ${formatFn(t1)}</div>
-        <div>Target 2: ${formatFn(t2)}</div>
+      <div style="margin-top: 8px; border-top: 1px dashed #bbb; padding-top: 4px; font-size: 0.8rem; color: #000;">
+        <div><b>Target 1:</b> ${formatFn(t1)}</div>
+        <div><b>Target 2:</b> ${formatFn(t2)}</div>
       </div>
     `;
   },
