@@ -34,6 +34,9 @@
       <div id="locations-list-empty" class="notice">No locations registered yet.</div>
       <div id="locations-list"></div>
     </section>
+
+    <!-- Dynamic form for adding machines to a location -->
+    <section id="location-machine-form-card" class="card hidden"></section>
   </main>
 
   <script src="js-config.php"></script>

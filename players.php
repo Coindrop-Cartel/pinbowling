@@ -40,15 +40,6 @@
     </section>
 
     <section class="card">
-      <h2>Delete Player</h2>
-      <div class="form-row">
-        <label for="player-select">Select Player</label>
-        <select id="player-select"></select>
-        <button type="button" id="delete-player-button" class="secondary">Delete Player</button>
-      </div>
-    </section>
-
-    <section class="card">
       <h2>Registered Players</h2>
       <div id="player-list-container">
         <ul id="player-list" class="notice" style="list-style: none; padding: 14px 16px; margin: 0;">

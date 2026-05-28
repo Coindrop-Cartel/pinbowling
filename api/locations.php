@@ -126,6 +126,14 @@ if ($method === 'PUT') {
 if ($method === 'DELETE') {
     validateApiSecret();
     
+    if ($action === 'machines') {
+        $locationId = isset($_GET['locationId']) ? (int)$_GET['locationId'] : 0;
+        $machineId = isset($_GET['machineId']) ? (int)$_GET['machineId'] : 0;
+        $stmt = $pdo->prepare('DELETE FROM Location_Machines WHERE location_id = ? AND machine_id = ?');
+        $stmt->execute([$locationId, $machineId]);
+        sendJson(['success' => true]);
+    }
+
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if (!$id) {
         sendJson(['error' => 'id query parameter is required'], 400);
