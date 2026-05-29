@@ -170,9 +170,16 @@ if ($method === 'DELETE') {
             $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
             if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
 
-            // Use the leagueId from the URL if provided, otherwise fallback to league-specific logic
-            $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : $id;
-            validateLeagueAccess($pdo, $leagueId);
+            if ($action === 'event') {
+                // Verify the event exists and retrieve its league_id for security validation
+                $stmt = $pdo->prepare('SELECT league_id FROM Events WHERE id = ?');
+                $stmt->execute([$id]);
+                $eventLeagueId = $stmt->fetchColumn();
+                if ($eventLeagueId === false) sendJson(['error' => 'Event not found'], 404);
+                validateLeagueAccess($pdo, $eventLeagueId);
+            } else {
+                validateLeagueAccess($pdo, $id); // Deleting a League
+            }
 
             $table = ($action === 'event') ? 'Events' : 'Leagues';
             $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ?");

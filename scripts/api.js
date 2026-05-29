@@ -69,11 +69,24 @@ export async function fetchJSON(url, options = {}) {
   // Construct a reliable absolute path for the API call
   const fullUrl = url.startsWith('http') ? url : `${APP_BASE}/${url}`;
   
+  // Prepare fetch options, ensuring a body is sent for POST requests (even if tunneled)
+  // to prevent server-side resets for bodyless POSTs.
+  const fetchOptions = {
+    ...options,
+    method,
+    headers: finalHeaders,
+    body: options.body || (method === 'POST' ? JSON.stringify({}) : undefined)
+  };
+
   try {
-    const response = await fetch(fullUrl, { ...options, method, headers: finalHeaders });
+    const response = await fetch(fullUrl, fetchOptions);
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: response.statusText }));
-      throw new Error(error.error || response.statusText);
+      let errorMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) { /* Not a JSON response */ }
+      throw new Error(errorMessage);
     }
     return response.json();
   } catch (err) {
