@@ -13,7 +13,6 @@
  * - action: (Optional) Future-proofing for specific player sub-actions.
  */
 require_once __DIR__ . '/../includes/config.php';
-initDatabase();
 $pdo = getDbConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];
