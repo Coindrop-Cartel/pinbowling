@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PinBowling - Home</title>
   <link rel="stylesheet" href="styles.css?v=<?php echo $UI_VERSION; ?>" />
-  <link rel="icon" type="image/png" href="images/logo.png" />
+  <link rel="icon" type="image/png" href="images/logo.png?v=<?php echo $UI_VERSION; ?>" />
 </head>
 <body>
   <?php include 'includes/header.php'; ?>
