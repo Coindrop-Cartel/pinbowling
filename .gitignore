@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Security: Environment variables and secrets
+.env
+.env.local
+.env.*.local
+
+# Testing
+coverage/
+*.log
+
+# Editor/OS specific
+.vscode/
+.DS_Store

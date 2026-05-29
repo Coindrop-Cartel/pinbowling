@@ -1,0 +1,24 @@
+{
+  "name": "pinbowling",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "This app now uses a PHP backend for MySQL persistence.",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kylevoorhees/pinbowling.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kylevoorhees/pinbowling/issues"
+  },
+  "homepage": "https://github.com/kylevoorhees/pinbowling#readme",
+  "devDependencies": {
+    "vitest": "^4.1.7"
+  }
+}
