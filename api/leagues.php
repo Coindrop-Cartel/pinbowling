@@ -160,29 +160,29 @@ if ($method === 'PUT') {
 
 // DELETE: Remove League or Event (Protected by API Secret)
 if ($method === 'DELETE') {
-    if ($action === 'player') {
-        $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
-        validateLeagueAccess($pdo, $leagueId);
-        $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
-        $stmt = $pdo->prepare("DELETE FROM League_Players WHERE league_id = ? AND player_id = ?");
-        $stmt->execute([$leagueId, $playerId]);
-    } else {
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
-
-        if ($action === 'event') {
-            $stmt = $pdo->prepare('SELECT league_id FROM Events WHERE id = ?');
-            $stmt->execute([$id]);
-            validateLeagueAccess($pdo, $stmt->fetchColumn());
+    try {
+        if ($action === 'player') {
+            $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
+            validateLeagueAccess($pdo, $leagueId);
+            $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
+            $pdo->prepare("DELETE FROM League_Players WHERE league_id = ? AND player_id = ?")->execute([$leagueId, $playerId]);
         } else {
-            validateLeagueAccess($pdo, $id);
-        }
+            $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+            if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
 
-        $table = ($action === 'event') ? 'Events' : 'Leagues';
-        $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ?");
-        $stmt->execute([$id]);
+            // Use the leagueId from the URL if provided, otherwise fallback to league-specific logic
+            $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : $id;
+            validateLeagueAccess($pdo, $leagueId);
+
+            $table = ($action === 'event') ? 'Events' : 'Leagues';
+            $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ?");
+            $stmt->execute([$id]);
+        }
+        sendJson(['success' => true]);
+    } catch (PDOException $e) {
+        // Return clear database errors (e.g., foreign key violations) instead of crashing
+        sendJson(['error' => 'Database error: ' . $e->getMessage()], 500);
     }
-    sendJson(['success' => true]);
 }
 
 sendJson(['error' => 'Unsupported request method'], 405);

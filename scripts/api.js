@@ -49,18 +49,28 @@ export async function fetchJSON(url, options = {}) {
   const leagueId = urlObj.searchParams.get('leagueId') || (options.body ? JSON.parse(options.body).league_id : null);
   const leaguePass = leagueId ? getLeaguePassword(leagueId) : null;
 
+  // Tunnel DELETE and PUT via POST to bypass potential server-level method blocking.
+  // This ensures the project setup is synchronized and robust across different hosts.
+  let method = options.method || 'GET';
+  const headers = { ...options.headers };
+
+  if (method === 'DELETE' || method === 'PUT') {
+    headers['X-HTTP-Method-Override'] = method;
+    method = 'POST';
+  }
+
   const finalHeaders = {
     'Content-Type': 'application/json',
     'X-PB-SECRET': API_SECRET,
     ...(leaguePass && { 'X-LEAGUE-PASSWORD': leaguePass }),
-    ...options.headers
+    ...headers
   };
 
   // Construct a reliable absolute path for the API call
   const fullUrl = url.startsWith('http') ? url : `${APP_BASE}/${url}`;
   
   try {
-    const response = await fetch(fullUrl, { ...options, headers: finalHeaders });
+    const response = await fetch(fullUrl, { ...options, method, headers: finalHeaders });
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: response.statusText }));
       throw new Error(error.error || response.statusText);
