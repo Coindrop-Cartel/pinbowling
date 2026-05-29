@@ -156,13 +156,14 @@ export function renderPreview(score10Input, score1Input, previewValues, Engine, 
 /**
  * Generates large printable signs showing target scores for each machine.
  * @param {Array} machines 
+ * @param {string} [format='bowling']
  */
-export function printMachineScores(machines) {
+export function printMachineScores(machines, format = 'bowling') {
   const printWindow = window.open('', '_blank');
   if (!printWindow) return alert('Please allow popups to print.');
 
   const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
-  const Engine = getScoringEngine('bowling');
+  const Engine = getScoringEngine(format);
 
   const pagesHtml = machines.map((m) => {
     const ranks = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
@@ -194,7 +195,7 @@ export function printMachineScores(machines) {
       <div class="page" style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; page-break-after: always; padding: 40px; box-sizing: border-box;">
         <div style="border: 6px solid #000; padding: 50px; width: 100%; max-width: 1100px;">
           <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 40px; border-bottom: 6px solid #000; padding-bottom: 15px;">
-            <h1 style="margin: 0; font-size: 4rem;">Round ${m.order_number}</h1>
+            <h1 style="margin: 0; font-size: 4rem;">${Engine.getRoundLabel()} ${m.order_number}</h1>
             <h2 style="margin: 0; font-size: 4rem;">${m.machine_name}</h2>
           </div>
           <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px;">${scoresHtml}</div>

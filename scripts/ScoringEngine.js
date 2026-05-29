@@ -31,4 +31,22 @@ export class ScoringEngine {
 
   getBonusTargets() { return { t1: 0, t2: 0 }; }
   getBonusTargetHtml() { return ''; }
+
+  /**
+   * Returns the terminology used for an individual round (e.g., "Round", "Frame", "Hole").
+   * @returns {string}
+   */
+  getRoundLabel() { return 'Round'; }
+
+  /**
+   * Returns the terminology used for columns in a summary table.
+   * @returns {string}
+   */
+  getTurnHeaderPrefix() { return 'Round'; }
+
+  /**
+   * Returns the label for the primary goal score (e.g., "Strike", "Target", "Par").
+   * @returns {string}
+   */
+  getPrimaryTargetLabel() { return 'Target'; }
 }

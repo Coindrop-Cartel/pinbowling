@@ -15,7 +15,7 @@ export async function initStandingsPage() {
   let refreshInterval = null;
   let scrollInterval = null;
 
-  const Engine = getScoringEngine('bowling');
+  let Engine = getScoringEngine('bowling');
 
   if (tvBtn) {
     tvBtn.addEventListener('click', toggleTvMode);
@@ -77,6 +77,7 @@ export async function initStandingsPage() {
   const renderLeagueSummary = async (leagueId) => {
     const leagues = await PB_API.getLeagues();
     const league = leagues.find(l => String(l.id) === String(leagueId));
+    const engine = getScoringEngine(league?.scoring_format || 'bowling');
     const players = league?.players || [];
     const events = league?.events || [];
 
@@ -109,7 +110,7 @@ export async function initStandingsPage() {
             map[String(row.order_number)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
             return map;
           }, {});
-          const { total } = Engine.calculateTurnResults(eventTargets, scoreMap);
+          const { total } = engine.calculateTurnResults(eventTargets, scoreMap);
           eventTotals[event.id] = total;
           totalSeasonPoints += total;
         } else { eventTotals[event.id] = null; }
@@ -148,6 +149,10 @@ export async function initStandingsPage() {
     }
     if (eventId === 'summary') return renderLeagueSummary(getActiveLeagueId());
 
+    const leagues = await PB_API.getLeagues();
+    const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
+    Engine = getScoringEngine(league?.scoring_format || 'bowling');
+
     const players = await PB_API.getPlayers();
     const machines = await PB_API.getTargetScores(eventId);
     const allEventScores = await PB_API.getScores(null, Number(eventId));
@@ -159,8 +164,6 @@ export async function initStandingsPage() {
     }, {});
 
     if (tvTitle) {
-      const leagues = await PB_API.getLeagues();
-      const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
       const event = league?.events.find(e => String(e.id) === String(eventId));
       tvTitle.textContent = `${league?.name || 'League'} - ${event?.event_name || 'Event'}`;
     }
@@ -177,7 +180,7 @@ export async function initStandingsPage() {
       return { player, turnResults, total, ordersWithScores };
     }).sort((a, b) => b.total - a.total);
 
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${machines.map(m => `<th>Target ${m.order_number}</th>`).join('')}<th>Total</th></tr>`;
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${machines.map(m => `<th>${Engine.getTurnHeaderPrefix()} ${m.order_number}</th>`).join('')}<th>Total</th></tr>`;
     if (standingsBody) standingsBody.innerHTML = rows.map((res, idx) => `
       <tr>
         <td>${idx + 1}</td>

@@ -32,8 +32,8 @@ export async function initScoresPage() {
   let machines = [];
   const printSheetBtn = document.getElementById('print-sheet-btn');
 
-  // Prepare for multiple scoring formats; default to bowling for now.
-  const Engine = getScoringEngine('bowling');
+  // Default engine
+  let Engine = getScoringEngine('bowling');
 
   if (printSheetBtn) {
     printSheetBtn.addEventListener('click', () => {
@@ -84,8 +84,8 @@ export async function initScoresPage() {
 
     row.innerHTML = `
       <div class="round-info" style="cursor: pointer; flex: 1; min-width: 200px;">
-        <div class="round-label"><b>Round ${round.order_number}:</b> ${round.machine_name}</div>
-        <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;"><b>Strike:</b> ${formatNumber(round.values[10])}</div>
+        <div class="round-label"><b>${Engine.getRoundLabel()} ${round.order_number}:</b> ${round.machine_name}</div>
+        <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;"><b>${Engine.getPrimaryTargetLabel()}:</b> ${formatNumber(round.values[10])}</div>
         ${bonusHtml}
         <div class="target-details hidden" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;">
           <div style="font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; color: #666;">Scoring Thresholds</div>
@@ -313,6 +313,10 @@ export async function initScoresPage() {
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
 
+    const leagues = await PB_API.getLeagues();
+    const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
+    Engine = getScoringEngine(league?.scoring_format || 'bowling');
+
     machines = await PB_API.getTargetScores(eventId);
 
     scoringHeader.classList.remove('hidden');
@@ -331,7 +335,7 @@ export async function initScoresPage() {
     if (resultsTableHeader) {
       const roundHeader = resultsTableHeader.querySelector('th:first-child');
       if (roundHeader) {
-        roundHeader.textContent = 'Round';
+        roundHeader.textContent = Engine.getRoundLabel();
       }
     }
 

@@ -187,4 +187,8 @@ export class BowlingEngine extends ScoringEngine {
     }
     return null;
   }
+
+  getRoundLabel() { return 'Frame'; }
+  getTurnHeaderPrefix() { return 'Frame'; }
+  getPrimaryTargetLabel() { return 'Strike'; }
 }

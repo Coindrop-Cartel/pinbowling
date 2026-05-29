@@ -29,13 +29,15 @@ export async function initConfigPage() {
   let eventTargets = [];
   let currentSuggestedMachines = [];
 
-  const Engine = getScoringEngine('bowling');
+  let Engine = getScoringEngine('bowling');
 
   if (printMachinesBtn) {
     printMachinesBtn.addEventListener('click', async () => {
       const eventId = getActiveEventId();
       if (!eventId) return alert('Select an event first.');
-      printMachineScores(eventTargets);
+      const leagues = await PB_API.getLeagues();
+      const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
+      printMachineScores(eventTargets, league?.scoring_format || 'bowling');
     });
   }
 
@@ -234,13 +236,15 @@ export async function initConfigPage() {
   const refresh = async () => {
     const eventId = getActiveEventId();
     masterMachines = await PB_API.getMachines();
+    const leaguesData = await PB_API.getLeagues();
+    const league = leaguesData.find(l => String(l.id) === String(getActiveLeagueId()));
+    Engine = getScoringEngine(league?.scoring_format || 'bowling');
 
     // Find the location associated with the current event to filter machine suggestions
     let locationId = null;
     if (eventId) {
-      const leaguesData = await PB_API.getLeagues();
-      for (const league of leaguesData) {
-        const eventMatch = (league.events || []).find(e => String(e.id) === String(eventId));
+      for (const l of leaguesData) {
+        const eventMatch = (l.events || []).find(e => String(e.id) === String(eventId));
         if (eventMatch) {
           locationId = eventMatch.location_id;
           break;
