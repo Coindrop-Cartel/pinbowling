@@ -31,7 +31,7 @@ if ($method === 'GET') {
             $league = $stmt->fetch();
             if ($league) {
                 // Automatically include events when fetching a specific league
-                $stmt = $pdo->prepare('SELECT * FROM Events WHERE league_id = ? ORDER BY event_date ASC');
+                $stmt = $pdo->prepare('SELECT id, league_id, location_id, event_name, event_date FROM Events WHERE league_id = ? ORDER BY event_date ASC');
                 $stmt->execute([$id]);
                 $league['events'] = $stmt->fetchAll();
 
@@ -39,6 +39,7 @@ if ($method === 'GET') {
                 $stmt->execute([$id]);
                 $league['players'] = $stmt->fetchAll();
 
+                unset($league['password']); // Never return hashes
                 sendJson($league);
             }
             sendJson(['error' => 'League not found'], 404);
@@ -49,11 +50,11 @@ if ($method === 'GET') {
         // fetch all leagues, events, and rosters in broad queries and 
         // group them in memory before returning the final JSON structure.
         
-        // Fetch all leagues
-        $leaguesStmt = $pdo->query('SELECT * FROM Leagues ORDER BY start_date DESC');
+        // Fetch all leagues (excluding password)
+        $leaguesStmt = $pdo->query('SELECT id, name, start_date FROM Leagues ORDER BY start_date DESC');
         $leagues = $leaguesStmt->fetchAll();
 
-        // Fetch all events joined with location names
+        // Fetch all events
         $eventsStmt = $pdo->query('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id ORDER BY e.event_date ASC');
         $allEvents = $eventsStmt->fetchAll();
 
@@ -87,58 +88,56 @@ if ($method === 'GET') {
 
 // POST: Create new League or Event (Protected by API Secret)
 if ($method === 'POST') {
-    validateApiSecret();
-    
     if ($action === 'player') {
+        validateLeagueAccess($pdo, $input['league_id']);
         if (empty($input['league_id']) || empty($input['player_id'])) {
             sendJson(['error' => 'league_id and player_id are required'], 400);
         }
         $stmt = $pdo->prepare('INSERT IGNORE INTO League_Players (league_id, player_id) VALUES (?, ?)');
         $stmt->execute([(int)$input['league_id'], (int)$input['player_id']]);
-        
-        $stmt = $pdo->prepare('SELECT * FROM Players WHERE id = ?');
-        $stmt->execute([(int)$input['player_id']]);
-        sendJson($stmt->fetch());
+        sendJson(['success' => true]);
     } else if ($action === 'event') {
+        validateLeagueAccess($pdo, $input['league_id']);
         if (empty($input['league_id']) || empty($input['event_name'])) {
             sendJson(['error' => 'league_id and event_name are required'], 400);
         }
         $sql = 'INSERT INTO Events (league_id, location_id, event_name, event_date) VALUES (?, ?, ?, ?)';
         $params = [(int)$input['league_id'], $input['location_id'] ?? null, $input['event_name'], $input['event_date'] ?? null];
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $newId = $pdo->lastInsertId();
-        $stmt = $pdo->prepare('SELECT * FROM Events WHERE id = ?');
-        $stmt->execute([$newId]);
-        sendJson($stmt->fetch());
+        $pdo->prepare($sql)->execute($params);
+        sendJson(['success' => true]);
     } else {
-        if (empty($input['name'])) {
-            sendJson(['error' => 'name is required'], 400);
-        }
-        $sql = 'INSERT INTO Leagues (name, start_date) VALUES (?, ?)';
-        $params = [$input['name'], $input['start_date'] ?? null];
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $newId = $pdo->lastInsertId();
-        $stmt = $pdo->prepare('SELECT * FROM Leagues WHERE id = ?');
-        $stmt->execute([$newId]);
-        sendJson($stmt->fetch());
+        validateApiSecret(); // League creation is global admin only
+        if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
+        
+        $password = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
+        $sql = 'INSERT INTO Leagues (name, start_date, password) VALUES (?, ?, ?)';
+        $pdo->prepare($sql)->execute([$input['name'], $input['start_date'] ?? null, $password]);
+        sendJson(['success' => true]);
     }
 }
 
 // PUT: Update League or Event (Protected by API Secret)
 if ($method === 'PUT') {
-    validateApiSecret();
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
 
     if ($action === 'event') {
+        validateLeagueAccess($pdo, $input['league_id']);
         $sql = 'UPDATE Events SET league_id = ?, location_id = ?, event_name = ?, event_date = ? WHERE id = ?';
         $params = [(int)$input['league_id'], $input['location_id'] ?? null, $input['event_name'], $input['event_date'] ?? null, $id];
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $stmt = $pdo->prepare('SELECT * FROM Events WHERE id = ?');
     } else {
+        // Handle password reset separately (Requires Global Admin)
+        if (isset($input['reset_password'])) {
+            validateApiSecret();
+            $newPass = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
+            $pdo->prepare('UPDATE Leagues SET password = ? WHERE id = ?')->execute([$newPass, $id]);
+            sendJson(['success' => true]);
+        }
+
+        validateLeagueAccess($pdo, $id);
         $sql = 'UPDATE Leagues SET name = ?, start_date = ? WHERE id = ?';
         $params = [$input['name'], $input['start_date'] ?? null, $id];
         $stmt = $pdo->prepare($sql);

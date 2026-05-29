@@ -17,6 +17,24 @@ export function setCurrentPlayerId(playerId) {
   }
 }
 
+export function getLeaguePassword(leagueId) {
+  return sessionStorage.getItem(`pb-league-pass-${leagueId}`);
+}
+
+export function setLeaguePassword(leagueId, pass) {
+  if (pass) sessionStorage.setItem(`pb-league-pass-${leagueId}`, pass);
+  else sessionStorage.removeItem(`pb-league-pass-${leagueId}`);
+}
+
+export function getAdminSessionPassword() {
+  return sessionStorage.getItem('pb-admin-pass');
+}
+
+export function setAdminSessionPassword(pass) {
+  if (pass) sessionStorage.setItem('pb-admin-pass', pass);
+  else sessionStorage.removeItem('pb-admin-pass');
+}
+
 // Calculate the base application path once to ensure relative API calls resolve correctly
 // regardless of clean URL routing (e.g., /leagues vs /leagues.php)
 // This prevents 404 errors when navigating sub-directories or using .htaccess rewrites.
@@ -27,9 +45,14 @@ const APP_BASE = window.location.pathname.substring(0, window.location.pathname.
  * and handles standardized JSON error responses.
  */
 export async function fetchJSON(url, options = {}) {
+  const urlObj = new URL(url.startsWith('http') ? url : `http://localhost/${url}`);
+  const leagueId = urlObj.searchParams.get('leagueId') || (options.body ? JSON.parse(options.body).league_id : null);
+  const leaguePass = leagueId ? getLeaguePassword(leagueId) : null;
+
   const finalHeaders = {
     'Content-Type': 'application/json',
     'X-PB-SECRET': API_SECRET,
+    ...(leaguePass && { 'X-LEAGUE-PASSWORD': leaguePass }),
     ...options.headers
   };
 

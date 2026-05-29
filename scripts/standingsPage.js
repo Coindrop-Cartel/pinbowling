@@ -75,9 +75,10 @@ export async function initStandingsPage() {
    * Uses bulk-fetching for all scores and target definitions to ensure fast rendering.
    */
   const renderLeagueSummary = async (leagueId) => {
-    const players = await PB_API.getPlayers();
     const leagues = await PB_API.getLeagues();
-    const events = leagues.find(l => String(l.id) === String(leagueId))?.events || [];
+    const league = leagues.find(l => String(l.id) === String(leagueId));
+    const players = league?.players || [];
+    const events = league?.events || [];
 
     const [allLeagueScores, allLeagueTargets] = await Promise.all([
       PB_API.getScores(null, null, leagueId),

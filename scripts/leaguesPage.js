@@ -1,6 +1,7 @@
 import { PB_API } from './api.js';
-import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog } from './uiComponents.js';
+import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog } from './uiComponents.js';
 import { setActiveLeagueId, setActiveEventId, getActiveLeagueId } from './utils.js';
+import { setLeaguePassword, getLeaguePassword, getAdminSessionPassword, setAdminSessionPassword } from './api.js';
 
 /**
  * Logic for managing Leagues and Events.
@@ -74,6 +75,11 @@ export async function initLeaguesPage() {
               </ul>
               <div class="notice league-players-empty hidden">No players assigned to this league.</div>
             </div>
+
+            <div style="margin-top: 30px; border-top: 2px solid #000; padding-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
+              <button class="edit-league-btn secondary">Edit League</button>
+              <button class="delete-league-btn">Delete League</button>
+            </div>
           </div>
         `;
 
@@ -90,7 +96,8 @@ export async function initLeaguesPage() {
 
         // Action listeners
         card.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
-        card.querySelector('.delete-league-btn').onclick = () => deleteLeague(league.id, league.name);
+        card.querySelector('.edit-league-btn').onclick = () => editLeague(league.id, league.name);
+        card.querySelector('.delete-league-btn').onclick = () => manageLeagueAction(league.id, () => deleteLeague(league.id, league.name));
         card.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
         
         card.querySelectorAll('.setup-event-btn').forEach(btn => {
@@ -110,7 +117,7 @@ export async function initLeaguesPage() {
         });
 
         card.querySelectorAll('.delete-event-btn').forEach(btn => {
-          btn.onclick = (e) => deleteEvent(Number(e.target.dataset.id), league.name);
+          btn.onclick = (e) => manageLeagueAction(league.id, () => deleteEvent(Number(e.target.dataset.id), league.name));
         });
 
         leaguesList.appendChild(card);
@@ -166,12 +173,18 @@ export async function initLeaguesPage() {
     const date = leagueDateInput.value;
 
     if (window.PB_ADMIN_PASSWORD) {
-      const pass = await showPrompt(`Enter Admin Password to create league "${name}":`);
+      let pass = getAdminSessionPassword();
+      if (pass !== window.PB_ADMIN_PASSWORD) {
+        pass = await showPrompt(`Enter Admin Password to create league "${name}":`);
+        if (pass === window.PB_ADMIN_PASSWORD) setAdminSessionPassword(pass);
+      }
       if (pass === null || pass !== window.PB_ADMIN_PASSWORD) return alert('Unauthorized');
     }
 
+    const leaguePass = await showPrompt(`Set a League Password for "${name}". This will be required for scoring and setup by non-admins. (Optional)`, 'League Password', false);
+
     try {
-      await PB_API.createLeague({ name, start_date: date });
+      await PB_API.createLeague({ name, start_date: date, password: leaguePass });
       leagueNameInput.value = '';
       leagueDateInput.value = '';
       await refresh();
@@ -180,6 +193,52 @@ export async function initLeaguesPage() {
       alert(`Failed to create league: ${err.message}`);
     }
   });
+
+  async function manageLeagueAction(leagueId, actionCallback) {
+    let pass = getLeaguePassword(leagueId) || getAdminSessionPassword();
+    
+    if (!pass || (pass !== window.PB_ADMIN_PASSWORD && !getLeaguePassword(leagueId))) {
+      pass = await showPrompt(`Enter League Password (or Admin Password) to continue:`, 'League Access');
+      if (pass === null) return;
+      
+      if (pass === window.PB_ADMIN_PASSWORD) {
+        setAdminSessionPassword(pass);
+      } else {
+        setLeaguePassword(leagueId, pass);
+      }
+    }
+
+    try {
+      await actionCallback();
+    } catch (err) {
+      if (err.message.includes('Unauthorized')) {
+        setLeaguePassword(leagueId, null);
+        setAdminSessionPassword(null);
+        alert('Invalid Password.');
+      } else throw err;
+    }
+  }
+
+  async function editLeague(leagueId, currentName) {
+    let globalPass = getAdminSessionPassword();
+    if (globalPass !== window.PB_ADMIN_PASSWORD) {
+      globalPass = await showPrompt(`Reset password for "${currentName}"? Enter Global Admin Password:`);
+      if (globalPass === window.PB_ADMIN_PASSWORD) setAdminSessionPassword(globalPass);
+    }
+    
+    if (globalPass === null) return;
+    if (globalPass !== window.PB_ADMIN_PASSWORD) return alert('Invalid Admin Password.');
+
+    const newLeaguePass = await showPrompt(`Enter new League Password (or leave blank to clear):`, 'Reset League Password', false);
+    
+    try {
+      await PB_API.updateLeague(leagueId, { reset_password: true, password: newLeaguePass });
+      alert('League password updated successfully.');
+      await refresh();
+    } catch (err) {
+      alert(`Update failed: ${err.message}`);
+    }
+  }
 
   async function renderPlayersForLeague(leagueId, leaguePlayers, allPlayers) {
     // Find the roster list specifically for this league card
@@ -219,38 +278,41 @@ export async function initLeaguesPage() {
   }
 
   async function addPlayerToLeague(leagueId, leagueName) {
-    const league = allLeagues.find(l => l.id === leagueId);
-    const playersInLeague = new Set((league.players || []).map(p => p.id));
-    const availablePlayers = allPlayersCache.filter(p => !playersInLeague.has(p.id));
+    await manageLeagueAction(leagueId, async () => {
+      const league = allLeagues.find(l => l.id === leagueId);
+      if (!league) return;
+      
+      const playersInLeague = new Set((league.players || []).map(p => p.id));
+      const availablePlayers = allPlayersCache.filter(p => !playersInLeague.has(p.id));
 
-    if (availablePlayers.length === 0) {
-        alert('All available players are already in this league.');
-        return;
-    }
+      if (availablePlayers.length === 0) {
+          alert('All available players are already in this league.');
+          return;
+      }
 
-    const playerOptions = availablePlayers.map(p => ({ value: p.id, label: p.player_name }));
+      const playerOptions = availablePlayers.map(p => ({ value: p.id, label: p.player_name }));
+      const selectedPlayerId = await showPlayerSelectionDialog(
+          `Add Player to ${leagueName}`,
+          'Select a player to add:',
+          playerOptions
+      );
 
-    const selectedPlayerId = await showPlayerSelectionDialog(
-        `Add Player to ${leagueName}`,
-        'Select a player to add:',
-        playerOptions
-    );
-
-    if (selectedPlayerId) {
-        if (window.PB_ADMIN_PASSWORD) {
-            const pass = await showPrompt(`Enter Admin Password to add player to "${leagueName}":`);
-            if (pass === null || pass !== window.PB_ADMIN_PASSWORD) return alert('Unauthorized');
-        }
-        await PB_API.addLeaguePlayer(leagueId, Number(selectedPlayerId));
-        await refresh();
-    }
+      if (selectedPlayerId) {
+          await PB_API.addLeaguePlayer(leagueId, Number(selectedPlayerId));
+          await refresh();
+      }
+    });
   }
 
   async function removePlayerFromLeague(leagueId, playerId, playerName) {
     if (!await showConfirm(`Remove ${playerName} from this league? Their scores will remain, but they will no longer be associated with this league's roster.`, 'Remove Player')) return;
 
     if (window.PB_ADMIN_PASSWORD) {
-        const pass = await showPrompt(`Enter Admin Password to remove ${playerName} from league:`);
+        let pass = getAdminSessionPassword();
+        if (pass !== window.PB_ADMIN_PASSWORD) {
+          pass = await showPrompt(`Enter Admin Password to remove ${playerName} from league:`);
+          if (pass === window.PB_ADMIN_PASSWORD) setAdminSessionPassword(pass);
+        }
         if (pass === null || pass !== window.PB_ADMIN_PASSWORD) return alert('Unauthorized');
     }
 

@@ -1,4 +1,4 @@
-import { PB_API } from './api.js';
+import { PB_API, getAdminSessionPassword, setAdminSessionPassword } from './api.js';
 import { setupLiveFilter, showConfirm, showPrompt } from './uiComponents.js';
 
 /**
@@ -41,7 +41,11 @@ export async function initMachinesPage() {
 
         item.querySelector('.delete-mach-btn').onclick = async () => {
           if (window.PB_ADMIN_PASSWORD) {
-            const confirmPass = await showPrompt(`Enter Admin Password to delete "${m.machine_name}":`);
+            let confirmPass = getAdminSessionPassword();
+            if (confirmPass !== window.PB_ADMIN_PASSWORD) {
+              confirmPass = await showPrompt(`Enter Admin Password to delete "${m.machine_name}":`);
+              if (confirmPass === window.PB_ADMIN_PASSWORD) setAdminSessionPassword(confirmPass);
+            }
             if (confirmPass === null) return;
             if (confirmPass !== window.PB_ADMIN_PASSWORD) return alert('Incorrect Password');
           }
@@ -83,7 +87,11 @@ export async function initMachinesPage() {
     if (!name) return;
 
     if (window.PB_ADMIN_PASSWORD) {
-      const confirmPass = await showPrompt(`Enter Admin Password to register "${name}":`);
+      let confirmPass = getAdminSessionPassword();
+      if (confirmPass !== window.PB_ADMIN_PASSWORD) {
+        confirmPass = await showPrompt(`Enter Admin Password to register "${name}":`);
+        if (confirmPass === window.PB_ADMIN_PASSWORD) setAdminSessionPassword(confirmPass);
+      }
       if (confirmPass === null) return;
       if (confirmPass !== window.PB_ADMIN_PASSWORD) return alert('Incorrect Password');
     }

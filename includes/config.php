@@ -130,6 +130,11 @@ function initDatabase() {
         $pdo->exec("ALTER TABLE Locations ADD COLUMN city VARCHAR(100) DEFAULT NULL, ADD COLUMN state VARCHAR(50) DEFAULT NULL");
     } catch (PDOException $e) { /* Columns likely already exist */ }
 
+    // Add password column to Leagues for league-specific protection
+    try {
+        $pdo->exec("ALTER TABLE Leagues ADD COLUMN password VARCHAR(255) DEFAULT NULL");
+    } catch (PDOException $e) { /* Column likely already exists */ }
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS Machines (
         id INT AUTO_INCREMENT PRIMARY KEY,
         machine_name VARCHAR(255) NOT NULL UNIQUE
@@ -278,6 +283,38 @@ function initDatabase() {
     try {
         $pdo->exec("ALTER TABLE Scores ADD CONSTRAINT fk_scores_event FOREIGN KEY (event_id) REFERENCES Events(id) ON DELETE CASCADE");
     } catch (PDOException $e) { /* Constraint likely already exists */ }
+}
+
+/**
+ * Validates access to a specific league.
+ * Access is granted if the global admin secret is correct OR if the
+ * provided league-specific password matches.
+ * 
+ * @param PDO $pdo
+ * @param int $leagueId
+ * @return void
+ */
+function validateLeagueAccess($pdo, $leagueId) {
+    global $API_SECRET;
+    $headers = function_exists('getallheaders') ? getallheaders() : [];
+    $providedSecret = $_SERVER['HTTP_X_PB_SECRET'] ?? $headers['X-PB-SECRET'] ?? $headers['x-pb-secret'] ?? null;
+    $providedLeaguePass = $_SERVER['HTTP_X_LEAGUE_PASSWORD'] ?? $headers['X-LEAGUE-PASSWORD'] ?? $headers['x-league-password'] ?? null;
+
+    // 1. Check Global Secret (Admin Override)
+    if ($providedSecret === $API_SECRET) return;
+
+    // 2. Check League Specific Password
+    if (!$leagueId) sendJson(['error' => 'League ID required for validation'], 400);
+
+    $stmt = $pdo->prepare('SELECT password FROM Leagues WHERE id = ?');
+    $stmt->execute([(int)$leagueId]);
+    $hash = $stmt->fetchColumn();
+
+    if (!$hash) return; // League has no password set
+
+    if (!$providedLeaguePass || !password_verify($providedLeaguePass, $hash)) {
+        sendJson(['error' => 'Unauthorized: Invalid League Password'], 401);
+    }
 }
 
 /**
