@@ -1,5 +1,6 @@
 import { PB_API } from './api.js';
 import { setupLiveFilter, showConfirm, showPrompt } from './uiComponents.js';
+import { requireAdmin } from './auth.js';
 
 /**
  * Initializes the Player Management page.
@@ -121,17 +122,8 @@ export async function initPlayersPage() {
     const ifpaId = ifpaIdInput.value.trim() || null;
     const matchplayId = matchplayIdInput.value.trim() || null;
 
-    if (!name) return;
-
-    if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = await showPrompt(`Enter Admin Password to ${id ? 'update' : 'create'} player "${name}":`);
-      if (confirmation === null) { 
-        alert('Admin action cancelled.');
-        return;
-      } else if (confirmation !== window.PB_ADMIN_PASSWORD) { // Incorrect password
-        alert('Incorrect Admin Password.');
-        return;
-      }
+    if (!name || !await requireAdmin(`Enter Admin Password to ${id ? 'update' : 'create'} player "${name}":`)) {
+      return;
     }
 
     const payload = { player_name: name, ifpa_id: ifpaId, matchplay_id: matchplayId };
@@ -157,15 +149,8 @@ export async function initPlayersPage() {
       return;
     }
 
-    if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = await showPrompt(`Enter Admin Password to confirm deletion of ${player.player_name} (and all their scores):`);
-      if (confirmation === null) {
-        alert('Admin action cancelled.');
-        return;
-      } else if (confirmation !== window.PB_ADMIN_PASSWORD) { // Incorrect password
-        alert('Incorrect Admin Password.');
-        return;
-      }
+    if (!await requireAdmin(`Enter Admin Password to confirm deletion of ${player.player_name}:`)) {
+      return;
     }
 
     try {
