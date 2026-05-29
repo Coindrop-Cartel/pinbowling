@@ -78,6 +78,7 @@ $DB_USER = envValue($loadedEnv, ['DB_USER', 'MYSQL_USER'], 'username');
 $DB_PASS = envValue($loadedEnv, ['DB_PASS', 'MYSQL_PASSWORD'], 'password');
 $DB_CHARSET = 'utf8mb4';
 $API_SECRET = envValue($loadedEnv, ['API_SECRET'], 'bowl-2024-secret');
+$UI_VERSION = envValue($loadedEnv, ['UI_VERSION'], filemtime(__DIR__ . '/../index.php')); // Use index.php's modification time as a simple version for cache busting
 $ADMIN_PASSWORD = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');
 
 $DB_DSN = "mysql:host={$DB_HOST};port={$DB_PORT};dbname={$DB_NAME};charset={$DB_CHARSET}";

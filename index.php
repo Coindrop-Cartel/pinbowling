@@ -1,10 +1,11 @@
+<?php require_once 'includes/config.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PinBowling - Home</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=<?php echo $UI_VERSION; ?>" />
   <link rel="icon" type="image/png" href="images/logo.png" />
 </head>
 <body>
@@ -36,7 +37,7 @@
       <p>Total scores are calculated following standard bowling rules, including strike and spare bonuses from subsequent frames.</p>
     </section>
   </main>
-  <script src="js-config.php"></script>
-<script type="module" src="scripts/main.js"></script>
+  <script src="js-config.php?v=<?php echo $UI_VERSION; ?>"></script>
+  <script type="module" src="scripts/main.js?v=<?php echo $UI_VERSION; ?>"></script>
 </body>
 </html>
