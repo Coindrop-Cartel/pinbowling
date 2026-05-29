@@ -1,4 +1,5 @@
 import { getScoringEngine } from './engine.js';
+import * as self from './utils.js';
 
 /**
  * Utility functions and state management helpers.
@@ -16,7 +17,7 @@ export function setActiveLeagueId(id) {
   if (id) url.searchParams.set('leagueId', id);
   else url.searchParams.delete('leagueId');
   window.history.replaceState({}, '', url);
-  initNavigation();
+  self.initNavigation();
 }
 
 export function getActiveEventId() {
@@ -28,7 +29,7 @@ export function setActiveEventId(id) {
   if (id) url.searchParams.set('eventId', id);
   else url.searchParams.delete('eventId');
   window.history.replaceState({}, '', url);
-  initNavigation();
+  self.initNavigation();
 }
 
 export function getCurrentPlayerId() {
@@ -40,7 +41,7 @@ export function setCurrentPlayerId(playerId) {
   if (playerId) url.searchParams.set('playerId', playerId);
   else url.searchParams.delete('playerId');
   window.history.replaceState({}, '', url);
-  initNavigation();
+  self.initNavigation();
 }
 
 
