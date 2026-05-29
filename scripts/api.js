@@ -66,8 +66,9 @@ export async function fetchJSON(url, options = {}) {
     ...headers
   };
 
-  // Construct a reliable absolute path for the API call
-  const fullUrl = url.startsWith('http') ? url : `${APP_BASE}/${url}`;
+  // Construct a robust absolute URL including origin to prevent NetworkErrors
+  // in specific browser environments (like Firefox on private IPs).
+  const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${APP_BASE}/${url}`;
   
   // Prepare fetch options, ensuring a body is sent for POST requests (even if tunneled)
   // to prevent server-side resets for bodyless POSTs.

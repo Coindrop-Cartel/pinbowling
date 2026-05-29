@@ -175,7 +175,9 @@ if ($method === 'DELETE') {
                 $stmt = $pdo->prepare('SELECT league_id FROM Events WHERE id = ?');
                 $stmt->execute([$id]);
                 $eventLeagueId = $stmt->fetchColumn();
-                if ($eventLeagueId === false) sendJson(['error' => 'Event not found'], 404);
+                if ($eventLeagueId === false) {
+                    sendJson(['error' => 'Event not found'], 404);
+                }
                 validateLeagueAccess($pdo, $eventLeagueId);
             } else {
                 validateLeagueAccess($pdo, $id); // Deleting a League

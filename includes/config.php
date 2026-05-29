@@ -130,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 function validateLeagueAccess($pdo, $leagueId) {
     global $API_SECRET;
     $headers = function_exists('getallheaders') ? getallheaders() : [];
-    $providedSecret = $_SERVER['HTTP_X_PB_SECRET'] ?? $headers['X-PB-SECRET'] ?? $headers['x-pb-secret'] ?? null;
+    $providedSecret = $_SERVER['HTTP_X_PB_SECRET'] ?? $headers['X-PB-SECRET'] ?? $headers['x-pb-secret'] ?? $_SERVER['REDIRECT_HTTP_X_PB_SECRET'] ?? null;
     $providedLeaguePass = $_SERVER['HTTP_X_LEAGUE_PASSWORD'] ?? $headers['X-LEAGUE-PASSWORD'] ?? $headers['x-league-password'] ?? null;
 
     // 1. Check Global Secret (Admin Override)
@@ -174,6 +174,7 @@ function validateApiSecret() {
  * @param int $status HTTP status code.
  */
 function sendJson($data, $status = 200) {
+    if (ob_get_length()) ob_clean();
     header('Content-Type: application/json');
     http_response_code($status);
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
