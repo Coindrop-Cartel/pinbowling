@@ -1,39 +1,10 @@
 /**
  * API Client and State Management
  */
-const CURRENT_PLAYER_KEY = "pinbowling-current-player-id";
+import { getLeaguePassword } from './state.js';
+
 const API_SECRET = window.PB_API_SECRET || "";
 export const ADMIN_PASSWORD = window.PB_ADMIN_PASSWORD || "";
-
-export function getCurrentPlayerId() {
-  return localStorage.getItem(CURRENT_PLAYER_KEY);
-}
-
-export function setCurrentPlayerId(playerId) {
-  if (playerId) {
-    localStorage.setItem(CURRENT_PLAYER_KEY, playerId);
-  } else {
-    localStorage.removeItem(CURRENT_PLAYER_KEY);
-  }
-}
-
-export function getLeaguePassword(leagueId) {
-  return sessionStorage.getItem(`pb-league-pass-${leagueId}`);
-}
-
-export function setLeaguePassword(leagueId, pass) {
-  if (pass) sessionStorage.setItem(`pb-league-pass-${leagueId}`, pass);
-  else sessionStorage.removeItem(`pb-league-pass-${leagueId}`);
-}
-
-export function getAdminSessionPassword() {
-  return sessionStorage.getItem('pb-admin-pass');
-}
-
-export function setAdminSessionPassword(pass) {
-  if (pass) sessionStorage.setItem('pb-admin-pass', pass);
-  else sessionStorage.removeItem('pb-admin-pass');
-}
 
 // Calculate the base application path once to ensure relative API calls resolve correctly
 // regardless of clean URL routing (e.g., /leagues vs /leagues.php)

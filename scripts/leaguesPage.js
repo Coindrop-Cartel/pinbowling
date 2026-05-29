@@ -1,7 +1,7 @@
 import { PB_API } from './api.js';
 import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog } from './uiComponents.js';
 import { setActiveLeagueId, setActiveEventId, getActiveLeagueId } from './utils.js';
-import { setLeaguePassword, getLeaguePassword, getAdminSessionPassword, setAdminSessionPassword } from './api.js';
+import { setLeaguePassword, getLeaguePassword, getAdminSessionPassword, setAdminSessionPassword } from './state.js';
 
 /**
  * Logic for managing Leagues and Events.

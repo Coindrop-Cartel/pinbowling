@@ -1,5 +1,4 @@
 /** @vitest-environment jsdom */
-/** @vitest-environment jsdom */ 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 /**
@@ -21,15 +20,18 @@ vi.hoisted(() => {
 });
 
 import { 
+  fetchJSON, 
+  PB_API 
+} from '../../scripts/api.js';
+
+import {
   getCurrentPlayerId, 
   setCurrentPlayerId, 
   getLeaguePassword, 
   setLeaguePassword,
   getAdminSessionPassword,
-  setAdminSessionPassword,
-  fetchJSON, 
-  PB_API 
-} from '../../scripts/api.js';
+  setAdminSessionPassword
+} from '../../scripts/state.js';
 
 /**
  * Unit tests for the API Client.
