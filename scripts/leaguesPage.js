@@ -365,9 +365,14 @@ export async function initLeaguesPage() {
     const eventId = document.getElementById('event-id').value;
     const name = document.getElementById('event-name').value.trim();
     const date = document.getElementById('event-date').value;
-    const locationId = document.getElementById('event-location').value;
+    const locationValue = document.getElementById('event-location').value;
 
-    const payload = { league_id: leagueId, event_name: name, event_date: date, location_id: locationId };
+    const payload = { 
+      league_id: leagueId, 
+      event_name: name, 
+      event_date: date, 
+      location_id: locationValue ? Number(locationValue) : null 
+    };
 
     try {
       if (eventId) {

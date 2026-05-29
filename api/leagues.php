@@ -112,7 +112,12 @@ if ($method === 'POST') {
             sendJson(['error' => 'league_id and event_name are required'], 400);
         }
         $sql = 'INSERT INTO Events (league_id, location_id, event_name, event_date) VALUES (?, ?, ?, ?)';
-        $params = [(int)$input['league_id'], $input['location_id'] ?? null, $input['event_name'], $input['event_date'] ?? null];
+        $params = [
+            (int)$input['league_id'], 
+            !empty($input['location_id']) ? (int)$input['location_id'] : null, 
+            $input['event_name'], 
+            $input['event_date'] ?? null
+        ];
         $pdo->prepare($sql)->execute($params);
         sendJson(['success' => true]);
     } else {
@@ -134,7 +139,13 @@ if ($method === 'PUT') {
     if ($task === 'fixture') {
         validateLeagueAccess($pdo, $input['league_id']);
         $sql = 'UPDATE Events SET league_id = ?, location_id = ?, event_name = ?, event_date = ? WHERE id = ?';
-        $params = [(int)$input['league_id'], $input['location_id'] ?? null, $input['event_name'], $input['event_date'] ?? null, $id];
+        $params = [
+            (int)$input['league_id'], 
+            !empty($input['location_id']) ? (int)$input['location_id'] : null, 
+            $input['event_name'], 
+            $input['event_date'] ?? null, 
+            $id
+        ];
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $stmt = $pdo->prepare('SELECT * FROM Events WHERE id = ?');
