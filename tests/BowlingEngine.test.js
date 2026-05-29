@@ -97,4 +97,12 @@ describe('BowlingEngine', () => {
     const { total } = engine.calculateTurnResults(machines, scoreMap);
     expect(total).toBe(300);
   });
+
+  test('calculateTurnResults - Empty Scores', () => {
+    const scoreMap = {};
+    const { turnResults, total } = engine.calculateTurnResults(machines.slice(0, 1), scoreMap);
+    
+    expect(turnResults[0].score).toBe(0);
+    expect(total).toBe(0);
+  });
 });
