@@ -7,11 +7,11 @@ $pdo = getDbConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];
 $input = getJsonInput();
-$action = $_GET['action'] ?? 'location';
+$task = $_GET['task'] ?? 'location';
 
 // GET: Retrieve all locations or a specific one by ID
 if ($method === 'GET') {
-    if ($action === 'machines') {
+    if ($task === 'units') {
         $locationId = isset($_GET['locationId']) ? (int)$_GET['locationId'] : 0;
 
         if ($locationId) {
@@ -73,7 +73,7 @@ if ($method === 'GET') {
 // POST: Create a new location (Protected by API Secret)
 if ($method === 'POST') {
     if (empty($input['name'])) {
-        if ($action === 'machines') {
+        if ($task === 'units') {
             if (empty($input['location_id']) || empty($input['machine_id'])) {
                 sendJson(['error' => 'location_id and machine_id are required'], 400);
             }
@@ -128,7 +128,7 @@ if ($method === 'PUT') {
 if ($method === 'DELETE') {
     validateApiSecret();
     
-    if ($action === 'machines') {
+    if ($task === 'units') {
         $locationId = isset($_GET['locationId']) ? (int)$_GET['locationId'] : 0;
         $machineId = isset($_GET['machineId']) ? (int)$_GET['machineId'] : 0;
         $stmt = $pdo->prepare('DELETE FROM Location_Machines WHERE location_id = ? AND machine_id = ?');

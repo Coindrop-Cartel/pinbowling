@@ -121,28 +121,28 @@ export const PB_API = {
   createLeague: (league) => fetchJSON('api/leagues.php', { method: 'POST', body: JSON.stringify(league) }),
   updateLeague: (id, league) => fetchJSON(`api/leagues.php?id=${id}`, { method: 'PUT', body: JSON.stringify(league) }),
   deleteLeague: (id) => fetchJSON(`api/leagues.php?id=${id}`, { method: 'DELETE' }),
-  getEvents: (leagueId) => fetchJSON(`api/leagues.php?action=event${leagueId ? `&leagueId=${leagueId}` : ''}`),
-  createEvent: (event) => fetchJSON('api/leagues.php?action=event', { method: 'POST', body: JSON.stringify(event) }),
-  updateEvent: (id, event) => fetchJSON(`api/leagues.php?action=event&id=${id}`, { method: 'PUT', body: JSON.stringify(event) }),
-  deleteEvent: (id, leagueId) => fetchJSON(`api/leagues.php?action=event&id=${id}${leagueId ? `&leagueId=${leagueId}` : ''}`, { method: 'DELETE' }),
-  addLeaguePlayer: (leagueId, playerId) => fetchJSON('api/leagues.php?action=player', { method: 'POST', body: JSON.stringify({ league_id: leagueId, player_id: playerId }) }),
-  removeLeaguePlayer: (leagueId, playerId) => fetchJSON(`api/leagues.php?action=player&leagueId=${leagueId}&playerId=${playerId}`, { method: 'DELETE' }),
+  getEvents: (leagueId) => fetchJSON(`api/leagues.php?task=fixture${leagueId ? `&leagueId=${leagueId}` : ''}`),
+  createEvent: (event) => fetchJSON('api/leagues.php?task=fixture', { method: 'POST', body: JSON.stringify(event) }),
+  updateEvent: (id, event) => fetchJSON(`api/leagues.php?task=fixture&id=${id}`, { method: 'PUT', body: JSON.stringify(event) }),
+  deleteEvent: (id, leagueId) => fetchJSON(`api/leagues.php?task=fixture&id=${id}${leagueId ? `&leagueId=${leagueId}` : ''}`, { method: 'DELETE' }),
+  addLeaguePlayer: (leagueId, playerId) => fetchJSON('api/leagues.php?task=member', { method: 'POST', body: JSON.stringify({ league_id: leagueId, player_id: playerId }) }),
+  removeLeaguePlayer: (leagueId, playerId) => fetchJSON(`api/leagues.php?task=member&leagueId=${leagueId}&playerId=${playerId}`, { method: 'DELETE' }),
 
   // Locations and Target Scores
   getLocations: () => fetchJSON('api/locations.php'),
   createLocation: (loc) => fetchJSON('api/locations.php', { method: 'POST', body: JSON.stringify(loc) }),
   updateLocation: (id, loc) => fetchJSON(`api/locations.php?id=${id}`, { method: 'PUT', body: JSON.stringify(loc) }),
   deleteLocation: (id) => fetchJSON(`api/locations.php?id=${id}`, { method: 'DELETE' }),
-  getLocationMachines: (locationId) => fetchJSON(`api/locations.php?action=machines${locationId ? `&locationId=${locationId}` : ''}`),
+  getLocationMachines: (locationId) => fetchJSON(`api/locations.php?task=units${locationId ? `&locationId=${locationId}` : ''}`),
   addLocationMachine: (locationId, machineId, extra = {}) => 
-    fetchJSON('api/locations.php?action=machines', { method: 'POST', body: JSON.stringify({ location_id: locationId, machine_id: machineId, ...extra }) }),
-  removeLocationMachine: (locationId, machineId) => fetchJSON(`api/locations.php?action=machines&locationId=${locationId}&machineId=${machineId}`, { method: 'DELETE' }),
+    fetchJSON('api/locations.php?task=units', { method: 'POST', body: JSON.stringify({ location_id: locationId, machine_id: machineId, ...extra }) }),
+  removeLocationMachine: (locationId, machineId) => fetchJSON(`api/locations.php?task=units&locationId=${locationId}&machineId=${machineId}`, { method: 'DELETE' }),
   getTargetScores: (eventId, leagueId) => 
     fetchJSON(`api/machines.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`),
-  bulkUpdateTargetOrder: (updates) => fetchJSON('api/machines.php?action=reorder', { method: 'POST', body: JSON.stringify(updates) }),
+  bulkUpdateTargetOrder: (updates) => fetchJSON('api/machines.php?task=sort', { method: 'POST', body: JSON.stringify(updates) }),
   saveTargetScore: (target) => {
-    const url = `api/machines.php?action=target`;
+    const url = `api/machines.php?task=threshold`;
     return fetchJSON(url, { method: 'POST', body: JSON.stringify(target) });
   },
-  deleteTargetScore: (id) => fetchJSON(`api/machines.php?id=${id}&action=target`, { method: 'DELETE' })
+  deleteTargetScore: (id) => fetchJSON(`api/machines.php?id=${id}&task=threshold`, { method: 'DELETE' })
 };

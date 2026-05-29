@@ -50,7 +50,7 @@ function serializeMasterMachine($row) {
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
-$action = $_GET['action'] ?? 'machine';
+$task = $_GET['task'] ?? 'machine';
 $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
 $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
 
@@ -88,7 +88,7 @@ $input = getJsonInput();
 
 // POST: Add a new round/machine configuration (Protected by API Secret)
 if ($method === 'POST') {
-    if ($action === 'reorder') {
+    if ($task === 'sort') {
         validateApiSecret();
         if (!is_array($input)) {
             sendJson(['error' => 'Input must be an array of updates'], 400);
@@ -141,8 +141,8 @@ if ($method === 'POST') {
         }
     }
 
-    // Action 'target' handles Target_Scores, default action handles master Machines
-    if ($action === 'target') {
+    // Task 'threshold' handles Target_Scores, default handles master Machines
+    if ($task === 'threshold') {
         validateApiSecret(); // Protect tournament event setup
         if (empty($input['event_id']) || empty($input['machine_id'])) {
             sendJson(['error' => 'event_id and machine_id are required for target scores'], 400);
@@ -204,8 +204,8 @@ if ($method === 'PUT') {
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0; // ID of the round or master machine being updated
     if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
     
-    // Action 'target' handles Target_Scores, default action handles master Machines
-    if ($action === 'target') {
+    // Task 'threshold' handles Target_Scores, default handles master Machines
+    if ($task === 'threshold') {
         if (empty($input['machine_id']) || empty($input['order_number']) || empty($input['values'])) {
             sendJson(['error' => 'machine_id, order_number, and values are required for target scores'], 400);
         }
@@ -242,7 +242,7 @@ if ($method === 'DELETE') {
         sendJson(['error' => 'id query parameter is required'], 400);
     }
     
-    $table = ($action === 'target') ? 'Target_Scores' : 'Machines';
+    $table = ($task === 'threshold') ? 'Target_Scores' : 'Machines';
     $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ?");
     $stmt->execute([$id]);
     sendJson(['success' => true]);

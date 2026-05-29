@@ -19,12 +19,12 @@ $pdo = getDbConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];
 $input = getJsonInput();
-// Use 'action' parameter to distinguish between league and event operations
-$action = $_GET['action'] ?? 'league'; 
+// Use 'task' parameter (formerly 'action') to avoid ad-blocker filters
+$task = $_GET['task'] ?? 'league'; 
 
 // GET: Retrieve Leagues or Events
 if ($method === 'GET') {
-    if ($action === 'event') {
+    if ($task === 'fixture') {
         $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
         if ($leagueId) { // Fetch events for a specific league
             $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id WHERE e.league_id = ? ORDER BY e.event_date ASC');
@@ -98,7 +98,7 @@ if ($method === 'GET') {
 
 // POST: Create new League or Event (Protected by API Secret)
 if ($method === 'POST') {
-    if ($action === 'player') {
+    if ($task === 'member') {
         validateLeagueAccess($pdo, $input['league_id']);
         if (empty($input['league_id']) || empty($input['player_id'])) {
             sendJson(['error' => 'league_id and player_id are required'], 400);
@@ -106,7 +106,7 @@ if ($method === 'POST') {
         $stmt = $pdo->prepare('INSERT IGNORE INTO League_Players (league_id, player_id) VALUES (?, ?)');
         $stmt->execute([(int)$input['league_id'], (int)$input['player_id']]);
         sendJson(['success' => true]);
-    } else if ($action === 'event') {
+    } else if ($task === 'fixture') {
         validateLeagueAccess($pdo, $input['league_id']);
         if (empty($input['league_id']) || empty($input['event_name'])) {
             sendJson(['error' => 'league_id and event_name are required'], 400);
@@ -131,7 +131,7 @@ if ($method === 'PUT') {
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
 
-    if ($action === 'event') {
+    if ($task === 'fixture') {
         validateLeagueAccess($pdo, $input['league_id']);
         $sql = 'UPDATE Events SET league_id = ?, location_id = ?, event_name = ?, event_date = ? WHERE id = ?';
         $params = [(int)$input['league_id'], $input['location_id'] ?? null, $input['event_name'], $input['event_date'] ?? null, $id];
@@ -161,7 +161,7 @@ if ($method === 'PUT') {
 // DELETE: Remove League or Event (Protected by API Secret)
 if ($method === 'DELETE') {
     try {
-        if ($action === 'player') {
+        if ($task === 'member') {
             $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
             validateLeagueAccess($pdo, $leagueId);
             $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
@@ -170,7 +170,7 @@ if ($method === 'DELETE') {
             $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
             if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
 
-            if ($action === 'event') {
+            if ($task === 'fixture') {
                 // Verify the event exists and retrieve its league_id for security validation
                 $stmt = $pdo->prepare('SELECT league_id FROM Events WHERE id = ?');
                 $stmt->execute([$id]);
@@ -183,7 +183,7 @@ if ($method === 'DELETE') {
                 validateLeagueAccess($pdo, $id); // Deleting a League
             }
 
-            $table = ($action === 'event') ? 'Events' : 'Leagues';
+            $table = ($task === 'fixture') ? 'Events' : 'Leagues';
             $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ?");
             $stmt->execute([$id]);
         }
