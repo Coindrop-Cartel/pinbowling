@@ -150,16 +150,24 @@ if ($method === 'PUT') {
 
 // DELETE: Remove League or Event (Protected by API Secret)
 if ($method === 'DELETE') {
-    validateApiSecret();
-    
     if ($action === 'player') {
         $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
+        validateLeagueAccess($pdo, $leagueId);
         $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
         $stmt = $pdo->prepare("DELETE FROM League_Players WHERE league_id = ? AND player_id = ?");
         $stmt->execute([$leagueId, $playerId]);
     } else {
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
+
+        if ($action === 'event') {
+            $stmt = $pdo->prepare('SELECT league_id FROM Events WHERE id = ?');
+            $stmt->execute([$id]);
+            validateLeagueAccess($pdo, $stmt->fetchColumn());
+        } else {
+            validateLeagueAccess($pdo, $id);
+        }
+
         $table = ($action === 'event') ? 'Events' : 'Leagues';
         $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ?");
         $stmt->execute([$id]);

@@ -73,8 +73,6 @@ if ($method === 'GET') {
 
 // POST: Create a new location (Protected by API Secret)
 if ($method === 'POST') {
-    validateApiSecret();
-    
     if (empty($input['name'])) {
         if ($action === 'machines') {
             if (empty($input['location_id']) || empty($input['machine_id'])) {

@@ -86,16 +86,6 @@ export async function initMachinesPage() {
     const name = nameInput.value.trim();
     if (!name) return;
 
-    if (window.PB_ADMIN_PASSWORD) {
-      let confirmPass = getAdminSessionPassword();
-      if (confirmPass !== window.PB_ADMIN_PASSWORD) {
-        confirmPass = await showPrompt(`Enter Admin Password to register "${name}":`);
-        if (confirmPass === window.PB_ADMIN_PASSWORD) setAdminSessionPassword(confirmPass);
-      }
-      if (confirmPass === null) return;
-      if (confirmPass !== window.PB_ADMIN_PASSWORD) return alert('Incorrect Password');
-    }
-
     await PB_API.createMachine(name);
     nameInput.value = '';
     await load();

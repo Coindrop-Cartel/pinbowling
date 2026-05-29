@@ -100,7 +100,7 @@ export const PB_API = {
   getEvents: (leagueId) => fetchJSON(`api/leagues.php?action=event${leagueId ? `&leagueId=${leagueId}` : ''}`),
   createEvent: (event) => fetchJSON('api/leagues.php?action=event', { method: 'POST', body: JSON.stringify(event) }),
   updateEvent: (id, event) => fetchJSON(`api/leagues.php?action=event&id=${id}`, { method: 'PUT', body: JSON.stringify(event) }),
-  deleteEvent: (id) => fetchJSON(`api/leagues.php?action=event&id=${id}`, { method: 'DELETE' }),
+  deleteEvent: (id, leagueId) => fetchJSON(`api/leagues.php?action=event&id=${id}${leagueId ? `&leagueId=${leagueId}` : ''}`, { method: 'DELETE' }),
   addLeaguePlayer: (leagueId, playerId) => fetchJSON('api/leagues.php?action=player', { method: 'POST', body: JSON.stringify({ league_id: leagueId, player_id: playerId }) }),
   removeLeaguePlayer: (leagueId, playerId) => fetchJSON(`api/leagues.php?action=player&leagueId=${leagueId}&playerId=${playerId}`, { method: 'DELETE' }),
 

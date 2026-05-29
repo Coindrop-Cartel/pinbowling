@@ -117,7 +117,7 @@ export async function initLeaguesPage() {
         });
 
         card.querySelectorAll('.delete-event-btn').forEach(btn => {
-          btn.onclick = (e) => manageLeagueAction(league.id, () => deleteEvent(Number(e.target.dataset.id), league.name));
+          btn.onclick = (e) => manageLeagueAction(league.id, () => deleteEvent(Number(e.target.dataset.id), league.id, league.name));
         });
 
         leaguesList.appendChild(card);
@@ -326,9 +326,9 @@ export async function initLeaguesPage() {
     await refresh();
   }
 
-  async function deleteEvent(id, leagueName) {
+  async function deleteEvent(id, leagueId, leagueName) {
     if (!await showConfirm(`Delete this event from ${leagueName}?`, 'Delete Event')) return;
-    await PB_API.deleteEvent(id);
+    await PB_API.deleteEvent(id, leagueId);
     await refresh();
   }
 

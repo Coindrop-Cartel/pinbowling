@@ -78,9 +78,8 @@ $input = getJsonInput();
 
 // POST: Add a new round/machine configuration (Protected by API Secret)
 if ($method === 'POST') {
-    validateApiSecret();
-    
     if ($action === 'reorder') {
+        validateApiSecret();
         if (!is_array($input)) {
             sendJson(['error' => 'Input must be an array of updates'], 400);
         }
@@ -134,6 +133,7 @@ if ($method === 'POST') {
 
     // Action 'target' handles Target_Scores, default action handles master Machines
     if ($action === 'target') {
+        validateApiSecret(); // Protect tournament event setup
         if (empty($input['event_id']) || empty($input['machine_id'])) {
             sendJson(['error' => 'event_id and machine_id are required for target scores'], 400);
         }

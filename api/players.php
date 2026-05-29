@@ -18,8 +18,6 @@ $input = getJsonInput();
 
 // POST: Register a new player (Protected by API Secret)
 if ($method === 'POST') {
-    validateApiSecret();
-    
     if (empty($input['player_name'])) {
         sendJson(['error' => 'player_name is required'], 400);
     }

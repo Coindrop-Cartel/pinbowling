@@ -104,7 +104,7 @@ function getDbConnection() {
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, X-PB-SECRET, X-HTTP-Method-Override');
+    header('Access-Control-Allow-Headers: Content-Type, X-PB-SECRET, X-LEAGUE-PASSWORD, X-HTTP-Method-Override');
     exit;
 }
 
