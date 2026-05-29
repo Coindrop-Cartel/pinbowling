@@ -82,14 +82,20 @@ export function applyScoreFormatting(input) {
  * Sets the 'active' class on the navigation item matching the current URL.
  */
 export function initNavigation() {
-  const currentPath = window.location.pathname.split('/').pop() || 'index.php';
+  // Normalize current path (e.g., "machines.php" or "machines" becomes "machines")
+  const rawPath = window.location.pathname.split('/').pop() || 'index';
+  const currentBase = rawPath.replace(/\.php$/, '') || 'index';
+
   const urlParams = new URLSearchParams(window.location.search);
 
   document.querySelectorAll('.nav-item').forEach(link => {
-    const href = link.getAttribute('href');
-    if (href && !href.startsWith('http') && !href.startsWith('#')) {
-      const [path, existingQuery] = href.split('?');
-      const targetParams = new URLSearchParams(existingQuery);
+    let originalHref = link.getAttribute('href');
+    if (originalHref && !originalHref.startsWith('http') && !originalHref.startsWith('#')) {
+      let [path, existingQuery] = originalHref.split('?');
+      
+      // Normalize the path for the UI links (strip .php)
+      const cleanPath = path.replace(/\.php$/, '');
+      const targetParams = new URLSearchParams(existingQuery || '');
       
       // Carry over global state params to navigation links
       ['leagueId', 'eventId', 'playerId'].forEach(key => {
@@ -99,11 +105,17 @@ export function initNavigation() {
       });
       
       const newQuery = targetParams.toString();
-      link.setAttribute('href', path + (newQuery ? '?' + newQuery : ''));
+      const updatedHref = cleanPath + (newQuery ? '?' + newQuery : '');
+      link.setAttribute('href', updatedHref);
+      originalHref = updatedHref;
     }
 
-    if (href === currentPath) {
+    // Compare base filenames to set active state accurately
+    const hrefBase = originalHref ? originalHref.split('?')[0].split('/').pop().replace(/\.php$/, '') || 'index' : '';
+    if (hrefBase === currentBase) {
       link.classList.add('active');
+    } else {
+      link.classList.remove('active');
     }
   });
 }
