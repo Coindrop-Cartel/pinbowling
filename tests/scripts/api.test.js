@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 /** @vitest-environment jsdom */ 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 /**
  * Setup the browser environment properties required by api.js during module evaluation.
@@ -39,6 +39,15 @@ describe('API Client (api.js)', () => {
     vi.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
+
+    // Silence console methods within this test file to prevent 
+    // expected error scenarios from polluting the test runner output.
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('State Management Helpers', () => {
