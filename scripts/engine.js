@@ -1,5 +1,5 @@
-import { BowlingEngine } from './BowlingEngine.js';
-import { GolfEngine } from './GolfEngine.js';
+import { BowlingEngine } from './engines/BowlingEngine.js';
+import { GolfEngine } from './engines/GolfEngine.js';
 import { ScoringEngine } from './ScoringEngine.js';
 
 /**
