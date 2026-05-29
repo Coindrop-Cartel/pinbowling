@@ -15,7 +15,6 @@
  * - playerId: Foreign key filter for league roster deletions
  */
 require_once __DIR__ . '/../includes/config.php';
-initDatabase();
 $pdo = getDbConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];

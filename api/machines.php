@@ -14,7 +14,6 @@
  * - leagueId: Filter targets by league
  */
 require_once __DIR__ . '/../includes/config.php';
-initDatabase();
 $pdo = getDbConnection();
 
 /**

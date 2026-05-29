@@ -1,4 +1,4 @@
-import { ScoringEngine } from './ScoringEngine.js';
+import { ScoringEngine } from '../ScoringEngine.js';
 
 /**
  * Placeholder for future Golf scoring format.

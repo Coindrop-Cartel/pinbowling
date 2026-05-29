@@ -1,4 +1,4 @@
-import { ScoringEngine } from './ScoringEngine.js';
+import { ScoringEngine } from '../ScoringEngine.js';
 
 /**
  * Implementation of the Bowling-style scoring logic.
