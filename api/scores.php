@@ -17,7 +17,6 @@
  * - playerId: Required (the ID of the player whose scores will be wiped).
  */
 require_once __DIR__ . '/../includes/config.php';
-initDatabase();
 $pdo = getDbConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];

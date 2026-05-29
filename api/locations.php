@@ -3,7 +3,6 @@
  * REST API for managing the global registry of pinball locations.
  */
 require_once __DIR__ . '/../includes/config.php';
-initDatabase();
 $pdo = getDbConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];
