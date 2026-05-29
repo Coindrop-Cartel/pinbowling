@@ -2,6 +2,34 @@
 
 This app now uses a PHP backend for MySQL persistence.
 
+## Overview
+
+PinBowling is a specialized scoring application designed to map pinball scores to bowling-style frames and strikes. This repository contains the backend API (PHP/MySQL) and the client-side logic (Vanilla JS) responsible for managing leagues, events, players, and real-time score calculation.
+
+## Project Structure
+
+- `/api`: RESTful PHP endpoints for CRUD operations.
+- `/includes`: Core configuration, database initialization, and security utilities.
+- `/scripts`: Frontend ES modules for UI components, scoring engines, and API interaction.
+- `/docs`: Documentation including API specifications.
+- `js-config.php`: Secure bridge for passing server-side environment variables to the frontend.
+
+## API Documentation
+
+The project includes a comprehensive OpenAPI 3.0 specification. You can find the detailed endpoint documentation in:
+`docs/openapi.yaml`
+
+Key endpoints include:
+- `api/leagues.php`: Manage bowling leagues, seasonal events, and rosters.
+- `api/machines.php`: Manage the global machine registry and event-specific target scores.
+- `api/players.php`: Manage the global player database.
+- `api/locations.php`: Manage physical venues and their machine lineups (templates).
+- `api/scores.php`: Record and retrieve frame-by-frame scores.
+
+## Security
+
+Write operations are protected by an `X-PB-SECRET` header. League-specific actions can also be protected by a league password provided via the `X-LEAGUE-PASSWORD` header.
+
 ## Setup
 
 1. Upload the site files to a PHP-enabled web host.

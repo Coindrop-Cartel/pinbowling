@@ -20,6 +20,10 @@ export function initLocationsPage() {
 
   let allLocations = [];
 
+  /**
+   * Filters the visible locations based on the Name, City, and State inputs.
+   * Also handles validation to prevent duplicate venue names.
+   */
   const onFilterUpdate = () => {
     const n = nameInput.value.trim().toLowerCase();
     const c = cityInput.value.trim().toLowerCase();
@@ -93,6 +97,10 @@ export function initLocationsPage() {
     saveBtn.title = (exactMatch && !isEditingThis) ? "A venue with this name, city, and state already exists." : "";
   };
 
+  /**
+   * Fetches all registered venues and refreshes the UI.
+   * @async
+   */
   const renderLocations = async () => {
     try {
       allLocations = await PB_API.getLocations();
@@ -103,6 +111,10 @@ export function initLocationsPage() {
     }
   };
 
+  /**
+   * Populates the editor form with details from an existing location.
+   * @param {number} locId The primary key of the location.
+   */
   function editLocation(locId) {
     const loc = allLocations.find(l => l.id === locId);
     if (!loc) return;
@@ -118,6 +130,9 @@ export function initLocationsPage() {
     window.scrollTo(0, 0);
   }
 
+  /**
+   * Resets the location editor form to its default state.
+   */
   function resetForm() {
     editingIdInput.value = '';
     form.reset();
@@ -130,6 +145,13 @@ export function initLocationsPage() {
   cityInput.addEventListener('input', onFilterUpdate);
   stateInput.addEventListener('input', onFilterUpdate);
 
+  /**
+   * Renders the machines associated with a specific location.
+   * @param {number} locationId 
+   * @param {string} locationName 
+   * @param {Array<Object>|null} [machines=null] Optional pre-loaded machines.
+   * @async
+   */
   async function renderMachinesForLocation(locationId, locationName, machines = null) {
     const inner = document.querySelector(`#mach-for-loc-${locationId} .mach-list-inner`);
     const empty = document.querySelector(`#mach-for-loc-${locationId} .mach-empty`);
@@ -174,6 +196,15 @@ export function initLocationsPage() {
     });
   }
 
+  /**
+   * Displays the interactive form for adding or editing a machine at a location.
+   * This logic manages the "Target Templates" used for event setup.
+   * 
+   * @param {number} locationId 
+   * @param {string} locationName 
+   * @param {Object|null} [existing=null] Existing mapping to edit.
+   * @async
+   */
   async function showMachineForm(locationId, locationName, existing = null) {
     // Show the card and scroll immediately so the user sees something is happening
     machineFormCard.classList.remove('hidden');
@@ -273,6 +304,11 @@ export function initLocationsPage() {
     }
   });
 
+  /**
+   * Global helper for deleting locations.
+   * Attached to window to allow for simple inline event handlers if needed.
+   * @param {number} id 
+   */
   window.deleteLocation = async (id) => {
     const loc = allLocations.find(l => l.id === id);
     const locName = loc ? loc.name : 'this location';

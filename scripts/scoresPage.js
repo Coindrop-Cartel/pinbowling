@@ -6,6 +6,13 @@ import { createSearchableSelect } from './uiComponents.js';
 
 /**
  * Initializes the Player Scoring page.
+ * 
+ * This module handles:
+ * 1. Rendering the round-by-round input form based on event target scores.
+ * 2. Real-time calculation of bowling results (Marks, Running Total).
+ * 3. Player selection and roster filtering.
+ * 4. Saving cumulative ball data to the backend.
+ * @async
  */
 export async function initScoresPage() {
   const roundsInput = document.getElementById('rounds-input');
@@ -37,6 +44,15 @@ export async function initScoresPage() {
   warning.classList.add('hidden');
   playerSelect.disabled = false;
 
+  /**
+   * Helper to create a formatted numeric input for pinball scores.
+   * @param {number} roundNumber 
+   * @param {number} ball 
+   * @param {number} machineId 
+   * @param {string|number} value 
+   * @param {string} placeholder 
+   * @returns {HTMLInputElement}
+   */
   function createRollInput(roundNumber, ball, machineId, value = '', placeholder = '') {
     const input = document.createElement('input');
     input.placeholder = placeholder || `Ball ${ball} cumulative`;
@@ -50,6 +66,14 @@ export async function initScoresPage() {
     return input;
   }
 
+  /**
+   * Constructs the HTML structure for a single round's input row.
+   * 
+   * @param {Object} round The machine configuration for this round.
+   * @param {Object} turnValues Existing scores from the database (if any).
+   * @param {boolean} [isLastRound=false] Whether to apply 10th-frame logic.
+   * @returns {HTMLElement} The row element.
+   */
   function buildRoundRow(round, turnValues, isLastRound = false) {
     const row = document.createElement('div');
     row.className = 'round-row';
@@ -182,6 +206,10 @@ export async function initScoresPage() {
     return null;
   }
 
+  /**
+   * Populates the input fields with data retrieved from the API.
+   * @param {Array<Object>} scoreRows Raw score data from the database.
+   */
   function loadScoresIntoForm(scoreRows) {
     const scoreMap = scoreRows.reduce((map, row) => {
       map[String(row.order_number)] = row;
@@ -197,6 +225,10 @@ export async function initScoresPage() {
     });
   }
 
+  /**
+   * Handles the state transitions when a new player is selected.
+   * Fetches their existing scores and resets the calculation engine.
+   */
   async function refreshPlayerSelection() {
     const activePlayerId = await renderPlayerSelect();
     if (!activePlayerId) {
@@ -216,6 +248,10 @@ export async function initScoresPage() {
     renderCurrentResults();
   }
 
+  /**
+   * Aggregates current input values into a map for the scoring engine.
+   * @returns {Object} Map of order_number to ball scores.
+   */
   function getScoreMapFromInputs() {
     const scoreMap = {};
     roundsInput.querySelectorAll('.round-row').forEach((row) => {
@@ -229,6 +265,10 @@ export async function initScoresPage() {
     return scoreMap;
   }
 
+  /**
+   * Performs a real-time calculation of the bowling game based on the current 
+   * form state and renders the summary table.
+   */
   function renderCurrentResults() {
     const scoreMap = getScoreMapFromInputs();
     const { turnResults, total: finalTotal } = Engine.calculateTurnResults(machines, scoreMap);
@@ -253,6 +293,11 @@ export async function initScoresPage() {
     resultsPanel.classList.remove('hidden');
   }
 
+  /**
+   * Core refresh logic triggered when the active event changes.
+   * Loads the machine lineup for the specific night.
+   * @async
+   */
   const refresh = async () => {
     const eventId = getActiveEventId();
     if (!eventId) {

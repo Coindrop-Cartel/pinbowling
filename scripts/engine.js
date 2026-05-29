@@ -1,8 +1,23 @@
 /**
- * Scoring Provider
+ * Scoring Engines Module
+ * 
+ * This module provides the logic for translating raw cumulative pinball scores
+ * into specialized scoring formats (primarily Bowling). It handles the complex
+ * math behind thresholds, frame-by-frame bonuses, and the unique rules of 
+ * the 10th frame.
  */
 
+/**
+ * Implementation of the Bowling-style scoring logic.
+ * Maps pinball scores to 10 pins and calculates standard bowling bonuses.
+ */
 const BowlingEngine = {
+  /**
+   * Converts a raw pinball score into a 0-10 pin count based on machine-specific thresholds.
+   * @param {Object} round - The round/machine configuration containing threshold values.
+   * @param {number} rawScore - The cumulative pinball score achieved.
+   * @returns {number} Pin count (0-10).
+   */
   getPinCount(round, rawScore) {
     if (!round || typeof rawScore !== 'number' || rawScore <= 0) return 0;
     const thresholds = Object.entries(round.values)
@@ -52,6 +67,14 @@ const BowlingEngine = {
    * a mark (strike or spare). Strikes on subsequent balls use adjusted 
    * targets (multipliers) to simulate the difficulty of repeated strikes 
    * on the same machine.
+   * 
+   * @param {Object} round - Machine thresholds.
+   * @param {number} raw1 - Cumulative score after ball 1.
+   * @param {number} raw2 - Cumulative score after ball 2.
+   * @param {number} raw3 - Cumulative score after ball 3.
+   * @returns {Object} Frame result object containing mark string, 
+   *                  individual pin counts for bonus calculation, and 
+   *                  the base frame score.
    */
   getRound10Data(round, raw1, raw2, raw3) {
     const target1 = Number(round.values[10] || 0);
@@ -113,6 +136,16 @@ const BowlingEngine = {
     return { order: round.order_number, machine: round.machine_name, type: 'tenth', mark, first: firstPins, second: secondPins, third: thirdPins, score };
   },
 
+  /**
+   * Determines the result of a standard turn (Rounds 1-9).
+   * 
+   * @param {Object} round - Machine thresholds.
+   * @param {number} raw1 - Cumulative score after ball 1.
+   * @param {number} raw2 - Cumulative score after ball 2.
+   * @param {number} raw3 - Cumulative score after ball 3.
+   * @param {boolean} [isLastRound=false] - Flag to toggle Round 10 logic.
+   * @returns {Object} Turn data including strike/spare type and pin counts.
+   */
   getTurnDataFromValues(round, raw1, raw2, raw3, isLastRound = false) {
     if (isLastRound) return this.getRound10Data(round, raw1, raw2, raw3);
 
@@ -134,6 +167,14 @@ const BowlingEngine = {
     return { order: round.order_number, machine: round.machine_name, type, first, second, score };
   },
 
+  /**
+   * Lookahead helper to find the pin values of subsequent balls.
+   * Used to calculate bonuses for strikes (next 2 balls) and spares (next 1 ball).
+   * @param {number} roundIndex - The current round index in the turnData array.
+   * @param {number} count - How many subsequent balls to look for.
+   * @param {Array<Object>} turnData - The full array of processed turn results.
+   * @returns {Array<number>} An array of pin counts.
+   */
   getNextBallValues(roundIndex, count, turnData) {
     const values = [];
     for (let current = roundIndex + 1; current < turnData.length && values.length < count; current += 1) {
@@ -145,6 +186,11 @@ const BowlingEngine = {
     return values.slice(0, count);
   },
 
+  /**
+   * Formats the visual representation of a frame (e.g., "X", "9/", "7 2").
+   * @param {Object} turn - Processed turn result.
+   * @returns {string}
+   */
   formatMark(turn) {
     if (turn.type === 'tenth') return turn.mark;
     if (turn.type === 'strike') return 'X';
@@ -152,6 +198,14 @@ const BowlingEngine = {
     return `${turn.first} ${turn.second}`;
   },
 
+  /**
+   * The primary orchestration method for calculating a complete game's results.
+   * Iterates through rounds, determines frame types, applies bowling bonuses (lookahead),
+   * and returns a final summary.
+   * @param {Array<Object>} machines - The ordered list of machine/round configurations.
+   * @param {Object} scoreMap - Keyed by order_number, containing ball1, ball2, ball3 raw scores.
+   * @returns {{turnResults: Array<Object>, total: number}} The processed standings and total score.
+   */
   calculateTurnResults(machines, scoreMap) {
     const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
 
@@ -176,6 +230,18 @@ const BowlingEngine = {
     return { turnResults: results, total };
   },
 
+  /**
+   * Linearly interpolates threshold values for pins 9 through 2 based on
+   * the "Strike" (10) and "1-pin" targets.
+   * 
+   * This allows administrators to set just two points (the minimum score 
+   * needed for 1 pin and the score needed for a strike) while providing 
+   * a fair distribution of points for the values in between.
+   * 
+   * @param {number} score10 - Threshold for 10 pins.
+   * @param {number} score1 - Threshold for 1 pin.
+   * @returns {Object|null} Map of pin counts to pinball scores.
+   */
   buildRoundValues(score10, score1) {
     const values = {};
     if (score10 > 0 && score1 > 0) {
@@ -207,6 +273,10 @@ const GolfEngine = {
   formatMark(frame) { return ''; }
 };
 
+/**
+ * Registry of available scoring implementations.
+ * @type {Object<string, Object>}
+ */
 const ENGINES = {
   'bowling': BowlingEngine,
   'golf': GolfEngine

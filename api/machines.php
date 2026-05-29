@@ -1,6 +1,17 @@
 <?php
 /**
  * REST API for configuring PinBowling machines and their scoring thresholds.
+ * 
+ * Supported Methods:
+ * - GET: Fetch master machine registry or event-specific target scores.
+ * - POST: Add master machines, create target scores, or bulk-reorder rounds.
+ * - PUT: Update master machine names or specific target score thresholds.
+ * - DELETE: Remove machines from global registry or targets from specific events.
+ * 
+ * Query Parameters:
+ * - action: 'machine' (default), 'target', or 'reorder'
+ * - eventId: Filter targets by event
+ * - leagueId: Filter targets by league
  */
 require_once __DIR__ . '/../includes/config.php';
 initDatabase();

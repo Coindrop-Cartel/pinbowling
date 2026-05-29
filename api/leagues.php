@@ -1,7 +1,18 @@
 <?php
 /**
  * REST API for managing Leagues and their associated Events.
- * Handles CRUD operations for the Leagues and Events tables.
+ * 
+ * Supported Methods:
+ * - GET: Fetch leagues (bulk), single league with roster/events, or event list.
+ * - POST: Create new leagues, events, or associate players with leagues (rosters).
+ * - PUT: Update league/event details or reset league passwords.
+ * - DELETE: Remove leagues, events, or players from rosters.
+ * 
+ * Query Parameters:
+ * - action: 'league' (default), 'event', or 'player'
+ * - id: Primary key of the entity being acted upon
+ * - leagueId: Foreign key filter for events/players
+ * - playerId: Foreign key filter for league roster deletions
  */
 require_once __DIR__ . '/../includes/config.php';
 initDatabase();

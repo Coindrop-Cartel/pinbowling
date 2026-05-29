@@ -1,6 +1,20 @@
 <?php
 /**
  * REST API for recording and retrieving raw pinball scores.
+ * 
+ * Supported Methods:
+ * - GET: Retrieve scores. Supports filtering by eventId + playerId (session view), 
+ *        eventId (event standings), or leagueId (season summary).
+ * - POST: Upsert (insert or update) a score for a specific player, event, and round.
+ * - DELETE: Clear all scores recorded for a specific player across all events.
+ * 
+ * Query Parameters (GET):
+ * - eventId: Primary filter for night-specific scores.
+ * - playerId: Secondary filter for player-specific scores.
+ * - leagueId: Filter for fetching scores across all events in a league.
+ * 
+ * Query Parameters (DELETE):
+ * - playerId: Required (the ID of the player whose scores will be wiped).
  */
 require_once __DIR__ . '/../includes/config.php';
 initDatabase();

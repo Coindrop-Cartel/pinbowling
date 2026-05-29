@@ -3,6 +3,11 @@ import { setupLiveFilter, showConfirm, showPrompt } from './uiComponents.js';
 
 /**
  * Logic for the Global Machine Registry page.
+ * 
+ * Provides an interface to manage the master list of pinball machines.
+ * Includes live filtering, deduplication checks during entry, and 
+ * administrative protection for deletions.
+ * @async
  */
 export async function initMachinesPage() {
   const form = document.getElementById('machine-form');
@@ -17,6 +22,9 @@ export async function initMachinesPage() {
   /**
    * Renders the machine registry list based on the current filter text.
    * Also handles the validation of the "Add Machine" button.
+   * 
+   * @param {Array<Object>} filtered The list of machines matching the query.
+   * @param {string} query The search string entered by the user.
    */
   const onFilterUpdate = (filtered, query) => {
     list.innerHTML = '';

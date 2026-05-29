@@ -1,6 +1,16 @@
 <?php
 /**
  * REST API for managing players.
+ * 
+ * Supported Methods:
+ * - GET: Retrieve the global alphabetical list of players.
+ * - POST: Create a new player record. Handles duplicate name conflicts gracefully (409).
+ * - PUT: Update an existing player's name or external platform IDs (IFPA/Matchplay).
+ * - DELETE: Permanently remove a player and all their recorded scores.
+ * 
+ * Query Parameters:
+ * - id: Required for PUT and DELETE methods (the Player's primary key).
+ * - action: (Optional) Future-proofing for specific player sub-actions.
  */
 require_once __DIR__ . '/../includes/config.php';
 initDatabase();
