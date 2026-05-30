@@ -1,16 +1,110 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js';
 import { formatNumber, applyScoreFormatting } from '@scripts/utils.js';
-import { createSearchableSelect } from '@ui/uiComponents.js';
+import { createSearchableSelect, showPlayerSelectionDialog } from '@ui/uiComponents.js';
 
 export async function initPlayPage() {
   const form = document.getElementById('quick-play-form');
   const locSelect = document.getElementById('qp-location');
+  const nameInput = document.getElementById('qp-event-name');
   const generateBtn = document.getElementById('generate-qp-btn');
+  const createToggleBtn = document.getElementById('create-new-toggle');
+  const generatorOptions = document.getElementById('qp-generator-options');
+
+  const setupFields = document.getElementById('qp-setup-fields');
+  const setupSummary = document.getElementById('qp-setup-summary');
+  const summaryText = document.getElementById('qp-summary-text');
   
   const previewSection = document.getElementById('qp-preview-section');
   const framesList = document.getElementById('qp-frames-list');
   const finalizeBtn = document.getElementById('finalize-qp-btn');
+  
+  const sessionsList = document.getElementById('qp-sessions-list');
+  let allPlayersCache = [];
+  let todayEvents = [];
+  let qpLeague = null;
+
+  async function refreshSessionsData() {
+    const leagues = await PB_API.getLeagues();
+    qpLeague = leagues.find(l => l.name === 'Quick Play Sessions');
+    const today = new Date().toISOString().split('T')[0];
+    todayEvents = qpLeague ? (qpLeague.events || []).filter(e => e.event_date === today) : [];
+    allPlayersCache = await PB_API.getPlayers();
+  }
+
+  function renderExistingSessions() {
+    if (!sessionsList) return;
+    sessionsList.innerHTML = '';
+    
+    const nameQuery = nameInput.value.toLowerCase().trim();
+    const locQuery = Number(locSelect.value);
+
+    // Only show the results list if the user has started interacting
+    if (!nameQuery && !locQuery) return;
+    
+    const filtered = todayEvents.filter(e => {
+      const matchesName = !nameQuery || e.event_name.toLowerCase().includes(nameQuery);
+      const matchesLoc = !locQuery || Number(e.location_id) === locQuery;
+      return matchesName && matchesLoc;
+    });
+
+    if (filtered.length === 0) return;
+
+    sessionsList.innerHTML = '<p class="hint" style="margin-bottom: 8px;">Found existing sessions for today:</p>';
+    filtered.forEach(event => {
+      const div = document.createElement('div');
+      div.className = 'league-registry-item';
+      div.style = "padding: 12px; cursor: pointer; margin-bottom: 8px; background: #fff; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;";
+      div.innerHTML = `
+        <div><strong>${event.event_name}</strong><br><small>${event.location_name || 'No Location'} | ${event.event_date}</small></div>
+        <div style="display: flex; gap: 6px;">
+          <button class="scoreboard-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Scoreboard</button>
+          <button class="join-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Join</button>
+          <button class="play-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Play</button>
+        </div>
+      `;
+
+      div.querySelector('.scoreboard-btn').onclick = (e) => {
+        e.stopPropagation();
+        window.location.href = `standings?eventId=${event.id}&leagueId=${qpLeague.id}`;
+      };
+
+      div.querySelector('.join-btn').onclick = async (e) => {
+        e.stopPropagation();
+        const options = allPlayersCache.map(p => ({ value: p.id, label: p.player_name }));
+        const selectedId = await showPlayerSelectionDialog('Join Session', 'Select your name to add yourself to this session:', options);
+        if (selectedId) {
+          await PB_API.addLeaguePlayer(qpLeague.id, Number(selectedId));
+          window.location.href = `scores?eventId=${event.id}&leagueId=${qpLeague.id}&playerId=${selectedId}`;
+        }
+      };
+
+      div.querySelector('.play-btn').onclick = async (e) => {
+        e.stopPropagation();
+        // We need the specific roster for this league
+        const leagues = await PB_API.getLeagues();
+        const currentLeague = leagues.find(l => l.id === qpLeague.id);
+        const roster = currentLeague?.players || [];
+        
+        if (roster.length === 0) {
+          alert('No players are assigned to this session yet. Use "Join" to add yourself.');
+          return;
+        }
+
+        const options = roster.map(p => ({ value: p.id, label: p.player_name }));
+        const selectedId = await showPlayerSelectionDialog('Play Session', 'Who is bowling?', options);
+        if (selectedId) {
+          window.location.href = `scores?eventId=${event.id}&leagueId=${qpLeague.id}&playerId=${selectedId}`;
+        }
+      };
+
+      div.onclick = (e) => {
+        if (e.target.closest('button')) return;
+        window.location.href = `scores?eventId=${event.id}&leagueId=${qpLeague.id}`;
+      };
+      sessionsList.appendChild(div);
+    });
+  }
 
   let generatedFrames = [];
   let locationsCache = [];
@@ -27,16 +121,34 @@ export async function initPlayPage() {
   });
 
   // Prepopulate Session Name when location changes if name is empty
-  locSelect.addEventListener('change', () => {
-    const nameInput = document.getElementById('qp-event-name');
-    if (!nameInput.value.trim() && locSelect.value) {
-      const loc = locationsCache.find(l => l.id === Number(locSelect.value));
-      if (loc) {
-        const date = new Date().toLocaleDateString();
-        nameInput.value = `${loc.name} - ${date}`;
-      }
-    }
+  if (locSelect) locSelect.addEventListener('change', () => {
+    renderExistingSessions();
   });
+
+  if (nameInput) nameInput.oninput = () => renderExistingSessions();
+
+  if (createToggleBtn && generatorOptions && generateBtn) {
+    createToggleBtn.onclick = () => {
+      const isHidden = generatorOptions.classList.contains('hidden');
+      generatorOptions.classList.toggle('hidden', !isHidden);
+      generateBtn.classList.toggle('hidden', !isHidden);
+      createToggleBtn.textContent = isHidden ? 'Cancel' : 'Create New Session';
+      if (sessionsList) sessionsList.classList.toggle('hidden', isHidden); // Hide existing matches when creating
+
+      // If we are canceling the creation flow, hide the preview section as well
+      if (!isHidden && previewSection) {
+        previewSection.classList.add('hidden');
+      }
+    };
+  }
+
+  const changeBtn = document.getElementById('qp-change-setup-btn');
+  if (changeBtn) {
+    changeBtn.onclick = () => {
+      if (setupFields) setupFields.classList.remove('hidden');
+      if (setupSummary) setupSummary.classList.add('hidden');
+    };
+  }
 
   // Initialize dragging listeners on the container once
   setupDragging(framesList);
@@ -46,21 +158,33 @@ export async function initPlayPage() {
     generatePreview();
   };
 
-  function generatePreview() {
-    const nameInput = document.getElementById('qp-event-name');
-    const locId = Number(locSelect.value);
+  await refreshSessionsData();
+  renderExistingSessions();
 
-    // Fallback prepopulation if name is still empty
-    if (!nameInput.value.trim()) {
-      const location = locationsCache.find(l => l.id === locId);
-      const date = new Date().toLocaleDateString();
-      nameInput.value = `${location ? location.name : 'Quick Play'} - ${date}`;
+  function generatePreview() {
+    const locId = Number(locSelect.value);
+    const location = locationsCache.find(l => l.id === locId);
+    const now = new Date();
+    const date = now.toLocaleDateString();
+    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const locName = location ? location.name : 'No Location';
+
+    const rawName = nameInput.value.trim();
+    const finalNamePreview = rawName 
+      ? `${rawName} - ${locName} - ${date} - ${time}`
+      : `${locName} - ${date} - ${time}`;
+
+    // Show minimized header
+    if (summaryText) {
+      summaryText.innerHTML = `<strong>${finalNamePreview}</strong>`;
     }
+    if (setupFields) setupFields.classList.add('hidden');
+    if (setupSummary) setupSummary.classList.remove('hidden');
+    if (generateBtn) generateBtn.textContent = 'Update Lineup';
 
     const frameCount = Number(document.getElementById('qp-frames').value);
     const difficulty = document.getElementById('qp-difficulty').value;
 
-    const location = locationsCache.find(l => l.id === locId);
     const locMachines = location?.machines || [];
     currentLocMachines = locMachines;
     
@@ -92,6 +216,7 @@ export async function initPlayPage() {
 
     renderPreview();
     previewSection.classList.remove('hidden');
+    
     previewSection.scrollIntoView({ behavior: 'smooth' });
   }
 
@@ -247,8 +372,18 @@ export async function initPlayPage() {
   }
 
   finalizeBtn.onclick = async () => {
-    const eventName = document.getElementById('qp-event-name').value.trim();
+    const rawName = nameInput.value.trim();
     const locId = Number(locSelect.value);
+    const location = locationsCache.find(l => l.id === locId);
+    const locName = location ? location.name : 'Unknown Location';
+    
+    const now = new Date();
+    const date = now.toLocaleDateString();
+    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const eventName = rawName 
+      ? `${rawName} - ${locName} - ${date} - ${time}`
+      : `${locName} - ${date} - ${time}`;
 
     finalizeBtn.disabled = true;
     finalizeBtn.textContent = 'Starting Session...';
@@ -270,7 +405,7 @@ export async function initPlayPage() {
       const newEvent = await PB_API.createEvent({
         league_id: qpLeague.id,
         event_name: eventName,
-        event_date: new Date().toISOString().split('T')[0],
+        event_date: now.toISOString().split('T')[0],
         location_id: locId
       });
 
@@ -282,28 +417,44 @@ export async function initPlayPage() {
 
       const engine = getScoringEngine('bowling');
 
-      for (const frame of generatedFrames) {
-        if (!frame.machine_id) {
-          console.warn(`Frame ${frame.order} is missing a machine selection.`);
-          continue;
-        }
-
-        const values = engine.buildRoundValues(frame.score10, frame.score1);
-
-        await PB_API.saveTargetScore({
-          event_id: Number(event.id),
-          machine_id: Number(frame.machine_id),
-          order_number: frame.order,
-          values: values
+      const targetPayloads = generatedFrames
+        .filter(f => f.machine_id)
+        .map(frame => {
+          const values = engine.buildRoundValues(frame.score10, frame.score1);
+          return {
+            event_id: Number(event.id),
+            machine_id: Number(frame.machine_id),
+            order_number: frame.order,
+            values: values
+          };
         });
+
+      if (targetPayloads.length > 0) {
+        // Sending all targets in a single request prevents 403 Forbidden 
+        // errors caused by server-side rate-limiting or flood protection.
+        await PB_API.saveTargetScore(targetPayloads);
       }
 
-      window.location.href = `scores.php?eventId=${event.id}&leagueId=${qpLeague.id}`;
+      // Instead of redirecting, refresh the data and show the updated list
+      await refreshSessionsData();
+      renderExistingSessions();
+      
+      // Reset UI to initial state
+      if (nameInput) nameInput.value = '';
+      if (previewSection) previewSection.classList.add('hidden');
+      if (setupFields) setupFields.classList.remove('hidden');
+      if (setupSummary) setupSummary.classList.add('hidden');
+      if (generatorOptions) generatorOptions.classList.add('hidden');
+      if (generateBtn) generateBtn.classList.add('hidden');
+      if (createToggleBtn) createToggleBtn.textContent = 'Create New Session';
+      finalizeBtn.disabled = false;
+      finalizeBtn.textContent = 'Create Session';
+
     } catch (err) {
       console.error(err);
       alert(err.message);
       finalizeBtn.disabled = false;
-      finalizeBtn.textContent = 'Finalize & Start Bowling';
+      finalizeBtn.textContent = 'Create Session';
     }
   };
 }

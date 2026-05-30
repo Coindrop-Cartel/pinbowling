@@ -9,15 +9,23 @@
   <section id="quick-play-form-card" class="card">
     <form id="quick-play-form">
       <h2>Session Details</h2>
-      <div class="form-row">
-        <label for="qp-location">Location</label>
-        <select id="qp-location" required>
-          <option value="">-- Select Location --</option>
-        </select>
+
+      <div id="qp-setup-fields">
+        <div class="form-row">
+          <label for="qp-location">Location</label>
+          <select id="qp-location" required>
+            <option value="">-- Select Location --</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="qp-event-name">Session Name</label>
+          <input type="text" id="qp-event-name" placeholder="e.g. Casual Friday Pinball">
+        </div>
       </div>
-      <div class="form-row">
-        <label for="qp-event-name">Session Name</label>
-        <input type="text" id="qp-event-name" placeholder="e.g. Casual Friday Pinball">
+
+      <div id="qp-setup-summary" class="hidden" style="display: flex; justify-content: space-between; align-items: center; background: #f9f9f9; padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #eee;">
+        <div id="qp-summary-text" style="font-weight: bold;"></div>
+        <button type="button" id="qp-change-setup-btn" class="secondary" style="padding: 4px 10px; font-size: 0.8rem;">Change</button>
       </div>
 
       <div id="qp-existing-matches" style="margin: 15px 0;">
@@ -57,7 +65,7 @@
     <h2>Review Lineup</h2>
     <div id="qp-frames-list" style="margin-bottom: 20px;"></div>
     <div class="form-actions">
-      <button id="finalize-qp-btn" class="primary">Finalize & Start Bowling</button>
+      <button id="finalize-qp-btn" class="primary">Create Session</button>
     </div>
   </section>
 </main>

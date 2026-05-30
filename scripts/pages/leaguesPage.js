@@ -205,8 +205,9 @@ export async function initLeaguesPage() {
   const refresh = async () => {
     try {
       const data = await PB_API.getLeagues();
+      // Filter out the internal 'Quick Play Sessions' league from management view
       allLeagues.length = 0;
-      allLeagues.push(...data);
+      allLeagues.push(...data.filter(l => l.name !== 'Quick Play Sessions'));
       // Also refresh the global player cache for selection dialogs
       allPlayersCache = await PB_API.getPlayers();
       filterInstance.performFilter();

@@ -144,43 +144,53 @@ if ($method === 'POST') {
     // Task 'threshold' handles Target_Scores, default handles master Machines
     if ($task === 'threshold') {
         validateApiSecret(); // Protect tournament event setup
-        if (empty($input['event_id']) || empty($input['machine_id'])) {
-            sendJson(['error' => 'event_id and machine_id are required for target scores'], 400);
-        }
-
-        $id = isset($input['id']) ? (int)$input['id'] : 0;
         
-        if ($id) {
-            // Capture original order to move scores if it changes manually
-            $stmtOrig = $pdo->prepare('SELECT order_number, event_id FROM Target_Scores WHERE id = ?');
-            $stmtOrig->execute([$id]);
-            $orig = $stmtOrig->fetch();
+        // Detect if input is a single object or a batch array
+        $batch = isset($input[0]) ? $input : [$input];
+        
+        $pdo->beginTransaction();
+        try {
+            foreach ($batch as $item) {
+                if (empty($item['event_id']) || empty($item['machine_id'])) {
+                    throw new Exception('event_id and machine_id are required for target scores');
+                }
 
-            $sql = 'UPDATE Target_Scores SET machine_id = ?, order_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
-            $params = [(int)$input['machine_id'], (int)$input['order_number']];
-            for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
-            $params[] = $id;
+                $id = isset($item['id']) ? (int)$item['id'] : 0;
+                
+                if ($id) {
+                    // Capture original order to move scores if it changes manually
+                    $stmtOrig = $pdo->prepare('SELECT order_number, event_id FROM Target_Scores WHERE id = ?');
+                    $stmtOrig->execute([$id]);
+                    $orig = $stmtOrig->fetch();
 
-            if ($orig && (int)$orig['order_number'] !== (int)$input['order_number']) {
-                $stmtScores = $pdo->prepare('UPDATE Scores SET order_number = ? WHERE event_id = ? AND order_number = ?');
-                $stmtScores->execute([(int)$input['order_number'], (int)$orig['event_id'], (int)$orig['order_number']]);
+                    $sql = 'UPDATE Target_Scores SET machine_id = ?, order_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
+                    $params = [(int)$item['machine_id'], (int)$item['order_number']];
+                    for ($i = 1; $i <= 10; $i++) $params[] = (int)($item['values'][$i] ?? 0);
+                    $params[] = $id;
+
+                    if ($orig && (int)$orig['order_number'] !== (int)$item['order_number']) {
+                        $stmtScores = $pdo->prepare('UPDATE Scores SET order_number = ? WHERE event_id = ? AND order_number = ?');
+                        $stmtScores->execute([(int)$item['order_number'], (int)$orig['event_id'], (int)$orig['order_number']]);
+                    }
+                } else {
+                    $sql = 'INSERT INTO Target_Scores (event_id, machine_id, order_number, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), 
+                               score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5),
+                               score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
+                    $params = [(int)$item['event_id'], (int)$item['machine_id'], (int)$item['order_number']];
+                    for ($i = 1; $i <= 10; $i++) $params[] = (int)($item['values'][$i] ?? 0);
+                }
+
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
             }
-        } else {
-            $sql = 'INSERT INTO Target_Scores (event_id, machine_id, order_number, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), 
-                       score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5),
-                       score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
-            $params = [(int)$input['event_id'], (int)$input['machine_id'], (int)$input['order_number']];
-            for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
+            $pdo->commit();
+            sendJson(['success' => true]);
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            sendJson(['error' => $e->getMessage()], 400);
         }
-
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        
-        $stmt = $pdo->prepare('SELECT ts.*, m.machine_name FROM Target_Scores ts JOIN Machines m ON ts.machine_id = m.id WHERE ts.event_id = ? AND ts.order_number = ?');
-        $stmt->execute([(int)$input['event_id'], (int)$input['order_number']]);
-        sendJson(serializeTargetScore($stmt->fetch()));
     } else { // Create a new master machine (title only)
         if (empty($input['machine_name'])) {
             sendJson(['error' => 'machine_name is required'], 400);

@@ -194,49 +194,55 @@ export async function initScoresPage() {
    * entire global player list is displayed.
    */
   async function renderPlayerSelect() {
-    // Fetch the global player registry to ensure consistency with the scoreboard
-    const players = await PB_API.getPlayers();
-    allPlayersCache.length = 0;
-    allPlayersCache.push(...players);
+    try {
+      // Fetch the global player registry to ensure consistency with the scoreboard
+      const players = (await PB_API.getPlayers()) || [];
+      allPlayersCache.length = 0;
+      allPlayersCache.push(...players);
 
-    const currentPlayerId = getCurrentPlayerId();
+      const currentPlayerId = getCurrentPlayerId();
 
-    if (!playerSearchInstance) {
-      let searchInput = document.getElementById('player-search');
-      if (!searchInput) {
-        searchInput = document.createElement('input');
-        searchInput.id = 'player-search';
-        searchInput.type = 'text';
-        searchInput.placeholder = 'Type to search player...';
-        searchInput.style.width = '100%';
-        searchInput.style.marginBottom = '10px';
-        searchInput.style.boxSizing = 'border-box';
-        playerSelect.before(searchInput);
+      if (!playerSearchInstance) {
+        let searchInput = document.getElementById('player-search');
+        if (!searchInput) {
+          searchInput = document.createElement('input');
+          searchInput.id = 'player-search';
+          searchInput.type = 'text';
+          searchInput.placeholder = 'Type to search player...';
+          searchInput.style.width = '100%';
+          searchInput.style.marginBottom = '10px';
+          searchInput.style.boxSizing = 'border-box';
+          if (playerSelect) playerSelect.before(searchInput);
+        }
+
+        if (searchInput && playerSelect) {
+          playerSearchInstance = createSearchableSelect(searchInput, playerSelect, allPlayersCache, {
+            valueKey: 'id',
+            labelKey: 'player_name',
+            placeholder: allPlayersCache.length === 0 ? 'No players configured' : 'Select a player',
+            onSelect: async (val) => {
+              if (!val) {
+                setCurrentPlayerId('');
+              } else {
+                setCurrentPlayerId(val);
+              }
+              await refreshPlayerSelection();
+            }
+          });
+        }
       }
 
-      playerSearchInstance = createSearchableSelect(searchInput, playerSelect, allPlayersCache, {
-        valueKey: 'id',
-        labelKey: 'player_name',
-        placeholder: players.length === 0 ? 'No players configured' : 'Select a player',
-        onSelect: async (val) => {
-          if (!val) {
-            setCurrentPlayerId('');
-          } else {
-            setCurrentPlayerId(val);
-          }
-          await refreshPlayerSelection();
-        }
-      });
-      playerSearchInstance.updateOptions('');
-    } else {
-      playerSearchInstance.updateOptions('');
-    }
+      if (playerSearchInstance) {
+        playerSearchInstance.updateOptions('');
+      }
 
-    if (currentPlayerId && players.some((player) => String(player.id) === currentPlayerId)) {
-      playerSelect.value = currentPlayerId;
-      return currentPlayerId;
+      if (currentPlayerId && allPlayersCache.some((player) => String(player.id) === String(currentPlayerId))) {
+        if (playerSelect) playerSelect.value = currentPlayerId;
+        return currentPlayerId;
+      }
+    } catch (err) {
+      console.error('Failed to render player selection:', err);
     }
-
     return null;
   }
 
@@ -360,7 +366,12 @@ export async function initScoresPage() {
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
     const event = league?.events.find(e => String(e.id) === String(eventId));
 
-    const leagueLabel = league?.name === 'Quick Play Sessions' ? '' : `${league?.name} - `;
+    const isQuickPlay = league?.name === 'Quick Play Sessions';
+    if (changeTournamentBtn) {
+      changeTournamentBtn.classList.toggle('hidden', isQuickPlay);
+    }
+
+    const leagueLabel = isQuickPlay ? '' : `${league?.name} - `;
     tournamentSummaryText.textContent = `${leagueLabel}${event?.event_name || 'Event'}`;
     tournamentSelectorUI.classList.add('hidden');
     tournamentSummary.classList.remove('hidden');
