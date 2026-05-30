@@ -11,8 +11,8 @@ export async function initTournamentSelector(onRefresh) {
   const activeEventId = getActiveEventId();
 
   container.innerHTML = `
-    <section class="card tournament-selector" style="margin-bottom: 1.5rem;">
-      <div style="display: flex; flex-direction: column; gap: 1rem; width: 100%; box-sizing: border-box;" autocomplete="off">
+    <section class="tournament-selector" style="margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; background: #fff; padding: 12px 15px;">
+      <div style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%; box-sizing: border-box;" autocomplete="off">
         <div style="width: 100%;">
           <label style="display: block; margin-bottom: 5px;">League Search</label>
           <div style="display: flex; gap: 8px;">

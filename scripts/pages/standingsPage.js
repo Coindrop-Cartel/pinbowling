@@ -140,18 +140,57 @@ export async function initStandingsPage() {
     if (standingsWrapper) standingsWrapper.classList.remove('hidden');
   };
 
+  // Selection UI Toggles (matching the scores page behavior)
+  let tournamentSummary, tournamentSummaryText, tournamentSelectorUI;
+
   const refresh = async () => {
     const eventId = getActiveEventId();
+    const leagueId = getActiveLeagueId();
+
     if (!eventId) {
       if (standingsWrapper) standingsWrapper.classList.add('hidden');
       if (standingsEmpty) standingsEmpty.classList.remove('hidden');
+      if (tournamentSelectorUI) tournamentSelectorUI.classList.remove('hidden');
+      if (tournamentSummary) tournamentSummary.classList.add('hidden');
       return;
     }
-    if (eventId === 'summary') return renderLeagueSummary(getActiveLeagueId());
 
     const leagues = await PB_API.getLeagues();
-    const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
+    const league = leagues.find(l => String(l.id) === String(leagueId));
     Engine = getScoringEngine(league?.scoring_format || 'bowling');
+
+    // Dynamic Summary UI Setup
+    if (!tournamentSummary) {
+      const selectorContainer = document.querySelector('.tournament-selector-container');
+      if (selectorContainer) {
+        tournamentSelectorUI = selectorContainer.closest('.tournament-selector') || selectorContainer;
+        tournamentSummary = document.createElement('div');
+        tournamentSummary.className = 'hidden';
+        tournamentSummary.style = "display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 5px;";
+        tournamentSummaryText = document.createElement('span');
+        tournamentSummaryText.style = "font-weight: bold; font-size: 1.1rem;";
+        const changeBtn = document.createElement('button');
+        changeBtn.className = 'secondary';
+        changeBtn.style = "padding: 4px 10px; font-size: 0.85rem;";
+        changeBtn.textContent = 'Change';
+        changeBtn.onclick = () => {
+          tournamentSelectorUI.classList.remove('hidden');
+          tournamentSummary.classList.add('hidden');
+        };
+        tournamentSummary.appendChild(tournamentSummaryText);
+        tournamentSummary.appendChild(changeBtn);
+        tournamentSelectorUI.before(tournamentSummary);
+      }
+    }
+
+    if (tournamentSelectorUI && tournamentSummary) {
+      const event = eventId === 'summary' ? { event_name: 'Season Summary' } : league?.events.find(e => String(e.id) === String(eventId));
+      tournamentSummaryText.textContent = `${league?.name || 'League'} - ${event?.event_name || 'Event'}`;
+      tournamentSelectorUI.classList.add('hidden');
+      tournamentSummary.classList.remove('hidden');
+    }
+
+    if (eventId === 'summary') return renderLeagueSummary(leagueId);
 
     const players = await PB_API.getPlayers();
     const machines = await PB_API.getTargetScores(eventId);

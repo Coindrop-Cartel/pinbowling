@@ -1,5 +1,8 @@
 <?php $pageTitle = 'Scores'; ?>
   <main class="page-container">
+    <header>
+      <h1>Play</h1>
+    </header>
     <section style="margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff;">
       <div id="tournament-selector-ui" style="padding: 12px 15px;">
         <h2>LEAGUE SELECTION</h2>
