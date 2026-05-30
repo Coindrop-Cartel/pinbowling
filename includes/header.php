@@ -5,21 +5,21 @@
       <span>PinBowling</span>
     </a>
     <ul class="nav-links">
-      <li class="nav-item"><a href="<?php echo $baseUrl; ?>/scores" class="nav-link">Lets Bowl!</a></li>
+      <li class="nav-item"><a href="<?php echo $baseUrl; ?>/scores" class="nav-link" data-route="SCORES">Lets Bowl!</a></li>
       <li class="nav-item dropdown">
         <a href="javascript:void(0)" class="nav-link dropbtn">Leagues</a>
         <div class="dropdown-content">
-          <a href="<?php echo $baseUrl; ?>/scores">Play</a>
-          <a href="<?php echo $baseUrl; ?>/leagues">Manage</a>
-          <a href="<?php echo $baseUrl; ?>/standings">Scoreboard</a>
+          <a href="<?php echo $baseUrl; ?>/scores" class="nav-link" data-route="SCORES">Play</a>
+          <a href="<?php echo $baseUrl; ?>/leagues" class="nav-link" data-route="LEAGUES">Manage</a>
+          <a href="<?php echo $baseUrl; ?>/standings" class="nav-link" data-route="STANDINGS">Scoreboard</a>
         </div>
       </li>
       <li class="nav-item dropdown">
         <a href="javascript:void(0)" class="nav-link dropbtn">Admin</a>
         <div class="dropdown-content">
-          <a href="<?php echo $baseUrl; ?>/machines">Machines</a>
-          <a href="<?php echo $baseUrl; ?>/players">Players</a>
-          <a href="<?php echo $baseUrl; ?>/locations">Locations</a>
+          <a href="<?php echo $baseUrl; ?>/machines" class="nav-link" data-route="MACHINES">Machines</a>
+          <a href="<?php echo $baseUrl; ?>/players" class="nav-link" data-route="PLAYERS">Players</a>
+          <a href="<?php echo $baseUrl; ?>/locations" class="nav-link" data-route="LOCATIONS">Locations</a>
         </div>
       </li>
     </ul>

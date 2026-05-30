@@ -21,13 +21,13 @@ const buildUrl = (path, params = {}) => {
 
 export const ROUTES = {
   HOME: (params = {}) => buildUrl('/', params),
+  SCORES: (params = {}) => buildUrl('/scores', params),
   LEAGUES: (params = {}) => buildUrl('/leagues', params),
-  MACHINES: (params = {}) => buildUrl('/machines', params),
+  LEAGUE_SETUP: (params = {}) => buildUrl('/event-setup', params),
+  STANDINGS: (params = {}) => buildUrl('/standings', params),
   PLAYERS: (params = {}) => buildUrl('/players', params),
   LOCATIONS: (params = {}) => buildUrl('/locations', params),
-  STANDINGS: (params = {}) => buildUrl('/standings', params),
-  SCORES: (params = {}) => buildUrl('/scores', params),
-  SETTINGS: (params = {}) => buildUrl('/settings', params),
+  MACHINES: (params = {}) => buildUrl('/machines', params),
 };
 
 /**

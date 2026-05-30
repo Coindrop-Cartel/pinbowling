@@ -4,7 +4,7 @@
  * and dynamic UI rendering across different pages.
  */
 
-import { initNavigation } from '@scripts/utils.js';
+import { initNavigation } from '@ui/navigation.js';
 import { initMachinesPage } from '@pages/machinesPage.js';
 import { initLocationsPage } from '@pages/locationsPage.js';
 import { initConfigPage } from '@pages/configPage.js';

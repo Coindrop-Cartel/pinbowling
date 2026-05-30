@@ -4,6 +4,7 @@ import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormattin
 import { createSearchableSelect, showPrompt, initReadOnlyTournamentDisplay } from '@ui/uiComponents.js';
 import { printMachineScores } from '@ui/printing.js';
 import { requireAdmin } from '@services/auth.js';
+import {ROUTES, navigateTo} from '@constants/routes.js';
 
 export async function initConfigPage() {
   const configCard = document.getElementById('config-card');
@@ -45,7 +46,7 @@ export async function initConfigPage() {
   const doneBtn = document.getElementById('done-setup-btn');
   if (doneBtn) {
     doneBtn.addEventListener('click', () => {
-      navigateTo(ROUTES.LEAGUE_DETAILS(getActiveLeagueId()));
+      navigateTo(ROUTES.LEAGUES(getActiveLeagueId()));
     });
   }
 
