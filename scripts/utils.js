@@ -1,4 +1,5 @@
 import { getScoringEngine } from '@core/engine.js';
+import { ROUTES } from './routes.js';
 import * as self from '@scripts/utils.js';
 
 /**
@@ -22,7 +23,7 @@ function setUrlParam(key, value) {
   if (value) url.searchParams.set(key, value);
   else url.searchParams.delete(key);
   window.history.replaceState({}, '', url);
-  initNavigation();
+  self.initNavigation();
 }
 
 export const getActiveLeagueId = () => getUrlParam('leagueId');
