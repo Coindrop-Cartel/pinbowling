@@ -46,7 +46,8 @@ export async function initConfigPage() {
   if (doneBtn) {
     doneBtn.addEventListener('click', () => {
       const leagueId = getActiveLeagueId();
-      window.location.href = leagueId ? `leagues.php?leagueId=${leagueId}` : 'leagues.php';
+      const appBase = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) || '';
+      window.location.href = `${appBase}/leagues${leagueId ? `?leagueId=${leagueId}` : ''}`;
     });
   }
 
