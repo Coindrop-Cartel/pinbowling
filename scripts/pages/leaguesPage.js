@@ -22,6 +22,36 @@ export async function initLeaguesPage() {
   let allLeagues = [];
   let filterInstance = null;
 
+  // Setup "Create League" toggle behavior
+  const dateRow = leagueDateInput.closest('.form-row');
+  const actionsRow = createBtn.closest('.form-actions');
+  
+  // Initially hide the creation fields
+  if (dateRow) dateRow.classList.add('hidden');
+  if (actionsRow) actionsRow.classList.add('hidden');
+
+  const createToggle = document.createElement('button');
+  createToggle.type = 'button';
+  createToggle.className = 'secondary';
+  createToggle.textContent = 'Create New League';
+  createToggle.style.marginTop = '10px';
+  leagueNameInput.after(createToggle);
+
+  createToggle.onclick = () => {
+    const isHidden = dateRow.classList.contains('hidden');
+    dateRow.classList.toggle('hidden', !isHidden);
+    actionsRow.classList.toggle('hidden', !isHidden);
+    if (isHidden) {
+      createToggle.textContent = 'Cancel';
+      createToggle.style.marginTop = '0';
+      actionsRow.appendChild(createToggle);
+    } else {
+      createToggle.textContent = 'Create New League';
+      createToggle.style.marginTop = '10px';
+      leagueNameInput.after(createToggle);
+    }
+  };
+
   /**
    * Renders the league list based on filtering.
    * Handles the "X matches found" logic and duplicate prevention.
@@ -39,18 +69,23 @@ export async function initLeaguesPage() {
         const shouldExpand = activeLeagueId && String(league.id) === String(activeLeagueId);
 
         const card = document.createElement('div');
-        card.className = 'card league-item';
+        card.className = 'league-registry-item';
+        card.style.marginBottom = '5px';
+        card.style.border = '1px solid #ddd';
+        card.style.borderRadius = '4px';
+        card.style.overflow = 'hidden';
+
         card.innerHTML = `
-          <div class="league-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+          <div class="league-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 6px 12px; background: #f9f9f9;">
             <div>
-              <h3 style="margin: 0;">${league.name}</h3>
+              <h3 style="margin: 0; font-size: 1.05rem;">${league.name}</h3>
               <small>Started: ${league.start_date || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
             </div>
             <div style="display: flex; gap: 8px;">
-              <button class="delete-league-btn">Delete</button>
+              <button class="delete-league-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
             </div>
           </div>
-          <div class="league-details ${shouldExpand ? '' : 'hidden'}" style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 15px;">
+          <div class="league-details ${shouldExpand ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd; background: #fff;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
               <h4 style="margin: 0;">Events</h4>
               <button class="add-event-btn secondary" style="padding: 4px 12px; font-size: 0.85rem;">Add Event</button>
@@ -90,9 +125,13 @@ export async function initLeaguesPage() {
         card.querySelector('.league-header').onclick = (e) => {
           if (e.target.closest('button')) return;
           const details = card.querySelector('.league-details');
-          const isExpanding = details.classList.contains('hidden');
-          details.classList.toggle('hidden');
-          if (isExpanding) {
+          const wasHidden = details.classList.contains('hidden');
+
+          // Accordion behavior: Collapse all other league cards first
+          leaguesList.querySelectorAll('.league-details').forEach(d => d.classList.add('hidden'));
+
+          if (wasHidden) {
+            details.classList.remove('hidden');
             renderPlayersForLeague(league.id, league.players, allPlayersCache);
           }
         };
@@ -138,6 +177,12 @@ export async function initLeaguesPage() {
 
     // Duplicate Name Prevention
     const exactMatch = allLeagues.find(l => l.name.trim().toLowerCase() === query);
+
+    // Hide the "Create" toggle if an exact match exists, unless the creation 
+    // form is already open (in which case the button serves as "Cancel").
+    const isFormOpen = !dateRow.classList.contains('hidden');
+    createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
+
     const dateVal = leagueDateInput.value;
     createBtn.disabled = !query || !dateVal || !!exactMatch;
     
@@ -185,6 +230,12 @@ export async function initLeaguesPage() {
       await PB_API.createLeague({ name, start_date: date, password: leaguePass });
       leagueNameInput.value = '';
       leagueDateInput.value = '';
+      // Collapse creation form back down
+      dateRow.classList.add('hidden');
+      actionsRow.classList.add('hidden');
+      createToggle.textContent = 'Create New League';
+      createToggle.style.marginTop = '10px';
+      leagueNameInput.after(createToggle);
       await refresh();
     } catch (err) {
       console.error('League creation failed:', err);

@@ -19,6 +19,34 @@ export async function initPlayersPage() {
   let allPlayers = []; // Cache players for editing
   let filterInstance = null;
 
+  // Setup "Create Player" toggle
+  const ifpaRow = ifpaIdInput.closest('.form-row');
+  const matchplayRow = matchplayIdInput.closest('.form-row');
+  const actionsRow = savePlayerButton.closest('.form-actions');
+
+  const createToggle = document.createElement('button');
+  createToggle.type = 'button';
+  createToggle.className = 'secondary';
+  createToggle.textContent = 'Create New Player';
+  createToggle.style.marginTop = '10px';
+  playerNameInput.after(createToggle);
+
+  createToggle.onclick = () => {
+    const isHidden = ifpaRow.classList.contains('hidden');
+    ifpaRow.classList.toggle('hidden', !isHidden);
+    matchplayRow.classList.toggle('hidden', !isHidden);
+    actionsRow.classList.toggle('hidden', !isHidden);
+    if (isHidden) {
+      createToggle.textContent = 'Cancel';
+      createToggle.style.marginTop = '0';
+      actionsRow.appendChild(createToggle);
+    } else {
+      createToggle.textContent = 'Create New Player';
+      createToggle.style.marginTop = '10px';
+      playerNameInput.after(createToggle);
+    }
+  };
+
   const onFilterUpdate = (filtered, query) => {
     // Update alphabetical list
     playerList.innerHTML = '';
@@ -27,8 +55,10 @@ export async function initPlayersPage() {
     } else {
       filtered.forEach(p => {
         const li = document.createElement('li');
-        li.style.padding = '8px 0';
-        li.style.borderBottom = '1px solid #000';
+        li.style.padding = '6px 12px';
+        li.style.marginBottom = '5px';
+        li.style.background = '#f9f9f9';
+        li.style.borderRadius = '4px';
         li.style.display = 'flex';
         li.style.justifyContent = 'space-between';
         li.style.alignItems = 'center';
@@ -39,14 +69,12 @@ export async function initPlayersPage() {
             ${p.matchplay_id ? `<small>(Matchplay: ${p.matchplay_id})</small>` : ''}
           </span>
           <div style="display: flex; gap: 8px;">
-            <button type="button" class="edit-player-btn secondary" data-player-id="${p.id}">Edit</button>
-            <button type="button" class="delete-player-btn-inline" data-player-id="${p.id}">Delete</button>
+            <button type="button" class="edit-player-btn secondary" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.85rem;">Edit</button>
+            <button type="button" class="delete-player-btn-inline" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
           </div>
         `;
         playerList.appendChild(li);
       });
-      if (playerList.lastElementChild) playerList.lastElementChild.style.borderBottom = 'none';
-
       // Attach row action listeners
       playerList.querySelectorAll('.edit-player-btn').forEach(btn => {
         btn.addEventListener('click', (e) => editPlayer(Number(e.target.dataset.playerId)));
@@ -60,6 +88,11 @@ export async function initPlayersPage() {
     const exactMatch = allPlayers.find(p => p.player_name.trim().toLowerCase() === query);
     const isEditingThisPlayer = exactMatch && String(exactMatch.id) === String(editingPlayerIdInput.value);
     
+    // Hide the "Create" toggle if an exact match exists, unless the creation 
+    // form is already open (in which case the button serves as "Cancel").
+    const isFormOpen = !ifpaRow.classList.contains('hidden');
+    createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
+
     savePlayerButton.disabled = !query || (!!exactMatch && !isEditingThisPlayer);
     savePlayerButton.title = (exactMatch && !isEditingThisPlayer) ? "This player name already exists." : "";
   };
@@ -90,6 +123,15 @@ export async function initPlayersPage() {
     if (playerFormTitle) playerFormTitle.textContent = 'Add New Player';
     savePlayerButton.textContent = 'Save Player';
     cancelEditButton.classList.add('hidden');
+
+    // Collapse creation fields
+    if (ifpaRow) ifpaRow.classList.add('hidden');
+    if (matchplayRow) matchplayRow.classList.add('hidden');
+    if (actionsRow) actionsRow.classList.add('hidden');
+    createToggle.textContent = 'Create New Player';
+    createToggle.style.marginTop = '10px';
+    playerNameInput.after(createToggle);
+
     if (filterInstance) filterInstance.performFilter();
   }
 
@@ -108,6 +150,15 @@ export async function initPlayersPage() {
     if (playerFormTitle) playerFormTitle.textContent = `Edit Player: ${player.player_name}`;
     savePlayerButton.textContent = 'Update Player';
     cancelEditButton.classList.remove('hidden');
+
+    // Expand fields for editing
+    if (ifpaRow) ifpaRow.classList.remove('hidden');
+    if (matchplayRow) matchplayRow.classList.remove('hidden');
+    if (actionsRow) actionsRow.classList.remove('hidden');
+    createToggle.textContent = 'Cancel';
+    createToggle.style.marginTop = '0';
+    actionsRow.appendChild(createToggle);
+
     window.scrollTo(0, 0); // Scroll to the form
   }
 

@@ -36,16 +36,18 @@ export async function initMachinesPage() {
       emptyNotice.classList.add('hidden');
       filtered.forEach(m => {
         const item = document.createElement('div');
-        item.className = 'card league-item';
+        item.className = 'machine-registry-item';
         item.style.display = 'flex';
         item.style.justifyContent = 'space-between';
         item.style.alignItems = 'center';
-        item.style.padding = '10px 15px';
-        item.style.marginBottom = '10px';
+        item.style.padding = '6px 12px';
+        item.style.marginBottom = '5px';
+        item.style.background = '#f9f9f9';
+        item.style.borderRadius = '4px';
         
         item.innerHTML = `
           <span style="font-weight: bold;">${m.machine_name}</span>
-          <button class="delete-mach-btn">Delete</button>
+          <button class="delete-mach-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
         `;
 
         item.querySelector('.delete-mach-btn').onclick = async () => {

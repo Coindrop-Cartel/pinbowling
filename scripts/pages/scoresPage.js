@@ -23,7 +23,6 @@ export async function initScoresPage() {
   const resultsEmpty = document.getElementById('results-empty');
   const warning = document.getElementById('player-warning');
   const playerSelect = document.getElementById('player-select');
-  const scoringHeader = document.getElementById('scoring-header');
   const playerSelectionCard = document.getElementById('player-selection-card');
   const scoringCard = document.getElementById('scoring-card');
   const resultsCard = document.getElementById('results-card');
@@ -32,6 +31,40 @@ export async function initScoresPage() {
   let allPlayersCache = [];
   let machines = [];
   const printSheetBtn = document.getElementById('print-sheet-btn');
+
+  // Selection UI Toggles
+  const tournamentSelectorUI = document.getElementById('tournament-selector-ui');
+  const tournamentSummary = document.getElementById('tournament-summary');
+  const tournamentSummaryText = document.getElementById('tournament-summary-text');
+  const changeTournamentBtn = document.getElementById('change-tournament-btn');
+
+  const playerSelectorUI = document.getElementById('player-selector-ui');
+  const playerSummary = document.getElementById('player-summary');
+  const playerSummaryText = document.getElementById('player-summary-text');
+  const changePlayerBtn = document.getElementById('change-player-btn');
+
+  changeTournamentBtn.onclick = () => {
+    tournamentSelectorUI.classList.remove('hidden');
+    tournamentSummary.classList.add('hidden');
+
+    // Clear dependent UI to prevent inconsistent states
+    playerSelectionCard.classList.add('hidden');
+    playerSummary.classList.add('hidden');
+    scoringCard.classList.add('hidden');
+    resultsCard.classList.add('hidden');
+
+    // Reset active player state
+    setCurrentPlayerId('');
+  };
+
+  changePlayerBtn.onclick = () => {
+    playerSelectorUI.classList.remove('hidden');
+    playerSummary.classList.add('hidden');
+
+    // Hide scoring and results until a new player is confirmed
+    scoringCard.classList.add('hidden');
+    resultsCard.classList.add('hidden');
+  };
 
   // Default engine
   let Engine = getScoringEngine('bowling');
@@ -78,7 +111,7 @@ export async function initScoresPage() {
   function buildRoundRow(round, turnValues, isLastRound = false) {
     const row = document.createElement('div');
     row.className = 'round-row';
-    row.style = "display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid #eee;";
+    row.style = "display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 8px 12px; margin-bottom: 5px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;";
     row.dataset.order = round.order_number;
 
     const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
@@ -232,12 +265,20 @@ export async function initScoresPage() {
    */
   async function refreshPlayerSelection() {
     const activePlayerId = await renderPlayerSelect();
+
     if (!activePlayerId) {
       roundsInput.querySelectorAll('input').forEach((input) => (input.disabled = true));
       scoringCard.classList.add('hidden');
       resultsCard.classList.add('hidden');
+      playerSelectorUI.classList.remove('hidden');
+      playerSummary.classList.add('hidden');
       return;
     }
+
+    const player = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
+    playerSummaryText.textContent = player ? `Player: ${player.player_name}` : 'Player Selected';
+    playerSelectorUI.classList.add('hidden');
+    playerSummary.classList.remove('hidden');
 
     warning.classList.add('hidden');
     scoringCard.classList.remove('hidden');
@@ -303,7 +344,8 @@ export async function initScoresPage() {
     const eventId = getActiveEventId();
     if (!eventId) {
       roundsInput.innerHTML = '';
-      scoringHeader.classList.add('hidden');
+      tournamentSelectorUI.classList.remove('hidden');
+      tournamentSummary.classList.add('hidden');
       playerSelectionCard.classList.add('hidden');
       scoringCard.classList.add('hidden');
       resultsCard.classList.add('hidden');
@@ -316,11 +358,16 @@ export async function initScoresPage() {
 
     const leagues = await PB_API.getLeagues();
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
+    const event = league?.events.find(e => String(e.id) === String(eventId));
+
+    tournamentSummaryText.textContent = `${league?.name || 'League'} - ${event?.event_name || 'Event'}`;
+    tournamentSelectorUI.classList.add('hidden');
+    tournamentSummary.classList.remove('hidden');
+
     Engine = getScoringEngine(league?.scoring_format || 'bowling');
 
     machines = await PB_API.getTargetScores(eventId);
 
-    scoringHeader.classList.remove('hidden');
     playerSelectionCard.classList.remove('hidden');
 
     if (machines.length === 0) {

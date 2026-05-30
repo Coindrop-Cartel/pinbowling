@@ -19,6 +19,49 @@ export function initLocationsPage() {
   const saveBtn = document.getElementById('save-location-button');
   const cancelBtn = document.getElementById('cancel-loc-edit-button');
 
+  // Group City and State into one row for a more compact layout
+  const cityRow = cityInput.closest('.form-row');
+  const stateRow = stateInput.closest('.form-row');
+  let cityStateContainer = null;
+  if (cityRow && stateRow) {
+    cityStateContainer = document.createElement('div');
+    cityStateContainer.style = "display: flex; gap: 15px; margin-bottom: 15px;";
+    cityRow.style.flex = "2";
+    cityRow.style.marginBottom = "0";
+    stateRow.style.flex = "1";
+    stateRow.style.marginBottom = "0";
+    cityRow.before(cityStateContainer);
+    cityStateContainer.appendChild(cityRow);
+    cityStateContainer.appendChild(stateRow);
+  }
+
+  // Setup "Create Location" toggle behavior
+  const actionsRow = saveBtn.closest('.form-actions');
+  if (cityStateContainer) cityStateContainer.classList.add('hidden');
+  if (actionsRow) actionsRow.classList.add('hidden');
+
+  const createToggle = document.createElement('button');
+  createToggle.type = 'button';
+  createToggle.className = 'secondary';
+  createToggle.textContent = 'Create New Location';
+  createToggle.style.marginTop = '10px';
+  nameInput.after(createToggle);
+
+  createToggle.onclick = () => {
+    const isHidden = cityStateContainer.classList.contains('hidden');
+    cityStateContainer.classList.toggle('hidden', !isHidden);
+    actionsRow.classList.toggle('hidden', !isHidden);
+    if (isHidden) {
+      createToggle.textContent = 'Cancel';
+      createToggle.style.marginTop = '0';
+      actionsRow.appendChild(createToggle);
+    } else {
+      createToggle.textContent = 'Create New Location';
+      createToggle.style.marginTop = '10px';
+      nameInput.after(createToggle);
+    }
+  };
+
   let allLocations = [];
 
   /**
@@ -43,24 +86,29 @@ export function initLocationsPage() {
       filtered.forEach(loc => {
         const cityState = (loc.city && loc.state) ? ` (${loc.city}, ${loc.state})` : '';
         const locDiv = document.createElement('div');
-        locDiv.className = 'card league-item'; 
+        locDiv.className = 'location-registry-item';
+        locDiv.style.marginBottom = '5px';
+        locDiv.style.border = '1px solid #ddd';
+        locDiv.style.borderRadius = '4px';
+        locDiv.style.overflow = 'hidden';
+
         locDiv.innerHTML = `
-          <div class="location-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0;">
+          <div class="location-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 6px 12px; background: #f9f9f9;">
+            <h3 style="margin: 0; font-size: 1.05rem;">
               ${loc.name}${cityState}<br>
               <small>Machines: (${loc.machines?.length || 0})</small>
             </h3>
-            <div>
-              <button class="edit-loc-btn secondary">Edit</button>
-              <button class="delete-loc-btn">Delete</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="edit-loc-btn secondary" style="padding: 4px 10px; font-size: 0.85rem;">Edit</button>
+              <button class="delete-loc-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
             </div>
           </div>
-          <div class="location-details hidden" style="margin-top: 20px; border-top: 2px solid var(--pb-black); padding-top: 20px;">
-            <div style="margin-bottom: 20px;">
-              <button class="add-mach-btn secondary">Add Machine to Venue</button>
+          <div class="location-details hidden" style="padding: 12px 15px; border-top: 1px solid #ddd; background: #fff;">
+            <div style="margin-bottom: 15px;">
+              <button class="add-mach-btn secondary" style="padding: 4px 12px; font-size: 0.85rem;">Add Machine to Venue</button>
             </div>
             <div class="league-details-columns" style="display: flex; gap: 2rem; flex-wrap: wrap;">
-              <div class="machines-list" id="mach-for-loc-${loc.id}" style="flex: 1; min-width: 300px;">
+              <div class="machines-list" id="mach-for-loc-${loc.id}" style="flex: 1; min-width: 250px;">
                 <div class="mach-list-inner"></div>
                 <div class="notice mach-empty hidden">No machines at this venue.</div>
               </div>
@@ -72,7 +120,14 @@ export function initLocationsPage() {
         locDiv.querySelector('.location-header').onclick = (e) => {
           if (e.target.closest('button')) return;
           const details = locDiv.querySelector('.location-details');
-          details.classList.toggle('hidden');
+          const wasHidden = details.classList.contains('hidden');
+
+          // Accordion behavior: Collapse all other venues first
+          list.querySelectorAll('.location-details').forEach(d => d.classList.add('hidden'));
+
+          if (wasHidden) {
+            details.classList.remove('hidden');
+          }
         };
 
         locDiv.querySelector('.edit-loc-btn').onclick = () => editLocation(loc.id);
@@ -87,15 +142,22 @@ export function initLocationsPage() {
     }
 
     // Validation logic for duplicates
-    const exactMatch = allLocations.find(l => 
+    const exactNameMatch = allLocations.find(l => l.name.toLowerCase() === n);
+    const exactFullMatch = allLocations.find(l => 
       l.name.toLowerCase() === n &&
       (l.city || '').toLowerCase() === c &&
       (l.state || '').toLowerCase() === s
     );
-    const isEditingThis = exactMatch && String(exactMatch.id) === String(editingIdInput.value);
+    const isEditingThis = exactFullMatch && String(exactFullMatch.id) === String(editingIdInput.value);
+
+    // Hide the "Create" toggle if the name already exists, unless the form is open
+    const isFormOpen = cityStateContainer && !cityStateContainer.classList.contains('hidden');
+    if (createToggle) {
+      createToggle.classList.toggle('hidden', !!exactNameMatch && !isFormOpen);
+    }
     
-    saveBtn.disabled = !n || (!!exactMatch && !isEditingThis);
-    saveBtn.title = (exactMatch && !isEditingThis) ? "A venue with this name, city, and state already exists." : "";
+    saveBtn.disabled = !n || (!!exactFullMatch && !isEditingThis);
+    saveBtn.title = (exactFullMatch && !isEditingThis) ? "A venue with this name, city, and state already exists." : "";
   };
 
   /**
@@ -127,6 +189,14 @@ export function initLocationsPage() {
 
     saveBtn.textContent = 'Update Location';
     cancelBtn.classList.remove('hidden');
+
+    // Expand fields for editing
+    if (cityStateContainer) cityStateContainer.classList.remove('hidden');
+    if (actionsRow) actionsRow.classList.remove('hidden');
+    createToggle.textContent = 'Cancel';
+    createToggle.style.marginTop = '0';
+    actionsRow.appendChild(createToggle);
+
     onFilterUpdate();
     window.scrollTo(0, 0);
   }
@@ -139,6 +209,14 @@ export function initLocationsPage() {
     form.reset();
     saveBtn.textContent = 'Add Location';
     cancelBtn.classList.add('hidden');
+
+    // Collapse creation fields
+    if (cityStateContainer) cityStateContainer.classList.add('hidden');
+    if (actionsRow) actionsRow.classList.add('hidden');
+    createToggle.textContent = 'Create New Location';
+    createToggle.style.marginTop = '10px';
+    nameInput.after(createToggle);
+
     onFilterUpdate();
   }
 
@@ -175,15 +253,16 @@ export function initLocationsPage() {
 
     machines.forEach(m => {
       const item = document.createElement('div');
-      item.className = 'event-item';
+      item.style = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; background: #f9f9f9; padding: 6px 12px; border-radius: 4px;";
+      
       item.innerHTML = `
         <span>
-          ${m.machine_name}<br>
+          <strong style="font-size: 0.95rem;">${m.machine_name}</strong><br>
           <small>E: ${formatNumber(m.target_easy)} | M: ${formatNumber(m.target_med)} | H: ${formatNumber(m.target_hard)}</small>
         </span>
-        <div>
-          <button class="edit-mach-btn secondary">Edit</button>
-          <button class="remove-mach-btn">Remove</button>
+        <div style="display: flex; gap: 4px;">
+          <button class="edit-mach-btn secondary" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>
+          <button class="remove-mach-btn" style="padding: 2px 8px; font-size: 0.8rem;">Remove</button>
         </div>
       `;
       item.querySelector('.edit-mach-btn').onclick = () => showMachineForm(locationId, locationName, m);
