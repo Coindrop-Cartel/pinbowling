@@ -118,16 +118,26 @@ if ($method === 'POST') {
             $input['event_name'], 
             $input['event_date'] ?? null
         ];
-        $pdo->prepare($sql)->execute($params);
-        sendJson(['success' => true]);
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $newId = $pdo->lastInsertId();
+        
+        $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id WHERE e.id = ?');
+        $stmt->execute([$newId]);
+        sendJson($stmt->fetch());
     } else {
         validateApiSecret(); // League creation is global admin only
         if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
         
         $password = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
         $sql = 'INSERT INTO Leagues (name, start_date, password) VALUES (?, ?, ?)';
-        $pdo->prepare($sql)->execute([$input['name'], $input['start_date'] ?? null, $password]);
-        sendJson(['success' => true]);
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$input['name'], $input['start_date'] ?? null, $password]);
+        $newId = $pdo->lastInsertId();
+
+        $stmt = $pdo->prepare('SELECT id, name, start_date FROM Leagues WHERE id = ?');
+        $stmt->execute([$newId]);
+        sendJson($stmt->fetch());
     }
 }
 
