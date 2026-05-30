@@ -45,9 +45,7 @@ export async function initConfigPage() {
   const doneBtn = document.getElementById('done-setup-btn');
   if (doneBtn) {
     doneBtn.addEventListener('click', () => {
-      const leagueId = getActiveLeagueId();
-      const appBase = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) || '';
-      window.location.href = `${appBase}/leagues${leagueId ? `?leagueId=${leagueId}` : ''}`;
+      navigateTo(ROUTES.LEAGUE_DETAILS(getActiveLeagueId()));
     });
   }
 

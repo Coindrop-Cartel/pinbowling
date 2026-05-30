@@ -6,6 +6,10 @@
   <title><?php echo isset($pageTitle) ? "PinBowling - $pageTitle" : 'PinBowling'; ?></title>
   <link rel="stylesheet" href="<?php echo $baseUrl; ?>/styles.css?v=<?php echo $UI_VERSION; ?>" />
   <link rel="icon" type="image/png" href="<?php echo $baseUrl; ?>/images/logo.png?v=<?php echo $UI_VERSION; ?>" />
+  <script>
+    // Bridge PHP calculated base path to JavaScript
+    window.APP_BASE = "<?php echo $baseUrl; ?>";
+  </script>
   <script type="importmap">
   {
     "imports": {
@@ -13,7 +17,8 @@
       "@services/": "<?php echo $baseUrl; ?>/scripts/services/",
       "@ui/": "<?php echo $baseUrl; ?>/scripts/ui/",
       "@core/": "<?php echo $baseUrl; ?>/scripts/core/",
-      "@pages/": "<?php echo $baseUrl; ?>/scripts/pages/"
+      "@pages/": "<?php echo $baseUrl; ?>/scripts/pages/",
+      "@constants/": "<?php echo $baseUrl; ?>/constants/"
     }
   }
   </script>
