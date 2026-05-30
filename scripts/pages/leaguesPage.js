@@ -4,6 +4,7 @@ import { setActiveLeagueId, setActiveEventId, getActiveLeagueId } from '@scripts
 import { setLeaguePassword, getLeaguePassword, getAdminSessionPassword, setAdminSessionPassword } from '@services/state.js';
 import { requireAdmin, runAuthorizedLeagueAction } from '@services/auth.js';
 import { navigateTo } from '@scripts/utils.js';
+import { ROUTES } from '@scripts/routes.js';
 
 /**
  * Logic for managing Leagues and Events.

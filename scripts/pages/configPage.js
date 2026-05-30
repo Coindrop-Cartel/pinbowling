@@ -5,6 +5,7 @@ import { createSearchableSelect, showPrompt, initReadOnlyTournamentDisplay } fro
 import { printMachineScores } from '@ui/printing.js';
 import { requireAdmin } from '@services/auth.js';
 import {navigateTo} from '@scripts/utils.js';
+import { ROUTES } from '@scripts/routes.js';
 
 export async function initConfigPage() {
   const configCard = document.getElementById('config-card');

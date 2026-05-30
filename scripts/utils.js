@@ -78,34 +78,84 @@ export function applyScoreFormatting(input) {
 }
 
 /**
+ * Navigates to a specific internal route.
+ * @param {string} url - The destination path (typically generated via ROUTES).
+ */
+export const navigateTo = (url) => {
+  if (url) window.location.href = url;
+};
+
+/**
  * Dynamically generates the navigation menu from ROUTES and manages active states.
+ * If the container already contains navigation links (from layout.php), it updates them.
  * @param {string} containerSelector CSS selector for the nav container.
  */
 export function initNavigation(containerSelector = '.nav-container') {
   const navContainer = document.querySelector(containerSelector);
   if (!navContainer) return;
 
-  // Normalize current path (e.g., "machines.php" or "machines" becomes "machines")
-  const rawPath = window.location.pathname.split('/').pop() || 'index';
-  const currentBase = rawPath.replace(/\.php$/, '') || 'index';
   const urlParams = new URLSearchParams(window.location.search);
+  const PERSISTENT_PARAMS = ['leagueId', 'eventId', 'playerId'];
 
-  // Build navigation items from the routes configuration
-  navContainer.innerHTML = ROUTES.map(route => {
-    const url = new URL(route.path, window.location.origin);
+  // Normalize current path (e.g., "machines.php" or "machines" becomes "machines")
+  const rawPath = window.location.pathname.split('/').pop() || '';
+  const currentBase = rawPath.replace(/\.php$/, '') || 'index';
+
+  // If the container is completely empty (Vitest unit tests fallback), build links dynamically
+  if (navContainer.children.length === 0) {
+    navContainer.innerHTML = ROUTES.map(route => {
+      const url = new URL(route.path, window.location.origin);
+      
+      PERSISTENT_PARAMS.forEach(key => {
+        if (urlParams.has(key)) url.searchParams.set(key, urlParams.get(key));
+      });
+
+      const cleanPath = url.pathname.replace(/\.php$/, '');
+      const finalHref = cleanPath + url.search;
+      const pathWithSlash = finalHref.startsWith('/') ? finalHref : '/' + finalHref;
+      const hrefBase = cleanPath.split('/').pop() || 'index';
+      const isActive = hrefBase === currentBase;
+
+      return `<a href="${pathWithSlash}" class="nav-item ${isActive ? 'active' : ''}">${route.label}</a>`;
+    }).join('');
+  } else {
+    // If the navbar is already rendered (the real app), update the hrefs using data-route
+    const routeLinks = navContainer.querySelectorAll('[data-route]');
     
-    // Automatically carry over global state (leagueId, eventId, etc.)
-    PERSISTENT_PARAMS.forEach(key => {
-      if (urlParams.has(key)) url.searchParams.set(key, urlParams.get(key));
+    routeLinks.forEach(link => {
+      const routeName = link.dataset.route;
+      if (ROUTES[routeName]) {
+        const params = {};
+        PERSISTENT_PARAMS.forEach(key => {
+          if (urlParams.has(key)) {
+            params[key] = urlParams.get(key);
+          }
+        });
+        link.href = ROUTES[routeName](params);
+      }
     });
 
-    const cleanPath = url.pathname.replace(/\.php$/, '');
-    const finalHref = cleanPath + url.search;
-    const hrefBase = cleanPath.split('/').pop() || 'index';
-    const isActive = hrefBase === currentBase;
+    // Clear active classes first
+    const allLinks = navContainer.querySelectorAll('.nav-link, .nav-item');
+    allLinks.forEach(link => link.classList.remove('active'));
+    navContainer.querySelectorAll('.dropbtn').forEach(btn => btn.classList.remove('active'));
 
-    return `<a href="${finalHref}" class="nav-item ${isActive ? 'active' : ''}">${route.label}</a>`;
-  }).join('');
+    // Update active class on links
+    allLinks.forEach(link => {
+      const href = link.getAttribute('href');
+      if (href && href !== 'javascript:void(0)') {
+        const hrefBase = href.split('?')[0].split('/').pop().replace(/\.php$/, '') || 'index';
+        if (hrefBase === currentBase) {
+          link.classList.add('active');
+          const dropdown = link.closest('.dropdown');
+          if (dropdown) {
+            const dropbtn = dropdown.querySelector('.dropbtn');
+            if (dropbtn) dropbtn.classList.add('active');
+          }
+        }
+      }
+    });
+  }
 }
 
 /**
