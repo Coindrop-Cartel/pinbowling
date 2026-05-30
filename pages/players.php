@@ -1,15 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PinBowling Player Score Tracker</title>
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" type="image/png" href="images/logo.png" />
-</head>
-<body>
-  <?php include 'includes/header.php'; ?>
-
+<?php $pageTitle = 'Manage Players'; ?>
   <main class="page-container">
     <header>
       <h1>Manage Players</h1>
@@ -47,7 +36,3 @@
       </div>
     </section>
   </main>
-  <script src="js-config.php"></script>
-  <script type="module" src="scripts/main.js"></script>
-</body>
-</html>

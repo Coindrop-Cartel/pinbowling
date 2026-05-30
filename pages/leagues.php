@@ -1,16 +1,4 @@
-<?php require_once 'includes/config.php'; ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PinBowling - Leagues & Events</title>
-  <link rel="stylesheet" href="styles.css?v=<?php echo $UI_VERSION; ?>" />
-  <link rel="icon" type="image/png" href="images/logo.png" />
-</head>
-<body>
-  <?php include 'includes/header.php'; ?>
-
+<?php $pageTitle = 'Leagues & Events'; ?>
   <main class="page-container">
     <header>
       <h1>Leagues & Events Management</h1>
@@ -68,8 +56,3 @@
       </form>
     </section>
   </main>
-
-  <script src="js-config.php?v=<?php echo $UI_VERSION; ?>"></script>
-  <script type="module" src="scripts/main.js?v=<?php echo $UI_VERSION; ?>"></script>
-</body>
-</html>

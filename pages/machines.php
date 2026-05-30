@@ -1,15 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PinBowling - Manage Machines</title>
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" type="image/png" href="images/logo.png" />
-</head>
-<body>
-  <?php include 'includes/header.php'; ?>
-
+<?php $pageTitle = 'Manage Machines'; ?>
   <main class="page-container">
     <header>
       <h1>Manage Machines</h1>
@@ -33,8 +22,3 @@
       <div id="machines-list"></div>
     </section>
   </main>
-
-  <script src="js-config.php"></script>
-  <script type="module" src="scripts/main.js"></script>
-</body>
-</html>

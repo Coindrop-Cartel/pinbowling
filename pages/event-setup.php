@@ -1,15 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PinBowling - Event Setup</title>
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" type="image/png" href="images/logo.png" />
-</head>
-<body>
-  <?php include 'includes/header.php'; ?>
-
+<?php $pageTitle = 'Event Setup'; ?>
   <main class="page-container">
     <!-- Current Selection Display -->
     <section class="card">
@@ -92,8 +81,3 @@
       <button type="button" id="done-setup-btn">DONE</button>
     </div>
   </main>
-
-  <script src="js-config.php"></script>
-  <script type="module" src="scripts/main.js"></script>
-</body>
-</html>
