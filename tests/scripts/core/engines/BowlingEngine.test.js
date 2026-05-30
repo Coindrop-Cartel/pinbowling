@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest';
-import { BowlingEngine } from '../../../scripts/engines/BowlingEngine.js';
+import { BowlingEngine } from '@core/engines/BowlingEngine.js';
 
 /**
  * Unit tests for BowlingEngine

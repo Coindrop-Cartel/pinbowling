@@ -1,8 +1,9 @@
-import { PB_API } from './api.js';
-import { getScoringEngine } from './engine.js';
+import { PB_API } from '../services/api.js';
+import { getScoringEngine } from '../core/engine.js';
 import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormatting, formatNumber, printMachineScores } from './utils.js';
-import { createSearchableSelect, showPrompt } from './uiComponents.js';
-import { initReadOnlyTournamentDisplay } from './uiComponents.js';
+import { createSearchableSelect, showPrompt } from '../ui/uiComponents.js';
+import { initReadOnlyTournamentDisplay } from '../ui/uiComponents.js';
+import { requireAdmin } from '../services/auth.js';
 
 export async function initConfigPage() {
   const configCard = document.getElementById('config-card');
@@ -289,15 +290,8 @@ export async function initConfigPage() {
     if (!order_number || !machine_name || (!score10 && !score1) || !eventId) return;
 
     const values = Engine.buildRoundValues(score10, score1);
-    if (window.PB_ADMIN_PASSWORD) {
-      const confirmation = await showPrompt(`Enter Admin Password to save changes for Round ${order_number}:`);
-      if (confirmation === null) {
-        alert('Admin action cancelled.');
-        return;
-      } else if (confirmation !== window.PB_ADMIN_PASSWORD) { // Incorrect password
-        alert('Incorrect Admin Password.');
-        return;
-      }
+    if (!await requireAdmin(`Enter Admin Password to save changes for Round ${order_number}:`)) {
+      return;
     }
 
     // --- Resolving Master Machines ---

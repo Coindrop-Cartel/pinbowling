@@ -1,7 +1,8 @@
-import { PB_API } from './api.js';
-import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog } from './uiComponents.js';
+import { PB_API } from '../services/api.js';
+import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog } from '../ui/uiComponents.js';
 import { setActiveLeagueId, setActiveEventId, getActiveLeagueId } from './utils.js';
-import { setLeaguePassword, getLeaguePassword, getAdminSessionPassword, setAdminSessionPassword } from './state.js';
+import { setLeaguePassword, getLeaguePassword, getAdminSessionPassword, setAdminSessionPassword } from '../services/state.js';
+import { requireAdmin, runAuthorizedLeagueAction } from '../services/auth.js';
 
 /**
  * Logic for managing Leagues and Events.
@@ -97,7 +98,7 @@ export async function initLeaguesPage() {
         // Action listeners
         card.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
         card.querySelector('.edit-league-btn').onclick = () => editLeague(league.id, league.name);
-        card.querySelector('.delete-league-btn').onclick = () => manageLeagueAction(league.id, () => deleteLeague(league.id, league.name));
+        card.querySelector('.delete-league-btn').onclick = () => runAuthorizedLeagueAction(league.id, () => deleteLeague(league.id, league.name));
         card.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
         
         card.querySelectorAll('.setup-event-btn').forEach(btn => {
@@ -117,7 +118,7 @@ export async function initLeaguesPage() {
         });
 
         card.querySelectorAll('.delete-event-btn').forEach(btn => {
-          btn.onclick = (e) => manageLeagueAction(league.id, () => deleteEvent(Number(e.target.dataset.id), league.id, league.name));
+          btn.onclick = (e) => runAuthorizedLeagueAction(league.id, () => deleteEvent(Number(e.target.dataset.id), league.id, league.name));
         });
 
         leaguesList.appendChild(card);
@@ -172,13 +173,8 @@ export async function initLeaguesPage() {
     const name = leagueNameInput.value.trim();
     const date = leagueDateInput.value;
 
-    if (window.PB_ADMIN_PASSWORD) {
-      let pass = getAdminSessionPassword();
-      if (pass !== window.PB_ADMIN_PASSWORD) {
-        pass = await showPrompt(`Enter Admin Password to create league "${name}":`);
-        if (pass === window.PB_ADMIN_PASSWORD) setAdminSessionPassword(pass);
-      }
-      if (pass === null || pass !== window.PB_ADMIN_PASSWORD) return alert('Unauthorized');
+    if (!await requireAdmin(`Enter Admin Password to create league "${name}":`)) {
+      return;
     }
 
     const leaguePass = await showPrompt(`Set a League Password for "${name}". This will be required for scoring and setup by non-admins. (Optional)`, 'League Password', false);
@@ -194,41 +190,10 @@ export async function initLeaguesPage() {
     }
   });
 
-  async function manageLeagueAction(leagueId, actionCallback) {
-    let pass = getLeaguePassword(leagueId) || getAdminSessionPassword();
-    
-    if (!pass || (pass !== window.PB_ADMIN_PASSWORD && !getLeaguePassword(leagueId))) {
-      pass = await showPrompt(`Enter League Password (or Admin Password) to continue:`, 'League Access');
-      if (pass === null) return;
-      
-      if (pass === window.PB_ADMIN_PASSWORD) {
-        setAdminSessionPassword(pass);
-      } else {
-        setLeaguePassword(leagueId, pass);
-      }
-    }
-
-    try {
-      await actionCallback();
-    } catch (err) {
-      if (err.message.includes('Unauthorized')) {
-        setLeaguePassword(leagueId, null);
-        setAdminSessionPassword(null);
-        alert('Invalid Password.');
-      } else throw err;
-    }
-  }
-
   async function editLeague(leagueId, currentName) {
-    let globalPass = getAdminSessionPassword();
-    if (globalPass !== window.PB_ADMIN_PASSWORD) {
-      globalPass = await showPrompt(`Reset password for "${currentName}"? Enter Global Admin Password:`);
-      if (globalPass === window.PB_ADMIN_PASSWORD) setAdminSessionPassword(globalPass);
+    if (!await requireAdmin(`Reset password for "${currentName}"? Enter Global Admin Password:`)) {
+      return;
     }
-    
-    if (globalPass === null) return;
-    if (globalPass !== window.PB_ADMIN_PASSWORD) return alert('Invalid Admin Password.');
-
     const newLeaguePass = await showPrompt(`Enter new League Password (or leave blank to clear):`, 'Reset League Password', false);
     
     try {
@@ -278,7 +243,7 @@ export async function initLeaguesPage() {
   }
 
   async function addPlayerToLeague(leagueId, leagueName) {
-    await manageLeagueAction(leagueId, async () => {
+    await runAuthorizedLeagueAction(leagueId, async () => {
       const league = allLeagues.find(l => l.id === leagueId);
       if (!league) return;
       
@@ -307,13 +272,8 @@ export async function initLeaguesPage() {
   async function removePlayerFromLeague(leagueId, playerId, playerName) {
     if (!await showConfirm(`Remove ${playerName} from this league? Their scores will remain, but they will no longer be associated with this league's roster.`, 'Remove Player')) return;
 
-    if (window.PB_ADMIN_PASSWORD) {
-        let pass = getAdminSessionPassword();
-        if (pass !== window.PB_ADMIN_PASSWORD) {
-          pass = await showPrompt(`Enter Admin Password to remove ${playerName} from league:`);
-          if (pass === window.PB_ADMIN_PASSWORD) setAdminSessionPassword(pass);
-        }
-        if (pass === null || pass !== window.PB_ADMIN_PASSWORD) return alert('Unauthorized');
+    if (!await requireAdmin(`Enter Admin Password to remove ${playerName} from league:`)) {
+      return;
     }
 
     await PB_API.removeLeaguePlayer(leagueId, playerId);

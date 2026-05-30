@@ -1,6 +1,6 @@
-import { PB_API } from './api.js';
-import { setupLiveFilter, showConfirm, showPrompt } from './uiComponents.js';
-import { requireAdmin } from './auth.js';
+import { PB_API } from '../services/api.js';
+import { setupLiveFilter, showConfirm, showPrompt } from '../ui/uiComponents.js';
+import { requireAdmin } from '../services/auth.js';
 
 /**
  * Initializes the Player Management page.

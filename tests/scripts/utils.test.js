@@ -9,14 +9,14 @@ const mockEngine = {
 };
 
 // Mock getScoringEngine for renderPreview and print functions
-vi.mock('../../scripts/engine.js', () => ({
+vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => mockEngine),
 }));
 
 // Import all functions from utils.js.
 // We will mock initNavigation *selectively* for tests that call it.
-import * as Utils from '../../scripts/utils.js';
-import { getScoringEngine } from '../../scripts/engine.js'; // To check if it's called
+import * as Utils from '@scripts/utils.js';
+import { getScoringEngine } from '@core/engine.js'; // To check if it's called
 
 describe('Utility Functions (utils.js)', () => {
   let originalLocation;

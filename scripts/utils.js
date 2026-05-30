@@ -1,4 +1,4 @@
-import { getScoringEngine } from './engine.js';
+import { getScoringEngine } from './core/engine.js';
 import * as self from './utils.js';
 
 /**

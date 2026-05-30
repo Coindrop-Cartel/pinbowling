@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { printMachineScores, printBlankScoreSheet } from '../../scripts/printing.js';
+import { printMachineScores, printBlankScoreSheet } from '@ui/printing.js';
 
 // Mock engine and scoring labels
 const mockEngine = {
@@ -8,7 +8,7 @@ const mockEngine = {
   getRoundLabel: vi.fn(() => 'Frame'),
 };
 
-vi.mock('../../scripts/engine.js', () => ({
+vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => mockEngine),
 }));
 

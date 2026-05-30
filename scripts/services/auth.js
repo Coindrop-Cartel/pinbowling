@@ -1,5 +1,5 @@
 import { getAdminSessionPassword, setAdminSessionPassword, getLeaguePassword, setLeaguePassword } from './state.js';
-import { showPrompt } from './uiComponents.js';
+import { showPrompt } from '../ui/uiComponents.js';
 
 /**
  * Verifies if the user has global admin access. 

@@ -22,7 +22,7 @@ vi.hoisted(() => {
 import { 
   fetchJSON, 
   PB_API 
-} from '../../scripts/api.js';
+} from '@services/api.js';
 
 import {
   getCurrentPlayerId, 
@@ -31,7 +31,7 @@ import {
   setLeaguePassword,
   getAdminSessionPassword,
   setAdminSessionPassword
-} from '../../scripts/state.js';
+} from '@services/state.js';
 
 /**
  * Unit tests for the API Client.

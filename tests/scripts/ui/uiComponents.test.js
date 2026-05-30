@@ -19,22 +19,22 @@ vi.hoisted(() => {
 
 // Mock external dependencies used by the components.
 // These are hoisted but must be defined outside of vi.hoisted().
-vi.mock('../../scripts/api.js', () => ({
+vi.mock('@services/api.js', () => ({
   PB_API: {
     getLeagues: vi.fn(),
   },
 }));
 
-vi.mock('../../scripts/utils.js', () => ({
+vi.mock('@scripts/utils.js', () => ({
   getActiveLeagueId: vi.fn(),
   getActiveEventId: vi.fn(),
   setActiveLeagueId: vi.fn(),
   setActiveEventId: vi.fn(),
 }));
 
-import { createSearchableSelect, initReadOnlyTournamentDisplay, showDialog, showConfirm, showPrompt, showPlayerSelectionDialog } from '../../scripts/uiComponents.js';
-import { PB_API } from '../../scripts/api.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId } from '../../scripts/utils.js';
+import { createSearchableSelect, initReadOnlyTournamentDisplay, showDialog, showConfirm, showPrompt, showPlayerSelectionDialog } from '@ui/uiComponents.js';
+import { PB_API } from '@services/api.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId } from '@scripts/utils.js';
 
 /**
  * Tests for reusable UI components. 

@@ -1,5 +1,5 @@
-import { PB_API } from './api.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId } from './utils.js';
+import { PB_API } from '@services/api.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId } from '@scripts/utils.js';
 /**
  * Creates a searchable selection interaction between a text input and a select dropdown.
  * 

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi } from 'vitest';
-import { getScoringEngine } from '../../scripts/engine.js';
-import { BowlingEngine } from '../../scripts/engines/BowlingEngine.js';
+import { getScoringEngine } from '@core/engine.js';
+import { BowlingEngine } from '@core/engines/BowlingEngine.js';
 
 describe('Scoring Engine Factory (engine.js)', () => {
   it('should return an instance of BowlingEngine for "bowling" format', () => {

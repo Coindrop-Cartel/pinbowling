@@ -1,6 +1,6 @@
-import { PB_API } from './api.js';
-import { getActiveLeagueId, setActiveLeagueId, getActiveEventId, setActiveEventId } from './utils.js';
-import { createSearchableSelect } from './uiComponents.js';
+import { PB_API } from '@services/api.js';
+import { getActiveLeagueId, setActiveLeagueId, getActiveEventId, setActiveEventId } from '@scripts/utils.js';
+import { createSearchableSelect } from '@ui/uiComponents.js';
 
 export async function initTournamentSelector(onRefresh) {
   const container = document.querySelector('.tournament-selector-container');

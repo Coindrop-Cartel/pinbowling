@@ -1,6 +1,6 @@
-import { PB_API } from './api.js';
-import { getAdminSessionPassword, setAdminSessionPassword } from './state.js';
-import { setupLiveFilter, showConfirm, showPrompt } from './uiComponents.js';
+import { PB_API } from '../services/api.js';
+import { setupLiveFilter, showConfirm, showPrompt } from '../ui/uiComponents.js';
+import { requireAdmin } from '../services/auth.js';
 
 /**
  * Logic for the Global Machine Registry page.
@@ -49,14 +49,8 @@ export async function initMachinesPage() {
         `;
 
         item.querySelector('.delete-mach-btn').onclick = async () => {
-          if (window.PB_ADMIN_PASSWORD) {
-            let confirmPass = getAdminSessionPassword();
-            if (confirmPass !== window.PB_ADMIN_PASSWORD) {
-              confirmPass = await showPrompt(`Enter Admin Password to delete "${m.machine_name}":`);
-              if (confirmPass === window.PB_ADMIN_PASSWORD) setAdminSessionPassword(confirmPass);
-            }
-            if (confirmPass === null) return;
-            if (confirmPass !== window.PB_ADMIN_PASSWORD) return alert('Incorrect Password');
+          if (!await requireAdmin(`Enter Admin Password to delete "${m.machine_name}":`)) {
+            return;
           }
           if (await showConfirm(`Are you sure you want to remove "${m.machine_name}"? This will remove it from all locations and events.`, 'Delete Machine')) {
             await PB_API.deleteMachine(m.id);

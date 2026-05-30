@@ -1,5 +1,5 @@
-import { getScoringEngine } from './engine.js';
-import { formatNumber } from './utils.js';
+import { getScoringEngine } from '@core/engine.js';
+import { formatNumber } from '@scripts/utils.js';
 
 /**
  * Generates large printable signs showing target scores for each machine.
