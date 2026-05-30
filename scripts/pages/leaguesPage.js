@@ -3,7 +3,7 @@ import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, sh
 import { setActiveLeagueId, setActiveEventId, getActiveLeagueId } from '@scripts/utils.js';
 import { setLeaguePassword, getLeaguePassword, getAdminSessionPassword, setAdminSessionPassword } from '@services/state.js';
 import { requireAdmin, runAuthorizedLeagueAction } from '@services/auth.js';
-import { ROUTES, navigateTo } from '@constants/routes.js';
+import { navigateTo } from '@scripts/utils.js';
 
 /**
  * Logic for managing Leagues and Events.

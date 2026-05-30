@@ -4,7 +4,7 @@ import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormattin
 import { createSearchableSelect, showPrompt, initReadOnlyTournamentDisplay } from '@ui/uiComponents.js';
 import { printMachineScores } from '@ui/printing.js';
 import { requireAdmin } from '@services/auth.js';
-import {ROUTES, navigateTo} from '@constants/routes.js';
+import {navigateTo} from '@scripts/utils.js';
 
 export async function initConfigPage() {
   const configCard = document.getElementById('config-card');
