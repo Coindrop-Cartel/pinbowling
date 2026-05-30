@@ -12,6 +12,7 @@ import { initPlayersPage } from '@pages/playersPage.js';
 import { initScoresPage } from '@pages/scoresPage.js';
 import { initStandingsPage } from '@pages/standingsPage.js';
 import { initLeaguesPage } from '@pages/leaguesPage.js';
+import { initPlayPage } from '@pages/playPage.js';
 
 /**
  * Main entry point. Identifies which page is currently loaded 
@@ -32,6 +33,7 @@ function ready() {
     'rounds-input': initScoresPage,
     'standings-body': initStandingsPage,
     'leagues-list': initLeaguesPage,
+    'quick-play-form': initPlayPage,
   };
 
   // Detect and run initialization for the current page based on element presence

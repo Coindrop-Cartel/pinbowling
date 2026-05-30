@@ -360,7 +360,8 @@ export async function initScoresPage() {
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
     const event = league?.events.find(e => String(e.id) === String(eventId));
 
-    tournamentSummaryText.textContent = `${league?.name || 'League'} - ${event?.event_name || 'Event'}`;
+    const leagueLabel = league?.name === 'Quick Play Sessions' ? '' : `${league?.name} - `;
+    tournamentSummaryText.textContent = `${leagueLabel}${event?.event_name || 'Event'}`;
     tournamentSelectorUI.classList.add('hidden');
     tournamentSummary.classList.remove('hidden');
 

@@ -13,7 +13,7 @@
     <h2>About the Project</h2>
     <p>The system attempts to map pinball scoring to bowling scoring. It calculates strikes, spares, and total scores following standard bowling rules based the target scores for each machine.</p>
     <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-      <a href="<?php echo $baseUrl; ?>/scores" class="btn-standard">Let's Bowl</a>
+      <a href="<?php echo $baseUrl; ?>/play" class="btn-standard">Let's Bowl</a>
       <a href="<?php echo $baseUrl; ?>/leagues" class="btn-standard">Manage Leagues</a>
       <a href="<?php echo $baseUrl; ?>/scores" class="btn-standard">Enter Scores</a>
     </div>

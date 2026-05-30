@@ -1,11 +1,10 @@
 <?php $pageTitle = 'Scores'; ?>
   <main class="page-container">
     <header>
-      <h1>Play</h1>
+      <h1>Scores</h1>
     </header>
     <section style="margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff;">
       <div id="tournament-selector-ui" style="padding: 12px 15px;">
-        <h2>LEAGUE SELECTION</h2>
         <div class="tournament-selector-container"></div>
       </div>
       <div id="tournament-summary" class="hidden" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: #f9f9f9;">

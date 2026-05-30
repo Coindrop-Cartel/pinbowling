@@ -5,11 +5,11 @@
       <span>PinBowling</span>
     </a>
     <ul class="nav-links">
-      <li class="nav-item"><a href="<?php echo $baseUrl; ?>/scores" class="nav-link" data-route="SCORES">Lets Bowl!</a></li>
+      <li class="nav-item"><a href="<?php echo $baseUrl; ?>/play" class="nav-link" data-route="PLAY">Let's Bowl!</a></li>
       <li class="nav-item dropdown">
         <a href="javascript:void(0)" class="nav-link dropbtn">Leagues</a>
         <div class="dropdown-content">
-          <a href="<?php echo $baseUrl; ?>/scores" class="nav-link" data-route="SCORES">Play</a>
+          <a href="<?php echo $baseUrl; ?>/scores" class="nav-link" data-route="SCORES">Scores</a>
           <a href="<?php echo $baseUrl; ?>/leagues" class="nav-link" data-route="LEAGUES">Manage</a>
           <a href="<?php echo $baseUrl; ?>/standings" class="nav-link" data-route="STANDINGS">Scoreboard</a>
         </div>

@@ -6,7 +6,9 @@ export async function initTournamentSelector(onRefresh) {
   const container = document.querySelector('.tournament-selector-container');
   if (!container) return;
 
-  const leagues = await PB_API.getLeagues();
+  // Filter out the internal Quick Play league from standard searches
+  const allLeagues = await PB_API.getLeagues();
+  const leagues = allLeagues.filter(l => l.name !== 'Quick Play Sessions');
   const activeLeagueId = getActiveLeagueId();
   const activeEventId = getActiveEventId();
 
