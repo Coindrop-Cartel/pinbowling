@@ -6,42 +6,39 @@ import * as self from '@scripts/utils.js';
  */
 
 /**
+ * Global parameters that should persist across navigation.
+ */
+const PERSISTENT_PARAMS = ['leagueId', 'eventId', 'playerId'];
+
+/**
  * State helpers that prioritize URL parameters for sharing and consistency.
  */
-export function getActiveLeagueId() {
-  return new URLSearchParams(window.location.search).get('leagueId');
+function getUrlParam(key) {
+  return new URLSearchParams(window.location.search).get(key);
 }
 
+function setUrlParam(key, value) {
+  const url = new URL(window.location);
+  if (value) url.searchParams.set(key, value);
+  else url.searchParams.delete(key);
+  window.history.replaceState({}, '', url);
+  initNavigation();
+}
+
+export const getActiveLeagueId = () => getUrlParam('leagueId');
 export function setActiveLeagueId(id) {
-  const url = new URL(window.location);
-  if (id) url.searchParams.set('leagueId', id);
-  else url.searchParams.delete('leagueId');
-  window.history.replaceState({}, '', url);
-  self.initNavigation();
+  setUrlParam('leagueId', id);
 }
 
-export function getActiveEventId() {
-  return new URLSearchParams(window.location.search).get('eventId');
-}
-
+export const getActiveEventId = () => getUrlParam('eventId');
 export function setActiveEventId(id) {
-  const url = new URL(window.location);
-  if (id) url.searchParams.set('eventId', id);
-  else url.searchParams.delete('eventId');
-  window.history.replaceState({}, '', url);
-  self.initNavigation();
+  setUrlParam('eventId', id);
 }
 
-export function getCurrentPlayerId() {
-  return new URLSearchParams(window.location.search).get('playerId');
-}
+export const getCurrentPlayerId = () => getUrlParam('playerId');
 
 export function setCurrentPlayerId(playerId) {
-  const url = new URL(window.location);
-  if (playerId) url.searchParams.set('playerId', playerId);
-  else url.searchParams.delete('playerId');
-  window.history.replaceState({}, '', url);
-  self.initNavigation();
+  setUrlParam('playerId', playerId);
 }
 
 
@@ -80,45 +77,34 @@ export function applyScoreFormatting(input) {
 }
 
 /**
- * Sets the 'active' class on the navigation item matching the current URL.
+ * Dynamically generates the navigation menu from ROUTES and manages active states.
+ * @param {string} containerSelector CSS selector for the nav container.
  */
-export function initNavigation() {
+export function initNavigation(containerSelector = '.nav-container') {
+  const navContainer = document.querySelector(containerSelector);
+  if (!navContainer) return;
+
   // Normalize current path (e.g., "machines.php" or "machines" becomes "machines")
   const rawPath = window.location.pathname.split('/').pop() || 'index';
   const currentBase = rawPath.replace(/\.php$/, '') || 'index';
-
   const urlParams = new URLSearchParams(window.location.search);
 
-  document.querySelectorAll('.nav-item').forEach(link => {
-    let originalHref = link.getAttribute('href');
-    if (originalHref && !originalHref.startsWith('http') && !originalHref.startsWith('#')) {
-      let [path, existingQuery] = originalHref.split('?');
-      
-      // Normalize the path for the UI links (strip .php)
-      const cleanPath = path.replace(/\.php$/, '');
-      const targetParams = new URLSearchParams(existingQuery || '');
-      
-      // Carry over global state params to navigation links
-      ['leagueId', 'eventId', 'playerId'].forEach(key => {
-        if (urlParams.has(key) && !targetParams.has(key)) {
-          targetParams.set(key, urlParams.get(key));
-        }
-      });
-      
-      const newQuery = targetParams.toString();
-      const updatedHref = cleanPath + (newQuery ? '?' + newQuery : '');
-      link.setAttribute('href', updatedHref);
-      originalHref = updatedHref;
-    }
+  // Build navigation items from the routes configuration
+  navContainer.innerHTML = ROUTES.map(route => {
+    const url = new URL(route.path, window.location.origin);
+    
+    // Automatically carry over global state (leagueId, eventId, etc.)
+    PERSISTENT_PARAMS.forEach(key => {
+      if (urlParams.has(key)) url.searchParams.set(key, urlParams.get(key));
+    });
 
-    // Compare base filenames to set active state accurately
-    const hrefBase = originalHref ? originalHref.split('?')[0].split('/').pop().replace(/\.php$/, '') || 'index' : '';
-    if (hrefBase === currentBase) {
-      link.classList.add('active');
-    } else {
-      link.classList.remove('active');
-    }
-  });
+    const cleanPath = url.pathname.replace(/\.php$/, '');
+    const finalHref = cleanPath + url.search;
+    const hrefBase = cleanPath.split('/').pop() || 'index';
+    const isActive = hrefBase === currentBase;
+
+    return `<a href="${finalHref}" class="nav-item ${isActive ? 'active' : ''}">${route.label}</a>`;
+  }).join('');
 }
 
 /**
