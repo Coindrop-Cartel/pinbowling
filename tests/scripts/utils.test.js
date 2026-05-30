@@ -66,7 +66,7 @@ describe('Utility Functions (utils.js)', () => {
   describe('URL Parameter Management', () => {
     // Temporarily mock initNavigation for these tests as they call it
     beforeEach(() => {
-      vi.spyOn(Utils, 'initNavigation').mockImplementation(() => {});
+      vi.spyOn(Utils, 'initNavigation').mockImplementation(() => { });
     });
 
     afterEach(() => {
@@ -167,7 +167,7 @@ describe('Utility Functions (utils.js)', () => {
       inputElement.value = '1a2b3';
       inputElement.dispatchEvent(new Event('input'));
       // Use a regex to be resilient to JSDOM environments that might not emit commas
-      expect(inputElement.value).toMatch(/^1[,]?23$/); 
+      expect(inputElement.value).toMatch(/^1[,]?23$/);
     });
 
     it('should maintain cursor position (basic check)', () => {
@@ -295,5 +295,50 @@ describe('Utility Functions (utils.js)', () => {
       Utils.renderPreview(score10Input, score1Input, previewValues, getScoringEngine(), true);
       expect(previewValues.innerHTML).not.toContain('Target 1:');
     });
+  });
+});
+
+// Additional tests for navigateTo and initNavigation else branch
+describe('navigateTo function', () => {
+  it('sets window.location.href when a URL is provided', () => {
+    Object.defineProperty(window, 'location', {
+      value: { href: '' },
+      writable: true,
+    });
+    Utils.navigateTo('http://example.com/page');
+    expect(window.location.href).toBe('http://example.com/page');
+  });
+
+  it('does nothing when url is falsy', () => {
+    const originalHref = window.location.href;
+    Utils.navigateTo('');
+    expect(window.location.href).toBe(originalHref);
+  });
+});
+
+describe('initNavigation else branch (pre‑rendered links)', () => {
+  let originalLocation;
+  beforeEach(() => {
+    originalLocation = window.location;
+    delete window.location;
+    window.location = new URL('http://localhost/players.php?leagueId=5');
+    window.history.replaceState = vi.fn();
+    document.body.innerHTML = `
+      <div class="nav-container">
+        <a data-route="HOME" class="nav-link">Home</a>
+        <a data-route="MACHINES" class="nav-link" href="/machines.php?eventId=9">Machines</a>
+      </div>`;
+  });
+
+  afterEach(() => {
+    window.location = originalLocation;
+  });
+
+  it('sets active class on the current page link', () => {
+    window.location = new URL('http://localhost/machines.php?leagueId=2');
+    Utils.initNavigation();
+    const links = document.querySelectorAll('.nav-link');
+    expect(links[0].classList.contains('active')).toBe(false);
+    expect(links[1].classList.contains('active')).toBe(true);
   });
 });

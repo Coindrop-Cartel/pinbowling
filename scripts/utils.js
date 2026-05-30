@@ -131,7 +131,7 @@ export function initNavigation(containerSelector = '.nav-container') {
             params[key] = urlParams.get(key);
           }
         });
-        link.href = ROUTES[routeName](params);
+        link.setAttribute('href', ROUTES[routeName](params));
       }
     });
 
