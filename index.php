@@ -20,7 +20,7 @@ $route = trim(substr($path, strlen($baseDir)), '/');
 
 $targetFile = __DIR__ . '/pages/home.php'; // Default content
 
-if ($route !== '' && $route !== 'index' && $route !== 'index.php') {
+if ($route !== '') {
     $pageName = (strpos($route, '.php') === false) ? $route . '.php' : $route;
     $potentialFile = __DIR__ . '/pages/' . basename($pageName);
 
