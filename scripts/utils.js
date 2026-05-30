@@ -1,5 +1,5 @@
-import { getScoringEngine } from './core/engine.js';
-import * as self from './utils.js';
+import { getScoringEngine } from '@core/engine.js';
+import * as self from '@scripts/utils.js';
 
 /**
  * Utility functions and state management helpers.

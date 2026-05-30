@@ -3,7 +3,7 @@ RewriteEngine On
 
 # Redirect external requests for index or index.php back to the root folder
 RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /.*index(\.php)?\ HTTP/ [NC]
-RewriteRule ^index(\.php)?$ ./ [R=301,L]
+RewriteRule ^index(\.php)?$ %{CONTEXT_PREFIX}/ [R=301,L]
 
 # If the requested path isn't an existing file or directory,
 # send the request to index.php to be handled by our router.

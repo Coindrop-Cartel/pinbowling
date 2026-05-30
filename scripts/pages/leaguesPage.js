@@ -1,8 +1,8 @@
-import { PB_API } from '../services/api.js';
-import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog } from '../ui/uiComponents.js';
-import { setActiveLeagueId, setActiveEventId, getActiveLeagueId } from './utils.js';
-import { setLeaguePassword, getLeaguePassword, getAdminSessionPassword, setAdminSessionPassword } from '../services/state.js';
-import { requireAdmin, runAuthorizedLeagueAction } from '../services/auth.js';
+import { PB_API } from '@services/api.js';
+import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog } from '@ui/uiComponents.js';
+import { setActiveLeagueId, setActiveEventId, getActiveLeagueId } from '@scripts/utils.js';
+import { setLeaguePassword, getLeaguePassword, getAdminSessionPassword, setAdminSessionPassword } from '@services/state.js';
+import { requireAdmin, runAuthorizedLeagueAction } from '@services/auth.js';
 
 /**
  * Logic for managing Leagues and Events.
@@ -107,7 +107,8 @@ export async function initLeaguesPage() {
             const eventId = Number(btn.dataset.eventId);
             setActiveLeagueId(leagueId);
             setActiveEventId(eventId);
-            window.location.href = `event-setup.php?leagueId=${leagueId}&eventId=${eventId}`;
+            const appBase = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) || '';
+            window.location.href = `${appBase}/event-setup?leagueId=${leagueId}&eventId=${eventId}`;
           };
         });
         card.querySelectorAll('.edit-event-btn').forEach(btn => {

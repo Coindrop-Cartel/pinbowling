@@ -4,16 +4,14 @@
  * and dynamic UI rendering across different pages.
  */
 
-import { 
-  initNavigation
-} from './utils.js';
-import { initMachinesPage } from './pages/machinesPage.js';
-import { initLocationsPage } from './pages/locationsPage.js';
-import { initConfigPage } from './pages/configPage.js';
-import { initPlayersPage } from './pages/playersPage.js';
-import { initScoresPage } from './pages/scoresPage.js';
-import { initStandingsPage } from './pages/standingsPage.js';
-import { initLeaguesPage } from './pages/leaguesPage.js';
+import { initNavigation } from '@scripts/utils.js';
+import { initMachinesPage } from '@pages/machinesPage.js';
+import { initLocationsPage } from '@pages/locationsPage.js';
+import { initConfigPage } from '@pages/configPage.js';
+import { initPlayersPage } from '@pages/playersPage.js';
+import { initScoresPage } from '@pages/scoresPage.js';
+import { initStandingsPage } from '@pages/standingsPage.js';
+import { initLeaguesPage } from '@pages/leaguesPage.js';
 
 /**
  * Main entry point. Identifies which page is currently loaded 

@@ -1,9 +1,9 @@
-import { PB_API } from '../services/api.js';
-import { getScoringEngine } from '../core/engine.js';
-import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormatting, formatNumber, printMachineScores } from './utils.js';
-import { createSearchableSelect, showPrompt } from '../ui/uiComponents.js';
-import { initReadOnlyTournamentDisplay } from '../ui/uiComponents.js';
-import { requireAdmin } from '../services/auth.js';
+import { PB_API } from '@services/api.js';
+import { getScoringEngine } from '@core/engine.js';
+import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormatting, formatNumber } from '@scripts/utils.js';
+import { createSearchableSelect, showPrompt, initReadOnlyTournamentDisplay } from '@ui/uiComponents.js';
+import { printMachineScores } from '@ui/printing.js';
+import { requireAdmin } from '@services/auth.js';
 
 export async function initConfigPage() {
   const configCard = document.getElementById('config-card');

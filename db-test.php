@@ -54,7 +54,7 @@ try {
         echo '</ul>';
     }
 
-    echo '<p>Visit <code>index.php</code> or <code>players.php</code> to use the app.</p>';
+    echo '<p>Visit <a href="./">the Home Page</a> to start using the app.</p>';
     echo '</body></html>';
 } catch (PDOException $e) {
     $pdoDrivers = PDO::getAvailableDrivers();

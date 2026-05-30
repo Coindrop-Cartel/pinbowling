@@ -1,8 +1,9 @@
-import { PB_API } from '../services/api.js';
-import { getScoringEngine } from '../core/engine.js';
-import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, printBlankScoreSheet, setCurrentPlayerId, getCurrentPlayerId } from './utils.js';
-import { initTournamentSelector } from '../ui/tournamentSelector.js';
-import { createSearchableSelect } from '../ui/uiComponents.js';
+import { PB_API } from '@services/api.js';
+import { getScoringEngine } from '@core/engine.js';
+import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, setCurrentPlayerId, getCurrentPlayerId } from '@scripts/utils.js';
+import { initTournamentSelector } from '@ui/tournamentSelector.js';
+import { createSearchableSelect } from '@ui/uiComponents.js';
+import { printBlankScoreSheet } from '@ui/printing.js';
 
 /**
  * Initializes the Player Scoring page.

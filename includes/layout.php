@@ -6,6 +6,17 @@
   <title><?php echo isset($pageTitle) ? "PinBowling - $pageTitle" : 'PinBowling'; ?></title>
   <link rel="stylesheet" href="<?php echo $baseUrl; ?>/styles.css?v=<?php echo $UI_VERSION; ?>" />
   <link rel="icon" type="image/png" href="<?php echo $baseUrl; ?>/images/logo.png?v=<?php echo $UI_VERSION; ?>" />
+  <script type="importmap">
+  {
+    "imports": {
+      "@scripts/": "<?php echo $baseUrl; ?>/scripts/",
+      "@services/": "<?php echo $baseUrl; ?>/scripts/services/",
+      "@ui/": "<?php echo $baseUrl; ?>/scripts/ui/",
+      "@core/": "<?php echo $baseUrl; ?>/scripts/core/",
+      "@pages/": "<?php echo $baseUrl; ?>/scripts/pages/"
+    }
+  }
+  </script>
 </head>
 <body class="<?php echo $bodyClass ?? ''; ?>">
   <?php include __DIR__ . '/header.php'; ?>

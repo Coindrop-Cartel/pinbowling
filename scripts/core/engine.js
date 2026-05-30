@@ -1,4 +1,4 @@
-import { BowlingEngine } from './engines/BowlingEngine.js';
+import { BowlingEngine } from '@core/engines/BowlingEngine.js';
 
 export function getScoringEngine(format = 'bowling') {
   switch (format) {

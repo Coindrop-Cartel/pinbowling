@@ -81,11 +81,11 @@ describe('API Client (api.js)', () => {
       json: () => Promise.resolve({ data: 'ok' })
     });
 
-    await fetchJSON('api/players.php');
+    await fetchJSON('service/playerService.php');
 
     // APP_BASE for /app/index.php should be /app
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost/app/api/players.php',
+      'http://localhost/app/service/playerService.php',
       expect.any(Object)
     );
   });
@@ -96,7 +96,7 @@ describe('API Client (api.js)', () => {
       json: () => Promise.resolve({})
     });
 
-    await fetchJSON('api/machines.php');
+    await fetchJSON('service/machineService.php');
 
     const callHeaders = fetch.mock.calls[0][1].headers;
     expect(callHeaders['X-PB-SECRET']).toBe('test-api-secret');
@@ -109,7 +109,7 @@ describe('API Client (api.js)', () => {
       json: () => Promise.resolve({})
     });
 
-    await fetchJSON('api/machines.php?id=1', { method: 'PUT', body: JSON.stringify({ name: 'New' }) });
+    await fetchJSON('service/machineService.php?id=1', { method: 'PUT', body: JSON.stringify({ name: 'New' }) });
 
     const callArgs = fetch.mock.calls[0];
     expect(callArgs[1].method).toBe('POST');
@@ -123,7 +123,7 @@ describe('API Client (api.js)', () => {
     });
 
     await PB_API.getMachines();
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('api/machines.php'), expect.any(Object));
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/machineService.php'), expect.any(Object));
   });
 
   describe('fetchJSON Advanced Logic', () => {
@@ -134,7 +134,7 @@ describe('API Client (api.js)', () => {
         json: () => Promise.resolve({ error: 'Validation Failed' })
       });
 
-      await expect(fetchJSON('api/test')).rejects.toThrow('Validation Failed');
+      await expect(fetchJSON('service/testService.php')).rejects.toThrow('Validation Failed');
     });
 
     it('should fall back to statusText if JSON error parsing fails', async () => {
@@ -144,12 +144,12 @@ describe('API Client (api.js)', () => {
         json: () => Promise.reject(new Error('Not JSON'))
       });
 
-      await expect(fetchJSON('api/test')).rejects.toThrow('Internal Server Error');
+      await expect(fetchJSON('service/testService.php')).rejects.toThrow('Internal Server Error');
     });
 
     it('should provide a default empty body for POST requests to prevent server resets', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await fetchJSON('api/test', { method: 'POST' });
+      await fetchJSON('service/testService.php', { method: 'POST' });
       
       const callArgs = fetch.mock.calls[0][1];
       expect(callArgs.body).toBe(JSON.stringify({}));
@@ -159,7 +159,7 @@ describe('API Client (api.js)', () => {
       setLeaguePassword(5, 'league-access-code');
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
 
-      await fetchJSON('api/scores.php?leagueId=5');
+      await fetchJSON('service/scoreService.php?leagueId=5');
 
       const headers = fetch.mock.calls[0][1].headers;
       expect(headers['X-LEAGUE-PASSWORD']).toBe('league-access-code');
@@ -169,7 +169,7 @@ describe('API Client (api.js)', () => {
       setLeaguePassword(7, 'body-secret');
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
 
-      await fetchJSON('api/scores.php', { 
+      await fetchJSON('service/scoreService.php', { 
         method: 'POST', 
         body: JSON.stringify({ league_id: 7, other: 'data' }) 
       });
@@ -206,7 +206,7 @@ describe('API Client (api.js)', () => {
       await PB_API.createLeague(leagueData);
       
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('api/leagues.php'),
+        expect.stringContaining('service/leagueService.php'),
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify(leagueData)
@@ -221,7 +221,7 @@ describe('API Client (api.js)', () => {
       await PB_API.updateEvent(99, eventData);
       
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('api/leagues.php?task=fixture&id=99'),
+        expect.stringContaining('service/leagueService.php?task=fixture&id=99'),
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }),
@@ -235,7 +235,7 @@ describe('API Client (api.js)', () => {
 
       await PB_API.addLocationMachine(1, 10, { note: 'Back room' });
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('api/locations.php?task=units'),
+        expect.stringContaining('service/locationService.php?task=units'),
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({ location_id: 1, machine_id: 10, note: 'Back room' })
@@ -248,7 +248,7 @@ describe('API Client (api.js)', () => {
 
       await PB_API.deletePlayer(42);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('api/players.php?id=42'),
+        expect.stringContaining('service/playerService.php?id=42'),
         expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
       );
     });

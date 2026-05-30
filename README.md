@@ -4,11 +4,11 @@ This app now uses a PHP backend for MySQL persistence.
 
 ## Overview
 
-PinBowling is a specialized scoring application designed to map pinball scores to bowling-style frames and strikes. This repository contains the backend API (PHP/MySQL) and the client-side logic (Vanilla JS) responsible for managing leagues, events, players, and real-time score calculation.
+PinBowling is a specialized scoring application designed to map pinball scores to bowling-style frames and strikes. This repository contains the backend data services (PHP/MySQL) and the client-side logic (Vanilla JS) responsible for managing leagues, events, players, and real-time score calculation.
 
 ## Project Structure
 
-- `/api`: RESTful PHP endpoints for CRUD operations.
+- `/service`: RESTful PHP data services for CRUD operations.
 - `/includes`: Core configuration, database initialization, and security utilities.
 - `/scripts`: Frontend ES modules for UI components, scoring engines, and API interaction.
 - `/docs`: Documentation including API specifications.
@@ -20,11 +20,11 @@ The project includes a comprehensive OpenAPI 3.0 specification. You can find the
 `docs/openapi.yaml`
 
 Key endpoints include:
-- `api/leagues.php`: Manage bowling leagues, seasonal events, and rosters.
-- `api/machines.php`: Manage the global machine registry and event-specific target scores.
-- `api/players.php`: Manage the global player database.
-- `api/locations.php`: Manage physical venues and their machine lineups (templates).
-- `api/scores.php`: Record and retrieve frame-by-frame scores.
+- `service/leagueService.php`: Manage bowling leagues, seasonal events, and rosters.
+- `service/machineService.php`: Manage the global machine registry and event-specific target scores.
+- `service/playerService.php`: Manage the global player database.
+- `service/locationService.php`: Manage physical venues and their machine lineups (templates).
+- `service/scoreService.php`: Record and retrieve frame-by-frame scores.
 
 ## Security
 
@@ -38,7 +38,7 @@ Write operations are protected by an `X-PB-SECRET` header. League-specific actio
    - If your host lists a MySQL hostname, do not use `localhost` unless it is explicitly the listed value.
    - Use the same hostname exactly as shown under MySQL Databases.
    - If you upload a `.env` file with these values, `config.php` will also read it automatically.
-4. Make sure `config.php`, `api/machines.php`, `api/players.php`, and `api/scores.php` are on the server.
+4. Make sure config.php and the contents of the /service directory are on the server.
 5. Use `db-test.php` in the browser to verify the PHP-to-MySQL connection.
 
 ## PHP Backend Configuration
@@ -71,7 +71,7 @@ The PHP backend automatically creates the following tables if they do not alread
 
 ## Notes
 
-- The frontend now calls PHP endpoints under `api/`.
+- The frontend now calls PHP data services under `service/`.
 - The database is accessed through PDO, which is supported on modern PHP hosts.
 - On many shared hosts, external database connections are blocked, so the app must run on the same hosting platform as the MySQL database.
 

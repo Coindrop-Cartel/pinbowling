@@ -14,13 +14,21 @@ $path = parse_url($requestUri, PHP_URL_PATH);
 
 // 2. Calculate the route relative to the script's directory
 // This ensures it works whether the app is in the root or a subfolder
-$baseDir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
-$baseUrl = $baseDir ?: '';
+$scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
+$baseDir = rtrim($scriptDir, '/');
+$baseUrl = $baseDir;
 $route = trim(substr($path, strlen($baseDir)), '/');
 
 $targetFile = __DIR__ . '/pages/home.php'; // Default content
 
 if ($route !== '') {
+    // If the route is explicitly "index" or "index.php", redirect to the clean base URL
+    if ($route === 'index' || $route === 'index.php') {
+        header("Location: " . rtrim($baseUrl, '/') . "/", true, 301);
+        exit;
+    }
+
+    // Map the route to the /pages directory
     $pageName = (strpos($route, '.php') === false) ? $route . '.php' : $route;
     $potentialFile = __DIR__ . '/pages/' . basename($pageName);
 

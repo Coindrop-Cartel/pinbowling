@@ -1,7 +1,7 @@
-import { PB_API } from '../services/api.js';
-import { getScoringEngine } from '../core/engine.js'; 
-import { getActiveEventId, getActiveLeagueId, formatNumber } from './utils.js';
-import { initTournamentSelector } from '../ui/tournamentSelector.js';
+import { PB_API } from '@services/api.js';
+import { getScoringEngine } from '@core/engine.js'; 
+import { getActiveEventId, getActiveLeagueId, formatNumber } from '@scripts/utils.js';
+import { initTournamentSelector } from '@ui/tournamentSelector.js';
 
 export async function initStandingsPage() {
   const standingsHeader = document.getElementById('standings-header');

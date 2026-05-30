@@ -1,7 +1,7 @@
-import { PB_API } from '../services/api.js';
-import { applyScoreFormatting, formatNumber } from './utils.js';
-import { showConfirm, showPrompt } from '../ui/uiComponents.js';
-import { requireAdmin } from '../services/auth.js';
+import { PB_API } from '@services/api.js';
+import { applyScoreFormatting, formatNumber } from '@scripts/utils.js';
+import { showConfirm, showPrompt } from '@ui/uiComponents.js';
+import { requireAdmin } from '@services/auth.js';
 
 /**
  * Logic for managing league locations/venues.
