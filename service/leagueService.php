@@ -142,7 +142,6 @@ try {
     // POST: Create new League or Event (Protected by API Secret)
     if ($method === 'POST') {
         if ($task === 'member') {
-            validateLeagueAccess($pdo, $input['leagueId']);
             if (empty($input['leagueId']) || empty($input['playerId'])) {
                 sendJson(['error' => 'leagueId and playerId are required'], 400);
             }
@@ -150,7 +149,6 @@ try {
             $stmt->execute([(int)$input['leagueId'], (int)$input['playerId']]);
             sendJson(['success' => true]);
         } else if ($task === 'fixture') {
-            validateLeagueAccess($pdo, $input['leagueId']);
             if (empty($input['leagueId']) || empty($input['eventName'])) {
                 sendJson(['error' => 'leagueId and eventName are required'], 400);
             }
@@ -173,7 +171,6 @@ try {
             }
             sendJson(serializeEvent($row));
         } else {
-            validateApiSecret(); // League creation is global admin only
             if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
             
             $password = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;

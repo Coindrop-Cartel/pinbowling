@@ -78,10 +78,12 @@ $dbUser = envValue($loadedEnv, ['DB_USER', 'MYSQL_USER'], 'username');
 $dbPass = envValue($loadedEnv, ['DB_PASS', 'MYSQL_PASSWORD'], 'password');
 $dbCharset = 'utf8mb4';
 $apiSecret = envValue($loadedEnv, ['API_SECRET'], 'bowl-2024-secret');
+
 // UI_VERSION is used for asset cache-busting. 
 // It prioritizes .env, but falls back to the modification time of index.php.
 // Deployment Tip: 'touch index.php' on the server to force-clear client caches.
-$uiVersion = envValue($loadedEnv, ['UI_VERSION'], @filemtime(__DIR__ . '/../index.php') ?: '1.0.0');
+$uiVersion = envValue($loadedEnv, ['UI_VERSION'], @max(@filemtime(__DIR__ . '/../index.php'), @filemtime(__FILE__)) ?: '1.0.0');
+
 $adminPassword = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');
 
 $dbDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset={$dbCharset}";

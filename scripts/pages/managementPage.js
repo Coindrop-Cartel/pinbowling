@@ -90,6 +90,9 @@ export async function initManagementPage() {
     
     if (!confirmed) return;
 
+    const adminVerified = await requireAdmin('Enter Admin Password to perform database cleanup:');
+    if (!adminVerified) return;
+
     try {
       cleanupBtn.disabled = true;
       cleanupBtn.textContent = 'Running Cleanup...';

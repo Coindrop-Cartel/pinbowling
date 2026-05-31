@@ -89,8 +89,6 @@ try {
 
     // POST: Add a new round/machine configuration (Protected by API Secret)
     if ($method === 'POST') {
-        validateApiSecret(); // Protect all machine registry modifications
-
         if ($task === 'sort') {
             if (!is_array($input)) sendJson(['error' => 'Input must be an array of updates'], 400);
 

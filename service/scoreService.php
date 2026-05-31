@@ -95,7 +95,6 @@ try {
     // POST: Save or update a score for a specific player/frame (Protected by API Secret)
     if ($method === 'POST') {
         $event_id = isset($input['eventId']) ? (int)$input['eventId'] : 0;
-        validateApiSecret();
         
         $player_id = isset($input['playerId']) ? (int)$input['playerId'] : 0;
         $order_number = isset($input['orderNumber']) ? (int)$input['orderNumber'] : 0;

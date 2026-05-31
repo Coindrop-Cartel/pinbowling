@@ -189,10 +189,6 @@ export async function initLeaguesPage() {
     const name = leagueNameInput.value.trim();
     const date = leagueDateInput.value;
 
-    if (!await requireAdmin(`Enter Admin Password to create league "${name}":`)) {
-      return;
-    }
-
     const leaguePass = await showPrompt(`Set a League Password for "${name}". This will be required for scoring and setup by non-admins. (Optional)`, 'League Password', false);
 
     try {
@@ -295,39 +291,37 @@ export async function initLeaguesPage() {
   }
 
   async function addPlayerToLeague(leagueId, leagueName) {
-    await runAuthorizedLeagueAction(leagueId, async () => {
-      const league = allLeagues.find(l => l.id === leagueId);
-      if (!league) return;
-      
-      const playersInLeague = new Set((league.players || []).map(p => p.id));
-      const availablePlayers = allPlayersCache.filter(p => !playersInLeague.has(p.id));
+    const league = allLeagues.find(l => l.id === leagueId);
+    if (!league) return;
+    
+    const playersInLeague = new Set((league.players || []).map(p => p.id));
+    const availablePlayers = allPlayersCache.filter(p => !playersInLeague.has(p.id));
 
-      if (availablePlayers.length === 0) {
-          alert('All available players are already in this league.');
-          return;
-      }
+    if (availablePlayers.length === 0) {
+        alert('All available players are already in this league.');
+        return;
+    }
 
-      const playerOptions = availablePlayers.map(p => ({ value: p.id, label: p.playerName }));
-      const selectedPlayerId = await showPlayerSelectionDialog(
-          `Add Player to ${leagueName}`,
-          'Select a player to add:',
-          playerOptions
-      );
+    const playerOptions = availablePlayers.map(p => ({ value: p.id, label: p.playerName }));
+    const selectedPlayerId = await showPlayerSelectionDialog(
+        `Add Player to ${leagueName}`,
+        'Select a player to add:',
+        playerOptions
+    );
 
-      if (selectedPlayerId) {
-          await PB_API.addLeaguePlayer(leagueId, Number(selectedPlayerId));
+    if (selectedPlayerId) {
+        await PB_API.addLeaguePlayer(leagueId, Number(selectedPlayerId));
 
-          // Update local data and UI without a full refresh
-          const player = allPlayersCache.find(p => p.id === Number(selectedPlayerId));
-          if (player) {
-              if (!league.players) league.players = [];
-              league.players.push(player);
-              league.players.sort((a, b) => a.playerName.localeCompare(b.playerName));
-              renderPlayersForLeague(leagueId, league.players, allPlayersCache);
-              updateLeagueHeaderStats(leagueId, league);
-          }
-      }
-    });
+        // Update local data and UI without a full refresh
+        const player = allPlayersCache.find(p => p.id === Number(selectedPlayerId));
+        if (player) {
+            if (!league.players) league.players = [];
+            league.players.push(player);
+            league.players.sort((a, b) => a.playerName.localeCompare(b.playerName));
+            renderPlayersForLeague(leagueId, league.players, allPlayersCache);
+            updateLeagueHeaderStats(leagueId, league);
+        }
+    }
   }
 
   async function removePlayerFromLeague(leagueId, playerId, playerName) {
@@ -350,6 +344,8 @@ export async function initLeaguesPage() {
 
   async function deleteLeague(id, name) {
     if (!await showConfirm(`Are you sure you want to delete the entire league "${name}"? This will delete all associated events and target scores.`, 'Delete League')) return;
+    if (!await requireAdmin(`Enter Admin Password to delete league "${name}":`)) return;
+
     await PB_API.deleteLeague(id);
     await refresh();
   }
