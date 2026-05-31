@@ -20,6 +20,8 @@ export async function initPlayPage() {
   const finalizeBtn = document.getElementById('finalize-qp-btn');
   
   const sessionsList = document.getElementById('qp-sessions-list');
+  // The container/card for existing sessions
+  const sessionsCard = document.getElementById('qp-sessions-card');
   let allPlayersCache = [];
   let todayEvents = [];
   let qpLeague = null;
@@ -45,12 +47,15 @@ export async function initPlayPage() {
       return matchesName && matchesLoc;
     });
 
-    if (filtered.length === 0) return;
+    if (filtered.length === 0) {
+      sessionsList.innerHTML = '<div class="notice">No active sessions found for today matching your criteria.</div>';
+      return;
+    }
 
-    sessionsList.innerHTML = '<p class="hint" style="margin-bottom: 8px;">Found existing sessions for today:</p>';
+    sessionsList.innerHTML = '';
     filtered.forEach(event => {
       const div = document.createElement('div');
-      div.className = 'league-registry-item';
+      div.className = 'session-item';
       div.style = "padding: 12px; cursor: pointer; margin-bottom: 8px; background: #fff; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;";
       div.innerHTML = `
         <div><strong>${event.eventName}</strong><br><small>${event.locationName || 'No Location'} | ${event.eventDate}</small></div>
@@ -127,10 +132,15 @@ export async function initPlayPage() {
   if (createToggleBtn && generatorOptions && generateBtn) {
     createToggleBtn.onclick = () => {
       const isHidden = generatorOptions.classList.contains('hidden');
+      
       generatorOptions.classList.toggle('hidden', !isHidden);
       generateBtn.classList.toggle('hidden', !isHidden);
       createToggleBtn.textContent = isHidden ? 'Cancel' : 'Create New Session';
-      if (sessionsList) sessionsList.classList.toggle('hidden', isHidden); // Hide existing matches when creating
+      
+      // When creating, we hide the existing sessions results to focus on the generator
+      if (sessionsCard) {
+        sessionsCard.classList.toggle('hidden', isHidden);
+      }
 
       // If we are canceling the creation flow, hide the preview section as well
       if (!isHidden && previewSection) {
@@ -443,6 +453,7 @@ export async function initPlayPage() {
       if (setupSummary) setupSummary.classList.add('hidden');
       if (generatorOptions) generatorOptions.classList.add('hidden');
       if (generateBtn) generateBtn.classList.add('hidden');
+      if (sessionsCard) sessionsCard.classList.remove('hidden');
       if (createToggleBtn) createToggleBtn.textContent = 'Create New Session';
       finalizeBtn.disabled = false;
       finalizeBtn.textContent = 'Create Session';

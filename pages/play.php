@@ -28,12 +28,6 @@
         <button type="button" id="qp-change-setup-btn" class="secondary" style="padding: 4px 10px; font-size: 0.8rem;">Change</button>
       </div>
 
-      <div id="qp-existing-matches" style="margin: 15px 0;">
-        <div id="qp-sessions-list">
-          <!-- Existing sessions matching the filters will appear here -->
-        </div>
-      </div>
-
       <div id="qp-generator-options" class="form-row hidden" style="display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px;">
         <div style="flex: 1;">
           <label for="qp-frames">Number of Frames</label>
@@ -58,6 +52,14 @@
         <button type="submit" id="generate-qp-btn" class="hidden">Generate Preview</button>
       </div>
     </form>
+  </section>
+
+  <!-- Existing Sessions Card -->
+  <section id="qp-sessions-card" class="card">
+    <h2>Sessions Today</h2>
+    <div id="qp-sessions-list">
+      <!-- Existing sessions matching the filters will appear here -->
+    </div>
   </section>
 
   <!-- Preview Section (Populated after Generation) -->
