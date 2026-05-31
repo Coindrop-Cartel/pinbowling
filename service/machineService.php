@@ -60,9 +60,9 @@ try {
         if ($leagueId) { // Fetch all target scores for all events in a league
             $stmt = $pdo->prepare('
                 SELECT ts.*, m.machine_name 
-                FROM Target_Scores ts 
-                JOIN Machines m ON ts.machine_id = m.id 
-                JOIN Events e ON ts.event_id = e.id
+                FROM target_scores ts 
+                JOIN machines m ON ts.machine_id = m.id 
+                JOIN events e ON ts.event_id = e.id
                 WHERE e.league_id = ? 
                 ORDER BY ts.event_id ASC, ts.order_number ASC
             ');
@@ -71,15 +71,15 @@ try {
         } else if ($eventId) { // Fetch event-specific target scores
             $stmt = $pdo->prepare('
                 SELECT ts.*, m.machine_name 
-                FROM Target_Scores ts 
-                JOIN Machines m ON ts.machine_id = m.id 
+                FROM target_scores ts 
+                JOIN machines m ON ts.machine_id = m.id 
                 WHERE ts.event_id = ? 
                 ORDER BY ts.order_number ASC
             ');
             $stmt->execute([$eventId]);
             $machines = array_map('serializeTargetScore', $stmt->fetchAll());
         } else { // Fetch master list of machines (titles only)
-            $stmt = $pdo->query('SELECT id, machine_name FROM Machines ORDER BY machine_name ASC');
+            $stmt = $pdo->query('SELECT id, machine_name FROM machines ORDER BY machine_name ASC');
             $machines = array_map('serializeMasterMachine', $stmt->fetchAll());
         }
         sendJson($machines);
@@ -96,31 +96,31 @@ try {
 
             // Fetch the event_id for the targets we are reordering.
             // We assume all targets in the input belong to the same event.
-            $stmtEvent = $pdo->prepare('SELECT event_id FROM Target_Scores WHERE id = ?');
+            $stmtEvent = $pdo->prepare('SELECT event_id FROM target_scores WHERE id = ?');
             $stmtEvent->execute([(int)$input[0]['id']]);
             $eventId = $stmtEvent->fetchColumn();
             if (!$eventId) sendJson(['error' => 'Invalid target ID'], 400);
 
             $pdo->beginTransaction();
             try {
-                // To safely reorder across both Target_Scores and Scores tables without unique key
+                // To safely reorder across both target_scores and scores tables without unique key
                 // violations, we use a two-step "high-number shift" approach.
                 
                 // Step 1: Shift existing order_numbers to a high range (current + 1000)
                 // We fetch current numbers first to ensure we can map the Scores table correctly.
-                $stmtMap = $pdo->prepare('SELECT id, order_number FROM Target_Scores WHERE event_id = ?');
+                $stmtMap = $pdo->prepare('SELECT id, order_number FROM target_scores WHERE event_id = ?');
                 $stmtMap->execute([$eventId]);
                 $currentMapping = $stmtMap->fetchAll(PDO::FETCH_KEY_PAIR); // [id => old_order]
 
-                $stmtShiftTarget = $pdo->prepare('UPDATE Target_Scores SET order_number = order_number + 1000 WHERE event_id = ?');
+                $stmtShiftTarget = $pdo->prepare('UPDATE target_scores SET order_number = order_number + 1000 WHERE event_id = ?');
                 $stmtShiftTarget->execute([$eventId]);
                 
-                $stmtShiftScores = $pdo->prepare('UPDATE Scores SET order_number = order_number + 1000 WHERE event_id = ?');
+                $stmtShiftScores = $pdo->prepare('UPDATE scores SET order_number = order_number + 1000 WHERE event_id = ?');
                 $stmtShiftScores->execute([$eventId]);
 
                 // Step 2: Apply the new normalized incremental order numbers
-                $stmtUpdateTarget = $pdo->prepare('UPDATE Target_Scores SET order_number = ? WHERE id = ?');
-                $stmtUpdateScores = $pdo->prepare('UPDATE Scores SET order_number = ? WHERE event_id = ? AND order_number = ?');
+                $stmtUpdateTarget = $pdo->prepare('UPDATE target_scores SET order_number = ? WHERE id = ?');
+                $stmtUpdateScores = $pdo->prepare('UPDATE scores SET order_number = ? WHERE event_id = ? AND order_number = ?');
 
                 foreach ($input as $item) {
                     $id = (int)$item['id'];
@@ -141,7 +141,7 @@ try {
             }
         }
 
-        // Task 'threshold' handles event-specific target scores (Target_Scores table)
+        // Task 'threshold' handles event-specific target scores (target_scores table)
         if ($task === 'threshold') {
             $batch = isset($input[0]) ? $input : [$input];
             $pdo->beginTransaction();
@@ -150,18 +150,18 @@ try {
                     if (empty($item['eventId']) || empty($item['machineId'])) throw new Exception('eventId and machineId are required');
                     $id = (int)($item['id'] ?? 0);
                     if ($id) {
-                        $stmtOrig = $pdo->prepare('SELECT order_number, event_id FROM Target_Scores WHERE id = ?');
+                        $stmtOrig = $pdo->prepare('SELECT order_number, event_id FROM target_scores WHERE id = ?');
                         $stmtOrig->execute([$id]);
                         $orig = $stmtOrig->fetch();
-                        $sql = 'UPDATE Target_Scores SET machine_id = ?, order_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
+                        $sql = 'UPDATE target_scores SET machine_id = ?, order_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
                         $params = [(int)$item['machineId'], (int)$item['orderNumber']];
                         for ($i = 1; $i <= 10; $i++) $params[] = (int)($item['values'][$i] ?? 0);
                         $params[] = $id;
                         if ($orig && (int)$orig['order_number'] !== (int)$item['orderNumber']) {
-                            $pdo->prepare('UPDATE Scores SET order_number = ? WHERE event_id = ? AND order_number = ?')->execute([(int)$item['orderNumber'], (int)$orig['event_id'], (int)$orig['order_number']]);
+                            $pdo->prepare('UPDATE scores SET order_number = ? WHERE event_id = ? AND order_number = ?')->execute([(int)$item['orderNumber'], (int)$orig['event_id'], (int)$orig['order_number']]);
                         }
                     } else {
-                        $sql = 'INSERT INTO Target_Scores (event_id, machine_id, order_number, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5), score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
+                        $sql = 'INSERT INTO target_scores (event_id, machine_id, order_number, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5), score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
                         $params = [(int)$item['eventId'], (int)$item['machineId'], (int)$item['orderNumber']];
                         for ($i = 1; $i <= 10; $i++) $params[] = (int)($item['values'][$i] ?? 0);
                     }
@@ -182,11 +182,11 @@ try {
             sendJson(['error' => 'machineName is required'], 400);
         }
 
-        $stmt = $pdo->prepare('INSERT INTO Machines (machine_name) VALUES (?)');
+        $stmt = $pdo->prepare('INSERT INTO machines (machine_name) VALUES (?)');
         $stmt->execute([$name]);
         $id = (int)$pdo->lastInsertId();
 
-        $stmt = $pdo->prepare('SELECT id, machine_name FROM Machines WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT id, machine_name FROM machines WHERE id = ?');
         $stmt->execute([$id]);
         sendJson(serializeMasterMachine($stmt->fetch()));
     }
@@ -198,29 +198,29 @@ try {
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
         
-        // Task 'threshold' handles Target_Scores, default handles master Machines
+        // Task 'threshold' handles target_scores, default handles master machines
         if ($task === 'threshold') {
             if (empty($input['machineId']) || empty($input['orderNumber']) || empty($input['values'])) {
                 sendJson(['error' => 'machineId, orderNumber, and values are required for target scores'], 400);
             }
-            $sql = 'UPDATE Target_Scores SET machine_id = ?, order_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
+            $sql = 'UPDATE target_scores SET machine_id = ?, order_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
             $params = [(int)$input['machineId'], (int)$input['orderNumber']];
             for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
             $params[] = $id;
             $pdo->prepare($sql)->execute($params);
-            $stmt = $pdo->prepare('SELECT ts.*, m.machine_name FROM Target_Scores ts JOIN Machines m ON ts.machine_id = m.id WHERE ts.id = ?');
+            $stmt = $pdo->prepare('SELECT ts.*, m.machine_name FROM target_scores ts JOIN machines m ON ts.machine_id = m.id WHERE ts.id = ?');
             $stmt->execute([$id]);
             sendJson(serializeTargetScore($stmt->fetch()));
         } else { // Update a master machine (title only)
             $name = $input['machineName'] ?? $input['name'] ?? null;
             if (!$name) sendJson(['error' => 'machineName is required'], 400);
 
-            $sql = 'UPDATE Machines SET machine_name = ? WHERE id = ?';
+            $sql = 'UPDATE machines SET machine_name = ? WHERE id = ?';
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$name, $id]);
 
             // Fetch the updated master machine
-            $stmt = $pdo->prepare('SELECT id, machine_name FROM Machines WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT id, machine_name FROM machines WHERE id = ?');
             $stmt->execute([$id]);
             sendJson(serializeMasterMachine($stmt->fetch()));
         }
@@ -235,7 +235,7 @@ try {
             sendJson(['error' => 'id query parameter is required'], 400);
         }
         
-        $table = ($task === 'threshold') ? 'Target_Scores' : 'Machines';
+        $table = ($task === 'threshold') ? 'target_scores' : 'machines';
         $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ?");
         $stmt->execute([$id]);
         sendJson(['success' => true]);

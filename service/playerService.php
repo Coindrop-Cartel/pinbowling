@@ -32,7 +32,7 @@ try {
 
     // GET: Retrieve all registered players alphabetically
     if ($method === 'GET') {
-        $stmt = $pdo->query('SELECT * FROM Players ORDER BY player_name ASC');
+        $stmt = $pdo->query('SELECT * FROM players ORDER BY player_name ASC');
         sendJson(array_map('serializePlayer', $stmt->fetchAll()));
     }
 
@@ -48,20 +48,20 @@ try {
         $matchplay_id = $input['matchplayId'] ?? null;
 
         try {
-            $stmt = $pdo->prepare('INSERT INTO Players (player_name, ifpa_id, matchplay_id) VALUES (?, ?, ?)');
+            $stmt = $pdo->prepare('INSERT INTO players (player_name, ifpa_id, matchplay_id) VALUES (?, ?, ?)');
             $stmt->execute([$input['playerName'], $ifpa_id, $matchplay_id]);
             $id = (int)$pdo->lastInsertId();
         } catch (PDOException $error) {
             // Handle duplicate names gracefully by returning the existing record
             if ($error->errorInfo[1] === 1062) {
-                $stmt = $pdo->prepare('SELECT * FROM Players WHERE player_name = ?');
+                $stmt = $pdo->prepare('SELECT * FROM players WHERE player_name = ?');
                 $stmt->execute([$input['playerName']]);
                 sendJson(serializePlayer($stmt->fetch()), 409); // Conflict: Player name already exists
             }
             throw $error; // Re-throw other DB errors to global handler
         }
 
-        $stmt = $pdo->prepare('SELECT * FROM Players WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT * FROM players WHERE id = ?');
         $stmt->execute([$id]);
         sendJson(serializePlayer($stmt->fetch()));
     }
@@ -82,7 +82,7 @@ try {
         $matchplay_id = $input['matchplayId'] ?? null;
 
         try {
-            $stmt = $pdo->prepare('UPDATE Players SET player_name = ?, ifpa_id = ?, matchplay_id = ? WHERE id = ?');
+            $stmt = $pdo->prepare('UPDATE players SET player_name = ?, ifpa_id = ?, matchplay_id = ? WHERE id = ?');
             $stmt->execute([$input['playerName'], $ifpa_id, $matchplay_id, $id]);
         } catch (PDOException $error) {
             if ($error->errorInfo[1] === 1062) { // Duplicate entry
@@ -91,7 +91,7 @@ try {
             throw $error;
         }
 
-        $stmt = $pdo->prepare('SELECT * FROM Players WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT * FROM players WHERE id = ?');
         $stmt->execute([$id]);
         sendJson(serializePlayer($stmt->fetch()));
     }
@@ -105,14 +105,14 @@ try {
             sendJson(['error' => 'id query parameter is required'], 400);
         }
 
-        $stmt = $pdo->prepare('SELECT * FROM Players WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT * FROM players WHERE id = ?');
         $stmt->execute([$id]);
         $player = $stmt->fetch();
         if (!$player) {
             sendJson(['error' => 'Player not found'], 404);
         }
 
-        $stmt = $pdo->prepare('DELETE FROM Players WHERE id = ?');
+        $stmt = $pdo->prepare('DELETE FROM players WHERE id = ?');
         $stmt->execute([$id]);
         sendJson(['success' => true, 'deleted' => $player]);
     }

@@ -60,9 +60,9 @@ try {
         if ($league_id) {
             $stmt = $pdo->prepare(
                 'SELECT s.id, s.player_id, s.event_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
-                 FROM Scores s
-                 JOIN Machines m ON m.id = s.machine_id
-                 JOIN Events e ON s.event_id = e.id
+                 FROM scores s
+                 JOIN machines m ON m.id = s.machine_id
+                 JOIN events e ON s.event_id = e.id
                  WHERE e.league_id = ?
                  ORDER BY s.event_id ASC, s.player_id ASC, s.order_number ASC'
             );
@@ -70,8 +70,8 @@ try {
         } else if ($player_id) {
             $stmt = $pdo->prepare(
                 'SELECT s.id, s.player_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
-                 FROM Scores s
-                 JOIN Machines m ON m.id = s.machine_id
+                 FROM scores s
+                 JOIN machines m ON m.id = s.machine_id
                  WHERE s.player_id = ? AND s.event_id = ?
                  ORDER BY s.order_number ASC'
             );
@@ -79,8 +79,8 @@ try {
         } else {
             $stmt = $pdo->prepare(
                 'SELECT s.id, s.player_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
-                 FROM Scores s
-                 JOIN Machines m ON m.id = s.machine_id
+                 FROM scores s
+                 JOIN machines m ON m.id = s.machine_id
                  WHERE s.event_id = ?
                  ORDER BY s.player_id ASC, s.order_number ASC'
             );
@@ -113,13 +113,13 @@ try {
             sendJson(['error' => 'Invalid score values'], 400);
         }
 
-        $sql = 'INSERT INTO Scores (event_id, player_id, order_number, machine_id, ball1, ball2, ball3)
+        $sql = 'INSERT INTO scores (event_id, player_id, order_number, machine_id, ball1, ball2, ball3)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE machine_id = ?, ball1 = ?, ball2 = ?, ball3 = ?';
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$event_id, $player_id, $order_number, $machine_id, $ball1, $ball2, $ball3, $machine_id, $ball1, $ball2, $ball3]);
 
-        $stmt = $pdo->prepare('SELECT * FROM Scores WHERE player_id = ? AND order_number = ? AND event_id = ?');
+        $stmt = $pdo->prepare('SELECT * FROM scores WHERE player_id = ? AND order_number = ? AND event_id = ?');
         $stmt->execute([$player_id, $order_number, $event_id]);
         sendJson(serializeScore($stmt->fetch()));
     }
@@ -131,7 +131,7 @@ try {
         if (!$player_id) {
             sendJson(['error' => 'playerId query parameter is required'], 400);
         }
-        $stmt = $pdo->prepare('DELETE FROM Scores WHERE player_id = ?');
+        $stmt = $pdo->prepare('DELETE FROM scores WHERE player_id = ?');
         $stmt->execute([$player_id]);
         sendJson(['success' => true]);
     }

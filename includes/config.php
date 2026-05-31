@@ -99,8 +99,39 @@ function getDbConnection() {
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
         ]);
+        initializeDatabaseSchema($pdo);
     }
     return $pdo;
+}
+
+/**
+ * Ensures database tables follow the standardized lowercase snake_case convention.
+ * Migrates existing PascalCase tables if found.
+ * @param PDO $pdo
+ */
+function initializeDatabaseSchema($pdo) {
+    $migrations = [
+        'Leagues' => 'leagues',
+        'Events' => 'events',
+        'Machines' => 'machines',
+        'Players' => 'players',
+        'Scores' => 'scores',
+        'League_Players' => 'league_players',
+        'Locations' => 'locations',
+        'Location_Machines' => 'location_machines',
+        'Target_Scores' => 'target_scores'
+    ];
+
+    foreach ($migrations as $old => $new) {
+        if ($old === $new) continue;
+        $checkOld = $pdo->query("SHOW TABLES LIKE '$old'")->fetch();
+        if ($checkOld) {
+            $checkNew = $pdo->query("SHOW TABLES LIKE '$new'")->fetch();
+            if (!$checkNew) {
+                $pdo->exec("RENAME TABLE `$old` TO `$new` ");
+            }
+        }
+    }
 }
 
 // Handle HTTP Method Tunneling for environments that block DELETE/PUT.

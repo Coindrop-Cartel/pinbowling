@@ -77,7 +77,7 @@ try {
         } else {
             $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
             if ($id) {
-                $stmt = $pdo->prepare('SELECT * FROM Leagues WHERE id = ?');
+                $stmt = $pdo->prepare('SELECT * FROM leagues WHERE id = ?');
                 $stmt->execute([$id]);
                 $league = $stmt->fetch();
                 if ($league) {
@@ -102,15 +102,15 @@ try {
             // group them in memory before returning the final JSON structure.
             
             // Fetch all leagues (excluding password)
-            $leaguesStmt = $pdo->query('SELECT id, name, start_date FROM Leagues ORDER BY start_date DESC');
+            $leaguesStmt = $pdo->query('SELECT id, name, start_date FROM leagues ORDER BY start_date DESC');
             $leagues = $leaguesStmt->fetchAll();
 
             // Fetch all events
-            $eventsStmt = $pdo->query('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id ORDER BY e.event_date ASC');
+            $eventsStmt = $pdo->query('SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id ORDER BY e.event_date ASC');
             $allEvents = $eventsStmt->fetchAll();
 
             // Fetch all league players
-            $lpStmt = $pdo->query('SELECT lp.league_id, p.* FROM Players p JOIN League_Players lp ON p.id = lp.player_id ORDER BY p.player_name ASC');
+            $lpStmt = $pdo->query('SELECT lp.league_id, p.* FROM players p JOIN league_players lp ON p.id = lp.player_id ORDER BY p.player_name ASC');
             $allLeaguePlayers = $lpStmt->fetchAll();
 
             // Group events by their league_id
@@ -144,7 +144,7 @@ try {
             if (empty($input['leagueId']) || empty($input['playerId'])) {
                 sendJson(['error' => 'leagueId and playerId are required'], 400);
             }
-            $stmt = $pdo->prepare('INSERT IGNORE INTO League_Players (league_id, player_id) VALUES (?, ?)');
+            $stmt = $pdo->prepare('INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)');
             $stmt->execute([(int)$input['leagueId'], (int)$input['playerId']]);
             sendJson(['success' => true]);
         } else if ($task === 'fixture') {
@@ -152,7 +152,7 @@ try {
             if (empty($input['leagueId']) || empty($input['eventName'])) {
                 sendJson(['error' => 'leagueId and eventName are required'], 400);
             }
-            $sql = 'INSERT INTO Events (league_id, location_id, event_name, event_date) VALUES (?, ?, ?, ?)';
+            $sql = 'INSERT INTO events (league_id, location_id, event_name, event_date) VALUES (?, ?, ?, ?)';
             $params = [
                 (int)$input['leagueId'], 
                 !empty($input['locationId']) ? (int)$input['locationId'] : null, 
@@ -163,7 +163,7 @@ try {
             $stmt->execute($params);
             $newId = $pdo->lastInsertId();
             
-            $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id WHERE e.id = ?');
+            $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id WHERE e.id = ?');
             $stmt->execute([$newId]);
             sendJson(serializeEvent($stmt->fetch()));
         } else {
@@ -171,12 +171,12 @@ try {
             if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
             
             $password = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
-            $sql = 'INSERT INTO Leagues (name, start_date, password) VALUES (?, ?, ?)';
+            $sql = 'INSERT INTO leagues (name, start_date, password) VALUES (?, ?, ?)';
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$input['name'], $input['startDate'] ?? null, $password]);
             $newId = $pdo->lastInsertId();
 
-            $stmt = $pdo->prepare('SELECT id, name, start_date FROM Leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT id, name, start_date FROM leagues WHERE id = ?');
             $stmt->execute([$newId]);
             sendJson(serializeLeague($stmt->fetch()));
         }
@@ -189,7 +189,7 @@ try {
 
         if ($task === 'fixture') {
             validateLeagueAccess($pdo, $input['leagueId']);
-            $sql = 'UPDATE Events SET league_id = ?, location_id = ?, event_name = ?, event_date = ? WHERE id = ?';
+            $sql = 'UPDATE events SET league_id = ?, location_id = ?, event_name = ?, event_date = ? WHERE id = ?';
             $params = [
                 (int)$input['leagueId'], 
                 !empty($input['locationId']) ? (int)$input['locationId'] : null, 
@@ -199,22 +199,22 @@ try {
             ];
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
-            $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id WHERE e.id = ?');
+            $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id WHERE e.id = ?');
         } else {
             // Handle password reset separately (Requires Global Admin)
             if (isset($input['resetPassword'])) {
                 validateApiSecret();
                 $newPass = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
-                $pdo->prepare('UPDATE Leagues SET password = ? WHERE id = ?')->execute([$newPass, $id]);
+                $pdo->prepare('UPDATE leagues SET password = ? WHERE id = ?')->execute([$newPass, $id]);
                 sendJson(['success' => true]);
             }
 
             validateLeagueAccess($pdo, $id);
-            $sql = 'UPDATE Leagues SET name = ?, start_date = ? WHERE id = ?';
+            $sql = 'UPDATE leagues SET name = ?, start_date = ? WHERE id = ?';
             $params = [$input['name'], $input['startDate'] ?? null, $id];
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
-            $stmt = $pdo->prepare('SELECT * FROM Leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT * FROM leagues WHERE id = ?');
         }
         $stmt->execute([$id]);
 
@@ -250,7 +250,7 @@ try {
                 validateLeagueAccess($pdo, $id); // Deleting a League
             }
 
-            $table = ($task === 'fixture') ? 'Events' : 'Leagues';
+            $table = ($task === 'fixture') ? 'events' : 'leagues';
             $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ?");
             $stmt->execute([$id]);
         }

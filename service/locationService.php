@@ -52,16 +52,16 @@ try {
             if ($location_id) {
                 $stmt = $pdo->prepare('
                     SELECT lm.*, m.machine_name 
-                    FROM Location_Machines lm 
-                    JOIN Machines m ON lm.machine_id = m.id 
+                    FROM location_machines lm 
+                    JOIN machines m ON lm.machine_id = m.id 
                     WHERE lm.location_id = ?
                 ');
                 $stmt->execute([$location_id]);
             } else {
                 $stmt = $pdo->query('
                     SELECT lm.*, m.machine_name 
-                    FROM Location_Machines lm 
-                    JOIN Machines m ON lm.machine_id = m.id 
+                    FROM location_machines lm 
+                    JOIN machines m ON lm.machine_id = m.id 
                     ORDER BY lm.location_id ASC
                 ');
             }
@@ -70,7 +70,7 @@ try {
 
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if ($id) {
-            $stmt = $pdo->prepare('SELECT * FROM Locations WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT * FROM locations WHERE id = ?');
             $stmt->execute([$id]);
             $location = $stmt->fetch();
             if (!$location) {
@@ -78,18 +78,18 @@ try {
             }
             $result = serializeLocation($location);
             // Automatically include machines when fetching a specific location
-            $stmt = $pdo->prepare('SELECT lm.*, m.machine_name FROM Location_Machines lm JOIN Machines m ON lm.machine_id = m.id WHERE lm.location_id = ?');
+            $stmt = $pdo->prepare('SELECT lm.*, m.machine_name FROM location_machines lm JOIN machines m ON lm.machine_id = m.id WHERE lm.location_id = ?');
             $stmt->execute([$id]);
             $result['machines'] = array_map('serializeLocationMachine', $stmt->fetchAll());
             sendJson($result);
         }
 
         // Fetch all locations
-        $locationsStmt = $pdo->query('SELECT * FROM Locations ORDER BY name ASC');
+        $locationsStmt = $pdo->query('SELECT * FROM locations ORDER BY name ASC');
         $locations = array_map('serializeLocation', $locationsStmt->fetchAll());
 
         // Fetch all location-machine mappings
-        $machinesStmt = $pdo->query('SELECT lm.*, m.machine_name FROM Location_Machines lm JOIN Machines m ON lm.machine_id = m.id ORDER BY lm.location_id ASC');
+        $machinesStmt = $pdo->query('SELECT lm.*, m.machine_name FROM location_machines lm JOIN machines m ON lm.machine_id = m.id ORDER BY lm.location_id ASC');
         $allMachines = $machinesStmt->fetchAll();
 
         // Group machines by location_id
