@@ -79,7 +79,7 @@ export async function initLeaguesPage() {
           <div class="league-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 6px 12px; background: #f9f9f9;">
             <div>
               <h3 style="margin: 0; font-size: 1.05rem;">${league.name}</h3>
-              <small>Started: ${league.start_date || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
+              <small>Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
             </div>
             <div style="display: flex; gap: 8px;">
               <button class="delete-league-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
@@ -203,7 +203,7 @@ export async function initLeaguesPage() {
     const leaguePass = await showPrompt(`Set a League Password for "${name}". This will be required for scoring and setup by non-admins. (Optional)`, 'League Password', false);
 
     try {
-      await PB_API.createLeague({ name, start_date: date, password: leaguePass });
+      await PB_API.createLeague({ name, startDate: date, password: leaguePass });
       leagueNameInput.value = '';
       leagueDateInput.value = '';
       // Collapse creation form back down
@@ -228,7 +228,7 @@ export async function initLeaguesPage() {
 
     eventsListEl.innerHTML = (leagueEvents || []).map(e => `
       <li style="display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
-        <span>${e.event_name} <small>(${e.event_date || 'No Date'})</small></span>
+        <span>${e.eventName} <small>(${e.eventDate || 'No Date'})</small></span>
         <div style="display: flex; gap: 4px;">
           <button class="setup-event-btn secondary" data-league-id="${leagueId}" data-event-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Setup</button>
           <button class="edit-event-btn secondary" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>
@@ -261,7 +261,7 @@ export async function initLeaguesPage() {
     const newLeaguePass = await showPrompt(`Enter new League Password (or leave blank to clear):`, 'Reset League Password', false);
     
     try {
-      await PB_API.updateLeague(leagueId, { reset_password: true, password: newLeaguePass });
+      await PB_API.updateLeague(leagueId, { resetPassword: true, password: newLeaguePass });
       alert('League password updated successfully.');
       await refresh();
     } catch (err) {
@@ -286,8 +286,8 @@ export async function initLeaguesPage() {
                 const li = document.createElement('li');
                 li.style = "display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;";
                 li.innerHTML = `
-                    <span>${lp.player_name}</span>
-                    <button class="remove-player-btn" data-league-id="${leagueId}" data-player-id="${lp.id}" data-player-name="${lp.player_name}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>
+                    <span>${lp.playerName}</span>
+                    <button class="remove-player-btn" data-league-id="${leagueId}" data-player-id="${lp.id}" data-player-name="${lp.playerName}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>
                 `;
                 playersListEl.appendChild(li);
             }
@@ -312,7 +312,7 @@ export async function initLeaguesPage() {
     const card = addBtn.closest('.league-registry-item');
     const statsEl = card.querySelector('.league-header small');
     if (statsEl) {
-      statsEl.textContent = `Started: ${league.start_date || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}`;
+      statsEl.textContent = `Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}`;
     }
   }
 
@@ -329,7 +329,7 @@ export async function initLeaguesPage() {
           return;
       }
 
-      const playerOptions = availablePlayers.map(p => ({ value: p.id, label: p.player_name }));
+      const playerOptions = availablePlayers.map(p => ({ value: p.id, label: p.playerName }));
       const selectedPlayerId = await showPlayerSelectionDialog(
           `Add Player to ${leagueName}`,
           'Select a player to add:',
@@ -344,7 +344,7 @@ export async function initLeaguesPage() {
           if (player) {
               if (!league.players) league.players = [];
               league.players.push(player);
-              league.players.sort((a, b) => a.player_name.localeCompare(b.player_name));
+              league.players.sort((a, b) => a.playerName.localeCompare(b.playerName));
               renderPlayersForLeague(leagueId, league.players, allPlayersCache);
               updateLeagueHeaderStats(leagueId, league);
           }
@@ -392,12 +392,12 @@ export async function initLeaguesPage() {
   async function showEventForm(leagueId, leagueName, event = null) {
     eventFormCard.classList.remove('hidden');
     const titleEl = document.getElementById('event-form-title');
-    titleEl.innerHTML = event ? `Edit Event: ${event.event_name}` : `Add Event to League: <span id="event-form-league-name">${leagueName}</span>`;
+    titleEl.innerHTML = event ? `Edit Event: ${event.eventName}` : `Add Event to League: <span id="event-form-league-name">${leagueName}</span>`;
     
     document.getElementById('event-league-id').value = leagueId;
     document.getElementById('event-id').value = event ? event.id : '';
-    document.getElementById('event-name').value = event ? event.event_name : '';
-    document.getElementById('event-date').value = event ? (event.event_date || '') : '';
+    document.getElementById('event-name').value = event ? event.eventName : '';
+    document.getElementById('event-date').value = event ? (event.eventDate || '') : '';
 
     // Populate location dropdown
     const locationSelect = document.getElementById('event-location');
@@ -407,7 +407,7 @@ export async function initLeaguesPage() {
       const opt = document.createElement('option');
       opt.value = loc.id;
       opt.textContent = loc.name;
-      if (event && event.location_id == loc.id) opt.selected = true;
+      if (event && event.locationId == loc.id) opt.selected = true;
       locationSelect.appendChild(opt);
     });
 
@@ -425,10 +425,10 @@ export async function initLeaguesPage() {
     const locationValue = document.getElementById('event-location').value;
 
     const payload = { 
-      league_id: leagueId, 
-      event_name: name, 
-      event_date: date, 
-      location_id: locationValue ? Number(locationValue) : null 
+      leagueId: leagueId, 
+      eventName: name, 
+      eventDate: date, 
+      locationId: locationValue ? Number(locationValue) : null 
     };
 
     try {

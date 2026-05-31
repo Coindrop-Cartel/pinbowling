@@ -14,6 +14,18 @@
  */
 require_once __DIR__ . '/../includes/config.php';
 
+/**
+ * Helper to transform Players into camelCase.
+ */
+function serializePlayer($row) {
+    return [
+        'id' => (int)$row['id'],
+        'playerName' => $row['player_name'],
+        'ifpaId' => $row['ifpa_id'],
+        'matchplayId' => $row['matchplay_id']
+    ];
+}
+
 try {
     $pdo = getDbConnection();
     $method = $_SERVER['REQUEST_METHOD'];
@@ -21,37 +33,37 @@ try {
     // GET: Retrieve all registered players alphabetically
     if ($method === 'GET') {
         $stmt = $pdo->query('SELECT * FROM Players ORDER BY player_name ASC');
-        sendJson($stmt->fetchAll());
+        sendJson(array_map('serializePlayer', $stmt->fetchAll()));
     }
 
     $input = getJsonInput();
 
     // POST: Register a new player (Protected by API Secret)
     if ($method === 'POST') {
-        if (empty($input['player_name'])) {
-            sendJson(['error' => 'player_name is required'], 400);
+        if (empty($input['playerName'])) {
+            sendJson(['error' => 'playerName is required'], 400);
         }
 
-        $ifpa_id = $input['ifpa_id'] ?? null;
-        $matchplay_id = $input['matchplay_id'] ?? null;
+        $ifpa_id = $input['ifpaId'] ?? null;
+        $matchplay_id = $input['matchplayId'] ?? null;
 
         try {
             $stmt = $pdo->prepare('INSERT INTO Players (player_name, ifpa_id, matchplay_id) VALUES (?, ?, ?)');
-            $stmt->execute([$input['player_name'], $ifpa_id, $matchplay_id]);
+            $stmt->execute([$input['playerName'], $ifpa_id, $matchplay_id]);
             $id = (int)$pdo->lastInsertId();
         } catch (PDOException $error) {
             // Handle duplicate names gracefully by returning the existing record
             if ($error->errorInfo[1] === 1062) {
                 $stmt = $pdo->prepare('SELECT * FROM Players WHERE player_name = ?');
-                $stmt->execute([$input['player_name']]);
-                sendJson($stmt->fetch(), 409); // Conflict: Player name already exists
+                $stmt->execute([$input['playerName']]);
+                sendJson(serializePlayer($stmt->fetch()), 409); // Conflict: Player name already exists
             }
             throw $error; // Re-throw other DB errors to global handler
         }
 
         $stmt = $pdo->prepare('SELECT * FROM Players WHERE id = ?');
         $stmt->execute([$id]);
-        sendJson($stmt->fetch());
+        sendJson(serializePlayer($stmt->fetch()));
     }
 
     // PUT: Update an existing player (Protected by API Secret)
@@ -62,16 +74,16 @@ try {
         if (!$id) {
             sendJson(['error' => 'id query parameter is required'], 400);
         }
-        if (empty($input['player_name'])) {
-            sendJson(['error' => 'player_name is required'], 400);
+        if (empty($input['playerName'])) {
+            sendJson(['error' => 'playerName is required'], 400);
         }
 
-        $ifpa_id = $input['ifpa_id'] ?? null;
-        $matchplay_id = $input['matchplay_id'] ?? null;
+        $ifpa_id = $input['ifpaId'] ?? null;
+        $matchplay_id = $input['matchplayId'] ?? null;
 
         try {
             $stmt = $pdo->prepare('UPDATE Players SET player_name = ?, ifpa_id = ?, matchplay_id = ? WHERE id = ?');
-            $stmt->execute([$input['player_name'], $ifpa_id, $matchplay_id, $id]);
+            $stmt->execute([$input['playerName'], $ifpa_id, $matchplay_id, $id]);
         } catch (PDOException $error) {
             if ($error->errorInfo[1] === 1062) { // Duplicate entry
                 sendJson(['error' => 'Player name already exists'], 409);
@@ -81,7 +93,7 @@ try {
 
         $stmt = $pdo->prepare('SELECT * FROM Players WHERE id = ?');
         $stmt->execute([$id]);
-        sendJson($stmt->fetch());
+        sendJson(serializePlayer($stmt->fetch()));
     }
 
     // DELETE: Remove a player and their associated scores (Protected by API Secret)

@@ -17,7 +17,7 @@ const APP_BASE = window.location.pathname.substring(0, window.location.pathname.
  */
 export async function fetchJSON(url, options = {}) {
   const urlObj = new URL(url.startsWith('http') ? url : `http://localhost/${url}`);
-  const leagueId = urlObj.searchParams.get('leagueId') || (options.body ? JSON.parse(options.body).league_id : null);
+  const leagueId = urlObj.searchParams.get('leagueId') || (options.body ? JSON.parse(options.body).leagueId : null);
   const leaguePass = leagueId ? getLeaguePassword(leagueId) : null;
 
   // Tunnel DELETE and PUT via POST to bypass potential server-level method blocking.
@@ -79,9 +79,9 @@ export const PB_API = {
   },
   saveScore: (score) => fetchJSON('service/scoreService.php', { method: 'POST', body: JSON.stringify(score) }), // score object should contain eventId
   deletePlayer: (id) => fetchJSON(`service/playerService.php?id=${id}`, { method: 'DELETE' }),
-  createMachine: (machineName) => fetchJSON('service/machineService.php', { method: 'POST', body: JSON.stringify({ machine_name: machineName }) }), // Create master machine
+  createMachine: (machineName) => fetchJSON('service/machineService.php', { method: 'POST', body: JSON.stringify({ machineName }) }), // Create master machine
   updatePlayer: (id, player) => fetchJSON(`service/playerService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(player) }),
-  updateMachine: (id, machineName) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'PUT', body: JSON.stringify({ machine_name: machineName }) }), // Update master machine
+  updateMachine: (id, machineName) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'PUT', body: JSON.stringify({ machineName }) }), // Update master machine
   deleteMachine: (id) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'DELETE' }),
   createPlayer: (player) => fetchJSON('service/playerService.php', { method: 'POST', body: JSON.stringify(player) }),
   clearScores: (playerId) => fetchJSON(`service/scoreService.php?playerId=${playerId}`, { method: 'DELETE' }),
@@ -96,7 +96,7 @@ export const PB_API = {
   createEvent: (event) => fetchJSON('service/leagueService.php?task=fixture', { method: 'POST', body: JSON.stringify(event) }),
   updateEvent: (id, event) => fetchJSON(`service/leagueService.php?task=fixture&id=${id}`, { method: 'PUT', body: JSON.stringify(event) }),
   deleteEvent: (id, leagueId) => fetchJSON(`service/leagueService.php?task=fixture&id=${id}${leagueId ? `&leagueId=${leagueId}` : ''}`, { method: 'DELETE' }),
-  addLeaguePlayer: (leagueId, playerId) => fetchJSON('service/leagueService.php?task=member', { method: 'POST', body: JSON.stringify({ league_id: leagueId, player_id: playerId }) }),
+  addLeaguePlayer: (leagueId, playerId) => fetchJSON('service/leagueService.php?task=member', { method: 'POST', body: JSON.stringify({ leagueId, playerId }) }),
   removeLeaguePlayer: (leagueId, playerId) => fetchJSON(`service/leagueService.php?task=member&leagueId=${leagueId}&playerId=${playerId}`, { method: 'DELETE' }),
 
   // Locations and Target Scores
@@ -106,7 +106,7 @@ export const PB_API = {
   deleteLocation: (id) => fetchJSON(`service/locationService.php?id=${id}`, { method: 'DELETE' }),
   getLocationMachines: (locationId) => fetchJSON(`service/locationService.php?task=units${locationId ? `&locationId=${locationId}` : ''}`),
   addLocationMachine: (locationId, machineId, extra = {}) => 
-    fetchJSON('service/locationService.php?task=units', { method: 'POST', body: JSON.stringify({ location_id: locationId, machine_id: machineId, ...extra }) }),
+    fetchJSON('service/locationService.php?task=units', { method: 'POST', body: JSON.stringify({ locationId, machineId, ...extra }) }),
   removeLocationMachine: (locationId, machineId) => fetchJSON(`service/locationService.php?task=units&locationId=${locationId}&machineId=${machineId}`, { method: 'DELETE' }),
   getTargetScores: (eventId, leagueId) => 
     fetchJSON(`service/machineService.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`),

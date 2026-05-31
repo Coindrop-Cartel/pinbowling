@@ -110,7 +110,7 @@ export class BowlingEngine extends ScoringEngine {
       score = firstPins + secondPins;
     }
 
-    return { order: round.order_number, machine: round.machine_name, type: 'tenth', mark, first: firstPins, second: secondPins, third: thirdPins, score };
+    return { orderNumber: round.orderNumber, machineName: round.machineName, type: 'tenth', mark, first: firstPins, second: secondPins, third: thirdPins, score };
   }
 
   getTurnDataFromValues(round, raw1, raw2, raw3, isLastRound = false) {
@@ -131,7 +131,7 @@ export class BowlingEngine extends ScoringEngine {
     } else {
       type = 'open'; first = c2; second = Math.max(0, c3 - c2); score = first + second;
     }
-    return { order: round.order_number, machine: round.machine_name, type, first, second, score };
+    return { orderNumber: round.orderNumber, machineName: round.machineName, type, first, second, score };
   }
 
   getNextBallValues(roundIndex, count, turnData) {
@@ -153,11 +153,11 @@ export class BowlingEngine extends ScoringEngine {
   }
 
   calculateTurnResults(machines, scoreMap) {
-    const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
+    const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
     const turnData = machines.map((round) => {
-      const entry = scoreMap[String(round.order_number)] || { ball1: 0, ball2: 0, ball3: 0 };
-      return this.getTurnDataFromValues(round, Number(entry.ball1), Number(entry.ball2), Number(entry.ball3), round.order_number === maxOrder);
+      const entry = scoreMap[String(round.orderNumber)] || { ball1: 0, ball2: 0, ball3: 0 };
+      return this.getTurnDataFromValues(round, Number(entry.ball1), Number(entry.ball2), Number(entry.ball3), round.orderNumber === maxOrder);
     });
 
     let total = 0;
@@ -171,7 +171,7 @@ export class BowlingEngine extends ScoringEngine {
         turnScore = 10 + next1;
       }
       total += turnScore;
-      return { order: turn.order, machine: turn.machine, mark: this.formatMark(turn), score: turnScore };
+      return { orderNumber: turn.orderNumber, machineName: turn.machineName, mark: this.formatMark(turn), score: turnScore };
     });
     return { turnResults: results, total };
   }

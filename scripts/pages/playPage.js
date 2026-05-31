@@ -28,7 +28,7 @@ export async function initPlayPage() {
     const leagues = await PB_API.getLeagues();
     qpLeague = leagues.find(l => l.name === 'Quick Play Sessions');
     const today = new Date().toISOString().split('T')[0];
-    todayEvents = qpLeague ? (qpLeague.events || []).filter(e => e.event_date === today) : [];
+    todayEvents = qpLeague ? (qpLeague.events || []).filter(e => e.eventDate === today) : [];
     allPlayersCache = await PB_API.getPlayers();
   }
 
@@ -43,8 +43,8 @@ export async function initPlayPage() {
     if (!nameQuery && !locQuery) return;
     
     const filtered = todayEvents.filter(e => {
-      const matchesName = !nameQuery || e.event_name.toLowerCase().includes(nameQuery);
-      const matchesLoc = !locQuery || Number(e.location_id) === locQuery;
+      const matchesName = !nameQuery || e.eventName.toLowerCase().includes(nameQuery);
+      const matchesLoc = !locQuery || Number(e.locationId) === locQuery;
       return matchesName && matchesLoc;
     });
 
@@ -56,7 +56,7 @@ export async function initPlayPage() {
       div.className = 'league-registry-item';
       div.style = "padding: 12px; cursor: pointer; margin-bottom: 8px; background: #fff; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;";
       div.innerHTML = `
-        <div><strong>${event.event_name}</strong><br><small>${event.location_name || 'No Location'} | ${event.event_date}</small></div>
+        <div><strong>${event.eventName}</strong><br><small>${event.locationName || 'No Location'} | ${event.eventDate}</small></div>
         <div style="display: flex; gap: 6px;">
           <button class="scoreboard-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Scoreboard</button>
           <button class="join-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Join</button>
@@ -71,7 +71,7 @@ export async function initPlayPage() {
 
       div.querySelector('.join-btn').onclick = async (e) => {
         e.stopPropagation();
-        const options = allPlayersCache.map(p => ({ value: p.id, label: p.player_name }));
+        const options = allPlayersCache.map(p => ({ value: p.id, label: p.playerName }));
         const selectedId = await showPlayerSelectionDialog('Join Session', 'Select your name to add yourself to this session:', options);
         if (selectedId) {
           await PB_API.addLeaguePlayer(qpLeague.id, Number(selectedId));
@@ -91,7 +91,7 @@ export async function initPlayPage() {
           return;
         }
 
-        const options = roster.map(p => ({ value: p.id, label: p.player_name }));
+        const options = roster.map(p => ({ value: p.id, label: p.playerName }));
         const selectedId = await showPlayerSelectionDialog('Play Session', 'Who is bowling?', options);
         if (selectedId) {
           window.location.href = `scores?eventId=${event.id}&leagueId=${qpLeague.id}&playerId=${selectedId}`;
@@ -201,15 +201,15 @@ export async function initPlayPage() {
     }
 
     generatedFrames = selected.map((m, index) => ({
-      machine_id: Number(m.machine_id),
-      machine_name: m.machine_name,
+      machine_id: Number(m.machineId),
+      machine_name: m.machineName,
       targets: {
-        easy: m.target_easy,
-        med: m.target_med,
-        hard: m.target_hard
+        easy: m.targetEasy,
+        med: m.targetMed,
+        hard: m.targetHard
       },
-      score10: m[`target_${difficulty}`] || 1000000,
-      score1: Math.floor((m[`target_${difficulty}`] || 1000000) / 10),
+      score10: m['target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1)] || 1000000,
+      score1: Math.floor((m['target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1)] || 1000000) / 10),
       order: index + 1,
       tempId: Math.random().toString(36).substr(2, 9)
     }));
@@ -291,15 +291,15 @@ export async function initPlayPage() {
         const mSelect = row.querySelector('.row-machine-select');
         
         const mSearchInstance = createSearchableSelect(mSearch, mSelect, currentLocMachines, {
-          valueKey: 'machine_id',
-          labelKey: 'machine_name',
+          valueKey: 'machineId',
+          labelKey: 'machineName',
           placeholder: '-- Select Machine --',
           onSelect: (val) => {
-            const match = currentLocMachines.find(m => String(m.machine_id) === String(val));
+            const match = currentLocMachines.find(m => String(m.machineId) === String(val));
             if (match) {
-              frame.machine_name = match.machine_name;
-              frame.machine_id = Number(match.machine_id);
-              frame.targets = { easy: match.target_easy, med: match.target_med, hard: match.target_hard };
+              frame.machine_name = match.machineName;
+              frame.machine_id = Number(match.machineId);
+              frame.targets = { easy: match.targetEasy, med: match.targetMed, hard: match.targetHard };
               renderPreview(); 
             }
           }

@@ -254,7 +254,7 @@ export function initLocationsPage() {
     }
     empty.classList.add('hidden');
 
-    machines.sort((a, b) => a.machine_name.localeCompare(b.machine_name));
+    machines.sort((a, b) => a.machineName.localeCompare(b.machineName));
 
     machines.forEach(m => {
       const item = document.createElement('div');
@@ -262,8 +262,8 @@ export function initLocationsPage() {
       
       item.innerHTML = `
         <span>
-          <strong style="font-size: 0.95rem;">${m.machine_name}</strong><br>
-          <small>E: ${formatNumber(m.target_easy)} | M: ${formatNumber(m.target_med)} | H: ${formatNumber(m.target_hard)}</small>
+          <strong style="font-size: 0.95rem;">${m.machineName}</strong><br>
+          <small>E: ${formatNumber(m.targetEasy)} | M: ${formatNumber(m.targetMed)} | H: ${formatNumber(m.targetHard)}</small>
         </span>
         <div style="display: flex; gap: 4px;">
           <button class="edit-mach-btn secondary" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>
@@ -272,8 +272,8 @@ export function initLocationsPage() {
       `;
       item.querySelector('.edit-mach-btn').onclick = () => showMachineForm(locationId, locationName, m);
       item.querySelector('.remove-mach-btn').onclick = async () => {
-        if (await showConfirm(`Remove ${m.machine_name} from this location?`, 'Remove Machine')) {
-          await PB_API.removeLocationMachine(locationId, m.machine_id);
+        if (await showConfirm(`Remove ${m.machineName} from this location?`, 'Remove Machine')) {
+          await PB_API.removeLocationMachine(locationId, m.machineId);
           renderLocations();
         }
       };
@@ -302,20 +302,20 @@ export function initLocationsPage() {
         <label>Select Machine</label>
         <select id="loc-mach-select" ${existing ? 'disabled' : ''}>
           <option value="">Choose machine...</option>
-          ${allMachines.map(m => `<option value="${m.id}" ${existing?.machine_id == m.id ? 'selected' : ''}>${m.machine_name}</option>`).join('')}
+          ${allMachines.map(m => `<option value="${m.id}" ${existing?.machineId == m.id ? 'selected' : ''}>${m.machineName}</option>`).join('')}
         </select>
       </div>
       <div class="form-row">
         <label>Target Score: Easy</label>
-        <input type="text" id="target-easy" value="${existing ? formatNumber(existing.target_easy) : ''}">
+        <input type="text" id="target-easy" value="${existing ? formatNumber(existing.targetEasy) : ''}">
       </div>
       <div class="form-row">
         <label>Target Score: Medium</label>
-        <input type="text" id="target-med" value="${existing ? formatNumber(existing.target_med) : ''}">
+        <input type="text" id="target-med" value="${existing ? formatNumber(existing.targetMed) : ''}">
       </div>
       <div class="form-row">
         <label>Target Score: Hard</label>
-        <input type="text" id="target-hard" value="${existing ? formatNumber(existing.target_hard) : ''}">
+        <input type="text" id="target-hard" value="${existing ? formatNumber(existing.targetHard) : ''}">
       </div>
       <div class="form-actions">
         <button id="save-loc-mach">${existing ? 'Update' : 'Add to'} Location</button>
@@ -337,13 +337,13 @@ export function initLocationsPage() {
 
     document.getElementById('cancel-loc-mach').onclick = () => machineFormCard.classList.add('hidden');
     document.getElementById('save-loc-mach').onclick = async () => {
-      const machineId = existing ? existing.machine_id : document.getElementById('loc-mach-select').value;
+      const machineId = existing ? existing.machineId : document.getElementById('loc-mach-select').value;
       if (!machineId) return;
 
       const extra = {
-        target_easy: Number(document.getElementById('target-easy').value.replace(/\D/g, '')) || 0,
-        target_med: Number(document.getElementById('target-med').value.replace(/\D/g, '')) || 0,
-        target_hard: Number(document.getElementById('target-hard').value.replace(/\D/g, '')) || 0,
+        targetEasy: Number(document.getElementById('target-easy').value.replace(/\D/g, '')) || 0,
+        targetMed: Number(document.getElementById('target-med').value.replace(/\D/g, '')) || 0,
+        targetHard: Number(document.getElementById('target-hard').value.replace(/\D/g, '')) || 0,
       };
 
       try {

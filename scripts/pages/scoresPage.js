@@ -112,13 +112,13 @@ export async function initScoresPage() {
     const row = document.createElement('div');
     row.className = 'round-row';
     row.style = "display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 8px 12px; margin-bottom: 5px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;";
-    row.dataset.order = round.order_number;
+    row.dataset.order = round.orderNumber;
 
     const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
 
     row.innerHTML = `
       <div class="round-info" style="cursor: pointer; flex: 1; min-width: 200px;">
-        <div class="round-label"><b>${Engine.getRoundLabel()} ${round.order_number}:</b> ${round.machine_name}</div>
+        <div class="round-label"><b>${Engine.getRoundLabel()} ${round.orderNumber}:</b> ${round.machineName}</div>
         <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;"><b>${Engine.getPrimaryTargetLabel()}:</b> ${formatNumber(round.values[10])}</div>
         ${bonusHtml}
         <div class="target-details hidden" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;">
@@ -146,9 +146,9 @@ export async function initScoresPage() {
       const value = turnValues?.[`ball${ball}`] ?? '';
       const placeholder = `Ball ${ball} cumulative`;
       
-      // Use round.machine_id (master list ID) instead of round.id (Target_Scores row ID)
+      // Use round.machineId (master list ID) instead of round.id (Target_Scores row ID)
       // to ensure database foreign key constraints pass.
-      const input = createRollInput(round.order_number, ball, round.machine_id, value, placeholder);
+      const input = createRollInput(round.orderNumber, ball, round.machineId, value, placeholder);
       
       input.addEventListener('input', () => {
         saveBtn.disabled = false;
@@ -170,11 +170,11 @@ export async function initScoresPage() {
       saveBtn.textContent = 'Saving...';
 
       await PB_API.saveScore({
-        player_id: Number(currentPlayerId),
-        order_number: round.order_number,
-        event_id: Number(getActiveEventId()),
-        league_id: Number(getActiveLeagueId()),
-        machine_id: round.machine_id,
+        playerId: Number(currentPlayerId),
+        orderNumber: round.orderNumber,
+        eventId: Number(getActiveEventId()),
+        leagueId: Number(getActiveLeagueId()),
+        machineId: round.machineId,
         ball1,
         ball2,
         ball3,
@@ -219,7 +219,7 @@ export async function initScoresPage() {
         if (searchInput && playerSelect) {
           playerSearchInstance = createSearchableSelect(searchInput, playerSelect, allPlayersCache, {
             valueKey: 'id',
-            labelKey: 'player_name',
+            labelKey: 'playerName',
             placeholder: allPlayersCache.length === 0 ? 'No players configured' : 'Select a player',
             onSelect: async (val) => {
               if (!val) {
@@ -253,16 +253,16 @@ export async function initScoresPage() {
    */
   function loadScoresIntoForm(scoreRows) {
     const scoreMap = scoreRows.reduce((map, row) => {
-      map[String(row.order_number)] = row;
+      map[String(row.orderNumber)] = row;
       return map;
     }, {});
     
-    const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
+    const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
     roundsInput.innerHTML = '';
     machines.forEach((round) => {
-      const turnValues = scoreMap[String(round.order_number)];
-      roundsInput.appendChild(buildRoundRow(round, turnValues, round.order_number === maxOrder));
+      const turnValues = scoreMap[String(round.orderNumber)];
+      roundsInput.appendChild(buildRoundRow(round, turnValues, round.orderNumber === maxOrder));
     });
   }
 
@@ -283,7 +283,7 @@ export async function initScoresPage() {
     }
 
     const player = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
-    playerSummaryText.textContent = player ? `Player: ${player.player_name}` : 'Player Selected';
+    playerSummaryText.textContent = player ? `Player: ${player.playerName}` : 'Player Selected';
     playerSelectorUI.classList.add('hidden');
     playerSummary.classList.remove('hidden');
 
@@ -365,7 +365,7 @@ export async function initScoresPage() {
 
     const leagues = await PB_API.getLeagues();
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
-    const event = league?.events.find(e => String(e.id) === String(eventId));
+    const event = league?.events?.find(e => String(e.id) === String(eventId));
 
     const isQuickPlay = league?.name === 'Quick Play Sessions';
     if (changeTournamentBtn) {
@@ -373,11 +373,11 @@ export async function initScoresPage() {
     }
 
     const leagueLabel = isQuickPlay ? '' : `${league?.name} - `;
-    tournamentSummaryText.textContent = `${leagueLabel}${event?.event_name || 'Event'}`;
+    tournamentSummaryText.textContent = `${leagueLabel}${event?.eventName || 'Event'}`;
     tournamentSelectorUI.classList.add('hidden');
     tournamentSummary.classList.remove('hidden');
 
-    Engine = getScoringEngine(league?.scoring_format || 'bowling');
+    Engine = getScoringEngine(league?.scoringFormat || 'bowling');
 
     machines = await PB_API.getTargetScores(eventId);
 
@@ -399,7 +399,6 @@ export async function initScoresPage() {
         roundHeader.textContent = Engine.getRoundLabel();
       }
     }
-
   };
 
   await initTournamentSelector(refresh);

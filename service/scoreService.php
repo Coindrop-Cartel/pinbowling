@@ -18,24 +18,43 @@
  */
 require_once __DIR__ . '/../includes/config.php';
 
+/**
+ * Helper to transform flat database rows into camelCase JSON.
+ * @param array $row
+ * @return array
+ */
+function serializeScore($row) {
+    return [
+        'id' => (int)$row['id'],
+        'playerId' => (int)$row['player_id'],
+        'eventId' => isset($row['event_id']) ? (int)$row['event_id'] : null,
+        'orderNumber' => (int)$row['order_number'],
+        'machineId' => (int)$row['machine_id'],
+        'machineName' => $row['machine_name'] ?? null,
+        'ball1' => (int)$row['ball1'],
+        'ball2' => (int)$row['ball2'],
+        'ball3' => (int)$row['ball3']
+    ];
+}
+
 try {
     $pdo = getDbConnection();
     $method = $_SERVER['REQUEST_METHOD'];
 
     // GET: Retrieve all frame scores for a specific player
     if ($method === 'GET') {
-        $event_id = isset($_GET['event_id']) ? (int)$_GET['event_id'] : 0;
-        $player_id = isset($_GET['player_id']) ? (int)$_GET['player_id'] : 0;
-        $league_id = isset($_GET['league_id']) ? (int)$_GET['league_id'] : 0;
+        $event_id = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
+        $player_id = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
+        $league_id = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
 
         /**
          * GET modes:
-         * 1. league_id: Returns all scores for all players/events in a specific league (for summary view).
-         * 2. event_id + player_id: Returns scores for a specific player session.
-         * 3. event_id: Returns all scores for a specific night (for event standings).
+         * 1. leagueId: Returns all scores for all players/events in a specific league (for summary view).
+         * 2. eventId + playerId: Returns scores for a specific player session.
+         * 3. eventId: Returns all scores for a specific night (for event standings).
          */
         if (!$event_id && !$league_id) {
-            sendJson(['error' => 'event_id or league_id query parameter is required'], 400);
+            sendJson(['error' => 'eventId or leagueId query parameter is required'], 400);
         }
 
         if ($league_id) {
@@ -68,25 +87,25 @@ try {
             $stmt->execute([$event_id]);
         }
 
-        sendJson($stmt->fetchAll());
+        sendJson(array_map('serializeScore', $stmt->fetchAll()));
     }
 
     $input = getJsonInput();
 
     // POST: Save or update a score for a specific player/frame (Protected by API Secret)
     if ($method === 'POST') {
-        $event_id = isset($input['event_id']) ? (int)$input['event_id'] : 0;
+        $event_id = isset($input['eventId']) ? (int)$input['eventId'] : 0;
         validateApiSecret();
         
-        $player_id = isset($input['player_id']) ? (int)$input['player_id'] : 0;
-        $order_number = isset($input['order_number']) ? (int)$input['order_number'] : 0;
-        $machine_id = isset($input['machine_id']) ? (int)$input['machine_id'] : 0;
+        $player_id = isset($input['playerId']) ? (int)$input['playerId'] : 0;
+        $order_number = isset($input['orderNumber']) ? (int)$input['orderNumber'] : 0;
+        $machine_id = isset($input['machineId']) ? (int)$input['machineId'] : 0;
         $ball1 = isset($input['ball1']) ? (int)$input['ball1'] : 0;
         $ball2 = isset($input['ball2']) ? (int)$input['ball2'] : 0;
         $ball3 = isset($input['ball3']) ? (int)$input['ball3'] : 0;
 
         if (!$event_id || !$player_id || !$order_number || !$machine_id) {
-            sendJson(['error' => 'event_id, player_id, order_number, and machine_id are required'], 400);
+            sendJson(['error' => 'eventId, playerId, orderNumber, and machineId are required'], 400);
         }
         
         // Basic range validation
@@ -102,15 +121,15 @@ try {
 
         $stmt = $pdo->prepare('SELECT * FROM Scores WHERE player_id = ? AND order_number = ? AND event_id = ?');
         $stmt->execute([$player_id, $order_number, $event_id]);
-        sendJson($stmt->fetch());
+        sendJson(serializeScore($stmt->fetch()));
     }
 
     // DELETE: Clear all scores for a specific player (Protected by API Secret)
     if ($method === 'DELETE') {
         validateApiSecret();
-        $player_id = isset($_GET['player_id']) ? (int)$_GET['player_id'] : 0;
+        $player_id = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
         if (!$player_id) {
-            sendJson(['error' => 'player_id query parameter is required'], 400);
+            sendJson(['error' => 'playerId query parameter is required'], 400);
         }
         $stmt = $pdo->prepare('DELETE FROM Scores WHERE player_id = ?');
         $stmt->execute([$player_id]);

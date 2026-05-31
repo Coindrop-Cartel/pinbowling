@@ -40,7 +40,7 @@ export async function initConfigPage() {
       if (!eventId) return alert('Select an event first.');
       const leagues = await PB_API.getLeagues();
       const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
-      printMachineScores(eventTargets, league?.scoring_format || 'bowling');
+      printMachineScores(eventTargets, league?.scoringFormat || 'bowling');
     });
   }
 
@@ -53,7 +53,7 @@ export async function initConfigPage() {
 
   const isCurrentTargetLast = () => {
     const currentOrder = Number(orderInput.value);
-    const maxOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.order_number)) : 0;
+    const maxOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.orderNumber)) : 0;
     return currentOrder >= maxOrder;
   };
 
@@ -85,8 +85,8 @@ export async function initConfigPage() {
   }
 
   const updateQuickFillState = (machineName) => {
-    const match = currentSuggestedMachines.find(m => m.machine_name === machineName);
-    selectedMachineTargets = match ? { easy: match.target_easy, med: match.target_med, hard: match.target_hard } : null;
+    const match = currentSuggestedMachines.find(m => m.machineName === machineName);
+    selectedMachineTargets = match ? { easy: match.targetEasy, med: match.targetMed, hard: match.targetHard } : null;
     
     btnEasy.disabled = !selectedMachineTargets?.easy;
     btnMed.disabled = !selectedMachineTargets?.med;
@@ -94,7 +94,7 @@ export async function initConfigPage() {
   };
 
   machineSearch = createSearchableSelect(document.getElementById('machine-name'), machineSelect, currentSuggestedMachines, {
-    valueKey: 'machine_name',
+    valueKey: 'machineName',
     labelKey: 'machine_name',
     placeholder: '-- Choose machine --',
     onSelect: (val) => {
@@ -144,19 +144,19 @@ export async function initConfigPage() {
     roundsTable.classList.toggle('hidden', eventTargets.length === 0);
     reorderActions.classList.toggle('hidden', eventTargets.length === 0);
 
-    eventTargets.sort((a, b) => a.order_number - b.order_number);
-    const maxOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.order_number)) : 0;
+    eventTargets.sort((a, b) => a.orderNumber - b.orderNumber);
+    const maxOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.orderNumber)) : 0;
 
     eventTargets.forEach((round) => {
-      const bonusHtml = Engine.getBonusTargetHtml(round, round.order_number === maxOrder, formatNumber);
+      const bonusHtml = Engine.getBonusTargetHtml(round, round.orderNumber === maxOrder, formatNumber);
 
       const row = document.createElement('tr');
       row.draggable = true;
       row.dataset.id = round.id;
       row.innerHTML = `
         <td class="drag-handle" style="cursor: grab; color: #888;">☰</td>
-        <td>${round.order_number}</td>
-        <td>${round.machine_name}</td>
+        <td>${round.orderNumber}</td>
+        <td>${round.machineName}</td>
         <td class="targets-cell" style="cursor: pointer;">
           <div class="targets-summary">10: <strong>${formatNumber(round.values[10])}</strong> <small>▾</small></div>
           <div class="score-list hidden" style="margin-top: 5px; font-size: 0.9em;">
@@ -180,12 +180,12 @@ export async function initConfigPage() {
         const round = eventTargets.find(item => item.id === Number(btn.dataset.id));
         if (!round) return;
         editingMachineId = round.id;
-        orderInput.value = round.order_number;
-        displayOrder.textContent = round.order_number;
-        document.getElementById('machine-name').value = round.machine_name;
+        orderInput.value = round.orderNumber;
+        displayOrder.textContent = round.orderNumber;
+        document.getElementById('machine-name').value = round.machineName;
         score10Input.value = round.values[10] ? formatNumber(round.values[10]) : '';
         score1Input.value = round.values[1] ? formatNumber(round.values[1]) : '';
-        machineSearch.updateOptions(round.machine_name);
+        machineSearch.updateOptions(round.machineName);
         updateQuickFillState(round.machine_name);
         renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast());
         configCard.classList.remove('hidden');
@@ -224,7 +224,7 @@ export async function initConfigPage() {
     const rows = Array.from(roundsTable.querySelectorAll('tbody tr'));
     const updates = rows.map((row, index) => ({
       id: Number(row.dataset.id),
-      order_number: index + 1
+      orderNumber: index + 1
     }));
 
     try {
@@ -240,7 +240,7 @@ export async function initConfigPage() {
     masterMachines = await PB_API.getMachines();
     const leaguesData = await PB_API.getLeagues();
     const league = leaguesData.find(l => String(l.id) === String(getActiveLeagueId()));
-    Engine = getScoringEngine(league?.scoring_format || 'bowling');
+    Engine = getScoringEngine(league?.scoringFormat || 'bowling');
 
     // Find the location associated with the current event to filter machine suggestions
     let locationId = null;
@@ -248,7 +248,7 @@ export async function initConfigPage() {
       for (const l of leaguesData) {
         const eventMatch = (l.events || []).find(e => String(e.id) === String(eventId));
         if (eventMatch) {
-          locationId = eventMatch.location_id;
+          locationId = eventMatch.locationId;
           break;
         }
       }
@@ -258,7 +258,7 @@ export async function initConfigPage() {
     // Update the array in-place so the searchable select component sees the new data
     currentSuggestedMachines.length = 0;
     currentSuggestedMachines.push(...newData);
-    currentSuggestedMachines.sort((a, b) => a.machine_name.localeCompare(b.machine_name));
+    currentSuggestedMachines.sort((a, b) => a.machineName.localeCompare(b.machineName));
     
     // Clear search text on fresh load/navigation
     document.getElementById('machine-name').value = '';
@@ -282,33 +282,33 @@ export async function initConfigPage() {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const order_number = Number(orderInput.value);
-    const machine_name = document.getElementById('machine-name').value.trim();
+    const orderNumber = Number(orderInput.value);
+    const machineName = document.getElementById('machine-name').value.trim();
     const score10 = Number(score10Input.value.replace(/\D/g, ''));
     const score1 = Number(score1Input.value.replace(/\D/g, ''));
     const eventId = getActiveEventId();
 
-    if (!order_number || !machine_name || (!score10 && !score1) || !eventId) return;
+    if (!orderNumber || !machineName || (!score10 && !score1) || !eventId) return;
 
     const values = Engine.buildRoundValues(score10, score1);
-    if (!await requireAdmin(`Enter Admin Password to save changes for Round ${order_number}:`)) {
+    if (!await requireAdmin(`Enter Admin Password to save changes for Round ${orderNumber}:`)) {
       return;
     }
 
     // --- Resolving Master Machines ---
     // If the machine name entered doesn't exist in the master list, 
     // we create it first to obtain a global 'machine_id'.
-    let masterMachine = masterMachines.find(m => m.machine_name.toLowerCase() === machine_name.toLowerCase());
+    let masterMachine = masterMachines.find(m => m.machineName.toLowerCase() === machineName.toLowerCase());
     if (!masterMachine) {
-        masterMachine = await PB_API.createMachine(machine_name);
+        masterMachine = await PB_API.createMachine(machineName);
         masterMachines.push(masterMachine);
     }
 
     const payload = { 
       id: editingMachineId,
-      event_id: Number(eventId), 
-      machine_id: masterMachine.id, 
-      order_number, 
+      eventId: Number(eventId), 
+      machineId: masterMachine.id, 
+      orderNumber, 
       values 
     };
     console.log('Saving Target Score Payload:', payload);

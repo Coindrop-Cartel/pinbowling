@@ -8,7 +8,7 @@ export function printMachineScores(machines, format = 'bowling') {
   const printWindow = window.open('', '_blank');
   if (!printWindow) return alert('Please allow popups to print.');
 
-  const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
+  const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
   const Engine = getScoringEngine(format);
 
   const pagesHtml = machines.map((m) => {
@@ -25,7 +25,7 @@ export function printMachineScores(machines, format = 'bowling') {
     }).join('');
 
     let extraTargets = '';
-    if (m.order_number === maxOrder) {
+    if (m.orderNumber === maxOrder) {
       const { t1, t2 } = Engine.getBonusTargets(m);
       extraTargets = `
         <div style="margin-top: 40px; display: flex; justify-content: space-around; width: 100%; font-size: 2.2rem; font-weight: bold; border-top: 4px dashed #000; padding-top: 20px;">
@@ -38,8 +38,8 @@ export function printMachineScores(machines, format = 'bowling') {
       <div class="page" style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; page-break-after: always; padding: 40px; box-sizing: border-box;">
         <div style="border: 6px solid #000; padding: 50px; width: 100%; max-width: 1100px;">
           <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 40px; border-bottom: 6px solid #000; padding-bottom: 15px;">
-            <h1 style="margin: 0; font-size: 4rem;">${Engine.getRoundLabel()} ${m.order_number}</h1>
-            <h2 style="margin: 0; font-size: 4rem;">${m.machine_name}</h2>
+            <h1 style="margin: 0; font-size: 4rem;">${Engine.getRoundLabel()} ${m.orderNumber}</h1>
+            <h2 style="margin: 0; font-size: 4rem;">${m.machineName}</h2>
           </div>
           <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px;">${scoresHtml}</div>
           ${extraTargets}
@@ -62,8 +62,8 @@ export function printBlankScoreSheet(machines) {
   const framesHtml = machines.map((m) => `
     <div style="border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; page-break-inside: avoid;">
       <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px;">
-        <span style="font-weight: bold;">Round ${m.order_number}</span>
-        <span>Game: <strong>${m.machine_name}</strong></span>
+        <span style="font-weight: bold;">Round ${m.orderNumber}</span>
+        <span>Game: <strong>${m.machineName}</strong></span>
         <span>Target: <strong>${formatNumber(m.values[10])}</strong></span>
       </div>
       <div style="display: flex; gap: 20px;">

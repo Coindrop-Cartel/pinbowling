@@ -66,7 +66,7 @@ export async function initTournamentSelector(onRefresh) {
     events.forEach(e => {
       const opt = document.createElement('option');
       opt.value = e.id;
-      opt.textContent = e.event_name;
+      opt.textContent = e.eventName;
       if (String(e.id) === String(selectedEventId)) opt.selected = true;
       eventSelect.appendChild(opt);
     });

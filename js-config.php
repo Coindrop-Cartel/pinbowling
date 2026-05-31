@@ -17,6 +17,6 @@ if ($referer && parse_url($referer, PHP_URL_HOST) !== $_SERVER['HTTP_HOST']) {
 
 header('Content-Type: application/javascript');
 // Pass the secrets from PHP/ENV to global JS variables
-echo "window.PB_API_SECRET = " . json_encode($API_SECRET) . ";\n";
-echo "window.PB_ADMIN_PASSWORD = " . json_encode($ADMIN_PASSWORD) . ";\n";
-echo "window.PB_UI_VERSION = " . json_encode($UI_VERSION) . ";";
+echo "window.PB_API_SECRET = " . json_encode($apiSecret) . ";\n";
+echo "window.PB_ADMIN_PASSWORD = " . json_encode($adminPassword) . ";\n";
+echo "window.PB_UI_VERSION = " . json_encode($uiVersion) . ";";

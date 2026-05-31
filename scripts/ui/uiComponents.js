@@ -103,7 +103,7 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
           setActiveLeagueId(activeLeague.id);
         }
         leagueName = activeLeague.name;
-        eventName = `${activeEvent.event_name} (${activeEvent.event_date || 'No Date'})`;
+        eventName = `${activeEvent.eventName} (${activeEvent.eventDate || 'No Date'})`;
       } else if (activeEventId === 'summary') {
         activeLeague = leagues.find(l => String(l.id) === String(activeLeagueId));
         leagueName = activeLeague ? activeLeague.name : 'Invalid League';

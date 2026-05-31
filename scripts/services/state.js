@@ -7,9 +7,9 @@ export const setCurrentPlayerId = (id) =>
   id ? localStorage.setItem('currentPlayerId', id) : localStorage.removeItem('currentPlayerId');
 
 export const getLeaguePassword = (leagueId) => 
-  sessionStorage.getItem(`league_pass_${leagueId}`);
+  sessionStorage.getItem(`leaguePass_${leagueId}`);
 export const setLeaguePassword = (leagueId, password) => 
-  password ? sessionStorage.setItem(`league_pass_${leagueId}`, password) : sessionStorage.removeItem(`league_pass_${leagueId}`);
+  password ? sessionStorage.setItem(`leaguePass_${leagueId}`, password) : sessionStorage.removeItem(`leaguePass_${leagueId}`);
 
 export const getAdminSessionPassword = () => 
   sessionStorage.getItem('adminPassword');

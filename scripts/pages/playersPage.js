@@ -64,9 +64,9 @@ export async function initPlayersPage() {
         li.style.alignItems = 'center';
         li.innerHTML = `
           <span>
-            ${p.player_name} 
-            ${p.ifpa_id ? `<small>(IFPA: ${p.ifpa_id})</small>` : ''}
-            ${p.matchplay_id ? `<small>(Matchplay: ${p.matchplay_id})</small>` : ''}
+            ${p.playerName} 
+            ${p.ifpaId ? `<small>(IFPA: ${p.ifpaId})</small>` : ''}
+            ${p.matchplayId ? `<small>(Matchplay: ${p.matchplayId})</small>` : ''}
           </span>
           <div style="display: flex; gap: 8px;">
             <button type="button" class="edit-player-btn secondary" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.85rem;">Edit</button>
@@ -85,7 +85,7 @@ export async function initPlayersPage() {
     }
 
     // Logic to prevent duplicate player names
-    const exactMatch = allPlayers.find(p => p.player_name.trim().toLowerCase() === query);
+    const exactMatch = allPlayers.find(p => p.playerName.trim().toLowerCase() === query);
     const isEditingThisPlayer = exactMatch && String(exactMatch.id) === String(editingPlayerIdInput.value);
     
     // Hide the "Create" toggle if an exact match exists, unless the creation 
@@ -98,7 +98,7 @@ export async function initPlayersPage() {
   };
 
   filterInstance = setupLiveFilter(playerNameInput, allPlayers, {
-    labelKey: 'player_name',
+    labelKey: 'playerName',
     onFilter: onFilterUpdate
   });
 
@@ -144,10 +144,10 @@ export async function initPlayersPage() {
     if (!player) return;
 
     editingPlayerIdInput.value = player.id;
-    playerNameInput.value = player.player_name;
-    ifpaIdInput.value = player.ifpa_id || '';
-    matchplayIdInput.value = player.matchplay_id || '';
-    if (playerFormTitle) playerFormTitle.textContent = `Edit Player: ${player.player_name}`;
+    playerNameInput.value = player.playerName;
+    ifpaIdInput.value = player.ifpaId || '';
+    matchplayIdInput.value = player.matchplayId || '';
+    if (playerFormTitle) playerFormTitle.textContent = `Edit Player: ${player.playerName}`;
     savePlayerButton.textContent = 'Update Player';
     cancelEditButton.classList.remove('hidden');
 
@@ -177,7 +177,7 @@ export async function initPlayersPage() {
       return;
     }
 
-    const payload = { player_name: name, ifpa_id: ifpaId, matchplay_id: matchplayId };
+    const payload = { playerName: name, ifpaId: ifpaId, matchplayId: matchplayId };
 
     try {
       if (id) {
@@ -196,11 +196,11 @@ export async function initPlayersPage() {
     const player = allPlayers.find(p => p.id === playerId);
     if (!player) return;
     
-    if (!await showConfirm(`Are you sure you want to delete player "${player.player_name}"? This action cannot be undone and will remove all their associated scores.`, 'Delete Player')) {
+    if (!await showConfirm(`Are you sure you want to delete player "${player.playerName}"? This action cannot be undone and will remove all their associated scores.`, 'Delete Player')) {
       return;
     }
 
-    if (!await requireAdmin(`Enter Admin Password to confirm deletion of ${player.player_name}:`)) {
+    if (!await requireAdmin(`Enter Admin Password to confirm deletion of ${player.playerName}:`)) {
       return;
     }
 

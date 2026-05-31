@@ -46,15 +46,15 @@ export async function initMachinesPage() {
         item.style.borderRadius = '4px';
         
         item.innerHTML = `
-          <span style="font-weight: bold;">${m.machine_name}</span>
+          <span style="font-weight: bold;">${m.machineName}</span>
           <button class="delete-mach-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
         `;
 
         item.querySelector('.delete-mach-btn').onclick = async () => {
-          if (!await requireAdmin(`Enter Admin Password to delete "${m.machine_name}":`)) {
+          if (!await requireAdmin(`Enter Admin Password to delete "${m.machineName}":`)) {
             return;
           }
-          if (await showConfirm(`Are you sure you want to remove "${m.machine_name}"? This will remove it from all locations and events.`, 'Delete Machine')) {
+          if (await showConfirm(`Are you sure you want to remove "${m.machineName}"? This will remove it from all locations and events.`, 'Delete Machine')) {
             await PB_API.deleteMachine(m.id);
             await load();
           }
@@ -64,13 +64,13 @@ export async function initMachinesPage() {
     }
 
     // Disable button if input is empty OR if an exact match already exists
-    const exactMatch = allMachines.find(m => m.machine_name.trim().toLowerCase() === query);
+    const exactMatch = allMachines.find(m => m.machineName.trim().toLowerCase() === query);
     submitBtn.disabled = !query || !!exactMatch;
     submitBtn.title = exactMatch ? "This machine name already exists in the registry." : "";
   };
 
   filterInstance = setupLiveFilter(nameInput, allMachines, {
-    labelKey: 'machine_name',
+    labelKey: 'machineName',
     onFilter: onFilterUpdate
   });
 

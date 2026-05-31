@@ -171,7 +171,7 @@ describe('API Client (api.js)', () => {
 
       await fetchJSON('service/scoreService.php', { 
         method: 'POST', 
-        body: JSON.stringify({ league_id: 7, other: 'data' }) 
+        body: JSON.stringify({ leagueId: 7, other: 'data' }) 
       });
 
       const headers = fetch.mock.calls[0][1].headers;
@@ -201,7 +201,7 @@ describe('API Client (api.js)', () => {
 
     it('createLeague should send a POST request with the league data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ success: true }) });
-      const leagueData = { name: 'Major League Pinball', start_date: '2024-05-01' };
+      const leagueData = { name: 'Major League Pinball', startDate: '2024-05-01' };
       
       await PB_API.createLeague(leagueData);
       
@@ -216,7 +216,7 @@ describe('API Client (api.js)', () => {
 
     it('updateEvent should use PUT tunneling and include task parameters', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 99 }) });
-      const eventData = { event_name: 'Season Finals', league_id: 5 };
+      const eventData = { eventName: 'Season Finals', leagueId: 5 };
       
       await PB_API.updateEvent(99, eventData);
       
@@ -238,7 +238,7 @@ describe('API Client (api.js)', () => {
         expect.stringContaining('service/locationService.php?task=units'),
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ location_id: 1, machine_id: 10, note: 'Back room' })
+          body: JSON.stringify({ locationId: 1, machineId: 10, note: 'Back room' })
         })
       );
     });
