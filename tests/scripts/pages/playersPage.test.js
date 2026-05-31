@@ -30,6 +30,10 @@ vi.mock('@services/auth.js', () => ({
 
 describe('Player Management Page (playersPage.js)', () => {
   beforeEach(() => {
+    // Mock layout methods not implemented in JSDOM
+    vi.stubGlobal('scrollTo', vi.fn());
+    Element.prototype.scrollIntoView = vi.fn();
+
     document.body.innerHTML = `
       <h2 id="player-form-title">Add</h2>
       <form id="player-form">

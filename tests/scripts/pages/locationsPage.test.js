@@ -26,6 +26,10 @@ vi.mock('@ui/uiComponents.js', () => ({
 
 describe('Locations Management Page (locationsPage.js)', () => {
   beforeEach(() => {
+    // Mock layout methods not implemented in JSDOM
+    vi.stubGlobal('scrollTo', vi.fn());
+    Element.prototype.scrollIntoView = vi.fn();
+
     document.body.innerHTML = `
       <form id="location-form">
         <input id="editing-location-id" />

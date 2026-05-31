@@ -34,6 +34,7 @@ describe('Utility Functions (utils.js)', () => {
 
   beforeEach(() => {
     vi.stubGlobal('scrollTo', vi.fn());
+    Element.prototype.scrollIntoView = vi.fn();
 
     originalLocation = window.location;
     originalHistory = window.history;

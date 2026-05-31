@@ -41,6 +41,7 @@ describe('Tournament Selector Component (tournamentSelector.js)', () => {
 
   beforeEach(() => {
     vi.stubGlobal('scrollTo', vi.fn());
+    Element.prototype.scrollIntoView = vi.fn();
 
     document.body.innerHTML = '<div class="tournament-selector-container"></div>';
     vi.clearAllMocks();

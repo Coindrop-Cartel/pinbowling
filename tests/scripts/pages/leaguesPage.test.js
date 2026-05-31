@@ -39,6 +39,10 @@ describe('Leagues Management Page (leaguesPage.js)', () => {
   ];
 
   beforeEach(() => {
+    // Mock layout methods not implemented in JSDOM
+    vi.stubGlobal('scrollTo', vi.fn());
+    Element.prototype.scrollIntoView = vi.fn();
+
     document.body.innerHTML = `
       <form id="league-form">
         <input id="league-name" />

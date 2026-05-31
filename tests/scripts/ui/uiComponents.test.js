@@ -44,6 +44,10 @@ describe('UI Components (uiComponents.js)', () => {
   let searchInput, selectElement;
 
   beforeEach(() => {
+    // Mock layout methods not implemented in JSDOM
+    vi.stubGlobal('scrollTo', vi.fn());
+    Element.prototype.scrollIntoView = vi.fn();
+
     // Create a minimal DOM environment
     document.body.innerHTML = `
       <input id="search-input" />
@@ -111,6 +115,7 @@ describe('initReadOnlyTournamentDisplay', () => {
 
   beforeEach(() => {
     vi.stubGlobal('scrollTo', vi.fn());
+    Element.prototype.scrollIntoView = vi.fn();
 
     document.body.innerHTML = '<div id="display-container"></div>';
     container = document.getElementById('display-container');

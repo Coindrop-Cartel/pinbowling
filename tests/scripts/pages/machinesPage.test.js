@@ -29,6 +29,10 @@ vi.mock('@services/auth.js', () => ({
 
 describe('Machine Registry Page (machinesPage.js)', () => {
   beforeEach(() => {
+    // Mock layout methods not implemented in JSDOM
+    vi.stubGlobal('scrollTo', vi.fn());
+    Element.prototype.scrollIntoView = vi.fn();
+
     document.body.innerHTML = `
       <form id="machine-form">
         <input id="machine-name" />
