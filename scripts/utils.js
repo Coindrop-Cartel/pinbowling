@@ -1,46 +1,45 @@
-import { getScoringEngine } from './engine.js';
+import { getScoringEngine } from '@core/engine.js';
+import { ROUTES } from './routes.js';
+import * as self from '@scripts/utils.js';
 
 /**
  * Utility functions and state management helpers.
  */
 
 /**
+ * Global parameters that should persist across navigation.
+ */
+const PERSISTENT_PARAMS = ['leagueId', 'eventId', 'playerId'];
+
+/**
  * State helpers that prioritize URL parameters for sharing and consistency.
  */
-export function getActiveLeagueId() {
-  return new URLSearchParams(window.location.search).get('leagueId');
+function getUrlParam(key) {
+  return new URLSearchParams(window.location.search).get(key);
 }
 
+function setUrlParam(key, value) {
+  const url = new URL(window.location);
+  if (value) url.searchParams.set(key, value);
+  else url.searchParams.delete(key);
+  window.history.replaceState({}, '', url);
+  self.initNavigation();
+}
+
+export const getActiveLeagueId = () => getUrlParam('leagueId');
 export function setActiveLeagueId(id) {
-  const url = new URL(window.location);
-  if (id) url.searchParams.set('leagueId', id);
-  else url.searchParams.delete('leagueId');
-  window.history.replaceState({}, '', url);
-  initNavigation();
+  setUrlParam('leagueId', id);
 }
 
-export function getActiveEventId() {
-  return new URLSearchParams(window.location.search).get('eventId');
-}
-
+export const getActiveEventId = () => getUrlParam('eventId');
 export function setActiveEventId(id) {
-  const url = new URL(window.location);
-  if (id) url.searchParams.set('eventId', id);
-  else url.searchParams.delete('eventId');
-  window.history.replaceState({}, '', url);
-  initNavigation();
+  setUrlParam('eventId', id);
 }
 
-export function getCurrentPlayerId() {
-  return new URLSearchParams(window.location.search).get('playerId');
-}
+export const getCurrentPlayerId = () => getUrlParam('playerId');
 
 export function setCurrentPlayerId(playerId) {
-  const url = new URL(window.location);
-  if (playerId) url.searchParams.set('playerId', playerId);
-  else url.searchParams.delete('playerId');
-  window.history.replaceState({}, '', url);
-  initNavigation();
+  setUrlParam('playerId', playerId);
 }
 
 
@@ -79,45 +78,85 @@ export function applyScoreFormatting(input) {
 }
 
 /**
- * Sets the 'active' class on the navigation item matching the current URL.
+ * Navigates to a specific internal route.
+ * @param {string} url - The destination path (typically generated via ROUTES).
  */
-export function initNavigation() {
-  // Normalize current path (e.g., "machines.php" or "machines" becomes "machines")
-  const rawPath = window.location.pathname.split('/').pop() || 'index';
-  const currentBase = rawPath.replace(/\.php$/, '') || 'index';
+export const navigateTo = (url) => {
+  if (url) window.location.href = url;
+};
+
+/**
+ * Dynamically generates the navigation menu from ROUTES and manages active states.
+ * If the container already contains navigation links (from layout.php), it updates them.
+ * @param {string} containerSelector CSS selector for the nav container.
+ */
+export function initNavigation(containerSelector = '.nav-container') {
+  const navContainer = document.querySelector(containerSelector);
+  if (!navContainer) return;
 
   const urlParams = new URLSearchParams(window.location.search);
+  const PERSISTENT_PARAMS = ['leagueId', 'eventId', 'playerId'];
 
-  document.querySelectorAll('.nav-item').forEach(link => {
-    let originalHref = link.getAttribute('href');
-    if (originalHref && !originalHref.startsWith('http') && !originalHref.startsWith('#')) {
-      let [path, existingQuery] = originalHref.split('?');
+  // Normalize current path (e.g., "machines.php" or "machines" becomes "machines")
+  const rawPath = window.location.pathname.split('/').filter(Boolean).pop() || '';
+  const currentBase = rawPath.replace(/\.php$/, '') || 'index';
+
+  // If the container is completely empty (Vitest unit tests fallback), build links dynamically
+  if (navContainer.children.length === 0) {
+    navContainer.innerHTML = ROUTES.map(route => {
+      const url = new URL(route.path, window.location.origin);
       
-      // Normalize the path for the UI links (strip .php)
-      const cleanPath = path.replace(/\.php$/, '');
-      const targetParams = new URLSearchParams(existingQuery || '');
-      
-      // Carry over global state params to navigation links
-      ['leagueId', 'eventId', 'playerId'].forEach(key => {
-        if (urlParams.has(key) && !targetParams.has(key)) {
-          targetParams.set(key, urlParams.get(key));
-        }
+      PERSISTENT_PARAMS.forEach(key => {
+        if (urlParams.has(key)) url.searchParams.set(key, urlParams.get(key));
       });
-      
-      const newQuery = targetParams.toString();
-      const updatedHref = cleanPath + (newQuery ? '?' + newQuery : '');
-      link.setAttribute('href', updatedHref);
-      originalHref = updatedHref;
-    }
 
-    // Compare base filenames to set active state accurately
-    const hrefBase = originalHref ? originalHref.split('?')[0].split('/').pop().replace(/\.php$/, '') || 'index' : '';
-    if (hrefBase === currentBase) {
-      link.classList.add('active');
-    } else {
-      link.classList.remove('active');
-    }
-  });
+      const cleanPath = url.pathname.replace(/\.php$/, '');
+      const finalHref = cleanPath + url.search;
+      const pathWithSlash = finalHref.startsWith('/') ? finalHref : '/' + finalHref;
+      const hrefBase = cleanPath.split('/').pop() || 'index';
+      const isActive = hrefBase === currentBase;
+
+      return `<a href="${pathWithSlash}" class="nav-item ${isActive ? 'active' : ''}">${route.label}</a>`;
+    }).join('');
+  } else {
+    // If the navbar is already rendered (the real app), update the hrefs using data-route
+    const routeLinks = navContainer.querySelectorAll('[data-route]');
+    
+    routeLinks.forEach(link => {
+      const routeName = link.dataset.route;
+      if (ROUTES[routeName]) {
+        const params = {};
+        PERSISTENT_PARAMS.forEach(key => {
+          if (urlParams.has(key)) {
+            params[key] = urlParams.get(key);
+          }
+        });
+        link.setAttribute('href', ROUTES[routeName](params));
+      }
+    });
+
+    // Clear active classes first
+    const allLinks = navContainer.querySelectorAll('.nav-link, .nav-item');
+    allLinks.forEach(link => link.classList.remove('active'));
+    navContainer.querySelectorAll('.dropbtn').forEach(btn => btn.classList.remove('active'));
+
+    // Update active class on links
+    allLinks.forEach(link => {
+      const href = link.getAttribute('href');
+      if (href && href !== 'javascript:void(0)') {
+        const rawHref = href.split('?')[0].split('/').filter(Boolean).pop() || '';
+        const hrefBase = rawHref.replace(/\.php$/, '') || 'index';
+        if (hrefBase === currentBase) {
+          link.classList.add('active');
+          const dropdown = link.closest('.dropdown');
+          if (dropdown) {
+            const dropbtn = dropdown.querySelector('.dropbtn');
+            if (dropbtn) dropbtn.classList.add('active');
+          }
+        }
+      }
+    });
+  }
 }
 
 /**
@@ -151,100 +190,4 @@ export function renderPreview(score10Input, score1Input, previewValues, Engine, 
   }
 
   previewValues.innerHTML = html;
-}
-
-/**
- * Generates large printable signs showing target scores for each machine.
- * @param {Array} machines 
- * @param {string} [format='bowling']
- */
-export function printMachineScores(machines, format = 'bowling') {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) return alert('Please allow popups to print.');
-
-  const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.order_number)) : 0;
-  const Engine = getScoringEngine(format);
-
-  const pagesHtml = machines.map((m) => {
-    const ranks = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
-    const scoresHtml = ranks.map((rank) => {
-      const formatted = formatNumber(m.values[rank] || 0);
-      let fontSize = '2.5rem';
-      if (formatted.length > 9) fontSize = '1.4rem';
-      else if (formatted.length > 7) fontSize = '1.8rem';
-
-      return `
-        <div style="border: 3px solid #000; position: relative; height: 120px; display: flex; align-items: center; justify-content: center; background: #fff; overflow: hidden; box-sizing: border-box;">
-          <div style="position: absolute; top: 0; right: 0; border-left: 3px solid #000; border-bottom: 3px solid #000; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; background: #f0f0f0;">${rank}</div>
-          <div style="font-size: ${fontSize}; font-weight: bold; text-align: center; width: 100%; white-space: nowrap;">${formatted}</div>
-        </div>
-      `;
-    }).join('');
-
-    let extraTargets = '';
-    if (m.order_number === maxOrder) {
-      const { t1, t2 } = Engine.getBonusTargets(m);
-      extraTargets = `
-        <div style="margin-top: 40px; display: flex; justify-content: space-around; width: 100%; font-size: 2.2rem; font-weight: bold; border-top: 4px dashed #000; padding-top: 20px;">
-          <div>Target 1: ${formatNumber(t1)}</div>
-          <div>Target 2: ${formatNumber(t2)}</div>
-        </div>`;
-    }
-
-    return `
-      <div class="page" style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; page-break-after: always; padding: 40px; box-sizing: border-box;">
-        <div style="border: 6px solid #000; padding: 50px; width: 100%; max-width: 1100px;">
-          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 40px; border-bottom: 6px solid #000; padding-bottom: 15px;">
-            <h1 style="margin: 0; font-size: 4rem;">${Engine.getRoundLabel()} ${m.order_number}</h1>
-            <h2 style="margin: 0; font-size: 4rem;">${m.machine_name}</h2>
-          </div>
-          <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px;">${scoresHtml}</div>
-          ${extraTargets}
-        </div>
-      </div>`;
-  }).join('');
-
-  printWindow.document.write(`<html><body style="margin:0;">${pagesHtml}</body></html>`);
-  printWindow.document.close();
-  setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
-}
-
-/**
- * Generates a printable PDF-like score sheet for manual tracking.
- * @param {Array} machines 
- */
-export function printBlankScoreSheet(machines) {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) return alert('Please allow popups to print.');
-
-  const framesHtml = machines.map((m) => `
-    <div style="border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; page-break-inside: avoid;">
-      <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px;">
-        <span style="font-weight: bold;">Round ${m.order_number}</span>
-        <span>Game: <strong>${m.machine_name}</strong></span>
-        <span>Target: <strong>${formatNumber(m.values[10])}</strong></span>
-      </div>
-      <div style="display: flex; gap: 20px;">
-        <div style="flex: 1;"><small>Ball 1</small><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
-        <div style="flex: 1;"><small>Ball 2</small><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
-        <div style="flex: 1;"><small>Ball 3</small><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
-      </div>
-    </div>`).join('');
-
-  printWindow.document.write(`
-    <html>
-      <head><style>body { font-family: sans-serif; padding: 20px; }</style></head>
-      <body>
-        <div style="border-bottom: 2px solid #000; margin-bottom: 12px; padding-bottom: 6px;">
-          <h1>PinBowling Score Sheet</h1>
-          <p>Player: __________________________ &nbsp;&nbsp; Date: ________</p>
-        </div>
-        ${framesHtml}
-      </body>
-    </html>`);
-  printWindow.document.close();
-  setTimeout(() => { 
-    printWindow.print(); 
-    printWindow.close(); 
-  }, 250);
 }

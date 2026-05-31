@@ -71,33 +71,76 @@ function envValue(array $env, array $names, $default = null) {
 
 // --- Database & Security Configuration ---
 
-$DB_HOST = envValue($loadedEnv, ['DB_HOST', 'MYSQL_HOST'], 'localhost');
-$DB_PORT = envValue($loadedEnv, ['DB_PORT', 'MYSQL_PORT'], '3306');
-$DB_NAME = envValue($loadedEnv, ['DB_NAME', 'MYSQL_DATABASE'], 'pinbowling');
-$DB_USER = envValue($loadedEnv, ['DB_USER', 'MYSQL_USER'], 'username');
-$DB_PASS = envValue($loadedEnv, ['DB_PASS', 'MYSQL_PASSWORD'], 'password');
-$DB_CHARSET = 'utf8mb4';
-$API_SECRET = envValue($loadedEnv, ['API_SECRET'], 'bowl-2024-secret');
-$UI_VERSION = envValue($loadedEnv, ['UI_VERSION'], filemtime(__DIR__ . '/../index.php')); // Use index.php's modification time as a simple version for cache busting
-$ADMIN_PASSWORD = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');
+$dbHost = envValue($loadedEnv, ['DB_HOST', 'MYSQL_HOST'], 'localhost');
+$dbPort = envValue($loadedEnv, ['DB_PORT', 'MYSQL_PORT'], '3306');
+$dbName = envValue($loadedEnv, ['DB_NAME', 'MYSQL_DATABASE'], 'pinbowling');
+$dbUser = envValue($loadedEnv, ['DB_USER', 'MYSQL_USER'], 'username');
+$dbPass = envValue($loadedEnv, ['DB_PASS', 'MYSQL_PASSWORD'], 'password');
+$dbCharset = 'utf8mb4';
+$apiSecret = envValue($loadedEnv, ['API_SECRET'], 'bowl-2024-secret');
+// UI_VERSION is used for asset cache-busting. 
+// It prioritizes .env, but falls back to the modification time of index.php.
+// Deployment Tip: 'touch index.php' on the server to force-clear client caches.
+$uiVersion = envValue($loadedEnv, ['UI_VERSION'], @filemtime(__DIR__ . '/../index.php') ?: '1.0.0');
+$adminPassword = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');
 
-$DB_DSN = "mysql:host={$DB_HOST};port={$DB_PORT};dbname={$DB_NAME};charset={$DB_CHARSET}";
+$dbDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset={$dbCharset}";
 
 /**
  * Established a singleton PDO connection to the MySQL database.
  * @return PDO
  */
 function getDbConnection() {
-    global $DB_DSN, $DB_USER, $DB_PASS;
+    global $dbDsn, $dbUser, $dbPass;
     static $pdo = null;
     if ($pdo === null) {
-        $pdo = new PDO($DB_DSN, $DB_USER, $DB_PASS, [
+        $pdo = new PDO($dbDsn, $dbUser, $dbPass, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
         ]);
+        initializeDatabaseSchema($pdo);
     }
     return $pdo;
+}
+
+/**
+ * Ensures database tables follow the standardized lowercase snake_case convention.
+ * Migrates existing PascalCase tables if found.
+ * @param PDO $pdo
+ */
+function initializeDatabaseSchema($pdo) {
+    $migrations = [
+        'Leagues' => 'leagues',
+        'Events' => 'events',
+        'Machines' => 'machines',
+        'Players' => 'players',
+        'Scores' => 'scores',
+        'League_Players' => 'league_players',
+        'Locations' => 'locations',
+        'Location_Machines' => 'location_machines',
+        'Target_Scores' => 'target_scores'
+    ];
+
+    foreach ($migrations as $old => $new) {
+        if ($old === $new) continue;
+        $checkOld = $pdo->query("SHOW TABLES LIKE '$old'")->fetch();
+        if ($checkOld) {
+            $checkNew = $pdo->query("SHOW TABLES LIKE '$new'")->fetch();
+            if (!$checkNew) {
+                $pdo->exec("RENAME TABLE `$old` TO `$new` ");
+            }
+        }
+    }
+
+    // Ensure 'leagues' table has the 'password' column (added for protected leagues)
+    $checkLeagues = $pdo->query("SHOW TABLES LIKE 'leagues'")->fetch();
+    if ($checkLeagues) {
+        $checkPassword = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'password'")->fetch();
+        if (!$checkPassword) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `password` VARCHAR(255) DEFAULT NULL AFTER `start_date` ");
+        }
+    }
 }
 
 // Handle HTTP Method Tunneling for environments that block DELETE/PUT.
@@ -129,18 +172,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
  * @return void
  */
 function validateLeagueAccess($pdo, $leagueId) {
-    global $API_SECRET;
+    global $apiSecret;
     $headers = function_exists('getallheaders') ? getallheaders() : [];
     $providedSecret = $_SERVER['HTTP_X_PB_SECRET'] ?? $headers['X-PB-SECRET'] ?? $headers['x-pb-secret'] ?? $_SERVER['REDIRECT_HTTP_X_PB_SECRET'] ?? null;
     $providedLeaguePass = $_SERVER['HTTP_X_LEAGUE_PASSWORD'] ?? $headers['X-LEAGUE-PASSWORD'] ?? $headers['x-league-password'] ?? null;
 
     // 1. Check Global Secret (Admin Override)
-    if ($providedSecret === $API_SECRET) return;
+    if ($providedSecret === $apiSecret) return;
 
     // 2. Check League Specific Password
     if (!$leagueId) sendJson(['error' => 'League ID required for validation'], 400);
 
-    $stmt = $pdo->prepare('SELECT password FROM Leagues WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT password FROM leagues WHERE id = ?');
     $stmt->execute([(int)$leagueId]);
     $hash = $stmt->fetchColumn();
 
@@ -157,14 +200,14 @@ function validateLeagueAccess($pdo, $leagueId) {
  * @return void
  */
 function validateApiSecret() {
-    global $API_SECRET;
+    global $apiSecret;
     
     // Hosted environments (CGI/FastCGI) often rename or strip custom headers.
     // We check common variations and Apache-specific header arrays.
     $headers = function_exists('getallheaders') ? getallheaders() : [];
     $providedSecret = $_SERVER['HTTP_X_PB_SECRET'] ?? $headers['X-PB-SECRET'] ?? $headers['x-pb-secret'] ?? $_SERVER['REDIRECT_HTTP_X_PB_SECRET'] ?? null;
 
-    if (!$providedSecret || $providedSecret !== $API_SECRET) {
+    if (!$providedSecret || $providedSecret !== $apiSecret) {
         sendJson(['error' => 'Unauthorized: Invalid or missing API secret'], 401);
     }
 }

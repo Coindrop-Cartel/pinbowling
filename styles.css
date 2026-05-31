@@ -81,7 +81,7 @@ body {
   font-size: 1rem;
 }
 
-.nav-link:hover, .dropdown:hover .dropbtn {
+.nav-link:hover, .dropdown:hover .dropbtn, .nav-link.active, .dropbtn.active {
   background: var(--pb-black);
   color: var(--pb-white);
 }

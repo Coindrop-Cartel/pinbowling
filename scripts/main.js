@@ -4,16 +4,15 @@
  * and dynamic UI rendering across different pages.
  */
 
-import { 
-  initNavigation
-} from './utils.js';
-import { initMachinesPage } from './machinesPage.js';
-import { initLocationsPage } from './locationsPage.js';
-import { initConfigPage } from './configPage.js';
-import { initPlayersPage } from './playersPage.js';
-import { initScoresPage } from './scoresPage.js';
-import { initStandingsPage } from './standingsPage.js';
-import { initLeaguesPage } from './leaguesPage.js';
+import { initNavigation } from '@ui/navigation.js';
+import { initMachinesPage } from '@pages/machinesPage.js';
+import { initLocationsPage } from '@pages/locationsPage.js';
+import { initConfigPage } from '@pages/configPage.js';
+import { initPlayersPage } from '@pages/playersPage.js';
+import { initScoresPage } from '@pages/scoresPage.js';
+import { initStandingsPage } from '@pages/standingsPage.js';
+import { initLeaguesPage } from '@pages/leaguesPage.js';
+import { initPlayPage } from '@pages/playPage.js';
 
 /**
  * Main entry point. Identifies which page is currently loaded 
@@ -24,28 +23,23 @@ import { initLeaguesPage } from './leaguesPage.js';
  * for the current view context.
  */
 function ready() {
-  initNavigation(); // From utils.js
-  if (document.getElementById('machine-form')) {
-    initMachinesPage();
-  }
-  if (document.getElementById('location-form')) {
-    initLocationsPage();
-  }
-  if (document.getElementById('round-form')) {
-    initConfigPage(); // From pages/configPage.js
-  }
-  if (document.getElementById('player-list')) {
-    initPlayersPage(); // From pages/playersPage.js
-  }
-  if (document.getElementById('rounds-input')) {
-    initScoresPage(); // From pages/scoresPage.js
-  }
-  if (document.getElementById('standings-body')) {
-    initStandingsPage(); // From pages/standingsPage.js
-  }
-  if (document.getElementById('leagues-list')) {
-    initLeaguesPage(); // From pages/leaguesPage.js
-  }
+  initNavigation('.nav-container'); 
+
+  const pageInitializers = {
+    'machine-form': initMachinesPage,
+    'location-form': initLocationsPage,
+    'round-form': initConfigPage,
+    'player-list': initPlayersPage,
+    'rounds-input': initScoresPage,
+    'standings-body': initStandingsPage,
+    'leagues-list': initLeaguesPage,
+    'quick-play-form': initPlayPage,
+  };
+
+  // Detect and run initialization for the current page based on element presence
+  Object.entries(pageInitializers).forEach(([elementId, initialize]) => {
+    if (document.getElementById(elementId)) initialize();
+  });
 }
 
 document.addEventListener('DOMContentLoaded', ready);
