@@ -68,10 +68,10 @@ try {
         if ($task === 'fixture') {
             $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
             if ($leagueId) { // Fetch events for a specific league
-                $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id WHERE e.league_id = ? ORDER BY e.event_date ASC');
+                $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id WHERE e.league_id = ? ORDER BY e.event_date ASC');
                 $stmt->execute([$leagueId]);
             } else { // Fetch all events
-                $stmt = $pdo->query('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id ORDER BY e.event_date ASC');
+                $stmt = $pdo->query('SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id ORDER BY e.event_date ASC');
             }
             sendJson(array_map('serializeEvent', $stmt->fetchAll()));
         } else {
@@ -82,11 +82,11 @@ try {
                 $league = $stmt->fetch();
                 if ($league) {
                     // Automatically include events when fetching a specific league
-                    $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM Events e LEFT JOIN Locations l ON e.location_id = l.id WHERE e.league_id = ? ORDER BY e.event_date ASC');
+                    $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id WHERE e.league_id = ? ORDER BY e.event_date ASC');
                     $stmt->execute([$id]);
                     $league['events'] = $stmt->fetchAll();
 
-                    $stmt = $pdo->prepare('SELECT p.* FROM Players p JOIN League_Players lp ON p.id = lp.player_id WHERE lp.league_id = ? ORDER BY p.player_name ASC');
+                    $stmt = $pdo->prepare('SELECT p.* FROM players p JOIN league_players lp ON p.id = lp.player_id WHERE lp.league_id = ? ORDER BY p.player_name ASC');
                     $stmt->execute([$id]);
                     $league['players'] = $stmt->fetchAll();
 
@@ -123,8 +123,9 @@ try {
             $playersByLeague = [];
             foreach ($allLeaguePlayers as $lp) {
                 $lId = $lp['league_id'];
-                unset($lp['league_id']);
-                $playersByLeague[$lId][] = serializePlayer($lp);
+                // We keep the raw row here and let serializeLeague handle the 
+                // conversion to camelCase to avoid double-serialization errors.
+                $playersByLeague[$lId][] = $lp;
             }
 
             // Attach events to their corresponding leagues
@@ -232,7 +233,13 @@ try {
             $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
             validateLeagueAccess($pdo, $leagueId);
             $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
-            $pdo->prepare("DELETE FROM League_Players WHERE league_id = ? AND player_id = ?")->execute([$leagueId, $playerId]);
+
+            // Remove player scores for all events within this specific league
+            $pdo->prepare("DELETE FROM scores WHERE player_id = ? AND event_id IN (SELECT id FROM events WHERE league_id = ?)")
+                ->execute([$playerId, $leagueId]);
+
+            // Remove from league roster
+            $pdo->prepare("DELETE FROM league_players WHERE league_id = ? AND player_id = ?")->execute([$leagueId, $playerId]);
         } else {
             $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
             if (!$id) sendJson(['error' => 'id query parameter is required'], 400);

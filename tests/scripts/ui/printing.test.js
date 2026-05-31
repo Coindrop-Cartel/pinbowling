@@ -38,8 +38,8 @@ describe('Printing Utilities (printing.js)', () => {
   describe('printMachineScores', () => {
     it('should open a new window and write machine scores HTML', () => {
       const machines = [
-        { id: 1, machine_name: 'Machine A', order_number: 1, values: { 10: 10000, 1: 1000 } },
-        { id: 2, machine_name: 'Machine B', order_number: 2, values: { 10: 20000, 1: 2000 } },
+        { id: 1, machineName: 'Machine A', orderNumber: 1, values: { 10: 10000, 1: 1000 } },
+        { id: 2, machineName: 'Machine B', orderNumber: 2, values: { 10: 20000, 1: 2000 } },
       ];
       printMachineScores(machines);
 
@@ -56,7 +56,7 @@ describe('Printing Utilities (printing.js)', () => {
 
     it('should include bonus targets for the last machine', () => {
       const machines = [
-        { id: 1, machine_name: 'Machine A', order_number: 1, values: { 10: 10000, 1: 1000 } },
+        { id: 1, machineName: 'Machine A', orderNumber: 1, values: { 10: 10000, 1: 1000 } },
       ];
       printMachineScores(machines);
       const html = mockPrintWindow.document.write.mock.calls[0][0];
@@ -81,7 +81,7 @@ describe('Printing Utilities (printing.js)', () => {
   describe('printBlankScoreSheet', () => {
     it('should open a new window and write blank score sheet HTML', () => {
       const machines = [
-        { id: 1, machine_name: 'Machine A', order_number: 1, values: { 10: 10000 } },
+        { id: 1, machineName: 'Machine A', orderNumber: 1, values: { 10: 10000 } },
       ];
       printBlankScoreSheet(machines);
 

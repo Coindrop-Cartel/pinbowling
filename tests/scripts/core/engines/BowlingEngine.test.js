@@ -11,8 +11,8 @@ describe('BowlingEngine', () => {
 
   // Mock machine configuration for tests
   const mockRound = (order) => ({
-    order_number: order,
-    machine_name: `Machine ${order}`,
+    orderNumber: order,
+    machineName: `Machine ${order}`,
     values: {
       1: 1000, 2: 2000, 3: 3000, 4: 4000, 5: 5000,
       6: 6000, 7: 7000, 8: 8000, 9: 9000, 10: 10000

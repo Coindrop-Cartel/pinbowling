@@ -112,7 +112,7 @@ export async function initScoresPage() {
     const row = document.createElement('div');
     row.className = 'round-row';
     row.style = "display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 8px 12px; margin-bottom: 5px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;";
-    row.dataset.order = round.orderNumber;
+    row.dataset.orderNumber = round.orderNumber;
 
     const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
 
@@ -196,8 +196,18 @@ export async function initScoresPage() {
    */
   async function renderPlayerSelect() {
     try {
-      // Fetch the global player registry to ensure consistency with the scoreboard
-      const players = (await PB_API.getPlayers()) || [];
+      const leagueId = getActiveLeagueId();
+      let players = [];
+
+      if (leagueId) {
+        // Fetch the specific league to get the assigned roster
+        const league = await PB_API.getLeague(leagueId);
+        players = league?.players || [];
+      } else {
+        // Fallback to the global player registry if no league is active
+        players = (await PB_API.getPlayers()) || [];
+      }
+
       allPlayersCache.length = 0;
       allPlayersCache.push(...players);
 
@@ -304,7 +314,7 @@ export async function initScoresPage() {
   function getScoreMapFromInputs() {
     const scoreMap = {};
     roundsInput.querySelectorAll('.round-row').forEach((row) => {
-      const orderNum = Number(row.dataset.order);
+      const orderNum = Number(row.dataset.orderNumber);
       scoreMap[orderNum] = {
         ball1: Number(row.querySelector('[data-ball="1"]').value.replace(/\D/g, '')) || 0,
         ball2: Number(row.querySelector('[data-ball="2"]').value.replace(/\D/g, '')) || 0,
@@ -328,8 +338,8 @@ export async function initScoresPage() {
           runningTotal += result.score;
           return `
         <tr>
-          <td>${result.order}</td>
-          <td>${result.machine}</td>
+          <td>${result.orderNumber}</td>
+          <td>${result.machineName}</td>
           <td>${result.mark}</td>
           <td>${formatNumber(runningTotal)}</td>
         </tr>

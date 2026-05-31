@@ -192,7 +192,7 @@ export async function initStandingsPage() {
 
     if (eventId === 'summary') return renderLeagueSummary(leagueId);
 
-    const players = await PB_API.getPlayers();
+    const players = league?.players || [];
     const machines = await PB_API.getTargetScores(eventId);
     const allEventScores = await PB_API.getScores(null, Number(eventId));
     

@@ -59,7 +59,7 @@ export async function initConfigPage() {
 
   document.getElementById('add-target-btn').addEventListener('click', () => {
     resetForm();
-    const nextOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.order_number)) + 1 : 1;
+    const nextOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.orderNumber)) + 1 : 1;
     orderInput.value = nextOrder;
     displayOrder.textContent = nextOrder;
     configCard.classList.remove('hidden');
@@ -95,7 +95,7 @@ export async function initConfigPage() {
 
   machineSearch = createSearchableSelect(document.getElementById('machine-name'), machineSelect, currentSuggestedMachines, {
     valueKey: 'machineName',
-    labelKey: 'machine_name',
+    labelKey: 'machineName',
     placeholder: '-- Choose machine --',
     onSelect: (val) => {
       updateQuickFillState(val);
@@ -186,7 +186,7 @@ export async function initConfigPage() {
         score10Input.value = round.values[10] ? formatNumber(round.values[10]) : '';
         score1Input.value = round.values[1] ? formatNumber(round.values[1]) : '';
         machineSearch.updateOptions(round.machineName);
-        updateQuickFillState(round.machine_name);
+        updateQuickFillState(round.machineName);
         renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast());
         configCard.classList.remove('hidden');
         window.scrollTo(0, 0);
