@@ -139,7 +139,11 @@ try {
 
             $stmt = $pdo->prepare('SELECT * FROM locations WHERE id = ?');
             $stmt->execute([$newId]);
-            sendJson(serializeLocation($stmt->fetch()), 201);
+            $row = $stmt->fetch();
+            if (!$row) {
+                sendJson(['error' => 'Location created but could not be retrieved.'], 500);
+            }
+            sendJson(serializeLocation($row), 201);
         }
     }
 
@@ -157,7 +161,11 @@ try {
 
         $stmt = $pdo->prepare('SELECT * FROM locations WHERE id = ?');
         $stmt->execute([$id]);
-        sendJson(serializeLocation($stmt->fetch()));
+        $row = $stmt->fetch();
+        if (!$row) {
+            sendJson(['error' => 'Location updated but could not be retrieved.'], 500);
+        }
+        sendJson(serializeLocation($row));
     }
 
     // DELETE: Remove a location (Protected by API Secret)

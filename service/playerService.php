@@ -63,7 +63,11 @@ try {
 
         $stmt = $pdo->prepare('SELECT * FROM players WHERE id = ?');
         $stmt->execute([$id]);
-        sendJson(serializePlayer($stmt->fetch()));
+        $row = $stmt->fetch();
+        if (!$row) {
+            sendJson(['error' => 'Player created but could not be retrieved.'], 500);
+        }
+        sendJson(serializePlayer($row));
     }
 
     // PUT: Update an existing player (Protected by API Secret)
@@ -93,7 +97,11 @@ try {
 
         $stmt = $pdo->prepare('SELECT * FROM players WHERE id = ?');
         $stmt->execute([$id]);
-        sendJson(serializePlayer($stmt->fetch()));
+        $row = $stmt->fetch();
+        if (!$row) {
+            sendJson(['error' => 'Player updated but could not be retrieved.'], 500);
+        }
+        sendJson(serializePlayer($row));
     }
 
     // DELETE: Remove a player and their associated scores (Protected by API Secret)

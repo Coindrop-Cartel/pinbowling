@@ -188,7 +188,11 @@ try {
 
         $stmt = $pdo->prepare('SELECT id, machine_name FROM machines WHERE id = ?');
         $stmt->execute([$id]);
-        sendJson(serializeMasterMachine($stmt->fetch()));
+        $row = $stmt->fetch();
+        if (!$row) {
+            sendJson(['error' => 'Machine created but could not be retrieved.'], 500);
+        }
+        sendJson(serializeMasterMachine($row));
     }
 
     // PUT: Update an existing round configuration (Protected by API Secret)
@@ -210,7 +214,11 @@ try {
             $pdo->prepare($sql)->execute($params);
             $stmt = $pdo->prepare('SELECT ts.*, m.machine_name FROM target_scores ts JOIN machines m ON ts.machine_id = m.id WHERE ts.id = ?');
             $stmt->execute([$id]);
-            sendJson(serializeTargetScore($stmt->fetch()));
+            $row = $stmt->fetch();
+            if (!$row) {
+                sendJson(['error' => 'Target score updated but could not be retrieved.'], 500);
+            }
+            sendJson(serializeTargetScore($row));
         } else { // Update a master machine (title only)
             $name = $input['machineName'] ?? $input['name'] ?? null;
             if (!$name) sendJson(['error' => 'machineName is required'], 400);
@@ -222,7 +230,11 @@ try {
             // Fetch the updated master machine
             $stmt = $pdo->prepare('SELECT id, machine_name FROM machines WHERE id = ?');
             $stmt->execute([$id]);
-            sendJson(serializeMasterMachine($stmt->fetch()));
+            $row = $stmt->fetch();
+            if (!$row) {
+                sendJson(['error' => 'Machine updated but could not be retrieved.'], 500);
+            }
+            sendJson(serializeMasterMachine($row));
         }
     }
 

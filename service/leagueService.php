@@ -166,7 +166,11 @@ try {
             
             $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id WHERE e.id = ?');
             $stmt->execute([$newId]);
-            sendJson(serializeEvent($stmt->fetch()));
+            $row = $stmt->fetch();
+            if (!$row) {
+                sendJson(['error' => 'Event created but could not be retrieved.'], 500);
+            }
+            sendJson(serializeEvent($row));
         } else {
             validateApiSecret(); // League creation is global admin only
             if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
@@ -179,7 +183,11 @@ try {
 
             $stmt = $pdo->prepare('SELECT id, name, start_date FROM leagues WHERE id = ?');
             $stmt->execute([$newId]);
-            sendJson(serializeLeague($stmt->fetch()));
+            $row = $stmt->fetch();
+            if (!$row) {
+                sendJson(['error' => 'League created but could not be retrieved.'], 500);
+            }
+            sendJson(serializeLeague($row));
         }
     }
 
@@ -220,6 +228,9 @@ try {
         $stmt->execute([$id]);
 
         $row = $stmt->fetch();
+        if (!$row) {
+            sendJson(['error' => 'Resource updated but could not be retrieved.'], 500);
+        }
         if ($task === 'fixture') {
             sendJson(serializeEvent($row));
         } else {
