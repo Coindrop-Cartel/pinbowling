@@ -132,6 +132,15 @@ function initializeDatabaseSchema($pdo) {
             }
         }
     }
+
+    // Ensure 'leagues' table has the 'password' column (added for protected leagues)
+    $checkLeagues = $pdo->query("SHOW TABLES LIKE 'leagues'")->fetch();
+    if ($checkLeagues) {
+        $checkPassword = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'password'")->fetch();
+        if (!$checkPassword) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `password` VARCHAR(255) DEFAULT NULL AFTER `start_date` ");
+        }
+    }
 }
 
 // Handle HTTP Method Tunneling for environments that block DELETE/PUT.
