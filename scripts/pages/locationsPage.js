@@ -63,6 +63,7 @@ export function initLocationsPage() {
   };
 
   let allLocations = [];
+  let expandedLocationId = null;
 
   /**
    * Filters the visible locations based on the Name, City, and State inputs.
@@ -85,6 +86,7 @@ export function initLocationsPage() {
       emptyNotice.classList.add('hidden');
       filtered.forEach(loc => {
         const cityState = (loc.city && loc.state) ? ` (${loc.city}, ${loc.state})` : '';
+        const isExpanded = String(loc.id) === String(expandedLocationId);
         const locDiv = document.createElement('div');
         locDiv.className = 'location-registry-item';
         locDiv.style.marginBottom = '5px';
@@ -103,7 +105,7 @@ export function initLocationsPage() {
               <button class="delete-loc-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
             </div>
           </div>
-          <div class="location-details hidden" style="padding: 12px 15px; border-top: 1px solid #ddd; background: #fff;">
+          <div class="location-details ${isExpanded ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd; background: #fff;">
             <div style="margin-bottom: 15px;">
               <button class="add-mach-btn secondary" style="padding: 4px 12px; font-size: 0.85rem;">Add Machine to Venue</button>
             </div>
@@ -127,6 +129,9 @@ export function initLocationsPage() {
 
           if (wasHidden) {
             details.classList.remove('hidden');
+            expandedLocationId = loc.id;
+          } else {
+            expandedLocationId = null;
           }
         };
 
@@ -267,7 +272,7 @@ export function initLocationsPage() {
       `;
       item.querySelector('.edit-mach-btn').onclick = () => showMachineForm(locationId, locationName, m);
       item.querySelector('.remove-mach-btn').onclick = async () => {
-        if (confirm(`Remove ${m.machine_name} from this location?`)) {
+        if (await showConfirm(`Remove ${m.machine_name} from this location?`, 'Remove Machine')) {
           await PB_API.removeLocationMachine(locationId, m.machine_id);
           renderLocations();
         }

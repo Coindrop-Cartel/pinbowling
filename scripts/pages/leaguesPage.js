@@ -88,19 +88,10 @@ export async function initLeaguesPage() {
           <div class="league-details ${shouldExpand ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd; background: #fff;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
               <h4 style="margin: 0;">Events</h4>
-              <button class="add-event-btn secondary" style="padding: 4px 12px; font-size: 0.85rem;">Add Event</button>
+              <button class="add-event-btn secondary" data-league-id="${league.id}" data-league-name="${league.name}" style="padding: 4px 12px; font-size: 0.85rem;">Add Event</button>
             </div>
-            <ul style="list-style: none; padding: 0;">
-              ${(league.events || []).map(e => `
-                <li style="display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
-                  <span>${e.event_name} <small>(${e.event_date || 'No Date'})</small></span>
-                  <div style="display: flex; gap: 4px;">
-                    <button class="setup-event-btn secondary" data-league-id="${league.id}" data-event-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Setup</button>
-                    <button class="edit-event-btn secondary" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>
-                    <button class="delete-event-btn" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>
-                  </div>
-                </li>
-              `).join('') || '<li>No events scheduled.</li>'}
+            <ul class="league-events-list" style="list-style: none; padding: 0;">
+              <!-- Events will be rendered here -->
             </ul>
 
             <div class="league-players-section" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
@@ -133,6 +124,9 @@ export async function initLeaguesPage() {
           if (wasHidden) {
             details.classList.remove('hidden');
             renderPlayersForLeague(league.id, league.players, allPlayersCache);
+            setActiveLeagueId(league.id);
+          } else {
+            setActiveLeagueId(null);
           }
         };
 
@@ -141,30 +135,11 @@ export async function initLeaguesPage() {
         card.querySelector('.edit-league-btn').onclick = () => editLeague(league.id, league.name);
         card.querySelector('.delete-league-btn').onclick = () => runAuthorizedLeagueAction(league.id, () => deleteLeague(league.id, league.name));
         card.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
-        
-        card.querySelectorAll('.setup-event-btn').forEach(btn => {
-          btn.onclick = () => {
-            const leagueId = Number(btn.dataset.leagueId);
-            const eventId = Number(btn.dataset.eventId);
-            setActiveLeagueId(leagueId);
-            setActiveEventId(eventId);
-            navigateTo(ROUTES.LEAGUE_SETUP({ leagueId, eventId }));
-          };
-        });
-        card.querySelectorAll('.edit-event-btn').forEach(btn => {
-          btn.onclick = () => {
-            const eventObj = league.events.find(ev => ev.id === Number(btn.dataset.id));
-            showEventForm(league.id, league.name, eventObj);
-          };
-        });
-
-        card.querySelectorAll('.delete-event-btn').forEach(btn => {
-          btn.onclick = (e) => runAuthorizedLeagueAction(league.id, () => deleteEvent(Number(e.target.dataset.id), league.id, league.name));
-        });
 
         leaguesList.appendChild(card);
 
-        // Initial render of players if details are not hidden (e.g., after refresh)
+        // Initial render of components
+        renderEventsForLeague(league.id, league.events, league.name);
         const details = card.querySelector('.league-details');
         if (!details.classList.contains('hidden')) renderPlayersForLeague(league.id, league.players, allPlayersCache);
 
@@ -244,6 +219,41 @@ export async function initLeaguesPage() {
     }
   });
 
+  function renderEventsForLeague(leagueId, leagueEvents, leagueName) {
+    const addBtn = document.querySelector(`.league-registry-item .add-event-btn[data-league-id="${leagueId}"]`);
+    if (!addBtn) return;
+
+    const card = addBtn.closest('.league-registry-item');
+    const eventsListEl = card.querySelector('.league-events-list');
+
+    eventsListEl.innerHTML = (leagueEvents || []).map(e => `
+      <li style="display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
+        <span>${e.event_name} <small>(${e.event_date || 'No Date'})</small></span>
+        <div style="display: flex; gap: 4px;">
+          <button class="setup-event-btn secondary" data-league-id="${leagueId}" data-event-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Setup</button>
+          <button class="edit-event-btn secondary" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>
+          <button class="delete-event-btn" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>
+        </div>
+      </li>
+    `).join('') || '<li>No events scheduled.</li>';
+
+    // Attach listeners
+    eventsListEl.querySelectorAll('.setup-event-btn').forEach(btn => {
+      btn.onclick = () => {
+        const eventId = Number(btn.dataset.eventId);
+        setActiveLeagueId(leagueId);
+        setActiveEventId(eventId);
+        navigateTo(ROUTES.LEAGUE_SETUP({ leagueId, eventId }));
+      };
+    });
+    eventsListEl.querySelectorAll('.edit-event-btn').forEach(btn => {
+      btn.onclick = () => showEventForm(leagueId, leagueName, leagueEvents.find(ev => ev.id === Number(btn.dataset.id)));
+    });
+    eventsListEl.querySelectorAll('.delete-event-btn').forEach(btn => {
+      btn.onclick = (e) => runAuthorizedLeagueAction(leagueId, () => deleteEvent(Number(e.target.dataset.id), leagueId, leagueName));
+    });
+  }
+
   async function editLeague(leagueId, currentName) {
     if (!await requireAdmin(`Reset password for "${currentName}"? Enter Global Admin Password:`)) {
       return;
@@ -296,6 +306,16 @@ export async function initLeaguesPage() {
     });
   }
 
+  function updateLeagueHeaderStats(leagueId, league) {
+    const addBtn = document.querySelector(`.league-registry-item .add-player-btn[data-league-id="${leagueId}"]`);
+    if (!addBtn) return;
+    const card = addBtn.closest('.league-registry-item');
+    const statsEl = card.querySelector('.league-header small');
+    if (statsEl) {
+      statsEl.textContent = `Started: ${league.start_date || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}`;
+    }
+  }
+
   async function addPlayerToLeague(leagueId, leagueName) {
     await runAuthorizedLeagueAction(leagueId, async () => {
       const league = allLeagues.find(l => l.id === leagueId);
@@ -318,7 +338,16 @@ export async function initLeaguesPage() {
 
       if (selectedPlayerId) {
           await PB_API.addLeaguePlayer(leagueId, Number(selectedPlayerId));
-          await refresh();
+
+          // Update local data and UI without a full refresh
+          const player = allPlayersCache.find(p => p.id === Number(selectedPlayerId));
+          if (player) {
+              if (!league.players) league.players = [];
+              league.players.push(player);
+              league.players.sort((a, b) => a.player_name.localeCompare(b.player_name));
+              renderPlayersForLeague(leagueId, league.players, allPlayersCache);
+              updateLeagueHeaderStats(leagueId, league);
+          }
       }
     });
   }
@@ -331,7 +360,14 @@ export async function initLeaguesPage() {
     }
 
     await PB_API.removeLeaguePlayer(leagueId, playerId);
-    await refresh();
+
+    // Update local data and UI without a full refresh
+    const league = allLeagues.find(l => l.id === leagueId);
+    if (league && league.players) {
+        league.players = league.players.filter(p => p.id !== playerId);
+        renderPlayersForLeague(leagueId, league.players, allPlayersCache);
+        updateLeagueHeaderStats(leagueId, league);
+    }
   }
 
   async function deleteLeague(id, name) {
@@ -343,7 +379,14 @@ export async function initLeaguesPage() {
   async function deleteEvent(id, leagueId, leagueName) {
     if (!await showConfirm(`Delete this event from ${leagueName}?`, 'Delete Event')) return;
     await PB_API.deleteEvent(id, leagueId);
-    await refresh();
+
+    // Update local data and UI without a full refresh
+    const league = allLeagues.find(l => l.id === leagueId);
+    if (league && league.events) {
+        league.events = league.events.filter(e => e.id !== id);
+        renderEventsForLeague(leagueId, league.events, league.name);
+        updateLeagueHeaderStats(leagueId, league);
+    }
   }
 
   async function showEventForm(leagueId, leagueName, event = null) {
@@ -389,15 +432,30 @@ export async function initLeaguesPage() {
     };
 
     try {
+      let result;
       if (eventId) {
-        await PB_API.updateEvent(eventId, payload);
+        result = await PB_API.updateEvent(eventId, payload);
       } else {
-        await PB_API.createEvent(payload);
+        result = await PB_API.createEvent(payload);
       }
 
       eventFormCard.classList.add('hidden');
       e.target.reset();
-      await refresh();
+
+      // Update local data and UI without a full refresh
+      const league = allLeagues.find(l => String(l.id) === String(leagueId));
+      if (league) {
+          if (!league.events) league.events = [];
+          if (eventId) {
+              const idx = league.events.findIndex(ev => String(ev.id) === String(eventId));
+              if (idx !== -1) league.events[idx] = { ...league.events[idx], ...payload, id: Number(eventId) };
+          } else if (result && result.id) {
+              league.events.push({ ...payload, id: result.id });
+          }
+          // Note: Sorting by date is omitted here to keep the list consistent with creation order
+          renderEventsForLeague(Number(leagueId), league.events, league.name);
+          updateLeagueHeaderStats(Number(leagueId), league);
+      }
     } catch (err) {
       console.error('Event save failed:', err);
       alert(`Failed to save event: ${err.message}`);
