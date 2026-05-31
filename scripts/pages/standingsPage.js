@@ -185,7 +185,11 @@ export async function initStandingsPage() {
 
     if (tournamentSelectorUI && tournamentSummary) {
       const event = eventId === 'summary' ? { eventName: 'Season Summary' } : league?.events.find(e => String(e.id) === String(eventId));
-      tournamentSummaryText.textContent = `${league?.name || 'League'} - ${event?.eventName || 'Event'}`;
+      if (league?.type === 'session') {
+        tournamentSummaryText.textContent = event?.eventName || 'Session Scoreboard';
+      } else {
+        tournamentSummaryText.textContent = `${league?.name || 'League'} - ${event?.eventName || 'Event'}`;
+      }
       tournamentSelectorUI.classList.add('hidden');
       tournamentSummary.classList.remove('hidden');
     }
@@ -204,7 +208,11 @@ export async function initStandingsPage() {
 
     if (tvTitle) {
       const event = league?.events?.find(e => String(e.id) === String(eventId));
-      tvTitle.textContent = `${league?.name || 'League'} - ${event?.eventName || 'Event'}`;
+      if (league?.type === 'session') {
+        tvTitle.textContent = event?.eventName || 'Session Scoreboard';
+      } else {
+        tvTitle.textContent = `${league?.name || 'League'} - ${event?.eventName || 'Event'}`;
+      }
     }
 
     const rows = players.map(player => {

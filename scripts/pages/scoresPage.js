@@ -377,12 +377,12 @@ export async function initScoresPage() {
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
     const event = league?.events?.find(e => String(e.id) === String(eventId));
 
-    const isQuickPlay = league?.name === 'Quick Play Sessions';
+    const isSession = league?.type === 'session';
     if (changeTournamentBtn) {
-      changeTournamentBtn.classList.toggle('hidden', isQuickPlay);
+      changeTournamentBtn.classList.toggle('hidden', isSession);
     }
 
-    const leagueLabel = isQuickPlay ? '' : `${league?.name} - `;
+    const leagueLabel = isSession ? '' : `${league?.name} - `;
     tournamentSummaryText.textContent = `${leagueLabel}${event?.eventName || 'Event'}`;
     tournamentSelectorUI.classList.add('hidden');
     tournamentSummary.classList.remove('hidden');

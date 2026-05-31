@@ -75,7 +75,7 @@ export async function initPlayPage() {
 
       div.querySelector('.scoreboard-btn').onclick = (e) => {
         e.stopPropagation();
-        window.location.href = `standings?eventId=${event.id}&leagueId=${qpLeague.id}`;
+        window.location.href = `standings?eventId=${event.id}&leagueId=${event.leagueId}`;
       };
 
       div.querySelector('.join-btn').onclick = async (e) => {
