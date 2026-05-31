@@ -119,9 +119,20 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$event_id, $player_id, $order_number, $machine_id, $ball1, $ball2, $ball3, $machine_id, $ball1, $ball2, $ball3]);
 
-        $stmt = $pdo->prepare('SELECT * FROM scores WHERE player_id = ? AND order_number = ? AND event_id = ?');
+        // Fetch the newly created/updated row with the machine name joined for UI consistency
+        $stmt = $pdo->prepare('
+            SELECT s.*, m.machine_name 
+            FROM scores s 
+            LEFT JOIN machines m ON s.machine_id = m.id 
+            WHERE s.player_id = ? AND s.order_number = ? AND s.event_id = ?
+        ');
         $stmt->execute([$player_id, $order_number, $event_id]);
-        sendJson(serializeScore($stmt->fetch()));
+        
+        $row = $stmt->fetch();
+        if (!$row) {
+            sendJson(['error' => 'Score saved but could not be retrieved. Please check for duplicate entries.'], 500);
+        }
+        sendJson(serializeScore($row));
     }
 
     // DELETE: Clear all scores for a specific player (Protected by API Secret)
