@@ -98,7 +98,7 @@ export function initNavigation(containerSelector = '.nav-container') {
   const PERSISTENT_PARAMS = ['leagueId', 'eventId', 'playerId'];
 
   // Normalize current path (e.g., "machines.php" or "machines" becomes "machines")
-  const rawPath = window.location.pathname.split('/').pop() || '';
+  const rawPath = window.location.pathname.split('/').filter(Boolean).pop() || '';
   const currentBase = rawPath.replace(/\.php$/, '') || 'index';
 
   // If the container is completely empty (Vitest unit tests fallback), build links dynamically
@@ -144,7 +144,8 @@ export function initNavigation(containerSelector = '.nav-container') {
     allLinks.forEach(link => {
       const href = link.getAttribute('href');
       if (href && href !== 'javascript:void(0)') {
-        const hrefBase = href.split('?')[0].split('/').pop().replace(/\.php$/, '') || 'index';
+        const rawHref = href.split('?')[0].split('/').filter(Boolean).pop() || '';
+        const hrefBase = rawHref.replace(/\.php$/, '') || 'index';
         if (hrefBase === currentBase) {
           link.classList.add('active');
           const dropdown = link.closest('.dropdown');

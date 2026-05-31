@@ -9,7 +9,8 @@ export const ADMIN_PASSWORD = window.PB_ADMIN_PASSWORD || "";
 // Calculate the base application path once to ensure relative API calls resolve correctly
 // regardless of clean URL routing (e.g., /leagues vs /leagues.php)
 // This prevents 404 errors when navigating sub-directories or using .htaccess rewrites.
-const APP_BASE = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) || '';
+const base = window.APP_BASE || window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) || '';
+const APP_BASE = base.endsWith('/') ? base.slice(0, -1) : base;
 
 /**
  * Wrapper for the Fetch API that automatically includes security headers 

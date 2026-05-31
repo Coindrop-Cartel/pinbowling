@@ -147,6 +147,24 @@ describe('API Client (api.js)', () => {
       await expect(fetchJSON('service/testService.php')).rejects.toThrow('Internal Server Error');
     });
 
+    it('should throw statusText if JSON response exists but has no error key', async () => {
+      fetch.mockResolvedValue({
+        ok: false,
+        statusText: 'Forbidden',
+        json: () => Promise.resolve({ success: false })
+      });
+
+      await expect(fetchJSON('service/test.php')).rejects.toThrow('Forbidden');
+    });
+
+    it('should construct origin-based URLs for relative paths', async () => {
+        fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+        await fetchJSON('test.php');
+        
+        const url = fetch.mock.calls[0][0];
+        expect(url).toBe('http://localhost/app/test.php');
+    });
+
     it('should provide a default empty body for POST requests to prevent server resets', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await fetchJSON('service/testService.php', { method: 'POST' });
@@ -198,6 +216,12 @@ describe('API Client (api.js)', () => {
       await PB_API.getScores(1, 2);
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('eventId=2&playerId=1'), expect.any(Object));
     });
+    
+    it('getScores should construct leagueId URL correctly', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+      await PB_API.getScores(null, null, 88);
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('leagueId=88'), expect.any(Object));
+    });
 
     it('createLeague should send a POST request with the league data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ success: true }) });
@@ -228,6 +252,24 @@ describe('API Client (api.js)', () => {
           body: JSON.stringify(eventData)
         })
       );
+    });
+
+    it('getTargetScores should use leagueId if provided', async () => {
+        fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+        await PB_API.getTargetScores(null, 5);
+        expect(fetch).toHaveBeenCalledWith(expect.stringContaining('leagueId=5'), expect.any(Object));
+    });
+
+    it('getTargetScores should prioritize eventId if both are missing', async () => {
+        fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+        await PB_API.getTargetScores(10);
+        expect(fetch).toHaveBeenCalledWith(expect.stringContaining('eventId=10'), expect.any(Object));
+    });
+
+    it('deleteTargetScore should include threshold task', async () => {
+        fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+        await PB_API.deleteTargetScore(123);
+        expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=threshold'), expect.any(Object));
     });
 
     it('location management methods should target the correct API and task', async () => {

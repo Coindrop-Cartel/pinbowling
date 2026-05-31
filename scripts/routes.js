@@ -12,8 +12,6 @@ export const ROUTES = [
   { path: 'config.php', label: 'Setup' }
 ];
 
-const BASE_PATH = window.APP_BASE || '';
-
 const buildUrl = (path, params = {}) => {
   if (typeof params !== 'object' || params === null) {
     params = { leagueId: params };
@@ -25,7 +23,8 @@ const buildUrl = (path, params = {}) => {
     }
   });
   const queryString = searchParams.toString();
-  const base = BASE_PATH.endsWith('/') ? BASE_PATH.slice(0, -1) : BASE_PATH;
+  const basePath = window.APP_BASE || '';
+  const base = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
   const p = path.startsWith('/') ? path : '/' + path;
   return `${base}${p}${queryString ? '?' + queryString : ''}`;
 };
@@ -38,4 +37,3 @@ ROUTES.STANDINGS = (params = {}) => buildUrl('/standings', params);
 ROUTES.PLAYERS = (params = {}) => buildUrl('/players', params);
 ROUTES.LOCATIONS = (params = {}) => buildUrl('/locations', params);
 ROUTES.MACHINES = (params = {}) => buildUrl('/machines', params);
-
