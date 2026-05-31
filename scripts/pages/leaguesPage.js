@@ -261,7 +261,7 @@ export async function initLeaguesPage() {
 
   async function renderPlayersForLeague(leagueId, leaguePlayers, allPlayers) {
     // Find the roster list specifically for this league card
-    const addBtn = document.querySelector(`.league-item .add-player-btn[data-league-id="${leagueId}"]`);
+    const addBtn = document.querySelector(`.league-registry-item .add-player-btn[data-league-id="${leagueId}"]`);
     if (!addBtn) return;
 
     const section = addBtn.closest('.league-players-section');
