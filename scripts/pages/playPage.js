@@ -73,7 +73,15 @@ export async function initPlayPage() {
 
       div.querySelector('.join-btn').onclick = async (e) => {
         e.stopPropagation();
-        const options = allPlayersCache.map(p => ({ value: p.id, label: p.playerName }));
+        const joinedIds = new Set((qpLeague?.players || []).map(p => p.id));
+        const available = allPlayersCache.filter(p => !joinedIds.has(p.id));
+
+        if (available.length === 0) {
+          alert('All registered players have already joined this session.');
+          return;
+        }
+
+        const options = available.map(p => ({ value: p.id, label: p.playerName }));
         const selectedId = await showPlayerSelectionDialog('Join Session', 'Select your name to add yourself to this session:', options);
         if (selectedId) {
           await PB_API.addLeaguePlayer(qpLeague.id, Number(selectedId));
