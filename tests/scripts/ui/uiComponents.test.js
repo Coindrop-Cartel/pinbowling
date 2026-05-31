@@ -110,6 +110,8 @@ describe('initReadOnlyTournamentDisplay', () => {
   let container;
 
   beforeEach(() => {
+    vi.stubGlobal('scrollTo', vi.fn());
+
     document.body.innerHTML = '<div id="display-container"></div>';
     container = document.getElementById('display-container');
 

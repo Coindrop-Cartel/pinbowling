@@ -46,6 +46,7 @@ describe('API Client (api.js)', () => {
     // expected error scenarios from polluting the test runner output.
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
   });
 
   afterEach(() => {

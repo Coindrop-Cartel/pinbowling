@@ -33,6 +33,8 @@ describe('Utility Functions (utils.js)', () => {
   let originalHistory;
 
   beforeEach(() => {
+    vi.stubGlobal('scrollTo', vi.fn());
+
     originalLocation = window.location;
     originalHistory = window.history;
 
