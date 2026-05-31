@@ -39,9 +39,6 @@ export async function initPlayPage() {
     const nameQuery = nameInput.value.toLowerCase().trim();
     const locQuery = Number(locSelect.value);
 
-    // Only show the results list if the user has started interacting
-    if (!nameQuery && !locQuery) return;
-    
     const filtered = todayEvents.filter(e => {
       const matchesName = !nameQuery || e.eventName.toLowerCase().includes(nameQuery);
       const matchesLoc = !locQuery || Number(e.locationId) === locQuery;
@@ -201,8 +198,8 @@ export async function initPlayPage() {
     }
 
     generatedFrames = selected.map((m, index) => ({
-      machine_id: Number(m.machineId),
-      machine_name: m.machineName,
+      machineId: Number(m.machineId),
+      machineName: m.machineName,
       targets: {
         easy: m.targetEasy,
         med: m.targetMed,
@@ -210,7 +207,7 @@ export async function initPlayPage() {
       },
       score10: m['target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1)] || 1000000,
       score1: Math.floor((m['target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1)] || 1000000) / 10),
-      order: index + 1,
+      orderNumber: index + 1,
       tempId: Math.random().toString(36).substr(2, 9)
     }));
 
@@ -233,8 +230,8 @@ export async function initPlayPage() {
       row.innerHTML = `
         <div class="frame-row-header" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #f9f9f9; cursor: pointer;">
           <div class="drag-handle" style="cursor: grab; color: #888; padding: 0 4px; font-size: 1.2rem;">☰</div>
-          <span style="font-weight: bold; min-width: 30px; text-align: center;">${frame.order}</span>
-          <span style="flex: 1; font-weight: bold;" class="machine-name-display">${frame.machine_name}</span>
+          <span style="font-weight: bold; min-width: 30px; text-align: center;">${frame.orderNumber}</span>
+          <span style="flex: 1; font-weight: bold;" class="machine-name-display">${frame.machineName}</span>
           <div style="display: flex; align-items: center; gap: 10px;" onclick="event.stopPropagation()">
             <div style="display: flex; align-items: center; gap: 4px;">
               <label style="font-size: 0.7rem; color: #666;">10:</label>
@@ -297,8 +294,8 @@ export async function initPlayPage() {
           onSelect: (val) => {
             const match = currentLocMachines.find(m => String(m.machineId) === String(val));
             if (match) {
-              frame.machine_name = match.machineName;
-              frame.machine_id = Number(match.machineId);
+              frame.machineName = match.machineName;
+              frame.machineId = Number(match.machineId);
               frame.targets = { easy: match.targetEasy, med: match.targetMed, hard: match.targetHard };
               renderPreview(); 
             }
@@ -394,7 +391,7 @@ export async function initPlayPage() {
       if (!qpLeague) {
         const newLeague = await PB_API.createLeague({ 
           name: 'Quick Play Sessions', 
-          start_date: new Date().toISOString().split('T')[0] 
+          startDate: new Date().toISOString().split('T')[0] 
         });
         if (!newLeague || !newLeague.id) {
           throw new Error('Failed to create "Quick Play" league. Backend did not return a league ID.');
@@ -403,10 +400,10 @@ export async function initPlayPage() {
       }
 
       const newEvent = await PB_API.createEvent({
-        league_id: qpLeague.id,
-        event_name: eventName,
-        event_date: now.toISOString().split('T')[0],
-        location_id: locId
+        leagueId: qpLeague.id,
+        eventName: eventName,
+        eventDate: now.toISOString().split('T')[0],
+        locationId: locId
       });
 
       if (!newEvent || !newEvent.id) {
@@ -418,13 +415,13 @@ export async function initPlayPage() {
       const engine = getScoringEngine('bowling');
 
       const targetPayloads = generatedFrames
-        .filter(f => f.machine_id)
+        .filter(f => f.machineId)
         .map(frame => {
           const values = engine.buildRoundValues(frame.score10, frame.score1);
           return {
-            event_id: Number(event.id),
-            machine_id: Number(frame.machine_id),
-            order_number: frame.order,
+            eventId: Number(event.id),
+            machineId: Number(frame.machineId),
+            orderNumber: frame.orderNumber,
             values: values
           };
         });

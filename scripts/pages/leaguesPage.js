@@ -104,11 +104,6 @@ export async function initLeaguesPage() {
               </ul>
               <div class="notice league-players-empty hidden">No players assigned to this league.</div>
             </div>
-
-            <div style="margin-top: 30px; border-top: 2px solid #000; padding-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
-              <button class="edit-league-btn secondary">Edit League</button>
-              <button class="delete-league-btn">Delete League</button>
-            </div>
           </div>
         `;
 
@@ -132,7 +127,6 @@ export async function initLeaguesPage() {
 
         // Action listeners
         card.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
-        card.querySelector('.edit-league-btn').onclick = () => editLeague(league.id, league.name);
         card.querySelector('.delete-league-btn').onclick = () => runAuthorizedLeagueAction(league.id, () => deleteLeague(league.id, league.name));
         card.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
 
@@ -252,21 +246,6 @@ export async function initLeaguesPage() {
     eventsListEl.querySelectorAll('.delete-event-btn').forEach(btn => {
       btn.onclick = (e) => runAuthorizedLeagueAction(leagueId, () => deleteEvent(Number(e.target.dataset.id), leagueId, leagueName));
     });
-  }
-
-  async function editLeague(leagueId, currentName) {
-    if (!await requireAdmin(`Reset password for "${currentName}"? Enter Global Admin Password:`)) {
-      return;
-    }
-    const newLeaguePass = await showPrompt(`Enter new League Password (or leave blank to clear):`, 'Reset League Password', false);
-    
-    try {
-      await PB_API.updateLeague(leagueId, { resetPassword: true, password: newLeaguePass });
-      alert('League password updated successfully.');
-      await refresh();
-    } catch (err) {
-      alert(`Update failed: ${err.message}`);
-    }
   }
 
   async function renderPlayersForLeague(leagueId, leaguePlayers, allPlayers) {
