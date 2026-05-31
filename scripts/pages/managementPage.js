@@ -1,6 +1,6 @@
 import { PB_API, ADMIN_PASSWORD } from '@services/api.js';
 import { requireAdmin } from '@services/auth.js';
-import { showPrompt, showConfirm } from '@ui/uiComponents.js';
+import { showPrompt, showConfirm, showAlert } from '@ui/uiComponents.js';
 
 /**
  * Logic for the System Management page.
@@ -65,7 +65,7 @@ export async function initManagementPage() {
    */
   resetPassBtn.onclick = async () => {
     const id = leagueSelect.value;
-    if (!id) return alert('Please select a league first.');
+    if (!id) return showAlert('Please select a league first.', 'Selection Required');
 
     const newPass = await showPrompt('Enter a new league password (leave blank to clear the password entirely):', 'Reset Password', false);
     if (newPass === null) return; // User cancelled the prompt
@@ -73,9 +73,9 @@ export async function initManagementPage() {
     try {
       // We call updateLeague with the resetPassword flag which is handled by leagueService.php
       await PB_API.updateLeague(id, { resetPassword: true, password: newPass });
-      alert('League password updated successfully.');
+      showAlert('League password updated successfully.', 'Success');
     } catch (err) {
-      alert('Failed to reset password: ' + err.message);
+      showAlert('Failed to reset password: ' + err.message, 'Error');
     }
   };
 
@@ -98,9 +98,9 @@ export async function initManagementPage() {
       cleanupBtn.textContent = 'Running Cleanup...';
       
       const result = await PB_API.runCleanup();
-      alert(`Cleanup successful! Removed ${result.leagues_cleaned || 0} expired session leagues.`);
+      showAlert(`Cleanup successful! Removed ${result.leagues_cleaned || 0} expired session leagues.`, 'Success');
     } catch (err) {
-      alert('Cleanup failed: ' + err.message);
+      showAlert('Cleanup failed: ' + err.message, 'Error');
     } finally {
       cleanupBtn.disabled = false;
       cleanupBtn.textContent = 'Run Cleanup Script';

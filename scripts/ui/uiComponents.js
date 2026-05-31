@@ -188,7 +188,7 @@ export function showDialog({ title, message, showInput = false, isPassword = tru
       ${inputHtml}
       <div class="form-actions" style="margin-top:30px; display:flex; gap:12px;">
         <button id="modal-confirm" style="flex:1;">${confirmText}</button>
-        <button id="modal-cancel" class="secondary" style="flex:1;">${cancelText}</button>
+        ${cancelText ? `<button id="modal-cancel" class="secondary" style="flex:1;">${cancelText}</button>` : ''}
       </div>
     `;
     
@@ -213,12 +213,15 @@ export function showDialog({ title, message, showInput = false, isPassword = tru
     }
 
     confirmBtn.onclick = () => finish(input ? input.value : true);
-    cancelBtn.onclick = () => finish(showInput ? null : false);
+    if (cancelBtn) {
+      cancelBtn.onclick = () => finish(showInput ? null : false);
+    }
   });
 }
 
 export const showConfirm = (message, title = 'Confirm Action') => showDialog({ title, message, confirmText: 'Yes, Proceed', cancelText: 'Cancel' });
 export const showPrompt = (message, title = 'Admin Password', isPassword = true) => showDialog({ title, message, showInput: true, isPassword, confirmText: 'Submit' });
+export const showAlert = (message, title = 'Notice') => showDialog({ title, message, confirmText: 'OK', cancelText: null });
 
 /**
  * Replaces native browser confirm() and prompt() with a custom UI modal
