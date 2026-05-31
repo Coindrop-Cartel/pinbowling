@@ -246,7 +246,7 @@ try {
 
             if ($task === 'fixture') {
                 // Verify the event exists and retrieve its league_id for security validation
-                $stmt = $pdo->prepare('SELECT league_id FROM Events WHERE id = ?');
+                $stmt = $pdo->prepare('SELECT league_id FROM events WHERE id = ?');
                 $stmt->execute([$id]);
                 $eventLeagueId = $stmt->fetchColumn();
                 if ($eventLeagueId === false) {
