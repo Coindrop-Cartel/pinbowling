@@ -49,6 +49,7 @@ function serializeLeague($row) {
     return [
         'id' => (int)$row['id'],
         'name' => $row['name'],
+        'type' => $row['type'] ?? 'standard',
         'startDate' => $row['start_date'],
         'events' => isset($row['events']) ? array_map('serializeEvent', $row['events']) : [],
         // Players are already standardized in playerService, keeping key consistent
@@ -102,7 +103,7 @@ try {
             // group them in memory before returning the final JSON structure.
             
             // Fetch all leagues (excluding password)
-            $leaguesStmt = $pdo->query('SELECT id, name, start_date FROM leagues ORDER BY start_date DESC');
+            $leaguesStmt = $pdo->query('SELECT id, name, start_date, type FROM leagues ORDER BY start_date DESC');
             $leagues = $leaguesStmt->fetchAll();
 
             // Fetch all events
@@ -176,12 +177,12 @@ try {
             if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
             
             $password = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
-            $sql = 'INSERT INTO leagues (name, start_date, password) VALUES (?, ?, ?)';
+            $sql = 'INSERT INTO leagues (name, start_date, password, type) VALUES (?, ?, ?, ?)';
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$input['name'], $input['startDate'] ?? null, $password]);
+            $stmt->execute([$input['name'], $input['startDate'] ?? null, $password, $input['type'] ?? 'standard']);
             $newId = $pdo->lastInsertId();
 
-            $stmt = $pdo->prepare('SELECT id, name, start_date FROM leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT id, name, start_date, type FROM leagues WHERE id = ?');
             $stmt->execute([$newId]);
             $row = $stmt->fetch();
             if (!$row) {

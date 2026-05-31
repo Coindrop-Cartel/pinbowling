@@ -227,9 +227,10 @@ export const showPrompt = (message, title = 'Admin Password', isPassword = true)
  * @param {string} title Dialog title.
  * @param {string} message Dialog message.
  * @param {Array<{value: string|number, label: string}>} options List of players to select from.
+ * @param {string} confirmText Text for the confirmation button.
  * @returns {Promise<string|null>} The selected player ID or null if cancelled.
  */
-export async function showPlayerSelectionDialog(title, message, options) {
+export async function showPlayerSelectionDialog(title, message, options, confirmText = 'Add Player') {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
     backdrop.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;box-sizing:border-box;backdrop-filter:blur(4px);";
@@ -246,7 +247,7 @@ export async function showPlayerSelectionDialog(title, message, options) {
         <select id="player-select-modal" style="width:100%;box-sizing:border-box;font-size:1.1rem;padding:12px;margin-top:10px;"></select>
       </div>
       <div class="form-actions" style="margin-top:30px; display:flex; gap:12px;">
-        <button id="modal-confirm" style="flex:1;">Add Player</button>
+        <button id="modal-confirm" style="flex:1;">${confirmText}</button>
         <button id="modal-cancel" class="secondary" style="flex:1;">Cancel</button>
       </div>
     `;

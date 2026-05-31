@@ -112,6 +112,7 @@ export const PB_API = {
   getTargetScores: (eventId, leagueId) => 
     fetchJSON(`service/machineService.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`),
   bulkUpdateTargetOrder: (updates) => fetchJSON('service/machineService.php?task=sort', { method: 'POST', body: JSON.stringify(updates) }),
+  runCleanup: () => fetchJSON('service/cleanupService.php'),
   saveTargetScore: (target) => {
     const url = `service/machineService.php?task=threshold`;
     return fetchJSON(url, { method: 'POST', body: JSON.stringify(target) });

@@ -141,6 +141,14 @@ function initializeDatabaseSchema($pdo) {
             $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `password` VARCHAR(255) DEFAULT NULL AFTER `start_date` ");
         }
     }
+
+    // Ensure 'leagues' table has the 'type' column for standard vs session distinction
+    if ($checkLeagues) {
+        $checkType = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'type'")->fetch();
+        if (!$checkType) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `type` ENUM('standard', 'session') DEFAULT 'standard' AFTER `name` ");
+        }
+    }
 }
 
 // Handle HTTP Method Tunneling for environments that block DELETE/PUT.
