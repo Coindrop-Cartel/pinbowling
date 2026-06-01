@@ -30,6 +30,19 @@ export async function initManagementPage() {
     authNotice.classList.add('hidden');
     toolsSection.classList.remove('hidden');
     loadLeagues();
+    renderVersionInfo();
+  };
+
+  /**
+   * Adds a subtle version indicator to the bottom of the management tools.
+   */
+  const renderVersionInfo = () => {
+    if (document.getElementById('mgmt-ui-version')) return;
+    const versionInfo = document.createElement('div');
+    versionInfo.id = 'mgmt-ui-version';
+    versionInfo.style = "margin-top: 3rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); text-align: right; font-size: 0.8rem; opacity: 0.5;";
+    versionInfo.textContent = `System UI Version: ${window.UI_VERSION || '1.0.0'}`;
+    toolsSection.appendChild(versionInfo);
   };
 
   if (loginBtn) {

@@ -80,8 +80,9 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
 
   if (activeEventId) {
     try {
-      // Fetch all leagues to find the specific one and its events
-      const leagues = await PB_API.getLeagues();
+      // Fetch leagues and filter out one-off "session" leagues for tournament displays
+      const allLeagues = await PB_API.getLeagues();
+      const leagues = allLeagues.filter(l => l.type !== 'session');
       let activeLeague = null;
       let activeEvent = null;
 

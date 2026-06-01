@@ -78,17 +78,14 @@ $dbUser = envValue($loadedEnv, ['DB_USER', 'MYSQL_USER'], 'username');
 $dbPass = envValue($loadedEnv, ['DB_PASS', 'MYSQL_PASSWORD'], 'password');
 $dbCharset = 'utf8mb4';
 $apiSecret = envValue($loadedEnv, ['API_SECRET'], 'bowl-2024-secret');
-
 // UI_VERSION is used for asset cache-busting. 
-// It prioritizes .env, but falls back to the modification time of index.php.
-// Deployment Tip: 'touch index.php' on the server to force-clear client caches.
+// It prioritizes .env, but falls back to the contents of version.txt.
 $uiVersion = envValue($loadedEnv, ['UI_VERSION']);
 
 if (!$uiVersion) {
-    // Fallback to file timestamps only if no version is explicitly set.
-    $rawVersion = @max(@filemtime(__DIR__ . '/../index.php'), @filemtime(__FILE__)) ?: '1.0.0';
-    // Hash the timestamp to avoid exposing deployment metadata.
-    $uiVersion = ($rawVersion !== '1.0.0') ? substr(md5($rawVersion), 0, 8) : '1.0.0';
+    $versionFile = __DIR__ . '/../version.txt';
+    // Read the version from version.txt, falling back to a hardcoded default if missing.
+    $uiVersion = is_readable($versionFile) ? trim(file_get_contents($versionFile)) : '1.0.0';
 }
 
 $adminPassword = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');

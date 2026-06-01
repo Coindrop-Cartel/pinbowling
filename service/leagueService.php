@@ -102,8 +102,14 @@ try {
             // fetch all leagues, events, and rosters in broad queries and 
             // group them in memory before returning the final JSON structure.
             
-            // Fetch all leagues (excluding password)
-            $leaguesStmt = $pdo->query('SELECT id, name, start_date, type FROM leagues ORDER BY start_date DESC');
+            // Fetch leagues (optionally filtered by type)
+            $typeFilter = $_GET['type'] ?? null;
+            $sql = 'SELECT id, name, start_date, type FROM leagues';
+            if ($typeFilter) $sql .= ' WHERE type = ?';
+            $sql .= ' ORDER BY start_date DESC';
+            
+            $leaguesStmt = $pdo->prepare($sql);
+            $leaguesStmt->execute($typeFilter ? [$typeFilter] : []);
             $leagues = $leaguesStmt->fetchAll();
 
             // Fetch all events
