@@ -72,22 +72,36 @@ try {
 
     // PUT: Update an existing player (Protected by API Secret)
     if ($method === 'PUT') {
-        validateAdminAccess();
-        
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id) {
             sendJson(['error' => 'id query parameter is required'], 400);
         }
-        if (empty($input['playerName'])) {
-            sendJson(['error' => 'playerName is required'], 400);
+
+        // Fetch existing record to check if name is changing
+        $stmt = $pdo->prepare('SELECT player_name FROM players WHERE id = ?');
+        $stmt->execute([$id]);
+        $existing = $stmt->fetch();
+        if (!$existing) {
+            sendJson(['error' => 'Player not found'], 404);
         }
 
+        $newName = $input['playerName'] ?? $existing['player_name'];
         $ifpa_id = $input['ifpaId'] ?? null;
         $matchplay_id = $input['matchplayId'] ?? null;
 
+        // Rule: Changing the name requires Admin Access. 
+        // Updating IFPA/Matchplay IDs does not.
+        if ($newName !== $existing['player_name']) {
+            validateAdminAccess();
+        }
+
+        if (empty($newName)) {
+            sendJson(['error' => 'playerName is required'], 400);
+        }
+
         try {
             $stmt = $pdo->prepare('UPDATE players SET player_name = ?, ifpa_id = ?, matchplay_id = ? WHERE id = ?');
-            $stmt->execute([$input['playerName'], $ifpa_id, $matchplay_id, $id]);
+            $stmt->execute([$newName, $ifpa_id, $matchplay_id, $id]);
         } catch (PDOException $error) {
             if ($error->errorInfo[1] === 1062) { // Duplicate entry
                 sendJson(['error' => 'Player name already exists'], 409);

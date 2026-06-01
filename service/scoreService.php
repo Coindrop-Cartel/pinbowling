@@ -112,6 +112,27 @@ try {
             sendJson(['error' => 'Invalid score values'], 400);
         }
 
+        // Security Rule: If updating an existing score in a protected 'standard' league,
+        // verify League or Admin credentials.
+        $stmtL = $pdo->prepare('SELECT l.id, l.password, l.type FROM events e JOIN leagues l ON e.league_id = l.id WHERE e.id = ?');
+        $stmtL->execute([$event_id]);
+        $leagueInfo = $stmtL->fetch();
+
+        if ($leagueInfo) {
+            $league_id = (int)$leagueInfo['id'];
+            $hasPassword = !empty($leagueInfo['password']);
+            $isStandard = ($leagueInfo['type'] === 'standard');
+
+            // Check if a score record already exists for this slot
+            $stmtCheck = $pdo->prepare('SELECT id FROM scores WHERE event_id = ? AND player_id = ? AND order_number = ?');
+            $stmtCheck->execute([$event_id, $player_id, $order_number]);
+            $existingScoreId = $stmtCheck->fetchColumn();
+
+            if ($existingScoreId && $hasPassword && $isStandard) {
+                validateLeagueAccess($pdo, $league_id);
+            }
+        }
+
         $sql = 'INSERT INTO scores (event_id, player_id, `order_number`, machine_id, ball1, ball2, ball3)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), ball1 = VALUES(ball1), ball2 = VALUES(ball2), ball3 = VALUES(ball3)';
