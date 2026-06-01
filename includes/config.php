@@ -171,6 +171,21 @@ function initializeDatabaseSchema($pdo) {
         CONSTRAINT `fk_scores_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `score_history` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `score_id` INT DEFAULT NULL,
+        `event_id` INT NOT NULL,
+        `player_id` INT NOT NULL,
+        `order_number` INT NOT NULL,
+        `machine_id` INT NOT NULL,
+        `ball1` BIGINT DEFAULT 0,
+        `ball2` BIGINT DEFAULT 0,
+        `ball3` BIGINT DEFAULT 0,
+        `status` ENUM('pending', 'approved') DEFAULT 'approved',
+        `change_type` ENUM('INSERT', 'UPDATE', 'DELETE') NOT NULL,
+        `changed_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS `league_players` (
         `league_id` INT NOT NULL,
         `player_id` INT NOT NULL,
@@ -291,6 +306,13 @@ function initializeDatabaseSchema($pdo) {
     $checkScores = $pdo->query("SHOW TABLES LIKE 'scores'")->fetch();
     if ($checkScores) {
         // Fix: Remove the overly restrictive index that ignores event_id
+
+        // Add status column for approval workflow
+        $checkStatus = $pdo->query("SHOW COLUMNS FROM `scores` LIKE 'status'")->fetch();
+        if (!$checkStatus) {
+            $pdo->exec("ALTER TABLE `scores` ADD COLUMN `status` ENUM('pending', 'approved') DEFAULT 'approved' AFTER `ball3` ");
+        }
+
         $checkOldIndex = $pdo->query("SHOW INDEX FROM `scores` WHERE Key_name = 'player_id_2' OR (Column_name = 'order_number' AND Seq_in_index = 2 AND Key_name != 'unique_player_round')")->fetch();
         if ($checkOldIndex) {
             // We need to be careful to only drop the index that lacks event_id. 
