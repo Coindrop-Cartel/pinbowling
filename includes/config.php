@@ -82,7 +82,14 @@ $apiSecret = envValue($loadedEnv, ['API_SECRET'], 'bowl-2024-secret');
 // UI_VERSION is used for asset cache-busting. 
 // It prioritizes .env, but falls back to the modification time of index.php.
 // Deployment Tip: 'touch index.php' on the server to force-clear client caches.
-$uiVersion = envValue($loadedEnv, ['UI_VERSION'], @max(@filemtime(__DIR__ . '/../index.php'), @filemtime(__FILE__)) ?: '1.0.0');
+$uiVersion = envValue($loadedEnv, ['UI_VERSION']);
+
+if (!$uiVersion) {
+    // Fallback to file timestamps only if no version is explicitly set.
+    $rawVersion = @max(@filemtime(__DIR__ . '/../index.php'), @filemtime(__FILE__)) ?: '1.0.0';
+    // Hash the timestamp to avoid exposing deployment metadata.
+    $uiVersion = ($rawVersion !== '1.0.0') ? substr(md5($rawVersion), 0, 8) : '1.0.0';
+}
 
 $adminPassword = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');
 
@@ -242,4 +249,15 @@ function sendJson($data, $status = 200) {
 function getJsonInput() {
     $body = file_get_contents('php://input');
     return json_decode($body, true) ?: [];
+}
+
+/**
+ * Appends the current UI_VERSION to an asset path for cache-busting.
+ * @param string $path Path to the asset (js/css).
+ * @return string
+ */
+function versionedAsset($path) {
+    global $uiVersion;
+    $separator = strpos($path, '?') !== false ? '&' : '?';
+    return $path . $separator . 'v=' . $uiVersion;
 }
