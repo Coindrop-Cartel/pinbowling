@@ -1,6 +1,6 @@
 <?php $pageTitle = 'Manage Players'; ?>
   <main class="page-container">
-    <header>
+    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h1>Manage Players</h1>
     </header>
 

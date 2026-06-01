@@ -1,8 +1,11 @@
-<?php $pageTitle = 'System Management'; ?>
+<?php $pageTitle = 'System Maintenance'; ?>
 <main class="page-container">
-  <header>
-    <h1>System Management</h1>
-    <p>Admin tools for database maintenance and security.</p>
+  <div id="auth-header-container" style="display: flex; justify-content: flex-end; padding: 10px 0; margin-bottom: 10px;"></div>
+  <header style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+    <div>
+      <h1>System Maintenance</h1>
+      <p>Admin-only tools for data cleanup and system security.</p>
+    </div>
   </header>
 
   <section id="management-auth-notice" class="card">

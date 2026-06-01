@@ -18,9 +18,12 @@ export async function initManagementPage() {
    * Verifies admin credentials before displaying management tools.
    */
   const checkAuth = async () => {
-    const verified = await requireAdmin('Enter Admin Password to access management tools:');
-    if (verified) {
+    const user = await PB_API.getCurrentUser();
+    
+    if (user && user.role === 'admin') {
       revealTools();
+    } else {
+      authNotice.innerHTML = `<h2>Access Denied</h2><p>You must be logged in as an administrator to access this page.</p>`;
     }
   };
 

@@ -118,6 +118,24 @@ function initializeDatabaseSchema($pdo) {
     // We use CREATE TABLE IF NOT EXISTS to ensure the database can be rebuilt 
     // automatically if tables are dropped or if starting a fresh installation.
     
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `users` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `player_id` INT UNIQUE,
+        `email` VARCHAR(255) UNIQUE NOT NULL,
+        `password_hash` VARCHAR(255) NOT NULL,
+        `role` ENUM('player', 'td', 'admin') DEFAULT 'player',
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT `fk_user_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `league_staff` (
+        `league_id` INT NOT NULL,
+        `user_id` INT NOT NULL,
+        PRIMARY KEY (`league_id`, `user_id`),
+        CONSTRAINT `fk_staff_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_staff_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS `leagues` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(255) NOT NULL,
@@ -348,6 +366,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 /**
+ * Helper to get the currently authenticated user from the session.
+ */
+function getCurrentUser() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    return $_SESSION['user'] ?? null;
+}
+
+/**
+ * Checks if the current user has permission to manage a specific league.
+ */
+function canManageLeague($pdo, $leagueId) {
+    $user = getCurrentUser();
+    if (!$user) return false;
+    if ($user['role'] === 'admin') return true;
+    
+    if ($user['role'] === 'td') {
+        $stmt = $pdo->prepare("SELECT 1 FROM league_staff WHERE league_id = ? AND user_id = ?");
+        $stmt->execute([$leagueId, $user['id']]);
+        return (bool)$stmt->fetch();
+    }
+    return false;
+}
+
+/**
  * Helper to retrieve custom headers from various server environments.
  * Handles standard, lowercase, and REDIRECT_ prefixed variants (common in CGI/FastCGI).
  */
@@ -406,6 +450,11 @@ function validateAdminAccess() {
     $providedSecret = getHeader('X-PB-Secret');
 
     if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+        return;
+    }
+    
+    $user = getCurrentUser();
+    if ($user && $user['role'] === 'admin') {
         return;
     }
 

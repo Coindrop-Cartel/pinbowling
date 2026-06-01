@@ -22,17 +22,25 @@ function serializePlayer($row) {
         'id' => (int)$row['id'],
         'playerName' => $row['player_name'],
         'ifpaId' => $row['ifpa_id'],
-        'matchplayId' => $row['matchplay_id']
+        'matchplayId' => $row['matchplay_id'],
+        'userRole' => $row['user_role'] ?? null,
+        'userId' => isset($row['user_id']) ? (int)$row['user_id'] : null
     ];
 }
 
 try {
     $pdo = getDbConnection();
     $method = $_SERVER['REQUEST_METHOD'];
+    $task = $_GET['task'] ?? null;
 
     // GET: Retrieve all registered players alphabetically
     if ($method === 'GET') {
-        $stmt = $pdo->query('SELECT * FROM players ORDER BY player_name ASC');
+        $stmt = $pdo->query('
+            SELECT p.*, u.role as user_role, u.id as user_id 
+            FROM players p 
+            LEFT JOIN users u ON p.id = u.player_id 
+            ORDER BY p.player_name ASC
+        ');
         sendJson(array_map('serializePlayer', $stmt->fetchAll()));
     }
 
@@ -75,6 +83,18 @@ try {
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id) {
             sendJson(['error' => 'id query parameter is required'], 400);
+        }
+
+        if ($task === 'role') {
+            validateAdminAccess();
+            $newRole = $input['role'] ?? 'player';
+            if (!in_array($newRole, ['player', 'td', 'admin'])) {
+                sendJson(['error' => 'Invalid role'], 400);
+            }
+            // $id here is the user_id passed in the URL
+            $stmt = $pdo->prepare('UPDATE users SET role = ? WHERE id = ?');
+            $stmt->execute([$newRole, $id]);
+            sendJson(['success' => true]);
         }
 
         // Fetch existing record to check if name is changing

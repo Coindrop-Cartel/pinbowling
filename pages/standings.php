@@ -2,10 +2,12 @@
   <main class="page-container standings-page">
     <div class="tournament-selector-container no-print"></div>
 
-    <header>
+    <header style="margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <h1>Standings</h1>
-        <button id="tv-mode-btn" class="btn-standard secondary no-print">TV Mode</button>
+        <div style="display: flex; align-items: center; gap: 15px;">
+          <button id="tv-mode-btn" class="btn-standard secondary no-print">TV Mode</button>
+        </div>
       </div>
       <p class="no-print">See the current player rankings and frame-by-frame scores.</p>
     </header>

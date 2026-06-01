@@ -1,11 +1,14 @@
 import { PB_API } from '@services/api.js';
-import { setupLiveFilter, showConfirm, showPrompt } from '@ui/uiComponents.js';
+import { setupLiveFilter, showConfirm, showPrompt, showChoiceDialog, showAlert } from '@ui/uiComponents.js';
 import { requireAdmin } from '@services/auth.js';
 
 /**
  * Initializes the Player Management page.
  */
 export async function initPlayersPage() {
+  const currentUser = await PB_API.getCurrentUser();
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
   const playerFormTitle = document.getElementById('player-form-title');
   const playerForm = document.getElementById('player-form');
   const editingPlayerIdInput = document.getElementById('editing-player-id');
@@ -63,12 +66,16 @@ export async function initPlayersPage() {
         li.style.justifyContent = 'space-between';
         li.style.alignItems = 'center';
         li.innerHTML = `
-          <span>
-            ${p.playerName} 
-            ${p.ifpaId ? `<small>(IFPA: ${p.ifpaId})</small>` : ''}
-            ${p.matchplayId ? `<small>(Matchplay: ${p.matchplayId})</small>` : ''}
-          </span>
+          <div style="flex: 1;">
+            <strong>${p.playerName}</strong> 
+            ${p.userRole ? `<span class="badge" style="background:#000; color:#fff; font-size:0.7rem; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle; font-weight: bold;">${p.userRole.toUpperCase()}</span>` : ''}
+            <br>
+            ${p.ifpaId ? `<small style="margin-right:10px;">IFPA: ${p.ifpaId}</small>` : ''}
+            ${p.matchplayId ? `<small>Matchplay: ${p.matchplayId}</small>` : ''}
+          </div>
           <div style="display: flex; gap: 8px;">
+            ${isAdmin && p.userId ? `<button type="button" class="pass-reset-btn secondary" data-user-id="${p.userId}" style="padding: 4px 10px; font-size: 0.85rem;">Reset Pass</button>` : ''}
+            ${isAdmin && p.userId ? `<button type="button" class="role-btn secondary" data-user-id="${p.userId}" data-role="${p.userRole}" style="padding: 4px 10px; font-size: 0.85rem;">Role</button>` : ''}
             <button type="button" class="edit-player-btn secondary" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.85rem;">Edit</button>
             <button type="button" class="delete-player-btn-inline" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
           </div>
@@ -76,6 +83,48 @@ export async function initPlayersPage() {
         playerList.appendChild(li);
       });
       // Attach row action listeners
+      playerList.querySelectorAll('.pass-reset-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const userId = Number(e.target.dataset.userId);
+          const playerName = e.target.closest('li').querySelector('strong').textContent;
+          const newPass = await showPrompt(`Enter a new temporary password for ${playerName}:`, 'Reset User Password', false);
+          
+          if (newPass) {
+             try {
+               // Reusing updateLeague logic style: pass password update to auth service
+               await PB_API.updateUserPassword(userId, newPass);
+               showAlert(`Password updated successfully for ${playerName}.`, 'Success');
+             } catch (err) {
+               showAlert(err.message, 'Update Failed');
+             }
+          }
+        });
+      });
+
+      playerList.querySelectorAll('.role-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const userId = Number(e.target.dataset.userId);
+          const currentRole = e.target.dataset.role;
+          const playerName = e.target.closest('li').querySelector('strong').textContent;
+          
+          const choices = [
+            { value: 'player', label: 'Player' },
+            { value: 'td', label: 'TD' },
+            { value: 'admin', label: 'Admin' }
+          ];
+
+          const newRole = await showChoiceDialog('Change User Role', `Assign a new role for ${playerName}:`, choices);
+          
+          if (newRole) {
+            try {
+              await PB_API.updateUserRole(userId, newRole);
+              await refresh();
+            } catch (err) {
+              showAlert(err.message, 'Update Failed');
+            }
+          }
+        });
+      });
       playerList.querySelectorAll('.edit-player-btn').forEach(btn => {
         btn.addEventListener('click', (e) => editPlayer(Number(e.target.dataset.playerId)));
       });

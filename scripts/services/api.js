@@ -90,6 +90,12 @@ export async function fetchJSON(url, options = {}) {
 }
 
 export const PB_API = {
+  // Auth
+  login: (email, password) => fetchJSON('service/authService.php?task=login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  logout: () => fetchJSON('service/authService.php?task=logout', { method: 'POST' }),
+  register: (data) => fetchJSON('service/authService.php?task=register', { method: 'POST', body: JSON.stringify(data) }),
+  getCurrentUser: () => fetchJSON('service/authService.php?task=me'),
+
   getMachines: (params) => fetchJSON('service/machineService.php', { params }),
   getPlayers: (params) => fetchJSON('service/playerService.php', { params }),
   getScores: (playerId, eventId, leagueId) => {
@@ -103,6 +109,8 @@ export const PB_API = {
   deletePlayer: (id) => fetchJSON(`service/playerService.php?id=${id}`, { method: 'DELETE' }),
   createMachine: (machineName) => fetchJSON('service/machineService.php', { method: 'POST', body: JSON.stringify({ machineName }) }), // Create master machine
   updatePlayer: (id, player) => fetchJSON(`service/playerService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(player) }),
+  updateUserPassword: (userId, password) => fetchJSON(`service/authService.php?task=reset&id=${userId}`, { method: 'POST', body: JSON.stringify({ password }) }),
+  updateUserRole: (userId, role) => fetchJSON(`service/playerService.php?task=role&id=${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
   updateMachine: (id, machineName) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'PUT', body: JSON.stringify({ machineName }) }), // Update master machine
   deleteMachine: (id) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'DELETE' }),
   createPlayer: (player) => fetchJSON('service/playerService.php', { method: 'POST', body: JSON.stringify(player) }),

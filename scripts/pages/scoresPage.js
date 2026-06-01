@@ -215,6 +215,12 @@ export async function initScoresPage() {
       const leagueId = getActiveLeagueId();
       let players = [];
 
+      // If user is logged in, prioritize their player ID
+      const currentUser = await PB_API.getCurrentUser();
+      if (currentUser && currentUser.player_id && !getCurrentPlayerId()) {
+        setCurrentPlayerId(currentUser.player_id);
+      }
+
       if (leagueId) {
         // Fetch the specific league to get the assigned roster
         const league = await PB_API.getLeague(leagueId);

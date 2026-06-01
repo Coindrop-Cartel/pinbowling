@@ -1,8 +1,10 @@
 <?php $pageTitle = 'Quick Play'; ?>
 <main class="page-container">
-  <header>
-    <h1>Quick Play</h1>
-    <p>Find an existing session for today or create a new custom lineup.</p>
+  <header style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+    <div>
+      <h1>Quick Play</h1>
+      <p>Find an existing session for today or create a new custom lineup.</p>
+    </div>
   </header>
 
   <!-- Session Creation and Search -->
