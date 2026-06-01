@@ -34,6 +34,7 @@ vi.mock('@ui/uiComponents.js', () => ({
   createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() })),
   showPrompt: vi.fn(),
   initReadOnlyTournamentDisplay: vi.fn((container, refresh) => refresh()),
+  initTournamentSelector: vi.fn(),
 }));
 
 describe('Event Config Page (configPage.js)', () => {

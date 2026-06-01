@@ -34,11 +34,12 @@ vi.mock('@core/engine.js', () => ({
 }));
 
 vi.mock('@ui/tournamentSelector.js', () => ({
-  initTournamentSelector: vi.fn((cb) => cb()),
+  initTournamentSelector: vi.fn((container, options) => options?.onRefresh?.()),
 }));
 
 vi.mock('@ui/uiComponents.js', () => ({
   createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() })),
+  initTournamentSelector: vi.fn((container, options) => options?.onRefresh?.()),
 }));
 
 describe('Scoring Entry Page (scoresPage.js)', () => {

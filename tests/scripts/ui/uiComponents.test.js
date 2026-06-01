@@ -32,7 +32,7 @@ vi.mock('@scripts/utils.js', () => ({
   setActiveEventId: vi.fn(),
 }));
 
-import { createSearchableSelect, initReadOnlyTournamentDisplay, showDialog, showConfirm, showPrompt, showPlayerSelectionDialog } from '@ui/uiComponents.js';
+import { createSearchableSelect, initReadOnlyTournamentDisplay, showDialog, showConfirm, showPrompt, showPlayerSelectionDialog, initTournamentSelector } from '@ui/uiComponents.js';
 import { PB_API } from '@services/api.js';
 import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId } from '@scripts/utils.js';
 
@@ -280,5 +280,51 @@ describe('showPlayerSelectionDialog', () => {
 
     document.getElementById('modal-cancel').click();
     await promise;
+  });
+});
+
+describe('initTournamentSelector', () => {
+  const mockLeagues = [
+    { id: 1, name: 'Standard League', type: 'standard', events: [] },
+    { id: 2, name: 'Session League', type: 'session', events: [] }
+  ];
+
+  beforeEach(() => {
+    document.body.innerHTML = '<div class="tournament-selector-container"></div>';
+    vi.clearAllMocks();
+    PB_API.getLeagues.mockResolvedValue(mockLeagues);
+    getActiveLeagueId.mockReturnValue('');
+    getActiveEventId.mockReturnValue('');
+  });
+
+  it('should filter for standard leagues by default', async () => {
+    await initTournamentSelector('.tournament-selector-container');
+    
+    const select = document.querySelector('.league-select-shared');
+    // 1 Placeholder + 1 Standard League (Session League should be filtered out)
+    expect(select.options.length).toBe(2);
+    expect(select.innerHTML).toContain('Standard League');
+    expect(select.innerHTML).not.toContain('Session League');
+  });
+
+  it('should include the active league even if it does not match the type filter', async () => {
+    vi.mocked(getActiveLeagueId).mockReturnValue('2'); 
+    
+    await initTournamentSelector('.tournament-selector-container', { typeFilter: 'standard' });
+    
+    const select = document.querySelector('.league-select-shared');
+    const search = document.querySelector('.league-search-shared');
+
+    // Since league ID 2 is active, the component automatically filters for its name.
+    // Initially: 1 Placeholder + 1 Match ("Session League") = 2
+    expect(select.options.length).toBe(2);
+    expect(select.value).toBe('2');
+
+    // Clear the search to reveal the full allowed list (Standard + Active Session)
+    search.value = '';
+    search.dispatchEvent(new Event('input'));
+
+    // 1 Placeholder + 1 Standard League + 1 Session League (active override) = 3
+    expect(select.options.length).toBe(3);
   });
 });

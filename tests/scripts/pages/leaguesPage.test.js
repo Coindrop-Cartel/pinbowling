@@ -35,6 +35,7 @@ vi.mock('@ui/uiComponents.js', () => ({
   showPrompt: vi.fn(),
   showPlayerSelectionDialog: vi.fn(),
   showDialog: vi.fn(),
+  initTournamentSelector: vi.fn(),
 }));
 
 describe('Leagues Management Page (leaguesPage.js)', () => {
