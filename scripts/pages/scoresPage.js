@@ -170,10 +170,10 @@ export async function initScoresPage() {
 
       await PB_API.saveScore({
         playerId: Number(currentPlayerId),
-        orderNumber: round.orderNumber,
+        orderNumber: Number(round.orderNumber),
         eventId: Number(getActiveEventId()),
         leagueId: Number(getActiveLeagueId()),
-        machineId: round.machineId,
+        machineId: Number(round.machineId),
         ball1,
         ball2,
         ball3,

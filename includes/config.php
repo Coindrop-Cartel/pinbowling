@@ -114,6 +114,97 @@ function getDbConnection() {
  * @param PDO $pdo
  */
 function initializeDatabaseSchema($pdo) {
+    // --- Base Table Creation ---
+    // We use CREATE TABLE IF NOT EXISTS to ensure the database can be rebuilt 
+    // automatically if tables are dropped or if starting a fresh installation.
+    
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `leagues` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `name` VARCHAR(255) NOT NULL,
+        `type` ENUM('standard', 'session') DEFAULT 'standard',
+        `start_date` DATE DEFAULT NULL,
+        `password` VARCHAR(255) DEFAULT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `locations` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `name` VARCHAR(255) NOT NULL,
+        `city` VARCHAR(255) DEFAULT NULL,
+        `state` VARCHAR(255) DEFAULT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `machines` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `machine_name` VARCHAR(255) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `players` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `player_name` VARCHAR(255) NOT NULL UNIQUE,
+        `ifpa_id` VARCHAR(50) DEFAULT NULL,
+        `matchplay_id` VARCHAR(50) DEFAULT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `events` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `league_id` INT NOT NULL,
+        `location_id` INT DEFAULT NULL,
+        `event_name` VARCHAR(255) NOT NULL,
+        `event_date` DATE DEFAULT NULL,
+        CONSTRAINT `fk_events_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_events_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `scores` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `player_id` INT NOT NULL,
+        `event_id` INT NOT NULL,
+        `order_number` INT NOT NULL,
+        `machine_id` INT NOT NULL,
+        `ball1` BIGINT DEFAULT 0,
+        `ball2` BIGINT DEFAULT 0,
+        `ball3` BIGINT DEFAULT 0,
+        UNIQUE KEY `unique_player_round` (`event_id`, `player_id`, `order_number`),
+        CONSTRAINT `fk_scores_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_scores_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_scores_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `league_players` (
+        `league_id` INT NOT NULL,
+        `player_id` INT NOT NULL,
+        PRIMARY KEY (`league_id`, `player_id`),
+        CONSTRAINT `fk_lp_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_lp_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `target_scores` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `event_id` INT NOT NULL,
+        `machine_id` INT NOT NULL,
+        `order_number` INT NOT NULL,
+        `score1` BIGINT DEFAULT 0, `score2` BIGINT DEFAULT 0, `score3` BIGINT DEFAULT 0, `score4` BIGINT DEFAULT 0, `score5` BIGINT DEFAULT 0,
+        `score6` BIGINT DEFAULT 0, `score7` BIGINT DEFAULT 0, `score8` BIGINT DEFAULT 0, `score9` BIGINT DEFAULT 0, `score10` BIGINT DEFAULT 0,
+        UNIQUE KEY `unique_event_round` (`event_id`, `order_number`),
+        CONSTRAINT `fk_ts_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_ts_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `location_machines` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `location_id` INT NOT NULL,
+        `machine_id` INT NOT NULL,
+        `note` TEXT DEFAULT NULL,
+        `score1` BIGINT DEFAULT 0, `score2` BIGINT DEFAULT 0, `score3` BIGINT DEFAULT 0, `score4` BIGINT DEFAULT 0, `score5` BIGINT DEFAULT 0,
+        `score6` BIGINT DEFAULT 0, `score7` BIGINT DEFAULT 0, `score8` BIGINT DEFAULT 0, `score9` BIGINT DEFAULT 0, `score10` BIGINT DEFAULT 0,
+        `target_easy` BIGINT DEFAULT 0,
+        `target_med` BIGINT DEFAULT 0,
+        `target_hard` BIGINT DEFAULT 0,
+        UNIQUE KEY `unique_location_machine` (`location_id`, `machine_id`),
+        CONSTRAINT `fk_lm_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_lm_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
     $migrations = [
         'Leagues' => 'leagues',
         'Events' => 'events',
@@ -151,6 +242,55 @@ function initializeDatabaseSchema($pdo) {
         $checkType = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'type'")->fetch();
         if (!$checkType) {
             $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `type` ENUM('standard', 'session') DEFAULT 'standard' AFTER `name` ");
+        }
+    }
+
+    // Ensure 'location_machines' table has all required scoring and target columns
+    $checkLM = $pdo->query("SHOW TABLES LIKE 'location_machines'")->fetch();
+    if ($checkLM) {
+        $checkScoreCol = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'score1'")->fetch();
+        if (!$checkScoreCol) {
+            $pdo->exec("ALTER TABLE `location_machines` 
+                ADD COLUMN `score1` BIGINT DEFAULT 0, ADD COLUMN `score2` BIGINT DEFAULT 0, ADD COLUMN `score3` BIGINT DEFAULT 0, ADD COLUMN `score4` BIGINT DEFAULT 0, ADD COLUMN `score5` BIGINT DEFAULT 0,
+                ADD COLUMN `score6` BIGINT DEFAULT 0, ADD COLUMN `score7` BIGINT DEFAULT 0, ADD COLUMN `score8` BIGINT DEFAULT 0, ADD COLUMN `score9` BIGINT DEFAULT 0, ADD COLUMN `score10` BIGINT DEFAULT 0,
+                ADD COLUMN `target_easy` BIGINT DEFAULT 0, ADD COLUMN `target_med` BIGINT DEFAULT 0, ADD COLUMN `target_hard` BIGINT DEFAULT 0,
+                ADD UNIQUE KEY `unique_location_machine` (`location_id`, `machine_id`) ");
+        }
+    }
+
+    // Ensure 'locations' table has city and state columns
+    $checkLocations = $pdo->query("SHOW TABLES LIKE 'locations'")->fetch();
+    if ($checkLocations) {
+        $checkCity = $pdo->query("SHOW COLUMNS FROM `locations` LIKE 'city'")->fetch();
+        if (!$checkCity) {
+            $pdo->exec("ALTER TABLE `locations` ADD COLUMN `city` VARCHAR(255) DEFAULT NULL AFTER `name`, ADD COLUMN `state` VARCHAR(255) DEFAULT NULL AFTER `city` ");
+        }
+    }
+
+    // Ensure 'target_scores' table has the unique constraint for round configuration
+    $checkTargets = $pdo->query("SHOW TABLES LIKE 'target_scores'")->fetch();
+    if ($checkTargets) {
+        $checkIndex = $pdo->query("SHOW INDEX FROM `target_scores` WHERE Key_name = 'unique_event_round'")->fetch();
+        if (!$checkIndex) {
+            $pdo->exec("ALTER TABLE `target_scores` ADD UNIQUE KEY `unique_event_round` (event_id, order_number)");
+        }
+    }
+
+    // Ensure 'scores' table has the unique constraint for upsert logic
+    $checkScores = $pdo->query("SHOW TABLES LIKE 'scores'")->fetch();
+    if ($checkScores) {
+        // Fix: Remove the overly restrictive index that ignores event_id
+        $checkOldIndex = $pdo->query("SHOW INDEX FROM `scores` WHERE Key_name = 'player_id_2' OR (Column_name = 'order_number' AND Seq_in_index = 2 AND Key_name != 'unique_player_round')")->fetch();
+        if ($checkOldIndex) {
+            // We need to be careful to only drop the index that lacks event_id. 
+            // Based on your DB output, it's likely named 'player_id' or 'player_id_2'
+            $indexName = $checkOldIndex['Key_name'];
+            $pdo->exec("ALTER TABLE `scores` DROP INDEX `$indexName` ");
+        }
+
+        $checkIndex = $pdo->query("SHOW INDEX FROM `scores` WHERE Key_name = 'unique_player_round'")->fetch();
+        if (!$checkIndex) {
+            $pdo->exec("ALTER TABLE `scores` ADD UNIQUE KEY `unique_player_round` (event_id, player_id, order_number)");
         }
     }
 }
