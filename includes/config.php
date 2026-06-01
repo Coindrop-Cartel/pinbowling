@@ -130,12 +130,13 @@ function initializeDatabaseSchema($pdo) {
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(255) NOT NULL,
         `city` VARCHAR(255) DEFAULT NULL,
-        `state` VARCHAR(255) DEFAULT NULL
+        `state` VARCHAR(255) DEFAULT NULL,
+        UNIQUE KEY `unique_location` (`name`, `city`, `state`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `machines` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
-        `machine_name` VARCHAR(255) NOT NULL
+        `machine_name` VARCHAR(255) NOT NULL UNIQUE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `players` (
@@ -264,6 +265,16 @@ function initializeDatabaseSchema($pdo) {
         $checkCity = $pdo->query("SHOW COLUMNS FROM `locations` LIKE 'city'")->fetch();
         if (!$checkCity) {
             $pdo->exec("ALTER TABLE `locations` ADD COLUMN `city` VARCHAR(255) DEFAULT NULL AFTER `name`, ADD COLUMN `state` VARCHAR(255) DEFAULT NULL AFTER `city` ");
+        }
+
+        // Drop the overly restrictive 'name' index and replace with a composite one
+        $checkOldIndex = $pdo->query("SHOW INDEX FROM `locations` WHERE Key_name = 'name'")->fetch();
+        if ($checkOldIndex) {
+            $pdo->exec("ALTER TABLE `locations` DROP INDEX `name` ");
+        }
+        $checkNewIndex = $pdo->query("SHOW INDEX FROM `locations` WHERE Key_name = 'unique_location'")->fetch();
+        if (!$checkNewIndex) {
+            $pdo->exec("ALTER TABLE `locations` ADD UNIQUE KEY `unique_location` (`name`, `city`, `state`) ");
         }
     }
 
