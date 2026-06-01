@@ -283,11 +283,15 @@ body.tv-mode-active {
 }
 
 body.tv-mode-active .navbar, 
+body.tv-mode-active .nav-container,
+body.tv-mode-active .nav-links,
 body.tv-mode-active .no-print,
 body.tv-mode-active header h1,
 body.tv-mode-active header p,
 body.tv-mode-active .hint,
-body.tv-mode-active .no-tv {
+body.tv-mode-active .no-tv,
+body.tv-mode-active .tournament-display,
+body.tv-mode-active .tournament-selector-container {
   display: none !important;
 }
 

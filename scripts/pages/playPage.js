@@ -26,8 +26,8 @@ export async function initPlayPage() {
   let todayEvents = [];
 
   async function refreshSessionsData() {
-    const leagues = await PB_API.getLeagues();
-    const sessionLeagues = leagues.filter(l => l.type === 'session');
+    // Fetch only session-type leagues directly from the server
+    const sessionLeagues = await PB_API.getLeagues({ type: 'session' });
     const today = new Date().toISOString().split('T')[0];
     
     todayEvents = [];

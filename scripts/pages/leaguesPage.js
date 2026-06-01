@@ -173,9 +173,10 @@ export async function initLeaguesPage() {
 
   const refresh = async () => {
     try {
-      const data = await PB_API.getLeagues();
+      // Fetch standard leagues only for management (one-off sessions are handled by cleanup)
+      const data = await PB_API.getLeagues({ type: 'standard' });
       allLeagues.length = 0;
-      allLeagues.push(...data.filter(l => l.type !== 'session'));
+      allLeagues.push(...data);
       // Also refresh the global player cache for selection dialogs
       allPlayersCache = await PB_API.getPlayers();
       filterInstance.performFilter();

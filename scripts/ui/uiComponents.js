@@ -86,9 +86,8 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
 
   if (activeEventId) {
     try {
-      // Fetch leagues and filter out one-off "session" leagues for tournament displays
-      const allLeagues = await PB_API.getLeagues();
-      const leagues = allLeagues.filter(l => l.type !== 'session');
+      // Fetch all leagues to ensure we can resolve metadata for session-based redirects
+      const leagues = await PB_API.getLeagues();
       let activeLeague = null;
       let activeEvent = null;
 
@@ -328,4 +327,138 @@ export function fitTVModeToScreen() {
     // Increase width to prevent content clipping inside the scaled container
     container.style.width = (100 / scaleFactor) + '%';
   }
+}
+
+/**
+ * Initializes a unified League and Event selector.
+ * 
+ * @param {HTMLElement|string} container The element or selector to render into.
+ * @param {Object} options
+ * @param {Function} options.onRefresh Callback after selection changes.
+ * @param {string|null} options.typeFilter 'standard', 'session', or null for all.
+ * @param {boolean} options.showEvents Whether to include the event selection dropdown.
+ */
+export async function initTournamentSelector(container, { onRefresh, typeFilter = 'standard', showEvents = true } = {}) {
+  const target = typeof container === 'string' ? document.querySelector(container) : container;
+  if (!target) return;
+
+  const activeLeagueId = getActiveLeagueId();
+  const activeEventId = getActiveEventId();
+
+  // Fetch all leagues to ensure metadata resolution works for redirects.
+  // We filter the list for the dropdown specifically to keep the UI clean.
+  const allLeagues = await PB_API.getLeagues();
+  const leagues = typeFilter 
+    ? allLeagues.filter(l => l.type === typeFilter || String(l.id) === String(activeLeagueId))
+    : allLeagues;
+
+  target.innerHTML = `
+    <section class="tournament-selector" style="margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; background: #fff; padding: 12px 15px;">
+      <div style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%; box-sizing: border-box;" autocomplete="off">
+        <div style="width: 100%;">
+          <label style="display: block; margin-bottom: 5px;">League Search</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" class="league-search-shared" style="flex: 1; box-sizing: border-box; margin-bottom: 0;" placeholder="Type to filter...">
+            <button class="clear-selection-btn secondary" style="padding: 10px 15px; white-space: nowrap;">Clear</button>
+          </div>
+        </div>
+        <div style="width: 100%;">
+          <label style="display: block; margin-bottom: 5px;">Select League</label>
+          <select class="league-select-shared" style="width: 100%; box-sizing: border-box;">
+            <option value="">-- Choose League --</option>
+          </select>
+        </div>
+        <div class="event-select-wrapper shared-ui-hidden" style="width: 100%;">
+          <label style="display: block; margin-bottom: 5px;">Event</label>
+          <select class="event-select-shared" style="width: 100%; box-sizing: border-box;">
+            <option value="">Select Event</option>
+          </select>
+        </div>
+      </div>
+    </section>
+  `;
+
+  if (!showEvents) target.querySelector('.event-select-wrapper').classList.add('hidden');
+
+  const searchInput = target.querySelector('.league-search-shared');
+  const leagueSelect = target.querySelector('.league-select-shared');
+  const eventSelect = target.querySelector('.event-select-shared');
+  const eventWrapper = target.querySelector('.event-select-wrapper');
+  const clearBtn = target.querySelector('.clear-selection-btn');
+
+  const populateEvents = (leagueId, selectedEventId) => {
+    if (!showEvents) return;
+    const isStandingsPage = !!document.getElementById('standings-body');
+    eventSelect.innerHTML = `<option value="">Select Event</option>${isStandingsPage && leagueId ? '<option value="summary">Season Summary</option>' : ''}`;
+    
+    if (!leagueId) {
+      eventWrapper.classList.add('hidden');
+      eventSelect.value = '';
+      return;
+    }
+
+    const league = allLeagues.find(l => String(l.id) === String(leagueId));
+    const events = league?.events || [];
+
+    if (events.length === 0 && !isStandingsPage) {
+      eventWrapper.classList.add('hidden');
+      return;
+    }
+
+    eventWrapper.classList.remove('hidden');
+    events.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = e.eventName;
+      if (String(e.id) === String(selectedEventId)) opt.selected = true;
+      eventSelect.appendChild(opt);
+    });
+  };
+
+  const { updateOptions } = createSearchableSelect(searchInput, leagueSelect, leagues, {
+    placeholder: '-- Choose League --',
+    onSelect: (leagueId) => {
+      setActiveLeagueId(leagueId);
+      setActiveEventId('');
+      populateEvents(leagueId);
+      if (onRefresh) onRefresh();
+    }
+  });
+
+  eventSelect.addEventListener('change', () => {
+    setActiveEventId(eventSelect.value);
+    if (onRefresh) onRefresh();
+  });
+
+  clearBtn.addEventListener('click', () => {
+    setActiveLeagueId('');
+    setActiveEventId('');
+    searchInput.value = '';
+    leagueSelect.value = '';
+    updateOptions('');
+    populateEvents('', '');
+    if (onRefresh) onRefresh();
+  });
+
+  // Initialization sync
+  let currentLeagueId = activeLeagueId;
+  if (!currentLeagueId && activeEventId && activeEventId !== 'summary') {
+    const found = allLeagues.find(l => (l.events || []).some(e => String(e.id) === String(activeEventId)));
+    if (found) { currentLeagueId = String(found.id); setActiveLeagueId(currentLeagueId); }
+  }
+
+  if (currentLeagueId) {
+    const league = allLeagues.find(l => String(l.id) === String(currentLeagueId));
+    if (league) {
+      searchInput.value = league.name;
+      updateOptions(league.name);
+      leagueSelect.value = currentLeagueId;
+      populateEvents(currentLeagueId, activeEventId);
+    } else {
+      updateOptions('');
+    }
+  } else {
+    updateOptions('');
+  }
+  if (onRefresh) await onRefresh();
 }

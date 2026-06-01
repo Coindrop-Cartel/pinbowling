@@ -1,8 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js';
 import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, setCurrentPlayerId, getCurrentPlayerId } from '@scripts/utils.js';
-import { initTournamentSelector } from '@ui/tournamentSelector.js';
-import { createSearchableSelect } from '@ui/uiComponents.js';
+import { initTournamentSelector, createSearchableSelect } from '@ui/uiComponents.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
 
 /**
@@ -373,6 +372,7 @@ export async function initScoresPage() {
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
 
+    // Fetch all leagues so we can resolve metadata for both standard and session types
     const leagues = await PB_API.getLeagues();
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
     const event = league?.events?.find(e => String(e.id) === String(eventId));
@@ -411,5 +411,5 @@ export async function initScoresPage() {
     }
   };
 
-  await initTournamentSelector(refresh);
+  await initTournamentSelector('.tournament-selector-container', { onRefresh: refresh });
 }
