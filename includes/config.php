@@ -326,49 +326,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 /**
+ * Helper to retrieve custom headers from various server environments.
+ * Handles standard, lowercase, and REDIRECT_ prefixed variants (common in CGI/FastCGI).
+ */
+function getHeader($name) {
+    static $headers = null;
+    if ($headers === null) {
+        $headers = function_exists('getallheaders') ? getallheaders() : [];
+    }
+    
+    $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+    return $_SERVER[$serverKey] 
+        ?? $headers[$name] 
+        ?? $headers[strtolower($name)] 
+        ?? $_SERVER["REDIRECT_$serverKey"] 
+        ?? null;
+}
+
+/**
  * Validates access to a specific league.
  * Access is granted if the global admin secret is correct OR if the
  * provided league-specific password matches.
- * 
- * @param PDO $pdo
- * @param int $leagueId
- * @return void
  */
 function validateLeagueAccess($pdo, $leagueId) {
-    global $apiSecret, $adminPassword;
-    $headers = function_exists('getallheaders') ? getallheaders() : [];
-    $providedSecret = $_SERVER['HTTP_X_PB_SECRET'] ?? $headers['X-PB-SECRET'] ?? $headers['x-pb-secret'] ?? $_SERVER['REDIRECT_HTTP_X_PB_SECRET'] ?? null;
-    $providedLeaguePass = $_SERVER['HTTP_X_LEAGUE_PASSWORD'] ?? $headers['X-LEAGUE-PASSWORD'] ?? $headers['x-league-password'] ?? null;
+    global $adminPassword, $apiSecret;
+    
+    $providedPass = getHeader('X-League-Password');
+    $providedSecret = getHeader('X-PB-Secret');
 
-    // 1. Check if the provided League Pass matches the Global Admin Password (Master Override)
-    if ($providedLeaguePass === $adminPassword) return;
+    // 1. Master Overrides: Admin Password or API Secret
+    if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+        return;
+    }
 
-    // 2. Check League Specific Password
+    // 2. League Specific Password Check
     if (!$leagueId) sendJson(['error' => 'League ID required for validation'], 400);
 
     $stmt = $pdo->prepare('SELECT password FROM leagues WHERE id = ?');
     $stmt->execute([(int)$leagueId]);
     $hash = $stmt->fetchColumn();
 
-    if (!$hash) return; // League has no password set
+    if (!$hash) return; // Open if no password set
 
-    if (!$providedLeaguePass || !password_verify($providedLeaguePass, $hash)) {
+    if (!$providedPass || !password_verify($providedPass, $hash)) {
         sendJson(['error' => 'Unauthorized: Invalid League Password'], 401);
     }
 }
 
 /**
+ * Verifies that the provided credentials match the Global Admin Password or API Secret.
+ * Used for system-wide modifications like master machine/player editing.
+ */
+function validateAdminAccess() {
+    global $adminPassword, $apiSecret;
+    
+    $providedPass = getHeader('X-League-Password');
+    $providedSecret = getHeader('X-PB-Secret');
+
+    if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+        return;
+    }
+
+    sendJson(['error' => 'Unauthorized: Admin access required'], 401);
+}
+
+/**
  * Security Gatekeeper. Verifies the custom X-PB-SECRET header against
  * the server-side API_SECRET. Rejects unauthorized write requests.
- * @return void
  */
 function validateApiSecret() {
-    global $apiSecret;
-    
-    // Hosted environments (CGI/FastCGI) often rename or strip custom headers.
-    // We check common variations and Apache-specific header arrays.
-    $headers = function_exists('getallheaders') ? getallheaders() : [];
-    $providedSecret = $_SERVER['HTTP_X_PB_SECRET'] ?? $headers['X-PB-SECRET'] ?? $headers['x-pb-secret'] ?? $_SERVER['REDIRECT_HTTP_X_PB_SECRET'] ?? null;
+    global $apiSecret, $adminPassword;
+    $providedSecret = getHeader('X-PB-Secret');
+    $providedPass = getHeader('X-League-Password');
+
+    // Allow either the secret or the admin password to satisfy API secret checks
+    if ($providedSecret === $apiSecret || ($providedPass && $providedPass === $adminPassword)) {
+        return;
+    }
 
     if (!$providedSecret || $providedSecret !== $apiSecret) {
         sendJson(['error' => 'Unauthorized: Invalid or missing API secret'], 401);

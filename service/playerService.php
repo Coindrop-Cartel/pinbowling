@@ -72,7 +72,7 @@ try {
 
     // PUT: Update an existing player (Protected by API Secret)
     if ($method === 'PUT') {
-        validateApiSecret();
+        validateAdminAccess();
         
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id) {
@@ -106,7 +106,7 @@ try {
 
     // DELETE: Remove a player and their associated scores (Protected by API Secret)
     if ($method === 'DELETE') {
-        validateApiSecret();
+        validateAdminAccess();
         
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id) {

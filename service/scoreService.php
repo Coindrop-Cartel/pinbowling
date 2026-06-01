@@ -136,7 +136,7 @@ try {
 
     // DELETE: Clear all scores for a specific player (Protected by API Secret)
     if ($method === 'DELETE') {
-        validateApiSecret();
+        validateAdminAccess();
         $player_id = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
         if (!$player_id) {
             sendJson(['error' => 'playerId query parameter is required'], 400);

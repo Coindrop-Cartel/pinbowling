@@ -158,6 +158,7 @@ try {
             if (empty($input['leagueId']) || empty($input['eventName'])) {
                 sendJson(['error' => 'leagueId and eventName are required'], 400);
             }
+            validateLeagueAccess($pdo, $input['leagueId']);
             $sql = 'INSERT INTO events (league_id, location_id, event_name, event_date) VALUES (?, ?, ?, ?)';
             $params = [
                 (int)$input['leagueId'], 
@@ -216,7 +217,8 @@ try {
         } else {
             // Handle password reset separately (Requires Global Admin)
             if (isset($input['resetPassword'])) {
-                validateApiSecret();
+                // Resetting a league password is a system-wide administrative task
+                validateAdminAccess();
                 $newPass = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
                 $pdo->prepare('UPDATE leagues SET password = ? WHERE id = ?')->execute([$newPass, $id]);
                 sendJson(['success' => true]);
