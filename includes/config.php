@@ -79,19 +79,14 @@ $dbPass = envValue($loadedEnv, ['DB_PASS', 'MYSQL_PASSWORD'], 'password');
 $dbCharset = 'utf8mb4';
 $apiSecret = envValue($loadedEnv, ['API_SECRET'], 'bowl-2024-secret');
 // UI_VERSION is used for asset cache-busting. 
-// It prioritizes .env, but falls back to the contents of version.txt.
-$uiVersion = envValue($loadedEnv, ['UI_VERSION']);
-$uiVersionSource = 'Environment Variable (.env)';
-
-if (!$uiVersion) {
-    $versionFile = __DIR__ . '/../version.txt';
-    // Read the version from version.txt, falling back to a hardcoded default if missing.
-    $isReadable = is_readable($versionFile);
-    $uiVersion = $isReadable ? trim(file_get_contents($versionFile)) : '1.0.0';
-    $uiVersionSource = $isReadable ? 'version.txt' : 'Hardcoded Fallback';
-}
+// It is read from version.txt to allow cache-busting updates without touching environment secrets.
+$versionFile = __DIR__ . '/../version.txt';
+$isReadable = is_readable($versionFile);
+$uiVersion = $isReadable ? trim(file_get_contents($versionFile)) : '1.0.0';
+$uiVersionSource = $isReadable ? 'version.txt' : 'Hardcoded Fallback';
 
 $adminPassword = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');
+$debugMode = false; // Initial state; toggled via Management UI and persisted in localStorage.
 
 $dbDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset={$dbCharset}";
 

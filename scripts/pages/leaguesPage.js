@@ -127,7 +127,7 @@ export async function initLeaguesPage() {
 
         // Action listeners
         card.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
-        card.querySelector('.delete-league-btn').onclick = () => runAuthorizedLeagueAction(league.id, () => deleteLeague(league.id, league.name));
+        card.querySelector('.delete-league-btn').onclick = () => deleteLeague(league.id, league.name);
         card.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
 
         leaguesList.appendChild(card);
@@ -239,7 +239,7 @@ export async function initLeaguesPage() {
       btn.onclick = () => showEventForm(leagueId, leagueName, leagueEvents.find(ev => ev.id === Number(btn.dataset.id)));
     });
     eventsListEl.querySelectorAll('.delete-event-btn').forEach(btn => {
-      btn.onclick = (e) => runAuthorizedLeagueAction(leagueId, () => deleteEvent(Number(e.target.dataset.id), leagueId, leagueName));
+      btn.onclick = (e) => deleteEvent(Number(e.target.dataset.id), leagueId, leagueName);
     });
   }
 
@@ -327,40 +327,42 @@ export async function initLeaguesPage() {
   async function removePlayerFromLeague(leagueId, playerId, playerName) {
     if (!await showConfirm(`Remove ${playerName} from this league? Their scores will remain, but they will no longer be associated with this league's roster.`, 'Remove Player')) return;
 
-    if (!await requireAdmin(`Enter Admin Password to remove ${playerName} from league:`)) {
-      return;
-    }
+    await runAuthorizedLeagueAction(leagueId, async () => {
+      await PB_API.removeLeaguePlayer(leagueId, playerId);
 
-    await PB_API.removeLeaguePlayer(leagueId, playerId);
-
-    // Update local data and UI without a full refresh
-    const league = allLeagues.find(l => l.id === leagueId);
-    if (league && league.players) {
-        league.players = league.players.filter(p => p.id !== playerId);
-        renderPlayersForLeague(leagueId, league.players, allPlayersCache);
-        updateLeagueHeaderStats(leagueId, league);
-    }
+      // Update local data and UI without a full refresh
+      const league = allLeagues.find(l => l.id === leagueId);
+      if (league && league.players) {
+          league.players = league.players.filter(p => p.id !== playerId);
+          renderPlayersForLeague(leagueId, league.players, allPlayersCache);
+          updateLeagueHeaderStats(leagueId, league);
+      }
+    });
   }
 
   async function deleteLeague(id, name) {
     if (!await showConfirm(`Are you sure you want to delete the entire league "${name}"? This will delete all associated events and target scores.`, 'Delete League')) return;
-    if (!await requireAdmin(`Enter Admin Password to delete league "${name}":`)) return;
 
-    await PB_API.deleteLeague(id);
-    await refresh();
+    await runAuthorizedLeagueAction(id, async () => {
+      await PB_API.deleteLeague(id);
+      await refresh();
+    });
   }
 
   async function deleteEvent(id, leagueId, leagueName) {
     if (!await showConfirm(`Delete this event from ${leagueName}?`, 'Delete Event')) return;
-    await PB_API.deleteEvent(id, leagueId);
+    
+    await runAuthorizedLeagueAction(leagueId, async () => {
+      await PB_API.deleteEvent(id, leagueId);
 
-    // Update local data and UI without a full refresh
-    const league = allLeagues.find(l => l.id === leagueId);
-    if (league && league.events) {
-        league.events = league.events.filter(e => e.id !== id);
-        renderEventsForLeague(leagueId, league.events, league.name);
-        updateLeagueHeaderStats(leagueId, league);
-    }
+      // Update local data and UI without a full refresh
+      const league = allLeagues.find(l => l.id === leagueId);
+      if (league && league.events) {
+          league.events = league.events.filter(e => e.id !== id);
+          renderEventsForLeague(leagueId, league.events, league.name);
+          updateLeagueHeaderStats(leagueId, league);
+      }
+    });
   }
 
   async function showEventForm(leagueId, leagueName, event = null) {

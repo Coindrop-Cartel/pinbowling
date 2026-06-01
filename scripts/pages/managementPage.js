@@ -8,8 +8,6 @@ import { showPrompt, showConfirm, showAlert } from '@ui/uiComponents.js';
  * Provides tools for password resets and database maintenance.
  */
 export async function initManagementPage() {
-  console.log('initManagementPage initialized');
-
   const authNotice = document.getElementById('management-auth-notice');
   const toolsSection = document.getElementById('management-tools');
   const loginBtn = document.getElementById('admin-login-btn');
@@ -31,7 +29,6 @@ export async function initManagementPage() {
     authNotice.classList.add('hidden');
     toolsSection.classList.remove('hidden');
     loadLeagues();
-    renderVersionInfo();
     renderLogoutButton();
   };
 
@@ -58,11 +55,37 @@ export async function initManagementPage() {
    */
   const renderVersionInfo = () => {
     if (document.getElementById('mgmt-ui-version')) return;
+    if (window.PB_DEBUG_MODE) console.log('[Management] Rendering version footer. current state:', window.PB_DEBUG_MODE);
+
     const versionInfo = document.createElement('div');
     versionInfo.id = 'mgmt-ui-version';
-    versionInfo.style = "margin-top: 3rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); text-align: right; font-size: 0.8rem; opacity: 0.5;";
-    versionInfo.textContent = `System UI Version: ${window.PB_UI_VERSION || '1.0.0'}`;
-    toolsSection.appendChild(versionInfo);
+    versionInfo.style = "margin-top: 3rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; opacity: 0.5;";
+
+    // Debug Mode Toggle
+    const debugLabel = document.createElement('label');
+    debugLabel.style = "display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;";
+    debugLabel.innerHTML = `
+      <input type="checkbox" id="mgmt-debug-toggle" style="margin:0;">
+      <span>Debug Logs</span>
+    `;
+    
+    const debugToggle = debugLabel.querySelector('input');
+    if (window.PB_DEBUG_MODE) console.log('[Management] Syncing checkbox UI with window.PB_DEBUG_MODE:', window.PB_DEBUG_MODE);
+    debugToggle.checked = Boolean(window.PB_DEBUG_MODE); // Explicitly sync state from global variable
+
+    debugToggle.onchange = () => {
+      const isEnabled = debugToggle.checked;
+      if (window.PB_DEBUG_MODE || isEnabled) console.log('[Management] Debug toggle changed. New state:', isEnabled);
+      window.PB_DEBUG_MODE = isEnabled;
+      localStorage.setItem('pb_debug_enabled', isEnabled);
+    };
+
+    const versionText = document.createElement('span');
+    versionText.textContent = `System UI Version: ${window.PB_UI_VERSION || '1.0.0'}`;
+
+    versionInfo.appendChild(debugLabel);
+    versionInfo.appendChild(versionText);
+    (toolsSection.parentElement || document.body).appendChild(versionInfo);
   };
 
   if (loginBtn) {
@@ -73,8 +96,8 @@ export async function initManagementPage() {
 
   // Perform an initial check on load. If no password is set or the user is already
   // authenticated, we reveal the tools immediately without a prompt.
-  console.log('Performing initial Management auth check...');
   checkAuth();
+  renderVersionInfo();
 
   /**
    * Populates the league selection dropdown.

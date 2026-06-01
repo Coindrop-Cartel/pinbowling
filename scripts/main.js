@@ -24,6 +24,18 @@ import { initManagementPage } from '@pages/managementPage.js';
  * for the current view context.
  */
 function ready() {
+  // Restore debug mode from local storage if previously toggled in Management UI
+  const storedDebug = localStorage.getItem('pb_debug_enabled');
+  if (storedDebug !== null) {
+    window.PB_DEBUG_MODE = (storedDebug === 'true');
+  }
+
+  if (window.PB_DEBUG_MODE) {
+    console.log('[Main] Application ready() triggered.');
+    console.log('[Main] localStorage lookup (pb_debug_enabled):', storedDebug);
+    console.log('[Main] Global window.PB_DEBUG_MODE finalized to:', window.PB_DEBUG_MODE);
+  }
+
   initNavigation('.nav-container'); 
 
   const pageInitializers = {

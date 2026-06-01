@@ -92,4 +92,62 @@ describe('Leagues Management Page (leaguesPage.js)', () => {
     expect(toggle.textContent).toBe('Cancel');
   });
 
+  it('should prompt for league password and create a league on form submission', async () => {
+    await initLeaguesPage();
+    const UI = await import('@ui/uiComponents.js');
+    
+    // Mock the optional league password prompt
+    UI.showPrompt.mockResolvedValue('test-league-pass');
+    PB_API.createLeague.mockResolvedValue({ id: 2, name: 'New League', password: 'test-league-pass' });
+    
+    document.getElementById('league-name').value = 'New League';
+    document.getElementById('league-name').dispatchEvent(new Event('input'));
+    document.getElementById('league-start-date').value = '2024-05-01';
+    document.getElementById('league-start-date').dispatchEvent(new Event('input'));
+
+    document.getElementById('create-league-btn').click();
+    
+    await vi.waitFor(() => {
+      expect(UI.showPrompt).toHaveBeenCalledWith(expect.stringContaining('League Password'), expect.any(String), false);
+      expect(PB_API.createLeague).toHaveBeenCalledWith(expect.objectContaining({
+        name: 'New League',
+        password: 'test-league-pass'
+      }));
+    });
+  });
+
+  it('should create a league without a password if the prompt is cancelled', async () => {
+    await initLeaguesPage();
+    const UI = await import('@ui/uiComponents.js');
+    
+    UI.showPrompt.mockResolvedValue(null); // Simulate "Cancel" on the password prompt
+    
+    document.getElementById('league-name').value = 'Open League';
+    document.getElementById('league-name').dispatchEvent(new Event('input'));
+    document.getElementById('league-start-date').value = '2024-06-01';
+    document.getElementById('league-start-date').dispatchEvent(new Event('input'));
+
+    document.getElementById('create-league-btn').click();
+    
+    await vi.waitFor(() => {
+      expect(PB_API.createLeague).toHaveBeenCalledWith(expect.objectContaining({
+        name: 'Open League',
+        password: null
+      }));
+    });
+  });
+
+  it('should delete a league after confirmation and admin check', async () => {
+    await initLeaguesPage();
+    const UI = await import('@ui/uiComponents.js');
+    UI.showConfirm.mockResolvedValue(true);
+    Auth.requireAdmin.mockResolvedValue(true);
+
+    const deleteBtn = document.querySelector('.delete-league-btn');
+    deleteBtn.click();
+
+    await vi.waitFor(() => {
+      expect(PB_API.deleteLeague).toHaveBeenCalledWith(1);
+    });
+  });
 });

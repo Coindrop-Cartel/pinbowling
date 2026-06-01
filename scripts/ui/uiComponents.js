@@ -173,6 +173,8 @@ export function setupLiveFilter(inputElement, data, { labelKey = 'name', onFilte
  */
 export function showDialog({ title, message, showInput = false, isPassword = true, confirmText = 'Confirm', cancelText = 'Cancel' }) {
   return new Promise((resolve) => {
+    if (window.PB_DEBUG_MODE) console.log('[UI] showDialog invoked:', { title, message, showInput });
+
     const backdrop = document.createElement('div');
     backdrop.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;box-sizing:border-box;backdrop-filter:blur(4px);";
     

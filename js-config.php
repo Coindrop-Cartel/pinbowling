@@ -23,4 +23,5 @@ header('Pragma: no-cache');
 // Pass the secrets from PHP/ENV to global JS variables
 echo "window.PB_API_SECRET = " . json_encode($apiSecret) . ";\n";
 echo "window.PB_ADMIN_PASSWORD = " . json_encode($adminPassword) . ";\n";
+echo "window.PB_DEBUG_MODE = " . json_encode($debugMode) . ";\n";
 echo "window.PB_UI_VERSION = " . json_encode($uiVersion) . ";";
