@@ -16,6 +16,10 @@ if ($referer && parse_url($referer, PHP_URL_HOST) !== $_SERVER['HTTP_HOST']) {
 }
 
 header('Content-Type: application/javascript');
+// Force the browser to fetch a fresh config bridge on every reload
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+
 // Pass the secrets from PHP/ENV to global JS variables
 echo "window.PB_API_SECRET = " . json_encode($apiSecret) . ";\n";
 echo "window.PB_ADMIN_PASSWORD = " . json_encode($adminPassword) . ";\n";

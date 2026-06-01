@@ -81,11 +81,14 @@ $apiSecret = envValue($loadedEnv, ['API_SECRET'], 'bowl-2024-secret');
 // UI_VERSION is used for asset cache-busting. 
 // It prioritizes .env, but falls back to the contents of version.txt.
 $uiVersion = envValue($loadedEnv, ['UI_VERSION']);
+$uiVersionSource = 'Environment Variable (.env)';
 
 if (!$uiVersion) {
     $versionFile = __DIR__ . '/../version.txt';
     // Read the version from version.txt, falling back to a hardcoded default if missing.
-    $uiVersion = is_readable($versionFile) ? trim(file_get_contents($versionFile)) : '1.0.0';
+    $isReadable = is_readable($versionFile);
+    $uiVersion = $isReadable ? trim(file_get_contents($versionFile)) : '1.0.0';
+    $uiVersionSource = $isReadable ? 'version.txt' : 'Hardcoded Fallback';
 }
 
 $adminPassword = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');
