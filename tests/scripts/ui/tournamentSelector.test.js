@@ -6,7 +6,10 @@ import * as Utils from '@scripts/utils.js';
 
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    getLeagues: vi.fn(),
+    getLeagues: vi.fn((params) => {
+      // Realistically simulate the server-side filtering
+      return Promise.resolve(mockLeaguesData.filter(l => !params?.type || l.type === params.type));
+    }),
   },
 }));
 
@@ -33,19 +36,19 @@ vi.mock('@ui/uiComponents.js', () => ({
   }),
 }));
 
-describe('Tournament Selector Component (tournamentSelector.js)', () => {
-  const mockLeagues = [
-    { id: 1, name: 'Monday League', events: [{ id: 101, eventName: 'Week 1' }] },
-    { id: 2, name: 'Quick Play Sessions', events: [] } // Should be filtered out
-  ];
+// Rename to avoid collision with captured scopes if needed
+const mockLeaguesData = [
+  { id: 1, name: 'Monday League', type: 'standard', events: [{ id: 101, eventName: 'Week 1' }] },
+  { id: 2, name: 'Quick Play Sessions', type: 'session', events: [] } 
+];
 
+describe('Tournament Selector Component (tournamentSelector.js)', () => {
   beforeEach(() => {
     vi.stubGlobal('scrollTo', vi.fn());
     Element.prototype.scrollIntoView = vi.fn();
 
     document.body.innerHTML = '<div class="tournament-selector-container"></div>';
     vi.clearAllMocks();
-    PB_API.getLeagues.mockResolvedValue(mockLeagues);
     Utils.getActiveLeagueId.mockReturnValue('');
     Utils.getActiveEventId.mockReturnValue('');
   });

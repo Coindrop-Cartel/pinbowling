@@ -112,24 +112,24 @@ try {
             sendJson(['error' => 'Invalid score values'], 400);
         }
 
-        $sql = 'INSERT INTO scores (event_id, player_id, order_number, machine_id, ball1, ball2, ball3)
+        $sql = 'INSERT INTO scores (event_id, player_id, `order_number`, machine_id, ball1, ball2, ball3)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE machine_id = ?, ball1 = ?, ball2 = ?, ball3 = ?';
+                ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), ball1 = VALUES(ball1), ball2 = VALUES(ball2), ball3 = VALUES(ball3)';
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([$event_id, $player_id, $order_number, $machine_id, $ball1, $ball2, $ball3, $machine_id, $ball1, $ball2, $ball3]);
+        $stmt->execute([$event_id, $player_id, $order_number, $machine_id, $ball1, $ball2, $ball3]);
 
         // Fetch the newly created/updated row with the machine name joined for UI consistency
         $stmt = $pdo->prepare('
             SELECT s.*, m.machine_name 
             FROM scores s 
             LEFT JOIN machines m ON s.machine_id = m.id 
-            WHERE s.player_id = ? AND s.order_number = ? AND s.event_id = ?
+            WHERE s.player_id = ? AND s.`order_number` = ? AND s.event_id = ?
         ');
         $stmt->execute([$player_id, $order_number, $event_id]);
         
         $row = $stmt->fetch();
         if (!$row) {
-            sendJson(['error' => 'Score saved but could not be retrieved. Please check for duplicate entries.'], 500);
+            sendJson(['error' => "Score saved but could not be retrieved (Event: $event_id, Player: $player_id, Round: $order_number). This usually indicates duplicate rows in the 'scores' table or missing Unique Constraints."], 500);
         }
         sendJson(serializeScore($row));
     }

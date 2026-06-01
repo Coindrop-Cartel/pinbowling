@@ -25,6 +25,7 @@ vi.mock('@ui/uiComponents.js', () => ({
   showPrompt: vi.fn(),
   showConfirm: vi.fn(),
   showAlert: vi.fn(),
+  initTournamentSelector: vi.fn(),
 }));
 
 describe('Management Page (managementPage.js)', () => {

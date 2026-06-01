@@ -158,7 +158,7 @@ export function initLocationsPage() {
     // Hide the "Create" toggle if the name already exists, unless the form is open
     const isFormOpen = cityStateContainer && !cityStateContainer.classList.contains('hidden');
     if (createToggle) {
-      createToggle.classList.toggle('hidden', !!exactNameMatch && !isFormOpen);
+      createToggle.classList.toggle('hidden', !!exactFullMatch && !isFormOpen);
     }
     
     saveBtn.disabled = !n || (!!exactFullMatch && !isEditingThis);
