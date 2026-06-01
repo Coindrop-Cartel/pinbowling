@@ -248,11 +248,14 @@ function getJsonInput() {
 
 /**
  * Appends the current UI_VERSION to an asset path for cache-busting.
+ * Converts /path/file.js to /v1.1.1/path/file.js
  * @param string $path Path to the asset (js/css).
  * @return string
  */
 function versionedAsset($path) {
-    global $uiVersion;
-    $separator = strpos($path, '?') !== false ? '&' : '?';
-    return $path . $separator . 'v=' . $uiVersion;
+    global $uiVersion, $baseUrl;
+    // Extract the part of the path after the base URL
+    $relativePath = str_replace($baseUrl, '', $path);
+    // Prepend the version segment: /baseUrl/v1.1.1/relativePath
+    return $baseUrl . '/v' . $uiVersion . '/' . ltrim($relativePath, '/');
 }

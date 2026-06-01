@@ -25,3 +25,8 @@ echo "window.PB_API_SECRET = " . json_encode($apiSecret) . ";\n";
 echo "window.PB_ADMIN_PASSWORD = " . json_encode($adminPassword) . ";\n";
 echo "window.PB_DEBUG_MODE = " . json_encode($debugMode) . ";\n";
 echo "window.PB_UI_VERSION = " . json_encode($uiVersion) . ";";
+
+// Log the version to console if the user has debug mode enabled in their browser
+echo "\nif (localStorage.getItem('pb_debug_enabled') === 'true') {";
+echo "  console.log('[Config Bridge] Server delivered UI Version: ' + " . json_encode($uiVersion) . ");";
+echo "}";

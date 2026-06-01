@@ -34,6 +34,7 @@ function ready() {
   if (window.PB_DEBUG_MODE) {
     console.log('[Main] Application ready() triggered.');
     console.log('[Main] localStorage lookup (pb_debug_enabled):', storedDebug);
+    console.log('[Main] Cache-Busting Version Active:', window.PB_UI_VERSION);
     console.log('[Main] Global window.PB_DEBUG_MODE finalized to:', window.PB_DEBUG_MODE);
   }
 
