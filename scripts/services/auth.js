@@ -1,5 +1,5 @@
 import { getAdminSessionPassword, setAdminSessionPassword, getLeaguePassword, setLeaguePassword } from '@services/state.js';
-import { showPrompt } from '@ui/uiComponents.js';
+import { showPrompt, showAlert } from '@ui/uiComponents.js';
 
 /**
  * Verifies if the user has global admin access. 
@@ -28,7 +28,7 @@ export async function requireAdmin(message = 'Enter Admin Password to continue:'
     return true;
   }
   
-  alert('Invalid Admin Password.');
+  showAlert('Invalid Admin Password.', 'Authentication Error');
   return false;
 }
 
@@ -71,7 +71,7 @@ export async function runAuthorizedLeagueAction(leagueId, actionCallback) {
       if (window.PB_DEBUG_MODE) console.error('[Auth] API rejected credentials. Clearing local session.');
       setLeaguePassword(leagueId, null);
       setAdminSessionPassword(null);
-      alert('Invalid Password.');
+      showAlert('The password provided was invalid for both this league and the global administrator.', 'Unauthorized');
     } else {
       throw err;
     }

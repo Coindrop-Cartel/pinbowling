@@ -276,34 +276,34 @@ td {
 }
 
 /* TV Mode Styles */
-body.tv-mode {
+body.tv-mode-active {
   background-color: var(--pb-white);
   color: var(--pb-black);
-  overflow: hidden; /* Hide main scrollbars; JS handles scrolling */
+  overflow-x: hidden; /* Prevent horizontal scroll from scaled width compensation */
 }
 
-body.tv-mode .navbar, 
-body.tv-mode .no-print,
-body.tv-mode header h1,
-body.tv-mode header p,
-body.tv-mode .hint,
-body.tv-mode .no-tv {
+body.tv-mode-active .navbar, 
+body.tv-mode-active .no-print,
+body.tv-mode-active header h1,
+body.tv-mode-active header p,
+body.tv-mode-active .hint,
+body.tv-mode-active .no-tv {
   display: none !important;
 }
 
-body.tv-mode .page-container {
+body.tv-mode-active .page-container {
   max-width: 100%;
   margin: 0;
   padding: 10px;
 }
 
-body.tv-mode .card {
+body.tv-mode-active .card {
   background: var(--pb-white);
   border: none;
   box-shadow: none;
 }
 
-body.tv-mode #tv-title {
+body.tv-mode-active #tv-title {
   display: block !important;
   font-size: 2.5rem;
   text-align: center;
@@ -311,26 +311,36 @@ body.tv-mode #tv-title {
   color: var(--pb-black);
 }
 
-body.tv-mode table {
+body.tv-mode-active table {
   font-size: 1.5rem;
 }
 
-body.tv-mode th {
+body.tv-mode-active th {
   background-color: var(--pb-black);
   font-size: 1.8rem;
   padding: 20px;
 }
 
-body.tv-mode td {
+body.tv-mode-active td {
   padding: 20px;
   background-color: var(--pb-white);
   border-color: var(--pb-black);
 }
 
-body.tv-mode .standings-total {
+body.tv-mode-active .standings-total {
   background-color: var(--pb-gray) !important;
   font-size: 2rem;
   color: var(--pb-black);
+}
+
+.tv-mode-wrapper {
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+
+#tv-mode-content {
+  transition: transform 0.3s ease; /* Optional: smooth transition when resizing */
 }
 
 /* Scoring Interface & Dynamic Components */

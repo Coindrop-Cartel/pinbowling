@@ -75,6 +75,12 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
   const activeLeagueId = getActiveLeagueId();
   const activeEventId = getActiveEventId();
 
+  // Toggle visibility of the TV Mode button based on event selection.
+  const tvBtn = document.querySelector('.tv-mode-btn');
+  if (tvBtn) {
+    tvBtn.classList.toggle('hidden', !activeEventId);
+  }
+
   let leagueName = 'No League Selected';
   let eventName = 'No Event Selected';
 
@@ -291,4 +297,35 @@ export async function showPlayerSelectionDialog(title, message, options, confirm
 
     setTimeout(() => searchInput.focus(), 50);
   });
+}
+
+/**
+ * Scales the TV Mode container to fit the viewport width.
+ * Prevents horizontal cutoff on standard 16:9 screens while allowing
+ * full expansion on ultra-wide displays.
+ */
+export function fitTVModeToScreen() {
+  const container = document.getElementById('tv-mode-content');
+  if (!container || !document.body.classList.contains('tv-mode-active')) {
+    if (container) {
+      container.style.transform = '';
+      container.style.width = '';
+    }
+    return;
+  }
+
+  // Reset to calculate natural dimensions
+  container.style.transform = 'scale(1)';
+  container.style.width = 'auto';
+
+  const viewportWidth = window.innerWidth - 40; // Horizontal padding
+  const contentWidth = container.offsetWidth;
+
+  if (contentWidth > viewportWidth) {
+    const scaleFactor = viewportWidth / contentWidth;
+    container.style.transformOrigin = 'top center';
+    container.style.transform = `scale(${scaleFactor})`;
+    // Increase width to prevent content clipping inside the scaled container
+    container.style.width = (100 / scaleFactor) + '%';
+  }
 }

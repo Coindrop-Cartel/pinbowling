@@ -14,6 +14,7 @@ import { initStandingsPage } from '@pages/standingsPage.js';
 import { initLeaguesPage } from '@pages/leaguesPage.js';
 import { initPlayPage } from '@pages/playPage.js';
 import { initManagementPage } from '@pages/managementPage.js';
+import { fitTVModeToScreen } from '@ui/uiComponents.js';
 
 /**
  * Main entry point. Identifies which page is currently loaded 
@@ -54,6 +55,9 @@ function ready() {
   Object.entries(pageInitializers).forEach(([elementId, initialize]) => {
     if (document.getElementById(elementId)) initialize();
   });
+
+  // Handle scaling if window is resized while in TV Mode
+  window.addEventListener('resize', fitTVModeToScreen);
 }
 
 document.addEventListener('DOMContentLoaded', ready);
