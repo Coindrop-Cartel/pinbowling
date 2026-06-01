@@ -24,13 +24,20 @@ export async function initPlayPage() {
   const sessionsCard = document.getElementById('qp-sessions-card');
   let allPlayersCache = [];
   let todayEvents = [];
-  let qpLeague = null;
 
   async function refreshSessionsData() {
-    const leagues = await PB_API.getLeagues();
-    qpLeague = leagues.find(l => l.name === 'Quick Play Sessions');
+    // Fetch only session-type leagues directly from the server
+    const sessionLeagues = await PB_API.getLeagues({ type: 'session' });
     const today = new Date().toISOString().split('T')[0];
-    todayEvents = qpLeague ? (qpLeague.events || []).filter(e => e.eventDate === today) : [];
+    
+    todayEvents = [];
+    sessionLeagues.forEach(league => {
+      const matches = (league.events || []).filter(e => e.eventDate === today);
+      matches.forEach(event => {
+        todayEvents.push({ ...event, leagueId: league.id, roster: league.players || [] });
+      });
+    });
+
     allPlayersCache = await PB_API.getPlayers();
   }
 
@@ -68,12 +75,12 @@ export async function initPlayPage() {
 
       div.querySelector('.scoreboard-btn').onclick = (e) => {
         e.stopPropagation();
-        window.location.href = `standings?eventId=${event.id}&leagueId=${qpLeague.id}`;
+        window.location.href = `standings?eventId=${event.id}&leagueId=${event.leagueId}`;
       };
 
       div.querySelector('.join-btn').onclick = async (e) => {
         e.stopPropagation();
-        const joinedIds = new Set((qpLeague?.players || []).map(p => p.id));
+        const joinedIds = new Set(event.roster.map(p => p.id));
         const available = allPlayersCache.filter(p => !joinedIds.has(p.id));
 
         if (available.length === 0) {
@@ -82,19 +89,16 @@ export async function initPlayPage() {
         }
 
         const options = available.map(p => ({ value: p.id, label: p.playerName }));
-        const selectedId = await showPlayerSelectionDialog('Join Session', 'Select your name to add yourself to this session:', options);
+        const selectedId = await showPlayerSelectionDialog('Play Session', 'Select your name to start playing:', options, 'Play');
         if (selectedId) {
-          await PB_API.addLeaguePlayer(qpLeague.id, Number(selectedId));
-          window.location.href = `scores?eventId=${event.id}&leagueId=${qpLeague.id}&playerId=${selectedId}`;
+          await PB_API.addLeaguePlayer(event.leagueId, Number(selectedId));
+          window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`;
         }
       };
 
       div.querySelector('.play-btn').onclick = async (e) => {
         e.stopPropagation();
-        // We need the specific roster for this league
-        const leagues = await PB_API.getLeagues();
-        const currentLeague = leagues.find(l => l.id === qpLeague.id);
-        const roster = currentLeague?.players || [];
+        const roster = event.roster || [];
         
         if (roster.length === 0) {
           alert('No players are assigned to this session yet. Use "Join" to add yourself.');
@@ -102,15 +106,15 @@ export async function initPlayPage() {
         }
 
         const options = roster.map(p => ({ value: p.id, label: p.playerName }));
-        const selectedId = await showPlayerSelectionDialog('Play Session', 'Who is bowling?', options);
+        const selectedId = await showPlayerSelectionDialog('Play Session', 'Who is bowling?', options, 'Play');
         if (selectedId) {
-          window.location.href = `scores?eventId=${event.id}&leagueId=${qpLeague.id}&playerId=${selectedId}`;
+          window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`;
         }
       };
 
       div.onclick = (e) => {
         if (e.target.closest('button')) return;
-        window.location.href = `scores?eventId=${event.id}&leagueId=${qpLeague.id}`;
+        window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}`;
       };
       sessionsList.appendChild(div);
     });
@@ -404,18 +408,17 @@ export async function initPlayPage() {
     finalizeBtn.textContent = 'Starting Session...';
 
     try {
-      const leagues = await PB_API.getLeagues();
-      let qpLeague = leagues.find(l => l.name === 'Quick Play Sessions');
-      if (!qpLeague) {
-        const newLeague = await PB_API.createLeague({ 
-          name: 'Quick Play Sessions', 
-          startDate: new Date().toISOString().split('T')[0] 
-        });
-        if (!newLeague || !newLeague.id) {
-          throw new Error('Failed to create "Quick Play" league. Backend did not return a league ID.');
-        }
-        qpLeague = newLeague;
+      const newLeague = await PB_API.createLeague({ 
+        name: eventName, 
+        startDate: now.toISOString().split('T')[0],
+        type: 'session'
+      });
+
+      if (!newLeague || !newLeague.id) {
+        throw new Error('Failed to create session league.');
       }
+
+      const qpLeague = newLeague;
 
       const newEvent = await PB_API.createEvent({
         leagueId: qpLeague.id,

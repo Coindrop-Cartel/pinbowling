@@ -52,7 +52,7 @@ Edit `config.php` and replace the placeholder values:
 
 ## Deployment
 
-To ensure client-side cache clearing after a deployment, make sure to **touch `index.php`** on the server. The application uses the modification timestamp of this file as the `UI_VERSION` for CSS and JS query strings.
+To ensure client-side cache clearing after a deployment, increment the version string in **`version.txt`**. The application uses this value as the `UI_VERSION` for CSS and JS query strings.
 
 If your hosting provider exports environment variables for database credentials, the scripts can also read:
 

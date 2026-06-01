@@ -75,12 +75,18 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
   const activeLeagueId = getActiveLeagueId();
   const activeEventId = getActiveEventId();
 
+  // Toggle visibility of the TV Mode button based on event selection.
+  const tvBtn = document.querySelector('.tv-mode-btn');
+  if (tvBtn) {
+    tvBtn.classList.toggle('hidden', !activeEventId);
+  }
+
   let leagueName = 'No League Selected';
   let eventName = 'No Event Selected';
 
   if (activeEventId) {
     try {
-      // Fetch all leagues to find the specific one and its events
+      // Fetch all leagues to ensure we can resolve metadata for session-based redirects
       const leagues = await PB_API.getLeagues();
       let activeLeague = null;
       let activeEvent = null;
@@ -110,11 +116,13 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
         eventName = 'Season Summary';
       } else {
         console.warn(`Event ID ${activeEventId} not found in any league. Clearing selection.`);
+        showAlert(`Event ID ${activeEventId} not found in any league. Clearing selection.`, 'Selection Warning');
         setActiveEventId('');
         eventName = 'Invalid Event Selected';
       }
     } catch (error) {
       console.error('Error fetching league/event details for read-only display:', error);
+      showAlert('Failed to load tournament details. Please check your connection.', 'Error');
       leagueName = 'Error Loading League';
       eventName = 'Error Loading Event';
     }
@@ -170,6 +178,8 @@ export function setupLiveFilter(inputElement, data, { labelKey = 'name', onFilte
  */
 export function showDialog({ title, message, showInput = false, isPassword = true, confirmText = 'Confirm', cancelText = 'Cancel' }) {
   return new Promise((resolve) => {
+    if (window.PB_DEBUG_MODE) console.log('[UI] showDialog invoked:', { title, message, showInput });
+
     const backdrop = document.createElement('div');
     backdrop.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;box-sizing:border-box;backdrop-filter:blur(4px);";
     
@@ -188,7 +198,7 @@ export function showDialog({ title, message, showInput = false, isPassword = tru
       ${inputHtml}
       <div class="form-actions" style="margin-top:30px; display:flex; gap:12px;">
         <button id="modal-confirm" style="flex:1;">${confirmText}</button>
-        <button id="modal-cancel" class="secondary" style="flex:1;">${cancelText}</button>
+        ${cancelText ? `<button id="modal-cancel" class="secondary" style="flex:1;">${cancelText}</button>` : ''}
       </div>
     `;
     
@@ -213,12 +223,15 @@ export function showDialog({ title, message, showInput = false, isPassword = tru
     }
 
     confirmBtn.onclick = () => finish(input ? input.value : true);
-    cancelBtn.onclick = () => finish(showInput ? null : false);
+    if (cancelBtn) {
+      cancelBtn.onclick = () => finish(showInput ? null : false);
+    }
   });
 }
 
 export const showConfirm = (message, title = 'Confirm Action') => showDialog({ title, message, confirmText: 'Yes, Proceed', cancelText: 'Cancel' });
 export const showPrompt = (message, title = 'Admin Password', isPassword = true) => showDialog({ title, message, showInput: true, isPassword, confirmText: 'Submit' });
+export const showAlert = (message, title = 'Notice') => showDialog({ title, message, confirmText: 'OK', cancelText: null });
 
 /**
  * Replaces native browser confirm() and prompt() with a custom UI modal
@@ -227,9 +240,10 @@ export const showPrompt = (message, title = 'Admin Password', isPassword = true)
  * @param {string} title Dialog title.
  * @param {string} message Dialog message.
  * @param {Array<{value: string|number, label: string}>} options List of players to select from.
+ * @param {string} confirmText Text for the confirmation button.
  * @returns {Promise<string|null>} The selected player ID or null if cancelled.
  */
-export async function showPlayerSelectionDialog(title, message, options) {
+export async function showPlayerSelectionDialog(title, message, options, confirmText = 'Add Player') {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
     backdrop.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;box-sizing:border-box;backdrop-filter:blur(4px);";
@@ -246,7 +260,7 @@ export async function showPlayerSelectionDialog(title, message, options) {
         <select id="player-select-modal" style="width:100%;box-sizing:border-box;font-size:1.1rem;padding:12px;margin-top:10px;"></select>
       </div>
       <div class="form-actions" style="margin-top:30px; display:flex; gap:12px;">
-        <button id="modal-confirm" style="flex:1;">Add Player</button>
+        <button id="modal-confirm" style="flex:1;">${confirmText}</button>
         <button id="modal-cancel" class="secondary" style="flex:1;">Cancel</button>
       </div>
     `;
@@ -282,4 +296,169 @@ export async function showPlayerSelectionDialog(title, message, options) {
 
     setTimeout(() => searchInput.focus(), 50);
   });
+}
+
+/**
+ * Scales the TV Mode container to fit the viewport width.
+ * Prevents horizontal cutoff on standard 16:9 screens while allowing
+ * full expansion on ultra-wide displays.
+ */
+export function fitTVModeToScreen() {
+  const container = document.getElementById('tv-mode-content');
+  if (!container || !document.body.classList.contains('tv-mode-active')) {
+    if (container) {
+      container.style.transform = '';
+      container.style.width = '';
+    }
+    return;
+  }
+
+  // Reset to calculate natural dimensions
+  container.style.transform = 'scale(1)';
+  container.style.width = 'auto';
+
+  const viewportWidth = window.innerWidth - 40; // Horizontal padding
+  const contentWidth = container.offsetWidth;
+
+  if (contentWidth > viewportWidth) {
+    const scaleFactor = viewportWidth / contentWidth;
+    container.style.transformOrigin = 'top center';
+    container.style.transform = `scale(${scaleFactor})`;
+    // Increase width to prevent content clipping inside the scaled container
+    container.style.width = (100 / scaleFactor) + '%';
+  }
+}
+
+/**
+ * Initializes a unified League and Event selector.
+ * 
+ * @param {HTMLElement|string} container The element or selector to render into.
+ * @param {Object} options
+ * @param {Function} options.onRefresh Callback after selection changes.
+ * @param {string|null} options.typeFilter 'standard', 'session', or null for all.
+ * @param {boolean} options.showEvents Whether to include the event selection dropdown.
+ */
+export async function initTournamentSelector(container, { onRefresh, typeFilter = 'standard', showEvents = true } = {}) {
+  const target = typeof container === 'string' ? document.querySelector(container) : container;
+  if (!target) return;
+
+  const activeLeagueId = getActiveLeagueId();
+  const activeEventId = getActiveEventId();
+
+  // Fetch all leagues to ensure metadata resolution works for redirects.
+  // We filter the list for the dropdown specifically to keep the UI clean.
+  const allLeagues = await PB_API.getLeagues();
+  const leagues = typeFilter 
+    ? allLeagues.filter(l => l.type === typeFilter || String(l.id) === String(activeLeagueId))
+    : allLeagues;
+
+  target.innerHTML = `
+    <section class="tournament-selector" style="margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; background: #fff; padding: 12px 15px;">
+      <div style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%; box-sizing: border-box;" autocomplete="off">
+        <div style="width: 100%;">
+          <label style="display: block; margin-bottom: 5px;">League Search</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" class="league-search-shared" style="flex: 1; box-sizing: border-box; margin-bottom: 0;" placeholder="Type to filter...">
+            <button class="clear-selection-btn secondary" style="padding: 10px 15px; white-space: nowrap;">Clear</button>
+          </div>
+        </div>
+        <div style="width: 100%;">
+          <label style="display: block; margin-bottom: 5px;">Select League</label>
+          <select class="league-select-shared" style="width: 100%; box-sizing: border-box;">
+            <option value="">-- Choose League --</option>
+          </select>
+        </div>
+        <div class="event-select-wrapper shared-ui-hidden" style="width: 100%;">
+          <label style="display: block; margin-bottom: 5px;">Event</label>
+          <select class="event-select-shared" style="width: 100%; box-sizing: border-box;">
+            <option value="">Select Event</option>
+          </select>
+        </div>
+      </div>
+    </section>
+  `;
+
+  if (!showEvents) target.querySelector('.event-select-wrapper').classList.add('hidden');
+
+  const searchInput = target.querySelector('.league-search-shared');
+  const leagueSelect = target.querySelector('.league-select-shared');
+  const eventSelect = target.querySelector('.event-select-shared');
+  const eventWrapper = target.querySelector('.event-select-wrapper');
+  const clearBtn = target.querySelector('.clear-selection-btn');
+
+  const populateEvents = (leagueId, selectedEventId) => {
+    if (!showEvents) return;
+    const isStandingsPage = !!document.getElementById('standings-body');
+    eventSelect.innerHTML = `<option value="">Select Event</option>${isStandingsPage && leagueId ? '<option value="summary">Season Summary</option>' : ''}`;
+    
+    if (!leagueId) {
+      eventWrapper.classList.add('hidden');
+      eventSelect.value = '';
+      return;
+    }
+
+    const league = allLeagues.find(l => String(l.id) === String(leagueId));
+    const events = league?.events || [];
+
+    if (events.length === 0 && !isStandingsPage) {
+      eventWrapper.classList.add('hidden');
+      return;
+    }
+
+    eventWrapper.classList.remove('hidden');
+    events.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = e.eventName;
+      if (String(e.id) === String(selectedEventId)) opt.selected = true;
+      eventSelect.appendChild(opt);
+    });
+  };
+
+  const { updateOptions } = createSearchableSelect(searchInput, leagueSelect, leagues, {
+    placeholder: '-- Choose League --',
+    onSelect: (leagueId) => {
+      setActiveLeagueId(leagueId);
+      setActiveEventId('');
+      populateEvents(leagueId);
+      if (onRefresh) onRefresh();
+    }
+  });
+
+  eventSelect.addEventListener('change', () => {
+    setActiveEventId(eventSelect.value);
+    if (onRefresh) onRefresh();
+  });
+
+  clearBtn.addEventListener('click', () => {
+    setActiveLeagueId('');
+    setActiveEventId('');
+    searchInput.value = '';
+    leagueSelect.value = '';
+    updateOptions('');
+    populateEvents('', '');
+    if (onRefresh) onRefresh();
+  });
+
+  // Initialization sync
+  let currentLeagueId = activeLeagueId;
+  if (!currentLeagueId && activeEventId && activeEventId !== 'summary') {
+    const found = allLeagues.find(l => (l.events || []).some(e => String(e.id) === String(activeEventId)));
+    if (found) { currentLeagueId = String(found.id); setActiveLeagueId(currentLeagueId); }
+  }
+
+  if (currentLeagueId) {
+    const league = allLeagues.find(l => String(l.id) === String(currentLeagueId));
+    if (league) {
+      searchInput.value = league.name;
+      updateOptions(league.name);
+      leagueSelect.value = currentLeagueId;
+      populateEvents(currentLeagueId, activeEventId);
+    } else {
+      updateOptions('');
+    }
+  } else {
+    updateOptions('');
+  }
+  if (onRefresh) await onRefresh();
 }

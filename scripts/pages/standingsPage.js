@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js'; 
 import { getActiveEventId, getActiveLeagueId, formatNumber } from '@scripts/utils.js';
-import { initTournamentSelector } from '@ui/tournamentSelector.js';
+import { fitTVModeToScreen, initTournamentSelector } from '@ui/uiComponents.js';
 
 export async function initStandingsPage() {
   const standingsHeader = document.getElementById('standings-header');
@@ -22,11 +22,14 @@ export async function initStandingsPage() {
   }
 
   function toggleTvMode() {
+    if (!getActiveEventId()) return; // Cannot enter TV Mode without a selection
+
     isTvMode = !isTvMode;
-    document.body.classList.toggle('tv-mode', isTvMode);
+    document.body.classList.toggle('tv-mode-active', isTvMode);
     
     if (isTvMode) {
       tvBtn.textContent = 'Exit (Esc)';
+      fitTVModeToScreen();
       // Update scores every 15 seconds
       refreshInterval = setInterval(refresh, 15000);
       startAutoScroll();
@@ -75,6 +78,7 @@ export async function initStandingsPage() {
    * Uses bulk-fetching for all scores and target definitions to ensure fast rendering.
    */
   const renderLeagueSummary = async (leagueId) => {
+    // Fetch all leagues to ensure we can resolve metadata regardless of type
     const leagues = await PB_API.getLeagues();
     const league = leagues.find(l => String(l.id) === String(leagueId));
     const engine = getScoringEngine(league?.scoringFormat || 'bowling');
@@ -152,9 +156,14 @@ export async function initStandingsPage() {
       if (standingsEmpty) standingsEmpty.classList.remove('hidden');
       if (tournamentSelectorUI) tournamentSelectorUI.classList.remove('hidden');
       if (tournamentSummary) tournamentSummary.classList.add('hidden');
+      if (tvBtn) tvBtn.classList.add('hidden');
       return;
     }
 
+    if (tvBtn) tvBtn.classList.remove('hidden');
+    if (standingsEmpty) standingsEmpty.classList.add('hidden');
+
+    // Fetch all leagues to support both standard tournaments and one-off sessions
     const leagues = await PB_API.getLeagues();
     const league = leagues.find(l => String(l.id) === String(leagueId));
     Engine = getScoringEngine(league?.scoringFormat || 'bowling');
@@ -165,6 +174,7 @@ export async function initStandingsPage() {
       if (selectorContainer) {
         tournamentSelectorUI = selectorContainer.closest('.tournament-selector') || selectorContainer;
         tournamentSummary = document.createElement('div');
+        tournamentSummary.classList.add('no-tv'); // Hide in TV Mode
         tournamentSummary.className = 'hidden';
         tournamentSummary.style = "display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 5px;";
         tournamentSummaryText = document.createElement('span');
@@ -185,7 +195,11 @@ export async function initStandingsPage() {
 
     if (tournamentSelectorUI && tournamentSummary) {
       const event = eventId === 'summary' ? { eventName: 'Season Summary' } : league?.events.find(e => String(e.id) === String(eventId));
-      tournamentSummaryText.textContent = `${league?.name || 'League'} - ${event?.eventName || 'Event'}`;
+      if (league?.type === 'session') {
+        tournamentSummaryText.textContent = event?.eventName || 'Session Scoreboard';
+      } else {
+        tournamentSummaryText.textContent = `${league?.name || 'League'} - ${event?.eventName || 'Event'}`;
+      }
       tournamentSelectorUI.classList.add('hidden');
       tournamentSummary.classList.remove('hidden');
     }
@@ -204,7 +218,11 @@ export async function initStandingsPage() {
 
     if (tvTitle) {
       const event = league?.events?.find(e => String(e.id) === String(eventId));
-      tvTitle.textContent = `${league?.name || 'League'} - ${event?.eventName || 'Event'}`;
+      if (league?.type === 'session') {
+        tvTitle.textContent = event?.eventName || 'Session Scoreboard';
+      } else {
+        tvTitle.textContent = `${league?.name || 'League'} - ${event?.eventName || 'Event'}`;
+      }
     }
 
     const rows = players.map(player => {
@@ -239,5 +257,5 @@ export async function initStandingsPage() {
     if (standingsWrapper) standingsWrapper.classList.remove('hidden');
   };
 
-  initTournamentSelector(refresh);
+  initTournamentSelector('.tournament-selector-container', { onRefresh: refresh });
 }

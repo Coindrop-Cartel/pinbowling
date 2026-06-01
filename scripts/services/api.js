@@ -17,13 +17,30 @@ const APP_BASE = base.endsWith('/') ? base.slice(0, -1) : base;
  * and handles standardized JSON error responses.
  */
 export async function fetchJSON(url, options = {}) {
-  const urlObj = new URL(url.startsWith('http') ? url : `http://localhost/${url}`);
+  let finalUrl = url;
+
+  // Determine the HTTP method (defaulting to GET)
+  let method = (options.method || 'GET').toUpperCase();
+
+  // Automatically append query parameters for GET requests if provided in options
+  if (method === 'GET' && typeof options.params === 'object' && options.params !== null) {
+    const cleanParams = Object.fromEntries(
+      Object.entries(options.params).filter(([_, v]) => v != null)
+    );
+    const queryString = new URLSearchParams(cleanParams).toString();
+    if (queryString) {
+      finalUrl += (finalUrl.includes('?') ? '&' : '?') + queryString;
+    }
+  }
+
+  if (window.PB_DEBUG_MODE) console.log(`[API] Constructing ${method} request to: ${url}`, { params: options.params, finalUrl });
+
+  const urlObj = new URL(finalUrl.startsWith('http') ? finalUrl : `http://localhost/${finalUrl}`);
   const leagueId = urlObj.searchParams.get('leagueId') || (options.body ? JSON.parse(options.body).leagueId : null);
   const leaguePass = leagueId ? getLeaguePassword(leagueId) : null;
 
   // Tunnel DELETE and PUT via POST to bypass potential server-level method blocking.
   // This ensures the project setup is synchronized and robust across different hosts.
-  let method = options.method || 'GET';
   const headers = { ...options.headers };
 
   if (method === 'DELETE' || method === 'PUT') {
@@ -40,7 +57,11 @@ export async function fetchJSON(url, options = {}) {
 
   // Construct a robust absolute URL including origin to prevent NetworkErrors
   // in specific browser environments (like Firefox on private IPs).
-  const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${APP_BASE}/${url}`;
+  // We trim leading slashes from finalUrl to ensure clean joining with APP_BASE
+  const sanitizedPath = finalUrl.startsWith('http') ? finalUrl : finalUrl.replace(/^\//, '');
+  const fullUrl = sanitizedPath.startsWith('http') ? sanitizedPath : `${window.location.origin}${APP_BASE}/${sanitizedPath}`;
+  
+  if (window.PB_DEBUG_MODE) console.log(`[API] Final Request URL: ${fullUrl}`);
   
   // Prepare fetch options, ensuring a body is sent for POST requests (even if tunneled)
   // to prevent server-side resets for bodyless POSTs.
@@ -69,8 +90,8 @@ export async function fetchJSON(url, options = {}) {
 }
 
 export const PB_API = {
-  getMachines: () => fetchJSON('service/machineService.php'),
-  getPlayers: () => fetchJSON('service/playerService.php'),
+  getMachines: (params) => fetchJSON('service/machineService.php', { params }),
+  getPlayers: (params) => fetchJSON('service/playerService.php', { params }),
   getScores: (playerId, eventId, leagueId) => {
     if (!eventId && !leagueId) return [];
     let url = 'service/scoreService.php?';
@@ -88,12 +109,12 @@ export const PB_API = {
   clearScores: (playerId) => fetchJSON(`service/scoreService.php?playerId=${playerId}`, { method: 'DELETE' }),
 
   // League and Event management
-  getLeagues: () => fetchJSON('service/leagueService.php'),
+  getLeagues: (params) => fetchJSON('service/leagueService.php', { params }),
   getLeague: (id) => fetchJSON(`service/leagueService.php?id=${id}`),
   createLeague: (league) => fetchJSON('service/leagueService.php', { method: 'POST', body: JSON.stringify(league) }),
   updateLeague: (id, league) => fetchJSON(`service/leagueService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(league) }),
   deleteLeague: (id) => fetchJSON(`service/leagueService.php?id=${id}`, { method: 'DELETE' }),
-  getEvents: (leagueId) => fetchJSON(`service/leagueService.php?task=fixture${leagueId ? `&leagueId=${leagueId}` : ''}`),
+  getEvents: (leagueId, params) => fetchJSON(`service/leagueService.php?task=fixture${leagueId ? `&leagueId=${leagueId}` : ''}`, { params }),
   createEvent: (event) => fetchJSON('service/leagueService.php?task=fixture', { method: 'POST', body: JSON.stringify(event) }),
   updateEvent: (id, event) => fetchJSON(`service/leagueService.php?task=fixture&id=${id}`, { method: 'PUT', body: JSON.stringify(event) }),
   deleteEvent: (id, leagueId) => fetchJSON(`service/leagueService.php?task=fixture&id=${id}${leagueId ? `&leagueId=${leagueId}` : ''}`, { method: 'DELETE' }),
@@ -101,17 +122,18 @@ export const PB_API = {
   removeLeaguePlayer: (leagueId, playerId) => fetchJSON(`service/leagueService.php?task=member&leagueId=${leagueId}&playerId=${playerId}`, { method: 'DELETE' }),
 
   // Locations and Target Scores
-  getLocations: () => fetchJSON('service/locationService.php'),
+  getLocations: (params) => fetchJSON('service/locationService.php', { params }),
   createLocation: (loc) => fetchJSON('service/locationService.php', { method: 'POST', body: JSON.stringify(loc) }),
   updateLocation: (id, loc) => fetchJSON(`service/locationService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(loc) }),
   deleteLocation: (id) => fetchJSON(`service/locationService.php?id=${id}`, { method: 'DELETE' }),
-  getLocationMachines: (locationId) => fetchJSON(`service/locationService.php?task=units${locationId ? `&locationId=${locationId}` : ''}`),
+  getLocationMachines: (locationId, params) => fetchJSON(`service/locationService.php?task=units${locationId ? `&locationId=${locationId}` : ''}`, { params }),
   addLocationMachine: (locationId, machineId, extra = {}) => 
     fetchJSON('service/locationService.php?task=units', { method: 'POST', body: JSON.stringify({ locationId, machineId, ...extra }) }),
   removeLocationMachine: (locationId, machineId) => fetchJSON(`service/locationService.php?task=units&locationId=${locationId}&machineId=${machineId}`, { method: 'DELETE' }),
-  getTargetScores: (eventId, leagueId) => 
-    fetchJSON(`service/machineService.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`),
+  getTargetScores: (eventId, leagueId, params) => 
+    fetchJSON(`service/machineService.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`, { params }),
   bulkUpdateTargetOrder: (updates) => fetchJSON('service/machineService.php?task=sort', { method: 'POST', body: JSON.stringify(updates) }),
+  runCleanup: () => fetchJSON('service/cleanupService.php'),
   saveTargetScore: (target) => {
     const url = `service/machineService.php?task=threshold`;
     return fetchJSON(url, { method: 'POST', body: JSON.stringify(target) });

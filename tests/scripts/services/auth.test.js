@@ -13,6 +13,7 @@ vi.mock('@services/state.js', () => ({
 
 vi.mock('@ui/uiComponents.js', () => ({
   showPrompt: vi.fn(),
+  showAlert: vi.fn(), // Add showAlert to the mock
 }));
 
 describe('Authorization Helpers (auth.js)', () => {
@@ -55,7 +56,7 @@ describe('Authorization Helpers (auth.js)', () => {
       
       const result = await requireAdmin();
       expect(result).toBe(false);
-      expect(window.alert).toHaveBeenCalledWith('Incorrect Admin Password.');
+      expect(UI.showAlert).toHaveBeenCalledWith('Invalid Admin Password.', 'Authentication Error');
     });
 
     it('should return false if prompt is cancelled', async () => {
@@ -68,7 +69,8 @@ describe('Authorization Helpers (auth.js)', () => {
     it('should execute action if admin password is in session', async () => {
       State.getAdminSessionPassword.mockReturnValue('admin-secret');
       const action = vi.fn();
-      await runAuthorizedLeagueAction(1, action);
+      const result = await runAuthorizedLeagueAction(1, action);
+      expect(result).toBe(true);
       expect(action).toHaveBeenCalled();
     });
 
@@ -78,8 +80,9 @@ describe('Authorization Helpers (auth.js)', () => {
       UI.showPrompt.mockResolvedValue('league-pass');
       
       const action = vi.fn();
-      await runAuthorizedLeagueAction(5, action);
+      const result = await runAuthorizedLeagueAction(5, action);
       
+      expect(result).toBe(true);
       expect(UI.showPrompt).toHaveBeenCalled();
       expect(State.setLeaguePassword).toHaveBeenCalledWith(5, 'league-pass');
       expect(action).toHaveBeenCalled();
@@ -89,7 +92,8 @@ describe('Authorization Helpers (auth.js)', () => {
         State.getAdminSessionPassword.mockReturnValue(null);
         UI.showPrompt.mockResolvedValue('admin-secret');
         
-        await runAuthorizedLeagueAction(5, vi.fn());
+        const result = await runAuthorizedLeagueAction(5, vi.fn());
+        expect(result).toBe(true);
         expect(State.setAdminSessionPassword).toHaveBeenCalledWith('admin-secret');
     });
 
@@ -97,11 +101,12 @@ describe('Authorization Helpers (auth.js)', () => {
       State.getLeaguePassword.mockReturnValue('stored-pass');
       const action = vi.fn().mockRejectedValue(new Error('Unauthorized access'));
       
-      await runAuthorizedLeagueAction(1, action);
+      const result = await runAuthorizedLeagueAction(1, action);
       
+      expect(result).toBe(false);
       expect(State.setLeaguePassword).toHaveBeenCalledWith(1, null);
       expect(State.setAdminSessionPassword).toHaveBeenCalledWith(null);
-      expect(window.alert).toHaveBeenCalledWith('Invalid Password.');
+      expect(UI.showAlert).toHaveBeenCalledWith('The password provided was invalid for both this league and the global administrator.', 'Unauthorized');
     });
 
     it('should re-throw non-authorization errors', async () => {

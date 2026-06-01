@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><?php echo isset($pageTitle) ? "PinBowling - $pageTitle" : 'PinBowling'; ?></title>
-  <link rel="stylesheet" href="<?php echo $baseUrl; ?>/styles.css?v=<?php echo $UI_VERSION; ?>" />
-  <link rel="icon" type="image/png" href="<?php echo $baseUrl; ?>/images/logo.png?v=<?php echo $UI_VERSION; ?>" />
+  <link rel="stylesheet" href="<?php echo versionedAsset($baseUrl . '/styles.css'); ?>" />
+  <link rel="icon" type="image/png" href="<?php echo versionedAsset($baseUrl . '/images/logo.png'); ?>" />
   <script>
     // Bridge PHP calculated base path to JavaScript
     window.APP_BASE = "<?php echo $baseUrl; ?>";
@@ -13,11 +13,11 @@
   <script type="importmap">
   {
     "imports": {
-      "@scripts/": "<?php echo $baseUrl; ?>/scripts/",
-      "@services/": "<?php echo $baseUrl; ?>/scripts/services/",
-      "@ui/": "<?php echo $baseUrl; ?>/scripts/ui/",
-      "@core/": "<?php echo $baseUrl; ?>/scripts/core/",
-      "@pages/": "<?php echo $baseUrl; ?>/scripts/pages/",
+      "@scripts/": "<?php echo versionedAsset($baseUrl . '/scripts/'); ?>",
+      "@services/": "<?php echo versionedAsset($baseUrl . '/scripts/services/'); ?>",
+      "@ui/": "<?php echo versionedAsset($baseUrl . '/scripts/ui/'); ?>",
+      "@core/": "<?php echo versionedAsset($baseUrl . '/scripts/core/'); ?>",
+      "@pages/": "<?php echo versionedAsset($baseUrl . '/scripts/pages/'); ?>",
       "@constants/": "<?php echo $baseUrl; ?>/constants/"
     }
   }
@@ -28,7 +28,7 @@
 
   <?php echo $pageContent; ?>
 
-  <script src="<?php echo $baseUrl; ?>/js-config.php?v=<?php echo $UI_VERSION; ?>"></script>
-  <script type="module" src="<?php echo $baseUrl; ?>/scripts/main.js?v=<?php echo $UI_VERSION; ?>"></script>
+  <script src="<?php echo versionedAsset($baseUrl . '/js-config.php'); ?>"></script>
+  <script type="module" src="<?php echo versionedAsset($baseUrl . '/scripts/main.js'); ?>"></script>
 </body>
 </html>

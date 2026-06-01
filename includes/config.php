@@ -79,10 +79,14 @@ $dbPass = envValue($loadedEnv, ['DB_PASS', 'MYSQL_PASSWORD'], 'password');
 $dbCharset = 'utf8mb4';
 $apiSecret = envValue($loadedEnv, ['API_SECRET'], 'bowl-2024-secret');
 // UI_VERSION is used for asset cache-busting. 
-// It prioritizes .env, but falls back to the modification time of index.php.
-// Deployment Tip: 'touch index.php' on the server to force-clear client caches.
-$uiVersion = envValue($loadedEnv, ['UI_VERSION'], @filemtime(__DIR__ . '/../index.php') ?: '1.0.0');
+// It is read from version.txt to allow cache-busting updates without touching environment secrets.
+$versionFile = __DIR__ . '/../version.txt';
+$isReadable = is_readable($versionFile);
+$uiVersion = $isReadable ? trim(file_get_contents($versionFile)) : '1.0.0';
+$uiVersionSource = $isReadable ? 'version.txt' : 'Hardcoded Fallback';
+
 $adminPassword = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');
+$debugMode = false; // Initial state; toggled via Management UI and persisted in localStorage.
 
 $dbDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset={$dbCharset}";
 
@@ -141,6 +145,14 @@ function initializeDatabaseSchema($pdo) {
             $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `password` VARCHAR(255) DEFAULT NULL AFTER `start_date` ");
         }
     }
+
+    // Ensure 'leagues' table has the 'type' column for standard vs session distinction
+    if ($checkLeagues) {
+        $checkType = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'type'")->fetch();
+        if (!$checkType) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `type` ENUM('standard', 'session') DEFAULT 'standard' AFTER `name` ");
+        }
+    }
 }
 
 // Handle HTTP Method Tunneling for environments that block DELETE/PUT.
@@ -172,13 +184,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
  * @return void
  */
 function validateLeagueAccess($pdo, $leagueId) {
-    global $apiSecret;
+    global $apiSecret, $adminPassword;
     $headers = function_exists('getallheaders') ? getallheaders() : [];
     $providedSecret = $_SERVER['HTTP_X_PB_SECRET'] ?? $headers['X-PB-SECRET'] ?? $headers['x-pb-secret'] ?? $_SERVER['REDIRECT_HTTP_X_PB_SECRET'] ?? null;
     $providedLeaguePass = $_SERVER['HTTP_X_LEAGUE_PASSWORD'] ?? $headers['X-LEAGUE-PASSWORD'] ?? $headers['x-league-password'] ?? null;
 
-    // 1. Check Global Secret (Admin Override)
-    if ($providedSecret === $apiSecret) return;
+    // 1. Check if the provided League Pass matches the Global Admin Password (Master Override)
+    if ($providedLeaguePass === $adminPassword) return;
 
     // 2. Check League Specific Password
     if (!$leagueId) sendJson(['error' => 'League ID required for validation'], 400);
@@ -232,4 +244,18 @@ function sendJson($data, $status = 200) {
 function getJsonInput() {
     $body = file_get_contents('php://input');
     return json_decode($body, true) ?: [];
+}
+
+/**
+ * Appends the current UI_VERSION to an asset path for cache-busting.
+ * Converts /path/file.js to /v1.1.1/path/file.js
+ * @param string $path Path to the asset (js/css).
+ * @return string
+ */
+function versionedAsset($path) {
+    global $uiVersion, $baseUrl;
+    // Extract the part of the path after the base URL
+    $relativePath = str_replace($baseUrl, '', $path);
+    // Prepend the version segment: /baseUrl/v1.1.1/relativePath
+    return $baseUrl . '/v' . $uiVersion . '/' . ltrim($relativePath, '/');
 }

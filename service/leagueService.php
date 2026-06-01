@@ -49,6 +49,7 @@ function serializeLeague($row) {
     return [
         'id' => (int)$row['id'],
         'name' => $row['name'],
+        'type' => $row['type'] ?? 'standard',
         'startDate' => $row['start_date'],
         'events' => isset($row['events']) ? array_map('serializeEvent', $row['events']) : [],
         // Players are already standardized in playerService, keeping key consistent
@@ -101,8 +102,14 @@ try {
             // fetch all leagues, events, and rosters in broad queries and 
             // group them in memory before returning the final JSON structure.
             
-            // Fetch all leagues (excluding password)
-            $leaguesStmt = $pdo->query('SELECT id, name, start_date FROM leagues ORDER BY start_date DESC');
+            // Fetch leagues (optionally filtered by type)
+            $typeFilter = $_GET['type'] ?? null;
+            $sql = 'SELECT id, name, start_date, type FROM leagues';
+            if ($typeFilter) $sql .= ' WHERE type = ?';
+            $sql .= ' ORDER BY start_date DESC';
+            
+            $leaguesStmt = $pdo->prepare($sql);
+            $leaguesStmt->execute($typeFilter ? [$typeFilter] : []);
             $leagues = $leaguesStmt->fetchAll();
 
             // Fetch all events
@@ -141,7 +148,6 @@ try {
     // POST: Create new League or Event (Protected by API Secret)
     if ($method === 'POST') {
         if ($task === 'member') {
-            validateLeagueAccess($pdo, $input['leagueId']);
             if (empty($input['leagueId']) || empty($input['playerId'])) {
                 sendJson(['error' => 'leagueId and playerId are required'], 400);
             }
@@ -149,7 +155,6 @@ try {
             $stmt->execute([(int)$input['leagueId'], (int)$input['playerId']]);
             sendJson(['success' => true]);
         } else if ($task === 'fixture') {
-            validateLeagueAccess($pdo, $input['leagueId']);
             if (empty($input['leagueId']) || empty($input['eventName'])) {
                 sendJson(['error' => 'leagueId and eventName are required'], 400);
             }
@@ -172,16 +177,15 @@ try {
             }
             sendJson(serializeEvent($row));
         } else {
-            validateApiSecret(); // League creation is global admin only
             if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
             
             $password = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
-            $sql = 'INSERT INTO leagues (name, start_date, password) VALUES (?, ?, ?)';
+            $sql = 'INSERT INTO leagues (name, start_date, password, type) VALUES (?, ?, ?, ?)';
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$input['name'], $input['startDate'] ?? null, $password]);
+            $stmt->execute([$input['name'], $input['startDate'] ?? null, $password, $input['type'] ?? 'standard']);
             $newId = $pdo->lastInsertId();
 
-            $stmt = $pdo->prepare('SELECT id, name, start_date FROM leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT id, name, start_date, type FROM leagues WHERE id = ?');
             $stmt->execute([$newId]);
             $row = $stmt->fetch();
             if (!$row) {

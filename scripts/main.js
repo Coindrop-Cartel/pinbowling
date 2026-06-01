@@ -13,6 +13,8 @@ import { initScoresPage } from '@pages/scoresPage.js';
 import { initStandingsPage } from '@pages/standingsPage.js';
 import { initLeaguesPage } from '@pages/leaguesPage.js';
 import { initPlayPage } from '@pages/playPage.js';
+import { initManagementPage } from '@pages/managementPage.js';
+import { fitTVModeToScreen } from '@ui/uiComponents.js';
 
 /**
  * Main entry point. Identifies which page is currently loaded 
@@ -23,6 +25,19 @@ import { initPlayPage } from '@pages/playPage.js';
  * for the current view context.
  */
 function ready() {
+  // Restore debug mode from local storage if previously toggled in Management UI
+  const storedDebug = localStorage.getItem('pb_debug_enabled');
+  if (storedDebug !== null) {
+    window.PB_DEBUG_MODE = (storedDebug === 'true');
+  }
+
+  if (window.PB_DEBUG_MODE) {
+    console.log('[Main] Application ready() triggered.');
+    console.log('[Main] localStorage lookup (pb_debug_enabled):', storedDebug);
+    console.log('[Main] Cache-Busting Version Active:', window.PB_UI_VERSION);
+    console.log('[Main] Global window.PB_DEBUG_MODE finalized to:', window.PB_DEBUG_MODE);
+  }
+
   initNavigation('.nav-container'); 
 
   const pageInitializers = {
@@ -34,12 +49,16 @@ function ready() {
     'standings-body': initStandingsPage,
     'leagues-list': initLeaguesPage,
     'quick-play-form': initPlayPage,
+    'management-tools': initManagementPage,
   };
 
   // Detect and run initialization for the current page based on element presence
   Object.entries(pageInitializers).forEach(([elementId, initialize]) => {
     if (document.getElementById(elementId)) initialize();
   });
+
+  // Handle scaling if window is resized while in TV Mode
+  window.addEventListener('resize', fitTVModeToScreen);
 }
 
 document.addEventListener('DOMContentLoaded', ready);
