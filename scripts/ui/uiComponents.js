@@ -110,11 +110,13 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
         eventName = 'Season Summary';
       } else {
         console.warn(`Event ID ${activeEventId} not found in any league. Clearing selection.`);
+        showAlert(`Event ID ${activeEventId} not found in any league. Clearing selection.`, 'Selection Warning');
         setActiveEventId('');
         eventName = 'Invalid Event Selected';
       }
     } catch (error) {
       console.error('Error fetching league/event details for read-only display:', error);
+      showAlert('Failed to load tournament details. Please check your connection.', 'Error');
       leagueName = 'Error Loading League';
       eventName = 'Error Loading Event';
     }

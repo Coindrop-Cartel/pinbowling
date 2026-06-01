@@ -13,7 +13,11 @@ try {
     // Trigger via CRON or CLI: curl -H "X-PB-SECRET: <SECRET>" https://yoursite.com/service/cleanupService.php
     validateApiSecret();
 
-    $retentionDays = 30;
+    // Check for optional retention period override via query string or JSON body
+    $input = getJsonInput();
+    $retentionDays = (int)($_GET['days'] ?? $input['days'] ?? 30);
+    if ($retentionDays <= 0) $retentionDays = 30;
+
     $cutoffDate = date('Y-m-d', strtotime("-$retentionDays days"));
 
     // Identify session leagues that have passed the retention threshold.

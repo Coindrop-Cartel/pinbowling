@@ -20,8 +20,10 @@ export async function initManagementPage() {
    * Verifies admin credentials before displaying management tools.
    */
   const checkAuth = async () => {
-    console.log('Authenticate Admin Session called');
-    revealTools();
+    const verified = await requireAdmin('Enter Admin Password to access management tools:');
+    if (verified) {
+      revealTools();
+    }
   };
 
   const revealTools = () => {
@@ -57,6 +59,7 @@ export async function initManagementPage() {
       });
     } catch (err) {
       console.error('Failed to load leagues for management:', err);
+      showAlert('Failed to load leagues for management: ' + err.message, 'Fetch Error');
     }
   }
 
@@ -84,7 +87,7 @@ export async function initManagementPage() {
    */
   cleanupBtn.onclick = async () => {
     const confirmed = await showConfirm(
-      'Are you sure you want to run the database cleanup? This will permanently delete all session-type leagues and their scores/targets that are older than 30 days.',
+      'Are you sure you want to run the database cleanup? This will permanently delete session-type leagues and their associated data based on the retention period.',
       'Confirm Cleanup'
     );
     
@@ -93,12 +96,16 @@ export async function initManagementPage() {
     const adminVerified = await requireAdmin('Enter Admin Password to perform database cleanup:');
     if (!adminVerified) return;
 
+    const daysInput = await showPrompt('Enter retention period in days (leagues older than this will be deleted):', 'Cleanup Configuration', false);
+    if (daysInput === null) return; // User cancelled the prompt
+    const days = parseInt(daysInput, 10) || 30;
+
     try {
       cleanupBtn.disabled = true;
       cleanupBtn.textContent = 'Running Cleanup...';
       
-      const result = await PB_API.runCleanup();
-      showAlert(`Cleanup successful! Removed ${result.leagues_cleaned || 0} expired session leagues.`, 'Success');
+      const result = await PB_API.runCleanup(days);
+      showAlert(`Cleanup successful! Removed ${result.leagues_cleaned || 0} session leagues older than ${days} days.`, 'Success');
     } catch (err) {
       showAlert('Cleanup failed: ' + err.message, 'Error');
     } finally {

@@ -23,7 +23,7 @@
 
     <section class="card">
       <h2>Database Cleanup</h2>
-      <p>Remove session leagues and associated data (scores, targets) older than 30 days.</p>
+      <p>Remove session leagues and associated data (scores, targets).</p>
       <button id="mgmt-run-cleanup-btn" class="danger">Run Cleanup Script</button>
     </section>
   </div>
