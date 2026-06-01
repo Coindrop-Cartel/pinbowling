@@ -1,4 +1,5 @@
 import { PB_API, ADMIN_PASSWORD } from '@services/api.js';
+import { setAdminSessionPassword } from '@services/state.js';
 import { requireAdmin } from '@services/auth.js';
 import { showPrompt, showConfirm, showAlert } from '@ui/uiComponents.js';
 
@@ -31,6 +32,25 @@ export async function initManagementPage() {
     toolsSection.classList.remove('hidden');
     loadLeagues();
     renderVersionInfo();
+    renderLogoutButton();
+  };
+
+  /**
+   * Injects a logout button into the tools section to clear the admin session.
+   */
+  const renderLogoutButton = () => {
+    if (document.getElementById('mgmt-logout-btn')) return;
+    const logoutBtn = document.createElement('button');
+    logoutBtn.id = 'mgmt-logout-btn';
+    logoutBtn.textContent = 'Logout Admin Session';
+    logoutBtn.className = 'btn-standard secondary no-print';
+    logoutBtn.style = "margin-bottom: 2rem;";
+    logoutBtn.onclick = () => {
+      setAdminSessionPassword(null);
+      toolsSection.classList.add('hidden');
+      authNotice.classList.remove('hidden');
+    };
+    toolsSection.prepend(logoutBtn);
   };
 
   /**
