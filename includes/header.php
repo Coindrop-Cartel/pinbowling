@@ -14,18 +14,13 @@
           <a href="<?php echo $baseUrl; ?>/standings" class="nav-link" data-route="STANDINGS">Scoreboard</a>
         </div>
       </li>
-      <li class="nav-item dropdown">
-        <a href="javascript:void(0)" class="nav-link dropbtn">Resources</a>
-        <div class="dropdown-content">
-          <a href="<?php echo $baseUrl; ?>/machines" class="nav-link" data-route="MACHINES">Machines</a>
-          <a href="<?php echo $baseUrl; ?>/locations" class="nav-link" data-route="LOCATIONS">Locations</a>
-        </div>
-      </li>
       <li id="admin-nav-item" class="nav-item dropdown hidden">
         <a href="javascript:void(0)" class="nav-link dropbtn">Admin</a>
         <div class="dropdown-content">
+          <a href="<?php echo $baseUrl; ?>/machines" class="nav-link" data-route="MACHINES">Machines</a>
+          <a href="<?php echo $baseUrl; ?>/locations" class="nav-link" data-route="LOCATIONS">Locations</a>
           <a href="<?php echo $baseUrl; ?>/players" class="nav-link" data-route="PLAYERS">Players</a>
-          <a href="<?php echo $baseUrl; ?>/management" class="nav-link" data-route="MAINTENANCE">Maintenance</a>
+          <a id="nav-maintenance" href="<?php echo $baseUrl; ?>/management" class="nav-link" data-route="MAINTENANCE">Maintenance</a>
         </div>
       </li>
     </ul>

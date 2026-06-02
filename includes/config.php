@@ -462,6 +462,27 @@ function validateAdminAccess() {
 }
 
 /**
+ * Verifies that the user is at least a TD or has master credentials.
+ */
+function validateTDAccess() {
+    global $adminPassword, $apiSecret;
+    
+    $providedPass = getHeader('X-League-Password');
+    $providedSecret = getHeader('X-PB-Secret');
+
+    if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+        return;
+    }
+    
+    $user = getCurrentUser();
+    if ($user && ($user['role'] === 'admin' || $user['role'] === 'td')) {
+        return;
+    }
+
+    sendJson(['error' => 'Unauthorized: TD or Admin access required'], 401);
+}
+
+/**
  * Security Gatekeeper. Verifies the custom X-PB-SECRET header against
  * the server-side API_SECRET. Rejects unauthorized write requests.
  */

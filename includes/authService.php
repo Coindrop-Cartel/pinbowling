@@ -91,7 +91,7 @@ try {
         }
 
         if ($task === 'reset') {
-            validateAdminAccess();
+            validateTDAccess();
             $userId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
             $newPassword = $input['password'] ?? '';
             

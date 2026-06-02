@@ -15,16 +15,6 @@
 
   <div id="management-tools" class="hidden">
     <section class="card">
-      <h2>League Security</h2>
-      <p>Reset or clear the password for a specific league.</p>
-      <div class="form-row">
-        <label for="mgmt-league-select">Select League</label>
-        <select id="mgmt-league-select"></select>
-      </div>
-      <button id="mgmt-reset-pass-btn">Reset League Password</button>
-    </section>
-
-    <section class="card">
       <h2>Database Cleanup</h2>
       <p>Remove session leagues and associated data (scores, targets).</p>
       <button id="mgmt-run-cleanup-btn" class="danger">Run Cleanup Script</button>

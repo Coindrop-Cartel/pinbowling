@@ -90,8 +90,13 @@ export async function initAuthHeader() {
 
   const render = (user) => {
     if (user) {
-      if (user.role === 'admin' && adminNav) {
+      const isTD = user.role === 'td';
+      const isAdmin = user.role === 'admin';
+
+      if ((isAdmin || isTD) && adminNav) {
         adminNav.classList.remove('hidden');
+        const maintenanceLink = adminNav.querySelector('#nav-maintenance');
+        if (maintenanceLink) maintenanceLink.classList.toggle('hidden', !isAdmin);
       }
 
       container.innerHTML = `

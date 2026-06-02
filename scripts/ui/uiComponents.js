@@ -239,9 +239,10 @@ export const showAlert = (message, title = 'Notice') => showDialog({ title, mess
  * @param {string} title Dialog title.
  * @param {string} message Dialog message.
  * @param {Array<{value: any, label: string, class?: string}>} choices List of options to present.
+ * @param {any} initialValue The value to select by default.
  * @returns {Promise<any|null>} The selected value, or null if cancelled.
  */
-export function showChoiceDialog(title, message, choices) {
+export function showChoiceDialog(title, message, choices, initialValue = null) {
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
     backdrop.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;box-sizing:border-box;backdrop-filter:blur(4px);";
@@ -250,17 +251,30 @@ export function showChoiceDialog(title, message, choices) {
     card.className = "card";
     card.style = "max-width:450px;width:100%;margin:0;box-shadow: 0 10px 25px rgba(0,0,0,0.5);";
 
+    let selectedValue = initialValue;
+
     card.innerHTML = `
       <h2 style="margin-top:0;">${title}</h2>
       <p style="margin-bottom:20px; line-height:1.5;">${message}</p>
       <div class="form-actions" style="margin-top:30px; display:flex; gap:12px; flex-wrap: wrap;">
-        ${choices.map(c => `<button class="choice-btn ${c.class || ''}" data-value="${c.value}" style="flex:1; min-width: 100px;">${c.label}</button>`).join('')}
-        <button id="modal-cancel" class="secondary" style="width:100%; margin-top: 5px;">Cancel</button>
+        ${choices.map(c => `<button type="button" class="choice-btn ${c.class || ''}" data-value="${c.value}" style="flex:1; min-width: 100px; transition: all 0.2s; border: 2px solid #000;">${c.label}</button>`).join('')}
+      </div>
+      <div class="form-actions" style="margin-top:20px; border-top: 1px solid #eee; padding-top: 20px; display:flex; gap:12px;">
+        <button id="modal-save" style="flex:1;">Save</button>
+        <button id="modal-cancel" class="secondary" style="flex:1;">Cancel</button>
       </div>
     `;
     
     backdrop.appendChild(card);
     document.body.appendChild(backdrop);
+
+    const updateStyles = () => {
+      card.querySelectorAll('.choice-btn').forEach(btn => {
+        const isSelected = String(btn.dataset.value) === String(selectedValue);
+        btn.style.backgroundColor = isSelected ? '#000' : '#fff';
+        btn.style.color = isSelected ? '#fff' : '#000';
+      });
+    };
 
     const finish = (value) => {
       document.body.removeChild(backdrop);
@@ -268,8 +282,15 @@ export function showChoiceDialog(title, message, choices) {
     };
 
     card.querySelectorAll('.choice-btn').forEach(btn => {
-      btn.onclick = () => finish(btn.dataset.value);
+      btn.onclick = () => {
+        selectedValue = btn.dataset.value;
+        updateStyles();
+      };
     });
+
+    updateStyles(); // Initial style application
+
+    card.querySelector('#modal-save').onclick = () => finish(selectedValue);
     card.querySelector('#modal-cancel').onclick = () => finish(null);
   });
 }

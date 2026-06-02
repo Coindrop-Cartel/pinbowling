@@ -86,11 +86,17 @@ try {
         }
 
         if ($task === 'role') {
-            validateAdminAccess();
+            validateTDAccess();
             $newRole = $input['role'] ?? 'player';
             if (!in_array($newRole, ['player', 'td', 'admin'])) {
                 sendJson(['error' => 'Invalid role'], 400);
             }
+
+            $user = getCurrentUser();
+            if ($user && $user['role'] === 'td' && $newRole === 'admin') {
+                sendJson(['error' => 'Unauthorized: TDs cannot assign Admin role'], 403);
+            }
+
             // $id here is the user_id passed in the URL
             $stmt = $pdo->prepare('UPDATE users SET role = ? WHERE id = ?');
             $stmt->execute([$newRole, $id]);
@@ -109,10 +115,16 @@ try {
         $ifpa_id = $input['ifpaId'] ?? null;
         $matchplay_id = $input['matchplayId'] ?? null;
 
-        // Rule: Changing the name requires Admin Access. 
-        // Updating IFPA/Matchplay IDs does not.
+        // Rule: Changing the name requires TD or Admin Access. 
         if ($newName !== $existing['player_name']) {
-            validateAdminAccess();
+            validateTDAccess();
+        } else {
+            // Updating IDs only: restricted to the profile owner, a TD, or an Admin
+            $user = getCurrentUser();
+            $isOwner = $user && (int)$user['player_id'] === $id;
+            if (!$isOwner) {
+                validateTDAccess();
+            }
         }
 
         if (empty($newName)) {
