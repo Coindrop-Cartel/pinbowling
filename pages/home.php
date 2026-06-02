@@ -1,6 +1,6 @@
 <?php $pageTitle = 'Home'; ?>
 <main class="page-container">
-  <header class="hero-section">
+  <header class="hero-section" style="position: relative;">
     <div class="hero-text">
       <h1>Welcome to PinBowling</h1>
       <p>A quick attempt to put together a basic way to track pinball scores in a bowling format. </p> 

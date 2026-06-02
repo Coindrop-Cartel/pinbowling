@@ -93,11 +93,19 @@ try {
             if (!is_array($input)) sendJson(['error' => 'Input must be an array of updates'], 400);
 
             // Fetch the event_id for the targets we are reordering.
-            // We assume all targets in the input belong to the same event.
-            $stmtEvent = $pdo->prepare('SELECT event_id FROM target_scores WHERE id = ?');
-            $stmtEvent->execute([(int)$input[0]['id']]);
-            $eventId = $stmtEvent->fetchColumn();
-            if (!$eventId) sendJson(['error' => 'Invalid target ID'], 400);
+            $stmtAuth = $pdo->prepare('
+                SELECT e.league_id, ts.event_id 
+                FROM target_scores ts 
+                JOIN events e ON ts.event_id = e.id 
+                WHERE ts.id = ?
+            ');
+            $stmtAuth->execute([(int)$input[0]['id']]);
+            $auth = $stmtAuth->fetch();
+
+            if (!$auth) sendJson(['error' => 'Invalid target ID'], 400);
+            
+            validateLeagueAccess($pdo, $auth['league_id']);
+            $eventId = $auth['event_id'];
 
             $pdo->beginTransaction();
             try {
@@ -144,6 +152,12 @@ try {
             $batch = isset($input[0]) ? $input : [$input];
             $pdo->beginTransaction();
             try {
+                // Validate access for the target league (Setup change)
+                $firstEventId = $batch[0]['eventId'] ?? 0;
+                $stmtL = $pdo->prepare('SELECT league_id FROM events WHERE id = ?');
+                $stmtL->execute([(int)$firstEventId]);
+                validateLeagueAccess($pdo, $stmtL->fetchColumn());
+
                 foreach ($batch as $item) {
                     if (empty($item['eventId']) || empty($item['machineId'])) throw new Exception('eventId and machineId are required');
                     $id = (int)($item['id'] ?? 0);
@@ -195,8 +209,6 @@ try {
 
     // PUT: Update an existing round configuration (Protected by API Secret)
     if ($method === 'PUT') {
-        validateApiSecret();
-        
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
         
@@ -205,6 +217,13 @@ try {
             if (empty($input['machineId']) || empty($input['orderNumber']) || empty($input['values'])) {
                 sendJson(['error' => 'machineId, orderNumber, and values are required for target scores'], 400);
             }
+
+            // Setup change: Admin or League access required
+            $stmtL = $pdo->prepare('SELECT e.league_id FROM target_scores ts JOIN events e ON ts.event_id = e.id WHERE ts.id = ?');
+            $stmtL->execute([$id]);
+            $lId = $stmtL->fetchColumn();
+            validateLeagueAccess($pdo, $lId);
+
             $sql = 'UPDATE target_scores SET machine_id = ?, order_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
             $params = [(int)$input['machineId'], (int)$input['orderNumber']];
             for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
@@ -218,6 +237,9 @@ try {
             }
             sendJson(serializeTargetScore($row));
         } else { // Update a master machine (title only)
+            // Master DB modification: Admin access required
+            validateAdminAccess();
+
             $name = $input['machineName'] ?? $input['name'] ?? null;
             if (!$name) sendJson(['error' => 'machineName is required'], 400);
 
@@ -238,14 +260,24 @@ try {
 
     // DELETE: Remove a round configuration (Protected by API Secret)
     if ($method === 'DELETE') {
-        validateApiSecret();
-        
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id) { // ID of the entity to delete
             sendJson(['error' => 'id query parameter is required'], 400);
         }
         
-        $table = ($task === 'threshold') ? 'target_scores' : 'machines';
+        if ($task === 'threshold') {
+            // Setup change: Admin or League access required
+            $stmtL = $pdo->prepare('SELECT e.league_id FROM target_scores ts JOIN events e ON ts.event_id = e.id WHERE ts.id = ?');
+            $stmtL->execute([$id]);
+            $lId = $stmtL->fetchColumn();
+            validateLeagueAccess($pdo, $lId);
+            $table = 'target_scores';
+        } else {
+            // Master DB modification: Admin access required
+            validateAdminAccess();
+            $table = 'machines';
+        }
+
         $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ?");
         $stmt->execute([$id]);
         sendJson(['success' => true]);

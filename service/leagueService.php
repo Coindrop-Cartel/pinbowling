@@ -217,7 +217,6 @@ try {
         } else {
             // Handle password reset separately (Requires Global Admin)
             if (isset($input['resetPassword'])) {
-                validateApiSecret();
                 // Resetting a league password is a system-wide administrative task
                 validateAdminAccess();
                 $newPass = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;

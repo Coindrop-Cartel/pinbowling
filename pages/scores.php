@@ -1,6 +1,6 @@
 <?php $pageTitle = 'Scores'; ?>
   <main class="page-container">
-    <header>
+    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h1>Scores</h1>
     </header>
     <section style="margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff;">

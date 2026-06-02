@@ -234,6 +234,152 @@ export const showPrompt = (message, title = 'Admin Password', isPassword = true)
 export const showAlert = (message, title = 'Notice') => showDialog({ title, message, confirmText: 'OK', cancelText: null });
 
 /**
+ * Displays a dialog with multiple choice buttons for selecting an option.
+ * 
+ * @param {string} title Dialog title.
+ * @param {string} message Dialog message.
+ * @param {Array<{value: any, label: string, class?: string}>} choices List of options to present.
+ * @param {any} initialValue The value to select by default.
+ * @returns {Promise<any|null>} The selected value, or null if cancelled.
+ */
+export function showChoiceDialog(title, message, choices, initialValue = null) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;box-sizing:border-box;backdrop-filter:blur(4px);";
+    
+    const card = document.createElement('div');
+    card.className = "card";
+    card.style = "max-width:450px;width:100%;margin:0;box-shadow: 0 10px 25px rgba(0,0,0,0.5);";
+
+    let selectedValue = initialValue;
+
+    card.innerHTML = `
+      <h2 style="margin-top:0;">${title}</h2>
+      <p style="margin-bottom:20px; line-height:1.5;">${message}</p>
+      <div class="form-actions" style="margin-top:30px; display:flex; gap:12px; flex-wrap: wrap;">
+        ${choices.map(c => `<button type="button" class="choice-btn ${c.class || ''}" data-value="${c.value}" style="flex:1; min-width: 100px; transition: all 0.2s; border: 2px solid #000;">${c.label}</button>`).join('')}
+      </div>
+      <div class="form-actions" style="margin-top:20px; border-top: 1px solid #eee; padding-top: 20px; display:flex; gap:12px;">
+        <button id="modal-save" style="flex:1;">Save</button>
+        <button id="modal-cancel" class="secondary" style="flex:1;">Cancel</button>
+      </div>
+    `;
+    
+    backdrop.appendChild(card);
+    document.body.appendChild(backdrop);
+
+    const updateStyles = () => {
+      card.querySelectorAll('.choice-btn').forEach(btn => {
+        const isSelected = String(btn.dataset.value) === String(selectedValue);
+        btn.style.backgroundColor = isSelected ? '#000' : '#fff';
+        btn.style.color = isSelected ? '#fff' : '#000';
+      });
+    };
+
+    const finish = (value) => {
+      document.body.removeChild(backdrop);
+      resolve(value);
+    };
+
+    card.querySelectorAll('.choice-btn').forEach(btn => {
+      btn.onclick = () => {
+        selectedValue = btn.dataset.value;
+        updateStyles();
+      };
+    });
+
+    updateStyles(); // Initial style application
+
+    card.querySelector('#modal-save').onclick = () => finish(selectedValue);
+    card.querySelector('#modal-cancel').onclick = () => finish(null);
+  });
+}
+
+/**
+ * Displays a dual-mode dialog for User Login and Registration.
+ */
+export async function showAuthDialog() {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;box-sizing:border-box;backdrop-filter:blur(4px);";
+    
+    const card = document.createElement('div');
+    card.className = "card";
+    card.style = "max-width:400px;width:100%;margin:0;box-shadow: 0 10px 25px rgba(0,0,0,0.5);";
+    
+    const renderMode = (isRegister = false) => {
+      card.innerHTML = `
+        <h2 style="margin-top:0;">${isRegister ? 'Create Account' : 'Sign In'}</h2>
+        <form id="auth-modal-form">
+          <div class="form-row">
+            <label>Email Address</label>
+            <input type="email" id="auth-email" required style="width:100%;box-sizing:border-box;">
+          </div>
+          <div class="form-row">
+            <label>Password</label>
+            <input type="password" id="auth-pass" required style="width:100%;box-sizing:border-box;">
+          </div>
+          ${isRegister ? `
+          <div class="form-row">
+            <label>Player Name (Full Name)</label>
+            <input type="text" id="auth-name" required placeholder="e.g. John Doe" style="width:100%;box-sizing:border-box;">
+          </div>` : ''}
+          <div class="form-actions" style="margin-top:20px; flex-direction: column; gap: 10px;">
+            <button type="submit" style="width:100%;">${isRegister ? 'Register' : 'Login'}</button>
+            <button type="button" id="auth-switch" class="secondary" style="width:100%; border:none; background:none; text-decoration:underline; font-size:0.9rem;">
+              ${isRegister ? 'Already have an account? Sign In' : 'Need an account? Register now'}
+            </button>
+            <button type="button" id="auth-cancel" class="secondary" style="width:100%;">Cancel</button>
+          </div>
+        </form>
+      `;
+
+      const form = card.querySelector('#auth-modal-form');
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const email = card.querySelector('#auth-email').value;
+        const password = card.querySelector('#auth-pass').value;
+        
+        try {
+          let user;
+          if (isRegister) {
+            const playerName = card.querySelector('#auth-name').value;
+            let regResult = await PB_API.register({ email, password, playerName });
+            
+            // Handle existing player profile claim
+            if (regResult && regResult.claimRequired) {
+              const confirmed = await showConfirm(regResult.message, 'Claim Profile');
+              if (confirmed) {
+                await PB_API.register({ email, password, playerName, confirmClaim: true });
+              } else {
+                return; // Exit and keep modal open for name change
+              }
+            }
+            user = await PB_API.login(email, password);
+          } else {
+            user = await PB_API.login(email, password);
+          }
+          document.body.removeChild(backdrop);
+          resolve(user);
+        } catch (err) {
+          showAlert(err.message, 'Authentication Failed');
+        }
+      };
+
+      card.querySelector('#auth-switch').onclick = () => renderMode(!isRegister);
+      card.querySelector('#auth-cancel').onclick = () => {
+        document.body.removeChild(backdrop);
+        resolve(null);
+      };
+    };
+
+    renderMode(false);
+    backdrop.appendChild(card);
+    document.body.appendChild(backdrop);
+  });
+}
+
+/**
  * Replaces native browser confirm() and prompt() with a custom UI modal
  * that matches the site's card-based theme, specifically for player selection.
  * 

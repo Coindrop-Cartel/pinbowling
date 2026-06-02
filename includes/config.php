@@ -118,6 +118,24 @@ function initializeDatabaseSchema($pdo) {
     // We use CREATE TABLE IF NOT EXISTS to ensure the database can be rebuilt 
     // automatically if tables are dropped or if starting a fresh installation.
     
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `users` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `player_id` INT UNIQUE,
+        `email` VARCHAR(255) UNIQUE NOT NULL,
+        `password_hash` VARCHAR(255) NOT NULL,
+        `role` ENUM('player', 'td', 'admin') DEFAULT 'player',
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT `fk_user_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `league_staff` (
+        `league_id` INT NOT NULL,
+        `user_id` INT NOT NULL,
+        PRIMARY KEY (`league_id`, `user_id`),
+        CONSTRAINT `fk_staff_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_staff_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS `leagues` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(255) NOT NULL,
@@ -169,6 +187,21 @@ function initializeDatabaseSchema($pdo) {
         CONSTRAINT `fk_scores_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_scores_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_scores_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `score_history` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `score_id` INT DEFAULT NULL,
+        `event_id` INT NOT NULL,
+        `player_id` INT NOT NULL,
+        `order_number` INT NOT NULL,
+        `machine_id` INT NOT NULL,
+        `ball1` BIGINT DEFAULT 0,
+        `ball2` BIGINT DEFAULT 0,
+        `ball3` BIGINT DEFAULT 0,
+        `status` ENUM('pending', 'approved') DEFAULT 'approved',
+        `change_type` ENUM('INSERT', 'UPDATE', 'DELETE') NOT NULL,
+        `changed_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `league_players` (
@@ -291,6 +324,13 @@ function initializeDatabaseSchema($pdo) {
     $checkScores = $pdo->query("SHOW TABLES LIKE 'scores'")->fetch();
     if ($checkScores) {
         // Fix: Remove the overly restrictive index that ignores event_id
+
+        // Add status column for approval workflow
+        $checkStatus = $pdo->query("SHOW COLUMNS FROM `scores` LIKE 'status'")->fetch();
+        if (!$checkStatus) {
+            $pdo->exec("ALTER TABLE `scores` ADD COLUMN `status` ENUM('pending', 'approved') DEFAULT 'approved' AFTER `ball3` ");
+        }
+
         $checkOldIndex = $pdo->query("SHOW INDEX FROM `scores` WHERE Key_name = 'player_id_2' OR (Column_name = 'order_number' AND Seq_in_index = 2 AND Key_name != 'unique_player_round')")->fetch();
         if ($checkOldIndex) {
             // We need to be careful to only drop the index that lacks event_id. 
@@ -326,49 +366,135 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 /**
+ * Helper to get the currently authenticated user from the session.
+ */
+function getCurrentUser() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    return $_SESSION['user'] ?? null;
+}
+
+/**
+ * Checks if the current user has permission to manage a specific league.
+ */
+function canManageLeague($pdo, $leagueId) {
+    $user = getCurrentUser();
+    if (!$user) return false;
+    if ($user['role'] === 'admin') return true;
+    
+    if ($user['role'] === 'td') {
+        $stmt = $pdo->prepare("SELECT 1 FROM league_staff WHERE league_id = ? AND user_id = ?");
+        $stmt->execute([$leagueId, $user['id']]);
+        return (bool)$stmt->fetch();
+    }
+    return false;
+}
+
+/**
+ * Helper to retrieve custom headers from various server environments.
+ * Handles standard, lowercase, and REDIRECT_ prefixed variants (common in CGI/FastCGI).
+ */
+function getHeader($name) {
+    static $headers = null;
+    if ($headers === null) {
+        $headers = function_exists('getallheaders') ? getallheaders() : [];
+    }
+    
+    $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+    return $_SERVER[$serverKey] 
+        ?? $headers[$name] 
+        ?? $headers[strtolower($name)] 
+        ?? $_SERVER["REDIRECT_$serverKey"] 
+        ?? null;
+}
+
+/**
  * Validates access to a specific league.
  * Access is granted if the global admin secret is correct OR if the
  * provided league-specific password matches.
- * 
- * @param PDO $pdo
- * @param int $leagueId
- * @return void
  */
 function validateLeagueAccess($pdo, $leagueId) {
-    global $apiSecret, $adminPassword;
-    $headers = function_exists('getallheaders') ? getallheaders() : [];
-    $providedSecret = $_SERVER['HTTP_X_PB_SECRET'] ?? $headers['X-PB-SECRET'] ?? $headers['x-pb-secret'] ?? $_SERVER['REDIRECT_HTTP_X_PB_SECRET'] ?? null;
-    $providedLeaguePass = $_SERVER['HTTP_X_LEAGUE_PASSWORD'] ?? $headers['X-LEAGUE-PASSWORD'] ?? $headers['x-league-password'] ?? null;
+    global $adminPassword, $apiSecret;
+    
+    $providedPass = getHeader('X-League-Password');
+    $providedSecret = getHeader('X-PB-Secret');
 
-    // 1. Global Master Bypass: Authenticated via API Secret OR Admin Password
-    if ($providedSecret === $apiSecret || $providedLeaguePass === $adminPassword) return;
-
-    // 2. Check League Specific Password
+    // 1. Master Overrides: Admin Password or API Secret
+    if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+        return;
+    }
+  
+    // 2. League Specific Password Check
     if (!$leagueId) sendJson(['error' => 'League ID required for validation'], 400);
 
     $stmt = $pdo->prepare('SELECT password FROM leagues WHERE id = ?');
     $stmt->execute([(int)$leagueId]);
     $hash = $stmt->fetchColumn();
 
-    if (!$hash) return; // League has no password set
+    if (!$hash) return; // Open if no password set
 
-    if (!$providedLeaguePass || !password_verify($providedLeaguePass, $hash)) {
+    if (!$providedPass || !password_verify($providedPass, $hash)) {
         sendJson(['error' => 'Unauthorized: Invalid League Password'], 401);
     }
 }
 
 /**
+ * Verifies that the provided credentials match the Global Admin Password or API Secret.
+ * Used for system-wide modifications like master machine/player editing.
+ */
+function validateAdminAccess() {
+    global $adminPassword, $apiSecret;
+    
+    $providedPass = getHeader('X-League-Password');
+    $providedSecret = getHeader('X-PB-Secret');
+
+    if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+        return;
+    }
+    
+    $user = getCurrentUser();
+    if ($user && $user['role'] === 'admin') {
+        return;
+    }
+
+    sendJson(['error' => 'Unauthorized: Admin access required'], 401);
+}
+
+/**
+ * Verifies that the user is at least a TD or has master credentials.
+ */
+function validateTDAccess() {
+    global $adminPassword, $apiSecret;
+    
+    $providedPass = getHeader('X-League-Password');
+    $providedSecret = getHeader('X-PB-Secret');
+
+    if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+        return;
+    }
+    
+    $user = getCurrentUser();
+    if ($user && ($user['role'] === 'admin' || $user['role'] === 'td')) {
+        return;
+    }
+
+    sendJson(['error' => 'Unauthorized: TD or Admin access required'], 401);
+}
+
+/**
  * Security Gatekeeper. Verifies the custom X-PB-SECRET header against
  * the server-side API_SECRET. Rejects unauthorized write requests.
- * @return void
  */
 function validateApiSecret() {
-    global $apiSecret;
-    
-    // Hosted environments (CGI/FastCGI) often rename or strip custom headers.
-    // We check common variations and Apache-specific header arrays.
-    $headers = function_exists('getallheaders') ? getallheaders() : [];
-    $providedSecret = $_SERVER['HTTP_X_PB_SECRET'] ?? $headers['X-PB-SECRET'] ?? $headers['x-pb-secret'] ?? $_SERVER['REDIRECT_HTTP_X_PB_SECRET'] ?? null;
+    global $apiSecret, $adminPassword;
+    $providedSecret = getHeader('X-PB-Secret');
+    $providedPass = getHeader('X-League-Password');
+
+    // Allow either the secret or the admin password to satisfy API secret checks
+    if ($providedSecret === $apiSecret || ($providedPass && $providedPass === $adminPassword)) {
+        return;
+    }
 
     if (!$providedSecret || $providedSecret !== $apiSecret) {
         sendJson(['error' => 'Unauthorized: Invalid or missing API secret'], 401);

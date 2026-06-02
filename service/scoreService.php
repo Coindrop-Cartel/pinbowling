@@ -33,13 +33,15 @@ function serializeScore($row) {
         'machineName' => $row['machine_name'] ?? null,
         'ball1' => (int)$row['ball1'],
         'ball2' => (int)$row['ball2'],
-        'ball3' => (int)$row['ball3']
+        'ball3' => (int)$row['ball3'],
+        'status' => $row['status'] ?? 'approved'
     ];
 }
 
 try {
     $pdo = getDbConnection();
     $method = $_SERVER['REQUEST_METHOD'];
+    $task = $_GET['task'] ?? 'score';
 
     // GET: Retrieve all frame scores for a specific player
     if ($method === 'GET') {
@@ -102,6 +104,7 @@ try {
         $ball1 = isset($input['ball1']) ? (int)$input['ball1'] : 0;
         $ball2 = isset($input['ball2']) ? (int)$input['ball2'] : 0;
         $ball3 = isset($input['ball3']) ? (int)$input['ball3'] : 0;
+        $status = $input['status'] ?? 'approved';
 
         if (!$event_id || !$player_id || !$order_number || !$machine_id) {
             sendJson(['error' => 'eventId, playerId, orderNumber, and machineId are required'], 400);
@@ -112,11 +115,58 @@ try {
             sendJson(['error' => 'Invalid score values'], 400);
         }
 
-        $sql = 'INSERT INTO scores (event_id, player_id, `order_number`, machine_id, ball1, ball2, ball3)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), ball1 = VALUES(ball1), ball2 = VALUES(ball2), ball3 = VALUES(ball3)';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$event_id, $player_id, $order_number, $machine_id, $ball1, $ball2, $ball3]);
+        // Security Rule: If updating an existing score in a protected 'standard' league,
+        // verify League or Admin credentials.
+        $stmtL = $pdo->prepare('SELECT l.id, l.password, l.type FROM events e JOIN leagues l ON e.league_id = l.id WHERE e.id = ?');
+        $stmtL->execute([$event_id]);
+        $leagueInfo = $stmtL->fetch();
+
+        if ($leagueInfo) {
+            $league_id = (int)$leagueInfo['id'];
+            $hasPassword = !empty($leagueInfo['password']);
+            $isStandard = ($leagueInfo['type'] === 'standard');
+
+            // Check if a score record already exists for this slot
+            $stmtCheck = $pdo->prepare('SELECT id FROM scores WHERE event_id = ? AND player_id = ? AND order_number = ?');
+            $stmtCheck->execute([$event_id, $player_id, $order_number]);
+            $existingScoreId = $stmtCheck->fetchColumn();
+
+            if ($existingScoreId && $hasPassword && $isStandard) {
+                validateLeagueAccess($pdo, $league_id);
+            }
+        }
+
+        $pdo->beginTransaction();
+        try {
+            // Log history for existing record before update
+            if ($existingScoreId) {
+                $stmtFetch = $pdo->prepare('SELECT * FROM scores WHERE id = ?');
+                $stmtFetch->execute([$existingScoreId]);
+                $old = $stmtFetch->fetch();
+                if ($old) {
+                    $stmtHistory = $pdo->prepare('INSERT INTO score_history (score_id, event_id, player_id, order_number, machine_id, ball1, ball2, ball3, status, change_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "UPDATE")');
+                    $stmtHistory->execute([$old['id'], $old['event_id'], $old['player_id'], $old['order_number'], $old['machine_id'], $old['ball1'], $old['ball2'], $old['ball3'], $old['status']]);
+                }
+            }
+
+            $sql = 'INSERT INTO scores (event_id, player_id, `order_number`, machine_id, ball1, ball2, ball3, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), ball1 = VALUES(ball1), ball2 = VALUES(ball2), ball3 = VALUES(ball3), status = VALUES(status)';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$event_id, $player_id, $order_number, $machine_id, $ball1, $ball2, $ball3, $status]);
+
+            // Log history for the new record after insert
+            if (!$existingScoreId) {
+                $newId = $pdo->lastInsertId();
+                $stmtHistory = $pdo->prepare('INSERT INTO score_history (score_id, event_id, player_id, order_number, machine_id, ball1, ball2, ball3, status, change_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "INSERT")');
+                $stmtHistory->execute([$newId, $event_id, $player_id, $order_number, $machine_id, $ball1, $ball2, $ball3, $status]);
+            }
+
+            $pdo->commit();
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
 
         // Fetch the newly created/updated row with the machine name joined for UI consistency
         $stmt = $pdo->prepare('
@@ -136,14 +186,33 @@ try {
 
     // DELETE: Clear all scores for a specific player (Protected by API Secret)
     if ($method === 'DELETE') {
-        validateApiSecret();
+        validateAdminAccess();
         $player_id = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
         if (!$player_id) {
             sendJson(['error' => 'playerId query parameter is required'], 400);
         }
-        $stmt = $pdo->prepare('DELETE FROM scores WHERE player_id = ?');
-        $stmt->execute([$player_id]);
-        sendJson(['success' => true]);
+
+        $pdo->beginTransaction();
+        try {
+            // Log all scores to history as DELETE before removal
+            $stmtFetch = $pdo->prepare('SELECT * FROM scores WHERE player_id = ?');
+            $stmtFetch->execute([$player_id]);
+            $rows = $stmtFetch->fetchAll();
+
+            $stmtHistory = $pdo->prepare('INSERT INTO score_history (score_id, event_id, player_id, order_number, machine_id, ball1, ball2, ball3, status, change_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "DELETE")');
+            foreach ($rows as $row) {
+                $stmtHistory->execute([$row['id'], $row['event_id'], $row['player_id'], $row['order_number'], $row['machine_id'], $row['ball1'], $row['ball2'], $row['ball3'], $row['status']]);
+            }
+
+            $stmt = $pdo->prepare('DELETE FROM scores WHERE player_id = ?');
+            $stmt->execute([$player_id]);
+            
+            $pdo->commit();
+            sendJson(['success' => true]);
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
     }
 
     sendJson(['error' => 'Unsupported request method'], 405);

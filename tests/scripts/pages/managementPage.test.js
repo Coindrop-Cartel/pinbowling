@@ -10,11 +10,13 @@ vi.mock('@services/api.js', () => ({
     getLeagues: vi.fn(),
     runCleanup: vi.fn(),
     updateLeague: vi.fn(),
+    getCurrentUser: vi.fn(),
   },
 }));
 
 vi.mock('@services/auth.js', () => ({
   requireAdmin: vi.fn(),
+  initAuthHeader: vi.fn(),
 }));
 
 vi.mock('@services/state.js', () => ({
@@ -46,7 +48,7 @@ describe('Management Page (managementPage.js)', () => {
   });
 
   it('should reveal tools and render version info when authenticated', async () => {
-    Auth.requireAdmin.mockResolvedValue(true);
+    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
     
     await initManagementPage();
 
@@ -58,37 +60,23 @@ describe('Management Page (managementPage.js)', () => {
   });
 
   it('should stay hidden if authentication fails', async () => {
-    Auth.requireAdmin.mockResolvedValue(false);
+    PB_API.getCurrentUser.mockResolvedValue(null);
     
     await initManagementPage();
 
-    const tools = document.getElementById('management-tools');
-    expect(tools.classList.contains('hidden')).toBe(true);
-  });
-
-  it('should clear session and hide tools when logout is clicked', async () => {
-    Auth.requireAdmin.mockResolvedValue(true);
-    await initManagementPage();
-
-    const logoutBtn = document.getElementById('mgmt-logout-btn');
-    expect(logoutBtn).not.toBeNull();
-
-    logoutBtn.click();
-
-    expect(State.setAdminSessionPassword).toHaveBeenCalledWith(null);
     const tools = document.getElementById('management-tools');
     expect(tools.classList.contains('hidden')).toBe(true);
   });
 
   it('should re-trigger auth check when login button is clicked', async () => {
-    Auth.requireAdmin.mockResolvedValue(false);
+    PB_API.getCurrentUser.mockResolvedValue(null);
     await initManagementPage();
     
     vi.clearAllMocks();
-    Auth.requireAdmin.mockResolvedValue(true);
+    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
     
     document.getElementById('admin-login-btn').click();
     
-    expect(Auth.requireAdmin).toHaveBeenCalled();
+    expect(PB_API.getCurrentUser).toHaveBeenCalled();
   });
 });

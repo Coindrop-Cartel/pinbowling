@@ -1,6 +1,6 @@
 <?php $pageTitle = 'Leagues & Events'; ?>
   <main class="page-container">
-    <header>
+    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h1>Leagues & Events Management</h1>
     </header>
 

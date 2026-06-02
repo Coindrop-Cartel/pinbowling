@@ -149,7 +149,7 @@ try {
 
     // PUT: Update an existing location (Protected by API Secret)
     if ($method === 'PUT') {
-        validateApiSecret();
+        validateAdminAccess();
         
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id || empty($input['name'])) {
@@ -170,7 +170,7 @@ try {
 
     // DELETE: Remove a location (Protected by API Secret)
     if ($method === 'DELETE') {
-        validateApiSecret();
+        validateAdminAccess();
         
         if ($task === 'units') {
             $location_id = isset($_GET['locationId']) ? (int)$_GET['locationId'] : 0;
