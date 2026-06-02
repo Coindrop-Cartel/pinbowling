@@ -84,7 +84,7 @@ export async function initPlayersPage() {
             ${p.matchplayId ? `<small>Matchplay: ${p.matchplayId}</small>` : ''}
           </div>
           <div style="display: flex; gap: 8px;">
-            ${(isAdmin || isTD) && p.userId ? `<button type="button" class="pass-reset-btn secondary" data-user-id="${p.userId}" style="padding: 4px 10px; font-size: 0.85rem;">Reset Pass</button>` : ''}
+            ${(isAdmin || isTD) && p.userId ? `<button type="button" class="pass-reset-btn secondary" data-user-id="${p.userId}" style="padding: 4px 10px; font-size: 0.85rem;">Reset</button>` : ''}
             ${(isAdmin || isTD) && p.userId ? `<button type="button" class="role-btn secondary" data-user-id="${p.userId}" data-role="${p.userRole}" style="padding: 4px 10px; font-size: 0.85rem;">Role</button>` : ''}
             ${canEdit ? `<button type="button" class="edit-player-btn secondary" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.85rem;">Edit</button>` : ''}
             ${isAdmin ? `<button type="button" class="delete-player-btn-inline" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>` : ''}

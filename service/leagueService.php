@@ -93,7 +93,6 @@ try {
                     $stmt->execute([$id]);
                     $league['players'] = $stmt->fetchAll();
 
-                    unset($league['password']); // Never return hashes
                     sendJson(serializeLeague($league));
                 }
                 sendJson(['error' => 'League not found'], 404);
@@ -194,13 +193,11 @@ try {
         } else {
             if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
             
-            $password = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
-            $sql = 'INSERT INTO leagues (name, start_date, password, type, scoring_format) VALUES (?, ?, ?, ?, ?)';
+            $sql = 'INSERT INTO leagues (name, start_date, type, scoring_format) VALUES (?, ?, ?, ?)';
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 $input['name'], 
                 $input['startDate'] ?? null, 
-                $password, 
                 $input['type'] ?? 'standard',
                 $input['scoringFormat'] ?? 'bowling'
             ]);
@@ -225,27 +222,10 @@ try {
         if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
 
         if ($task === 'fixture') {
-            $sql = 'UPDATE events SET league_id = ?, location_id = ?, event_name = ?, event_date = ?, scoring_format = ? WHERE id = ?';
-            $params = [
-                (int)$input['leagueId'], 
-                !empty($input['locationId']) ? (int)$input['locationId'] : null, 
-                $input['eventName'], 
-                $input['eventDate'] ?? null, 
-                $input['scoringFormat'] ?? 'bowling',
-                $id
-            ];
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id WHERE e.id = ?');
         } else {
-            // Handle password reset separately (Requires Global Admin)
-            if (isset($input['resetPassword'])) {
-                // Resetting a league password is a system-wide administrative task
-                validateAdminAccess();
-                $newPass = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
-                $pdo->prepare('UPDATE leagues SET password = ? WHERE id = ?')->execute([$newPass, $id]);
-                sendJson(['success' => true]);
-            }
             $sql = 'UPDATE leagues SET name = ?, start_date = ?, scoring_format = ? WHERE id = ?';
             $params = [
                 $input['name'], 

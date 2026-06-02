@@ -1,5 +1,4 @@
-import { PB_API, ADMIN_PASSWORD } from '@services/api.js';
-import { setAdminSessionPassword } from '@services/state.js';
+import { PB_API } from '@services/api.js';
 import { requireAdmin } from '@services/auth.js';
 import { showPrompt, showConfirm, showAlert } from '@ui/uiComponents.js';
 
@@ -18,17 +17,18 @@ export async function initManagementPage() {
    */
   const checkAuth = async () => {
     const user = await PB_API.getCurrentUser();
-    
-    if (user && user.role === 'admin') {
-      revealTools();
-    } else {
-      authNotice.innerHTML = `<h2>Access Denied</h2><p>You must be logged in as an administrator to access this page.</p>`;
+    const isAuthorized = user && (user.role === 'admin' || user.role === 'td');
+    if (isAuthorized) {
+      revealTools(user);
     }
   };
 
-  const revealTools = () => {
+  const revealTools = (user) => {
     authNotice.classList.add('hidden');
     toolsSection.classList.remove('hidden');
+    if (cleanupBtn) {
+      cleanupBtn.classList.toggle('hidden', user.role !== 'admin');
+    }
   };
 
   /**
@@ -91,8 +91,7 @@ export async function initManagementPage() {
     
     if (!confirmed) return;
 
-    const adminVerified = await requireAdmin('Enter Admin Password to perform database cleanup:');
-    if (!adminVerified) return;
+    if (!await requireAdmin()) return;
 
     const daysInput = await showPrompt('Enter retention period in days (leagues older than this will be deleted):', 'Cleanup Configuration', false);
     if (daysInput === null) return; // User cancelled the prompt

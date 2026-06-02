@@ -337,9 +337,6 @@ export async function initConfigPage() {
     if (!orderNumber || !machineName || (!score10 && !score1) || !eventId) return;
 
     const values = Engine.buildRoundValues(score10, score1, currentScaling);
-    if (!await requireAdmin(`Enter Admin Password to save changes for Round ${orderNumber}:`)) {
-      return;
-    }
 
     // --- Resolving Master Machines ---
     // If the machine name entered doesn't exist in the master list, 

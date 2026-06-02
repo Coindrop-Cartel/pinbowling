@@ -1,6 +1,8 @@
 import { PB_API } from '@services/api.js';
-import { setupLiveFilter, showConfirm, showPrompt } from '@ui/uiComponents.js';
-import { requireAdmin } from '@services/auth.js';
+import { setupLiveFilter, showConfirm, showPrompt, showAlert } from '@ui/uiComponents.js';
+import { requireAdmin, isManagementAuthorized } from '@services/auth.js';
+import { navigateTo } from '@scripts/utils.js';
+import { ROUTES } from '@scripts/routes.js';
 
 /**
  * Logic for the Global Machine Registry page.
@@ -11,6 +13,13 @@ import { requireAdmin } from '@services/auth.js';
  * @async
  */
 export async function initMachinesPage() {
+  const isAuthorized = await isManagementAuthorized();
+  if (!isAuthorized) {
+    showAlert('Unauthorized: Management access is required to view the machine registry.', 'Access Denied');
+    navigateTo(ROUTES.HOME);
+    return;
+  }
+
   const form = document.getElementById('machine-form');
   const nameInput = document.getElementById('machine-name');
   const list = document.getElementById('machines-list');
@@ -47,13 +56,10 @@ export async function initMachinesPage() {
         
         item.innerHTML = `
           <span style="font-weight: bold;">${m.machineName}</span>
-          <button class="delete-mach-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
+          ${isAuthorized ? '<button class="delete-mach-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>' : ''}
         `;
 
         item.querySelector('.delete-mach-btn').onclick = async () => {
-          if (!await requireAdmin(`Enter Admin Password to delete "${m.machineName}":`)) {
-            return;
-          }
           if (await showConfirm(`Are you sure you want to remove "${m.machineName}"? This will remove it from all locations and events.`, 'Delete Machine')) {
             await PB_API.deleteMachine(m.id);
             await load();

@@ -1,10 +1,8 @@
 /**
  * API Client and State Management
  */
-import { getLeaguePassword } from './state.js';
 
 const API_SECRET = window.PB_API_SECRET || "";
-export const ADMIN_PASSWORD = window.PB_ADMIN_PASSWORD || "";
 
 // Calculate the base application path once to ensure relative API calls resolve correctly
 // regardless of clean URL routing (e.g., /leagues vs /leagues.php)
@@ -37,7 +35,6 @@ export async function fetchJSON(url, options = {}) {
 
   const urlObj = new URL(finalUrl.startsWith('http') ? finalUrl : `http://localhost/${finalUrl}`);
   const leagueId = urlObj.searchParams.get('leagueId') || (options.body ? JSON.parse(options.body).leagueId : null);
-  const leaguePass = leagueId ? getLeaguePassword(leagueId) : null;
 
   // Tunnel DELETE and PUT via POST to bypass potential server-level method blocking.
   // This ensures the project setup is synchronized and robust across different hosts.
@@ -51,7 +48,6 @@ export async function fetchJSON(url, options = {}) {
   const finalHeaders = {
     'Content-Type': 'application/json',
     'X-PB-SECRET': API_SECRET,
-    ...(leaguePass && { 'X-LEAGUE-PASSWORD': leaguePass }),
     ...headers
   };
 

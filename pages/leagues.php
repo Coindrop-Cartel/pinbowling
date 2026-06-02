@@ -1,6 +1,6 @@
 <?php $pageTitle = 'Leagues & Events'; ?>
   <main class="page-container">
-    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <header>
       <h1>Leagues & Events Management</h1>
     </header>
 
@@ -13,6 +13,13 @@
         <div class="form-row">
           <label for="league-start-date">Start Date</label>
           <input id="league-start-date" type="date" required style="width: 100%; box-sizing: border-box;" />
+        </div>
+        <div class="form-row">
+          <label for="league-scoring-format">Default Scoring Format</label>
+          <select id="league-scoring-format" style="width: 100%; box-sizing: border-box;">
+            <option value="bowling">Bowling (Marks & Frames)</option>
+            <option value="classic">Classic (Points Only)</option>
+          </select>
         </div>
         <div class="form-actions">
           <button type="submit" id="create-league-btn" disabled>Create League</button>
@@ -47,6 +54,13 @@
           <select id="event-location" style="width: 100%; box-sizing: border-box;">
             <option value="">Select Location (Optional)</option>
             <!-- Locations will be loaded here -->
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="event-scoring-format">Scoring Format</label>
+          <select id="event-scoring-format" style="width: 100%; box-sizing: border-box;">
+            <option value="bowling">Bowling (Marks & Frames)</option>
+            <option value="classic">Classic (Points Only)</option>
           </select>
         </div>
         <div class="form-actions">

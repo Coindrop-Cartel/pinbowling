@@ -114,6 +114,7 @@ function getDbConnection() {
  * @param PDO $pdo
  */
 function initializeDatabaseSchema($pdo) {
+    global $adminPassword;
     // --- Base Table Creation ---
     // We use CREATE TABLE IF NOT EXISTS to ensure the database can be rebuilt 
     // automatically if tables are dropped or if starting a fresh installation.
@@ -141,7 +142,6 @@ function initializeDatabaseSchema($pdo) {
         `name` VARCHAR(255) NOT NULL,
         `type` ENUM('standard', 'session') DEFAULT 'standard',
         `start_date` DATE DEFAULT NULL,
-        `password` VARCHAR(255) DEFAULT NULL,
         `scoring_format` VARCHAR(50) DEFAULT 'bowling'
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
@@ -264,15 +264,6 @@ function initializeDatabaseSchema($pdo) {
         }
     }
 
-    // Ensure 'leagues' table has the 'password' column (added for protected leagues)
-    $checkLeagues = $pdo->query("SHOW TABLES LIKE 'leagues'")->fetch();
-    if ($checkLeagues) {
-        $checkPassword = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'password'")->fetch();
-        if (!$checkPassword) {
-            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `password` VARCHAR(255) DEFAULT NULL AFTER `start_date` ");
-        }
-    }
-
     // Ensure 'users' table uses 'username' instead of 'email'
     $checkUsers = $pdo->query("SHOW TABLES LIKE 'users'")->fetch();
     if ($checkUsers) {
@@ -295,7 +286,7 @@ function initializeDatabaseSchema($pdo) {
     if ($checkLeagues) {
         $checkLeagueScoring = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'scoring_format'")->fetch();
         if (!$checkLeagueScoring) {
-            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `scoring_format` VARCHAR(50) DEFAULT 'bowling' AFTER `password` ");
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `scoring_format` VARCHAR(50) DEFAULT 'bowling' AFTER `start_date` ");
         }
     }
 
@@ -347,6 +338,15 @@ function initializeDatabaseSchema($pdo) {
         if (!$checkIndex) {
             $pdo->exec("ALTER TABLE `target_scores` ADD UNIQUE KEY `unique_event_round` (event_id, order_number)");
         }
+    }
+
+    // --- Seed Default Admin User ---
+    // If no admin user exists, create one using the ADMIN_PASSWORD from .env
+    $checkAdmin = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
+    if ($checkAdmin == 0) {
+        $hashed = password_hash($adminPassword, PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)");
+        $stmt->execute(['admin', $hashed, 'admin']);
     }
 
     // Ensure 'scores' table has the unique constraint for upsert logic
@@ -444,34 +444,21 @@ function getHeader($name) {
  * provided league-specific password matches.
  */
 function validateLeagueAccess($pdo, $leagueId) {
-    global $adminPassword, $apiSecret;
-    
-    $providedPass = getHeader('X-League-Password');
+    global $apiSecret;
+
     $providedSecret = getHeader('X-PB-Secret');
 
-    // 1. Master Overrides: Session Role, Admin Password or API Secret
+    // 1. Master Overrides: Session Role or API Secret
     $user = getCurrentUser();
     if ($user && ($user['role'] === 'admin' || $user['role'] === 'td')) {
         return;
     }
 
-    // 1. Master Overrides: Admin Password or API Secret
-    if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+    if ($providedSecret && $providedSecret === $apiSecret) {
         return;
     }
-  
-    // 2. League Specific Password Check
-    if (!$leagueId) sendJson(['error' => 'League ID required for validation'], 400);
 
-    $stmt = $pdo->prepare('SELECT password FROM leagues WHERE id = ?');
-    $stmt->execute([(int)$leagueId]);
-    $hash = $stmt->fetchColumn();
-
-    if (!$hash) return; // Open if no password set
-
-    if (!$providedPass || !password_verify($providedPass, $hash)) {
-        sendJson(['error' => 'Unauthorized: Invalid League Password'], 401);
-    }
+    // If we reach here and it's a restricted action, we'll rely on the specific service logic
 }
 
 /**
@@ -479,12 +466,11 @@ function validateLeagueAccess($pdo, $leagueId) {
  * Used for system-wide modifications like master machine/player editing.
  */
 function validateAdminAccess() {
-    global $adminPassword, $apiSecret;
-    
-    $providedPass = getHeader('X-League-Password');
+    global $apiSecret;
+
     $providedSecret = getHeader('X-PB-Secret');
 
-    if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+    if ($providedSecret && $providedSecret === $apiSecret) {
         return;
     }
     
@@ -500,12 +486,11 @@ function validateAdminAccess() {
  * Verifies that the user is at least a TD or has master credentials.
  */
 function validateTDAccess() {
-    global $adminPassword, $apiSecret;
-    
-    $providedPass = getHeader('X-League-Password');
+    global $apiSecret;
+
     $providedSecret = getHeader('X-PB-Secret');
 
-    if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+    if ($providedSecret && $providedSecret === $apiSecret) {
         return;
     }
     
@@ -522,12 +507,11 @@ function validateTDAccess() {
  * the server-side API_SECRET. Rejects unauthorized write requests.
  */
 function validateApiSecret() {
-    global $apiSecret, $adminPassword;
-    $providedSecret = getHeader('X-PB-Secret');
-    $providedPass = getHeader('X-League-Password');
+    global $apiSecret;
 
-    // Allow either the secret or the admin password to satisfy API secret checks
-    if ($providedSecret === $apiSecret || ($providedPass && $providedPass === $adminPassword)) {
+    $providedSecret = getHeader('X-PB-Secret');
+
+    if ($providedSecret === $apiSecret) {
         return;
     }
 

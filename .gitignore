@@ -2,7 +2,7 @@
 node_modules/
 
 # Security: Environment variables and secrets
-.env
+.env.*
 .env.local
 .env.*.local
 

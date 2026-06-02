@@ -14,6 +14,7 @@ export async function initLeaguesPage() {
   const leagueForm = document.getElementById('league-form');
   const leagueNameInput = document.getElementById('league-name');
   const leagueDateInput = document.getElementById('league-start-date');
+  const leagueFormatInput = document.getElementById('league-scoring-format');
   const createBtn = document.getElementById('create-league-btn');
   const leaguesList = document.getElementById('leagues-list');
   const emptyNotice = document.getElementById('leagues-list-empty');
@@ -25,10 +26,12 @@ export async function initLeaguesPage() {
 
   // Setup "Create League" toggle behavior
   const dateRow = leagueDateInput.closest('.form-row');
+  const formatRow = leagueFormatInput ? leagueFormatInput.closest('.form-row') : null;
   const actionsRow = createBtn.closest('.form-actions');
   
   // Initially hide the creation fields
   if (dateRow) dateRow.classList.add('hidden');
+  if (formatRow) formatRow.classList.add('hidden');
   if (actionsRow) actionsRow.classList.add('hidden');
 
   let createToggle = null;
@@ -43,6 +46,7 @@ export async function initLeaguesPage() {
     createToggle.onclick = () => {
       const isHidden = dateRow.classList.contains('hidden');
       dateRow.classList.toggle('hidden', !isHidden);
+      if (formatRow) formatRow.classList.toggle('hidden', !isHidden);
       actionsRow.classList.toggle('hidden', !isHidden);
       if (isHidden) {
         createToggle.textContent = 'Cancel';
@@ -84,7 +88,7 @@ export async function initLeaguesPage() {
           <div class="league-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 6px 12px; background: #f9f9f9;">
             <div>
               <h3 style="margin: 0; font-size: 1.05rem;">${league.name}</h3>
-              <small>Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
+              <small>Started: ${league.startDate || 'N/A'} | Format: ${league.scoringFormat || 'bowling'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
             </div>
             <div style="display: flex; gap: 8px;">
               ${isAuthorized ? '<button class="delete-league-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>' : ''}
@@ -196,17 +200,17 @@ export async function initLeaguesPage() {
     e.preventDefault();
     const name = leagueNameInput.value.trim();
     const date = leagueDateInput.value;
+    const scoringFormat = leagueFormatInput.value;
 
     if (!isAuthorized) return;
 
-    const leaguePass = await showPrompt(`Set a League Password for "${name}". This will be required for scoring and setup by non-admins. (Optional)`, 'League Password', false);
-
     try {
-      await PB_API.createLeague({ name, startDate: date, password: leaguePass });
+      await PB_API.createLeague({ name, startDate: date, scoringFormat });
       leagueNameInput.value = '';
       leagueDateInput.value = '';
       // Collapse creation form back down
       dateRow.classList.add('hidden');
+      if (formatRow) formatRow.classList.add('hidden');
       actionsRow.classList.add('hidden');
       createToggle.textContent = 'Create New League';
       createToggle.style.marginTop = '10px';
@@ -226,7 +230,7 @@ export async function initLeaguesPage() {
 
     eventsListEl.innerHTML = (leagueEvents || []).map(e => `
       <li style="display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
-        <span>${e.eventName} <small>(${e.eventDate || 'No Date'})</small></span>
+        <span>${e.eventName} <small>(${e.eventDate || 'No Date'}) [${e.scoringFormat || 'bowling'}]</small></span>
         <div style="display: flex; gap: 4px;">
           ${isAuthorized ? `<button class="setup-event-btn secondary" data-league-id="${leagueId}" data-event-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Setup</button>` : ''}
           ${isAuthorized ? `<button class="edit-event-btn secondary" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>` : ''}
@@ -295,7 +299,7 @@ export async function initLeaguesPage() {
 
     const statsEl = card.querySelector('.league-header small');
     if (statsEl) {
-      statsEl.textContent = `Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}`;
+      statsEl.textContent = `Started: ${league.startDate || 'N/A'} | Format: ${league.scoringFormat || 'bowling'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}`;
     }
   }
 
@@ -396,6 +400,15 @@ export async function initLeaguesPage() {
       locationSelect.appendChild(opt);
     });
 
+    // Populate scoring format
+    const formatSelect = document.getElementById('event-scoring-format');
+    if (event) {
+      formatSelect.value = event.scoringFormat || 'bowling';
+    } else {
+      const league = allLeagues.find(l => String(l.id) === String(leagueId));
+      formatSelect.value = league?.scoringFormat || 'bowling';
+    }
+
     eventFormCard.scrollIntoView({ behavior: 'smooth' });
   }
 
@@ -408,6 +421,7 @@ export async function initLeaguesPage() {
     const name = document.getElementById('event-name').value.trim();
     const date = document.getElementById('event-date').value;
     const locationValue = document.getElementById('event-location').value;
+    const scoringFormat = document.getElementById('event-scoring-format').value;
 
     if (!isAuthorized) return;
 
@@ -415,7 +429,8 @@ export async function initLeaguesPage() {
       leagueId: leagueId, 
       eventName: name, 
       eventDate: date, 
-      locationId: locationValue ? Number(locationValue) : null 
+      locationId: locationValue ? Number(locationValue) : null,
+      scoringFormat
     };
 
     try {

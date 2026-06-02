@@ -1,12 +1,20 @@
 import { PB_API } from '@services/api.js';
-import { applyScoreFormatting, formatNumber } from '@scripts/utils.js';
-import { showConfirm, showPrompt } from '@ui/uiComponents.js';
-import { requireAdmin } from '@services/auth.js';
+import { applyScoreFormatting, formatNumber, navigateTo } from '@scripts/utils.js';
+import { showConfirm, showPrompt, showAlert } from '@ui/uiComponents.js';
+import { requireAdmin, isManagementAuthorized } from '@services/auth.js';
+import { ROUTES } from '@scripts/routes.js';
 
 /**
  * Logic for managing league locations/venues.
  */
-export function initLocationsPage() {
+export async function initLocationsPage() {
+  const isAuthorized = await isManagementAuthorized();
+  if (!isAuthorized) {
+    showAlert('Unauthorized: Management access is required to view locations.', 'Access Denied');
+    navigateTo(ROUTES.HOME);
+    return;
+  }
+
   const form = document.getElementById('location-form');
   const editingIdInput = document.getElementById('editing-location-id');
   const list = document.getElementById('locations-list');
@@ -366,10 +374,6 @@ export function initLocationsPage() {
 
     if (!locationName) return;
 
-    if (!await requireAdmin(`Enter Admin Password to ${id ? 'update' : 'create'} location "${locationName}":`)) {
-      return;
-    }
-
     const payload = { name: locationName, city, state };
 
     try {
@@ -394,10 +398,6 @@ export function initLocationsPage() {
     const locName = loc ? loc.name : 'this location';
 
     if (!await showConfirm(`Are you sure you want to delete the location "${locName}"?`, 'Delete Location')) {
-      return;
-    }
-
-    if (!await requireAdmin('Enter Admin Password to confirm location deletion:')) {
       return;
     }
 
