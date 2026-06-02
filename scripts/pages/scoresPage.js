@@ -1,5 +1,4 @@
 import { PB_API } from '@services/api.js';
-import { runAuthorizedLeagueAction } from '@services/auth.js';
 import { getScoringEngine } from '@core/engine.js';
 import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, setCurrentPlayerId, getCurrentPlayerId } from '@scripts/utils.js';
 import { initTournamentSelector, createSearchableSelect } from '@ui/uiComponents.js';
@@ -30,7 +29,6 @@ export async function initScoresPage() {
   let playerSearchInstance = null;
   let allPlayersCache = [];
   let machines = [];
-  let activeLeague = null;
   const printSheetBtn = document.getElementById('print-sheet-btn');
 
   // Selection UI Toggles
@@ -115,8 +113,6 @@ export async function initScoresPage() {
     row.style = "display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 8px 12px; margin-bottom: 5px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;";
     row.dataset.orderNumber = round.orderNumber;
 
-    let hasExistingScore = !!turnValues;
-
     const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
 
     row.innerHTML = `
@@ -169,36 +165,23 @@ export async function initScoresPage() {
       const ball2 = Number(row.querySelector('[data-ball="2"]').value.replace(/\D/g, '')) || 0;
       const ball3 = Number(row.querySelector('[data-ball="3"]').value.replace(/\D/g, '')) || 0;
 
-      const doSave = async () => {
-        await PB_API.saveScore({
-          playerId: Number(currentPlayerId),
-          orderNumber: Number(round.orderNumber),
-          eventId: Number(getActiveEventId()),
-          leagueId: Number(getActiveLeagueId()),
-          machineId: Number(round.machineId),
-          ball1,
-          ball2,
-          ball3,
-        });
-        hasExistingScore = true;
-        saveBtn.textContent = 'Save';
-        saveBtn.classList.remove('is-dirty');
-        renderCurrentResults();
-      };
-
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
 
-      // Rule: Updates to existing scores in standard leagues require authorization
-      if (hasExistingScore && activeLeague?.type === 'standard') {
-        const success = await runAuthorizedLeagueAction(activeLeague.id, doSave);
-        if (!success) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Save';
-        }
-      } else {
-        await doSave();
-      }
+      await PB_API.saveScore({
+        playerId: Number(currentPlayerId),
+        orderNumber: Number(round.orderNumber),
+        eventId: Number(getActiveEventId()),
+        leagueId: Number(getActiveLeagueId()),
+        machineId: Number(round.machineId),
+        ball1,
+        ball2,
+        ball3,
+      });
+
+      saveBtn.textContent = 'Save';
+      saveBtn.classList.remove('is-dirty');
+      renderCurrentResults();
     });
 
     return row;
@@ -214,12 +197,6 @@ export async function initScoresPage() {
     try {
       const leagueId = getActiveLeagueId();
       let players = [];
-
-      // If user is logged in, prioritize their player ID
-      const currentUser = await PB_API.getCurrentUser();
-      if (currentUser && currentUser.player_id && !getCurrentPlayerId()) {
-        setCurrentPlayerId(currentUser.player_id);
-      }
 
       if (leagueId) {
         // Fetch the specific league to get the assigned roster
@@ -398,7 +375,6 @@ export async function initScoresPage() {
     // Fetch all leagues so we can resolve metadata for both standard and session types
     const leagues = await PB_API.getLeagues();
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
-    activeLeague = league;
     const event = league?.events?.find(e => String(e.id) === String(eventId));
 
     const isSession = league?.type === 'session';
@@ -406,12 +382,12 @@ export async function initScoresPage() {
       changeTournamentBtn.classList.toggle('hidden', isSession);
     }
 
-    const leagueLabel = isSession ? '' : `${activeLeague?.name} - `;
+    const leagueLabel = isSession ? '' : `${league?.name} - `;
     tournamentSummaryText.textContent = `${leagueLabel}${event?.eventName || 'Event'}`;
     tournamentSelectorUI.classList.add('hidden');
     tournamentSummary.classList.remove('hidden');
 
-    Engine = getScoringEngine(activeLeague?.scoringFormat || 'bowling');
+    Engine = getScoringEngine(event?.scoringFormat || league?.scoringFormat || 'bowling');
 
     machines = await PB_API.getTargetScores(eventId);
 

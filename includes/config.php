@@ -141,7 +141,8 @@ function initializeDatabaseSchema($pdo) {
         `name` VARCHAR(255) NOT NULL,
         `type` ENUM('standard', 'session') DEFAULT 'standard',
         `start_date` DATE DEFAULT NULL,
-        `password` VARCHAR(255) DEFAULT NULL
+        `password` VARCHAR(255) DEFAULT NULL,
+        `scoring_format` VARCHAR(50) DEFAULT 'bowling'
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `locations` (
@@ -170,6 +171,7 @@ function initializeDatabaseSchema($pdo) {
         `location_id` INT DEFAULT NULL,
         `event_name` VARCHAR(255) NOT NULL,
         `event_date` DATE DEFAULT NULL,
+        `scoring_format` VARCHAR(50) DEFAULT 'bowling',
         CONSTRAINT `fk_events_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_events_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
@@ -286,6 +288,23 @@ function initializeDatabaseSchema($pdo) {
         $checkType = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'type'")->fetch();
         if (!$checkType) {
             $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `type` ENUM('standard', 'session') DEFAULT 'standard' AFTER `name` ");
+        }
+    }
+
+    // Ensure 'leagues' table has the 'scoring_format' column for default scoring engine
+    if ($checkLeagues) {
+        $checkLeagueScoring = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'scoring_format'")->fetch();
+        if (!$checkLeagueScoring) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `scoring_format` VARCHAR(50) DEFAULT 'bowling' AFTER `password` ");
+        }
+    }
+
+    // Ensure 'events' table has the 'scoring_format' column
+    $checkEvents = $pdo->query("SHOW TABLES LIKE 'events'")->fetch();
+    if ($checkEvents) {
+        $checkScoring = $pdo->query("SHOW COLUMNS FROM `events` LIKE 'scoring_format'")->fetch();
+        if (!$checkScoring) {
+            $pdo->exec("ALTER TABLE `events` ADD COLUMN `scoring_format` VARCHAR(50) DEFAULT 'bowling' AFTER `event_date` ");
         }
     }
 
