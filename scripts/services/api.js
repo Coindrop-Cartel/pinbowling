@@ -96,7 +96,7 @@ export async function fetchJSON(url, options = {}) {
 
 export const PB_API = {
   // Auth
-  login: (email, password) => fetchJSON('service/authService.php?task=login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  login: (username, password) => fetchJSON('service/authService.php?task=login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   logout: () => fetchJSON('service/authService.php?task=logout', { method: 'POST' }),
   register: (data) => fetchJSON('service/authService.php?task=register', { method: 'POST', body: JSON.stringify(data) }),
   getCurrentUser: () => fetchJSON('service/authService.php?task=me'),

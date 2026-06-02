@@ -2,7 +2,7 @@ import { PB_API } from '@services/api.js';
 import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog } from '@ui/uiComponents.js';
 import { setActiveLeagueId, setActiveEventId, getActiveLeagueId } from '@scripts/utils.js';
 import { setLeaguePassword, getLeaguePassword, getAdminSessionPassword, setAdminSessionPassword } from '@services/state.js';
-import { requireAdmin, runAuthorizedLeagueAction } from '@services/auth.js';
+import { requireAdmin, runAuthorizedLeagueAction, isManagementAuthorized } from '@services/auth.js';
 import { navigateTo } from '@scripts/utils.js';
 import { ROUTES } from '@scripts/routes.js';
 
@@ -10,6 +10,7 @@ import { ROUTES } from '@scripts/routes.js';
  * Logic for managing Leagues and Events.
  */
 export async function initLeaguesPage() {
+  const isAuthorized = await isManagementAuthorized();
   const leagueForm = document.getElementById('league-form');
   const leagueNameInput = document.getElementById('league-name');
   const leagueDateInput = document.getElementById('league-start-date');
@@ -30,27 +31,30 @@ export async function initLeaguesPage() {
   if (dateRow) dateRow.classList.add('hidden');
   if (actionsRow) actionsRow.classList.add('hidden');
 
-  const createToggle = document.createElement('button');
-  createToggle.type = 'button';
-  createToggle.className = 'secondary';
-  createToggle.textContent = 'Create New League';
-  createToggle.style.marginTop = '10px';
-  leagueNameInput.after(createToggle);
+  let createToggle = null;
+  if (isAuthorized) {
+    createToggle = document.createElement('button');
+    createToggle.type = 'button';
+    createToggle.className = 'secondary';
+    createToggle.textContent = 'Create New League';
+    createToggle.style.marginTop = '10px';
+    leagueNameInput.after(createToggle);
 
-  createToggle.onclick = () => {
-    const isHidden = dateRow.classList.contains('hidden');
-    dateRow.classList.toggle('hidden', !isHidden);
-    actionsRow.classList.toggle('hidden', !isHidden);
-    if (isHidden) {
-      createToggle.textContent = 'Cancel';
-      createToggle.style.marginTop = '0';
-      actionsRow.appendChild(createToggle);
-    } else {
-      createToggle.textContent = 'Create New League';
-      createToggle.style.marginTop = '10px';
-      leagueNameInput.after(createToggle);
-    }
-  };
+    createToggle.onclick = () => {
+      const isHidden = dateRow.classList.contains('hidden');
+      dateRow.classList.toggle('hidden', !isHidden);
+      actionsRow.classList.toggle('hidden', !isHidden);
+      if (isHidden) {
+        createToggle.textContent = 'Cancel';
+        createToggle.style.marginTop = '0';
+        actionsRow.appendChild(createToggle);
+      } else {
+        createToggle.textContent = 'Create New League';
+        createToggle.style.marginTop = '10px';
+        leagueNameInput.after(createToggle);
+      }
+    };
+  }
 
   /**
    * Renders the league list based on filtering.
@@ -70,6 +74,7 @@ export async function initLeaguesPage() {
 
         const card = document.createElement('div');
         card.className = 'league-registry-item';
+        card.dataset.leagueId = league.id;
         card.style.marginBottom = '5px';
         card.style.border = '1px solid #ddd';
         card.style.borderRadius = '4px';
@@ -82,13 +87,13 @@ export async function initLeaguesPage() {
               <small>Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
             </div>
             <div style="display: flex; gap: 8px;">
-              <button class="delete-league-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
+              ${isAuthorized ? '<button class="delete-league-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>' : ''}
             </div>
           </div>
           <div class="league-details ${shouldExpand ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd; background: #fff;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
               <h4 style="margin: 0;">Events</h4>
-              <button class="add-event-btn secondary" data-league-id="${league.id}" data-league-name="${league.name}" style="padding: 4px 12px; font-size: 0.85rem;">Add Event</button>
+              ${isAuthorized ? `<button class="add-event-btn secondary" data-league-id="${league.id}" data-league-name="${league.name}" style="padding: 4px 12px; font-size: 0.85rem;">Add Event</button>` : ''}
             </div>
             <ul class="league-events-list" style="list-style: none; padding: 0;">
               <!-- Events will be rendered here -->
@@ -97,7 +102,7 @@ export async function initLeaguesPage() {
             <div class="league-players-section" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h4 style="margin: 0;">Roster</h4>
-                <button class="add-player-btn secondary" data-league-id="${league.id}" data-league-name="${league.name}" style="padding: 4px 12px; font-size: 0.85rem;">Add Player</button>
+                ${isAuthorized ? `<button class="add-player-btn secondary" data-league-id="${league.id}" data-league-name="${league.name}" style="padding: 4px 12px; font-size: 0.85rem;">Add Player</button>` : ''}
               </div>
               <ul class="league-players-list" style="list-style: none; padding: 0;">
                 <!-- Players will be rendered here -->
@@ -126,9 +131,11 @@ export async function initLeaguesPage() {
         };
 
         // Action listeners
-        card.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
-        card.querySelector('.delete-league-btn').onclick = () => deleteLeague(league.id, league.name);
-        card.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
+        if (isAuthorized) {
+          card.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
+          card.querySelector('.delete-league-btn').onclick = () => deleteLeague(league.id, league.name);
+          card.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
+        }
 
         leaguesList.appendChild(card);
 
@@ -150,7 +157,7 @@ export async function initLeaguesPage() {
     // Hide the "Create" toggle if an exact match exists, unless the creation 
     // form is already open (in which case the button serves as "Cancel").
     const isFormOpen = !dateRow.classList.contains('hidden');
-    createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
+    if (createToggle) createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
 
     const dateVal = leagueDateInput.value;
     createBtn.disabled = !query || !dateVal || !!exactMatch;
@@ -190,6 +197,8 @@ export async function initLeaguesPage() {
     const name = leagueNameInput.value.trim();
     const date = leagueDateInput.value;
 
+    if (!isAuthorized) return;
+
     const leaguePass = await showPrompt(`Set a League Password for "${name}". This will be required for scoring and setup by non-admins. (Optional)`, 'League Password', false);
 
     try {
@@ -210,19 +219,18 @@ export async function initLeaguesPage() {
   });
 
   function renderEventsForLeague(leagueId, leagueEvents, leagueName) {
-    const addBtn = document.querySelector(`.league-registry-item .add-event-btn[data-league-id="${leagueId}"]`);
-    if (!addBtn) return;
+    const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
+    if (!card) return;
 
-    const card = addBtn.closest('.league-registry-item');
     const eventsListEl = card.querySelector('.league-events-list');
 
     eventsListEl.innerHTML = (leagueEvents || []).map(e => `
       <li style="display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
         <span>${e.eventName} <small>(${e.eventDate || 'No Date'})</small></span>
         <div style="display: flex; gap: 4px;">
-          <button class="setup-event-btn secondary" data-league-id="${leagueId}" data-event-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Setup</button>
-          <button class="edit-event-btn secondary" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>
-          <button class="delete-event-btn" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>
+          ${isAuthorized ? `<button class="setup-event-btn secondary" data-league-id="${leagueId}" data-event-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Setup</button>` : ''}
+          ${isAuthorized ? `<button class="edit-event-btn secondary" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>` : ''}
+          ${isAuthorized ? `<button class="delete-event-btn" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>` : ''}
         </div>
       </li>
     `).join('') || '<li>No events scheduled.</li>';
@@ -246,10 +254,10 @@ export async function initLeaguesPage() {
 
   async function renderPlayersForLeague(leagueId, leaguePlayers, allPlayers) {
     // Find the roster list specifically for this league card
-    const addBtn = document.querySelector(`.league-registry-item .add-player-btn[data-league-id="${leagueId}"]`);
-    if (!addBtn) return;
+    const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
+    if (!card) return;
 
-    const section = addBtn.closest('.league-players-section');
+    const section = card.querySelector('.league-players-section');
     const playersListEl = section.querySelector('.league-players-list');
     const emptyNoticeEl = section.querySelector('.league-players-empty');
 
@@ -262,7 +270,7 @@ export async function initLeaguesPage() {
                 li.style = "display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;";
                 li.innerHTML = `
                     <span>${lp.playerName}</span>
-                    <button class="remove-player-btn" data-league-id="${leagueId}" data-player-id="${lp.id}" data-player-name="${lp.playerName}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>
+                    ${isAuthorized ? `<button class="remove-player-btn" data-league-id="${leagueId}" data-player-id="${lp.id}" data-player-name="${lp.playerName}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>` : ''}
                 `;
                 playersListEl.appendChild(li);
             }
@@ -282,9 +290,9 @@ export async function initLeaguesPage() {
   }
 
   function updateLeagueHeaderStats(leagueId, league) {
-    const addBtn = document.querySelector(`.league-registry-item .add-player-btn[data-league-id="${leagueId}"]`);
-    if (!addBtn) return;
-    const card = addBtn.closest('.league-registry-item');
+    const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
+    if (!card) return;
+
     const statsEl = card.querySelector('.league-header small');
     if (statsEl) {
       statsEl.textContent = `Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}`;
@@ -400,6 +408,8 @@ export async function initLeaguesPage() {
     const name = document.getElementById('event-name').value.trim();
     const date = document.getElementById('event-date').value;
     const locationValue = document.getElementById('event-location').value;
+
+    if (!isAuthorized) return;
 
     const payload = { 
       leagueId: leagueId, 

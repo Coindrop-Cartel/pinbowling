@@ -1,13 +1,20 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js';
 import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormatting, formatNumber } from '@scripts/utils.js';
-import { createSearchableSelect, showPrompt, initReadOnlyTournamentDisplay } from '@ui/uiComponents.js';
+import { createSearchableSelect, showPrompt, showAlert, initReadOnlyTournamentDisplay } from '@ui/uiComponents.js';
 import { printMachineScores } from '@ui/printing.js';
-import { requireAdmin } from '@services/auth.js';
+import { requireAdmin, isManagementAuthorized } from '@services/auth.js';
 import {navigateTo} from '@scripts/utils.js';
 import { ROUTES } from '@scripts/routes.js';
 
 export async function initConfigPage() {
+  // Verify authorization before initializing the page logic
+  if (!await isManagementAuthorized()) {
+    showAlert('Unauthorized: Management access is required to view the setup page.', 'Access Denied');
+    navigateTo(ROUTES.HOME);
+    return;
+  }
+
   const configCard = document.getElementById('config-card');
   const orderInput = document.getElementById('order-number');
   const displayOrder = document.getElementById('display-order');

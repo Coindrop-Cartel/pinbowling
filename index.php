@@ -57,6 +57,18 @@ if (preg_match('/^v[0-9.]+\/(.*)$/', $route, $matches)) {
     $route = $realPath; // Update route for .php files like js-config.php
 }
 
+// 3.5 Authorization Guard for Management Routes
+// Prevent unauthorized users from loading management-only HTML templates
+$managementRoutes = ['config', 'locations', 'machines', 'players', 'management'];
+$checkRoute = str_replace('.php', '', $route);
+if (in_array($checkRoute, $managementRoutes)) {
+    $user = getCurrentUser();
+    if (!$user || ($user['role'] !== 'admin' && $user['role'] !== 'td')) {
+        header("Location: " . rtrim($baseUrl, '/') . "/");
+        exit;
+    }
+}
+
 $targetFile = __DIR__ . '/pages/home.php'; // Default content
 
 if ($route !== '') {

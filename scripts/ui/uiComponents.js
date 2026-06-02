@@ -312,8 +312,8 @@ export async function showAuthDialog() {
         <h2 style="margin-top:0;">${isRegister ? 'Create Account' : 'Sign In'}</h2>
         <form id="auth-modal-form">
           <div class="form-row">
-            <label>Email Address</label>
-            <input type="email" id="auth-email" required style="width:100%;box-sizing:border-box;">
+            <label>Username</label>
+            <input type="text" id="auth-username" required style="width:100%;box-sizing:border-box;">
           </div>
           <div class="form-row">
             <label>Password</label>

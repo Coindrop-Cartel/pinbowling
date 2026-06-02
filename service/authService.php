@@ -14,21 +14,21 @@ $input = getJsonInput();
 
 switch ($task) {
     case 'login':
-        $email = $input['email'] ?? '';
+        $username = $input['username'] ?? '';
         $password = $input['password'] ?? '';
 
-        if (!$email || !$password) {
-            sendJson(['error' => 'Email and password are required.'], 400);
+        if (!$username || !$password) {
+            sendJson(['error' => 'Username and password are required.'], 400);
         }
 
         // Fetch user and join with players table to get display name
         $stmt = $pdo->prepare("
-            SELECT u.id, u.player_id, u.email, u.password_hash, u.role, p.player_name 
+            SELECT u.id, u.player_id, u.username, u.password_hash, u.role, p.player_name 
             FROM users u 
             LEFT JOIN players p ON u.player_id = p.id 
-            WHERE u.email = ?
+            WHERE u.username = ?
         ");
-        $stmt->execute([$email]);
+        $stmt->execute([$username]);
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, $user['password_hash'])) {
@@ -40,7 +40,7 @@ switch ($task) {
             $_SESSION['user'] = $user;
             sendJson($user);
         } else {
-            sendJson(['error' => 'Invalid email or password.'], 401);
+            sendJson(['error' => 'Invalid username or password.'], 401);
         }
         break;
 
@@ -59,12 +59,12 @@ switch ($task) {
         break;
 
     case 'register':
-        $email = $input['email'] ?? '';
+        $username = $input['username'] ?? '';
         $password = $input['password'] ?? '';
         $playerName = $input['playerName'] ?? '';
 
-        if (!$email || !$password || !$playerName) {
-            sendJson(['error' => 'Email, password, and player name are required.'], 400);
+        if (!$username || !$password || !$playerName) {
+            sendJson(['error' => 'Username, password, and player name are required.'], 400);
         }
 
         try {
@@ -82,8 +82,8 @@ switch ($task) {
             }
 
             $hash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO users (player_id, email, password_hash, role) VALUES (?, ?, ?, 'player')");
-            $stmt->execute([$playerId, $email, $hash]);
+            $stmt = $pdo->prepare("INSERT INTO users (player_id, username, password_hash, role) VALUES (?, ?, ?, 'player')");
+            $stmt->execute([$playerId, $username, $hash]);
 
             $pdo->commit();
             sendJson(['success' => true]);
@@ -92,7 +92,7 @@ switch ($task) {
                 $pdo->rollBack();
             }
             if ($e->getCode() == 23000) {
-                sendJson(['error' => 'Email or Player Name is already registered.'], 409);
+                sendJson(['error' => 'Username or Player Name is already registered.'], 409);
             }
             sendJson(['error' => 'Registration failed: ' . $e->getMessage()], 500);
         }

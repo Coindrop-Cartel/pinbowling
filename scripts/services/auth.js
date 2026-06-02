@@ -101,7 +101,7 @@ export async function initAuthHeader() {
 
       container.innerHTML = `
         <div style="display: flex; align-items: center; gap: 15px;">
-          <span style="font-size: 0.85rem; font-weight: 500;">Hi, ${user.player_name || user.email}</span>
+          <span style="font-size: 0.85rem; font-weight: 500;">Hi, ${user.player_name || user.username}</span>
           <button id="header-logout-btn" style="padding: 8px 16px; background: #000; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">Log Out</button>
         </div>
       `;
@@ -120,4 +120,14 @@ export async function initAuthHeader() {
 
   const currentUser = await PB_API.getCurrentUser();
   render(currentUser);
+}
+
+/**
+ * Checks if the current user has either a 'td' or 'admin' role.
+ * Use this to conditionally disable or hide management UI elements.
+ */
+export async function isManagementAuthorized() {
+  const user = await PB_API.getCurrentUser();
+  if (!user) return false;
+  return user.role === 'admin' || user.role === 'td';
 }

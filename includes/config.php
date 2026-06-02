@@ -121,7 +121,7 @@ function initializeDatabaseSchema($pdo) {
     $pdo->exec("CREATE TABLE IF NOT EXISTS `users` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `player_id` INT UNIQUE,
-        `email` VARCHAR(255) UNIQUE NOT NULL,
+        `username` VARCHAR(255) UNIQUE NOT NULL,
         `password_hash` VARCHAR(255) NOT NULL,
         `role` ENUM('player', 'td', 'admin') DEFAULT 'player',
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -268,6 +268,16 @@ function initializeDatabaseSchema($pdo) {
         $checkPassword = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'password'")->fetch();
         if (!$checkPassword) {
             $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `password` VARCHAR(255) DEFAULT NULL AFTER `start_date` ");
+        }
+    }
+
+    // Ensure 'users' table uses 'username' instead of 'email'
+    $checkUsers = $pdo->query("SHOW TABLES LIKE 'users'")->fetch();
+    if ($checkUsers) {
+        $checkEmail = $pdo->query("SHOW COLUMNS FROM `users` LIKE 'email'")->fetch();
+        if ($checkEmail) {
+            // Migrate existing email column to username
+            $pdo->exec("ALTER TABLE `users` CHANGE `email` `username` VARCHAR(255) NOT NULL");
         }
     }
 
@@ -419,6 +429,12 @@ function validateLeagueAccess($pdo, $leagueId) {
     
     $providedPass = getHeader('X-League-Password');
     $providedSecret = getHeader('X-PB-Secret');
+
+    // 1. Master Overrides: Session Role, Admin Password or API Secret
+    $user = getCurrentUser();
+    if ($user && ($user['role'] === 'admin' || $user['role'] === 'td')) {
+        return;
+    }
 
     // 1. Master Overrides: Admin Password or API Secret
     if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
