@@ -121,7 +121,7 @@ describe('BowlingEngine', () => {
     expect(resSpare.turnResults[0].score).toBe(10);
 
     // Strike then Open in 10th
-    const scoreMapStrikeOpen = { '10': { ball1: 10000, ball2: 11000, ball3: 12000 } };
+    const scoreMapStrikeOpen = { '10': { ball1: 10000, ball2: 10000, ball3: 10000 } };
     const resStrikeOpen = engine.calculateTurnResults([machines[9]], scoreMapStrikeOpen);
     expect(resStrikeOpen.turnResults[0].mark).toBe('X 10 0');
     expect(resStrikeOpen.turnResults[0].score).toBe(20);
