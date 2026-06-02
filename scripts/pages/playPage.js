@@ -203,6 +203,8 @@ export async function initPlayPage() {
 
     const frameCount = Number(document.getElementById('qp-frames').value);
     const difficulty = document.getElementById('qp-difficulty').value;
+    const globalScaling = document.getElementById('qp-scaling').value;
+    const engine = getScoringEngine('bowling');
 
     const locMachines = location?.machines || [];
     currentLocMachines = locMachines;
@@ -219,19 +221,25 @@ export async function initPlayPage() {
       selected.push(locMachines[Math.floor(Math.random() * locMachines.length)]);
     }
 
-    generatedFrames = selected.map((m, index) => ({
-      machineId: Number(m.machineId),
-      machineName: m.machineName,
-      targets: {
-        easy: m.targetEasy,
-        med: m.targetMed,
-        hard: m.targetHard
-      },
-      score10: m['target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1)] || 1000000,
-      score1: Math.floor((m['target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1)] || 1000000) / 10),
-      orderNumber: index + 1,
-      tempId: Math.random().toString(36).substr(2, 9)
-    }));
+      generatedFrames = selected.map((m, index) => {
+        const score10 = m['target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1)] || 1000000;
+        const score1 = Math.floor(score10 / 10);
+        return {
+            machineId: Number(m.machineId),
+            machineName: m.machineName,
+            targets: {
+                easy: m.targetEasy || 1000000,
+                med: m.targetMed || 2000000,
+                hard: m.targetHard || 3000000
+            },
+            score10,
+            score1,
+            scaling: globalScaling,
+            values: engine.buildRoundValues(score10, score1, globalScaling),
+            orderNumber: index + 1,
+            tempId: Math.random().toString(36).substr(2, 9)
+        };
+    });
 
     renderPreview();
     previewSection.classList.remove('hidden');
@@ -247,6 +255,7 @@ export async function initPlayPage() {
       row.draggable = true;
       row.dataset.tempId = frame.tempId;
       const isExpanded = expandedTempId === frame.tempId;
+      const engine = getScoringEngine('bowling');
 
       row.style = "margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff;";
       row.innerHTML = `
@@ -272,10 +281,23 @@ export async function initPlayPage() {
             <input type="text" class="row-machine-search" placeholder="Filter machines..." style="width: 100%; box-sizing: border-box; margin-bottom: 5px;">
             <select class="row-machine-select" style="width: 100%; box-sizing: border-box;"></select>
           </div>
-          <div style="display: flex; gap: 6px;">
-             <button type="button" class="qfill" data-type="easy" style="font-size: 0.75rem; padding: 2px 10px;">Easy</button>
-             <button type="button" class="qfill" data-type="med" style="font-size: 0.75rem; padding: 2px 10px;">Med</button>
-             <button type="button" class="qfill" data-type="hard" style="font-size: 0.75rem; padding: 2px 10px;">Hard</button>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div style="display: flex; gap: 6px;">
+               <button type="button" class="qfill secondary" data-type="easy" style="font-size: 0.75rem; padding: 2px 10px;">Easy</button>
+               <button type="button" class="qfill secondary" data-type="med" style="font-size: 0.75rem; padding: 2px 10px;">Med</button>
+               <button type="button" class="qfill secondary" data-type="hard" style="font-size: 0.75rem; padding: 2px 10px;">Hard</button>
+            </div>
+            <div style="display: flex; gap: 4px;">
+               <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'}" data-scale="flat" style="font-size: 0.7rem; padding: 2px 8px;">Flat</button>
+               <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'}" data-scale="curved" style="font-size: 0.7rem; padding: 2px 8px;">Curved</button>
+            </div>
+          </div>
+          <div class="preview-values-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; font-size: 0.75rem; background: #f0f0f0; padding: 8px; border-radius: 4px;">
+            ${Object.entries(frame.values || {})
+              .sort((a, b) => Number(b[0]) - Number(a[0]))
+              .map(([rank, val]) => `<div><strong>${rank}:</strong> ${formatNumber(val)}</div>`)
+              .join('')
+            }
           </div>
         </div>
       `;
@@ -286,8 +308,23 @@ export async function initPlayPage() {
       applyScoreFormatting(s1);
 
       // Immediate data updates as user types
-      s10.oninput = () => { frame.score10 = Number(s10.value.replace(/\D/g, '')) || 0; };
-      s1.oninput = () => { frame.score1 = Number(s1.value.replace(/\D/g, '')) || 0; };
+      const updateValues = () => {
+        frame.score10 = Number(s10.value.replace(/\D/g, '')) || 0;
+        frame.score1 = Number(s1.value.replace(/\D/g, '')) || 0;
+        frame.values = engine.buildRoundValues(frame.score10, frame.score1, frame.scaling);
+
+        // Update the visual grid without re-rendering the whole row to maintain input focus
+        const grid = row.querySelector('.preview-values-grid');
+        if (grid) {
+            grid.innerHTML = Object.entries(frame.values || {})
+                .sort((a, b) => Number(b[0]) - Number(a[0]))
+                .map(([rank, val]) => `<div><strong>${rank}:</strong> ${formatNumber(val)}</div>`)
+                .join('');
+        }
+      };
+
+      s10.oninput = updateValues;
+      s1.oninput = updateValues;
 
       // Expand on click
       row.querySelector('.frame-row-header').onclick = () => {
@@ -298,9 +335,6 @@ export async function initPlayPage() {
       row.querySelector('.row-save-btn').onclick = (e) => {
         e.stopPropagation();
         expandedTempId = null;
-        // Update local state only. 
-        // The database is updated in bulk after the 'Finalize' button is clicked.
-        // If your code at line 274 was calling PB_API.saveTargetScore, remove it.
         renderPreview();
       };
 
@@ -319,6 +353,7 @@ export async function initPlayPage() {
               frame.machineName = match.machineName;
               frame.machineId = Number(match.machineId);
               frame.targets = { easy: match.targetEasy, med: match.targetMed, hard: match.targetHard };
+              updateValues();
               renderPreview(); 
             }
           }
@@ -333,18 +368,29 @@ export async function initPlayPage() {
 
         // Difficulty fills
         row.querySelectorAll('.qfill').forEach(btn => {
-          const type = btn.dataset.type;
-          const val = frame.targets?.[type];
-          if (!val) {
-            btn.disabled = true;
-            btn.style.opacity = '0.5';
-          } else {
-            btn.onclick = () => {
+          btn.onclick = () => {
+            const type = btn.dataset.type;
+            const val = frame.targets?.[type];
+            if (val) {
               frame.score10 = val;
               frame.score1 = Math.floor(val / 10);
               s10.value = formatNumber(frame.score10);
               s1.value = formatNumber(frame.score1);
-            };
+              updateValues();
+              renderPreview();
+            }
+          };
+        });
+
+        // Scaling toggles
+        row.querySelectorAll('.scaling-btn').forEach(btn => {
+          btn.onclick = () => {
+            const newScale = btn.dataset.scale;
+            if (frame.scaling !== newScale) {
+              frame.scaling = newScale;
+              updateValues();
+              renderPreview();
+            }
           }
         });
       }
@@ -433,17 +479,14 @@ export async function initPlayPage() {
 
       const event = newEvent;
 
-      const engine = getScoringEngine('bowling');
-
       const targetPayloads = generatedFrames
         .filter(f => f.machineId)
         .map(frame => {
-          const values = engine.buildRoundValues(frame.score10, frame.score1);
           return {
             eventId: Number(event.id),
             machineId: Number(frame.machineId),
             orderNumber: frame.orderNumber,
-            values: values
+            values: frame.values
           };
         });
 

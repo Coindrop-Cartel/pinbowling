@@ -73,7 +73,7 @@
 
   <!-- Preview Section (Populated after Generation) -->
   <section id="qp-preview-section" class="card hidden">
-    <h2>Review Lineup</h2>
+    <h2>Review Lineup & Targets</h2>
     <div id="qp-frames-list" style="margin-bottom: 20px;"></div>
     <div class="form-actions">
       <button id="finalize-qp-btn" class="primary">Create Session</button>
