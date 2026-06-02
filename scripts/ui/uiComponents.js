@@ -608,3 +608,88 @@ export async function initTournamentSelector(container, { onRefresh, typeFilter 
   }
   if (onRefresh) await onRefresh();
 }
+
+/**
+ * Creates a standardized expandable row component.
+ * @param {HTMLElement} container - The parent element to append to.
+ * @param {Object} options - Configuration options.
+ * @returns {HTMLElement} The created row element.
+ */
+export function createExpandableRow(container, options) {
+  const { 
+    id, 
+    headerHtml, 
+    contentHtml, 
+    isExpanded = false, 
+    onHeaderClick, 
+    draggable = false, 
+    className = '', 
+    tag = 'div' 
+  } = options;
+
+  const row = document.createElement(tag);
+  if (className) row.className = className;
+  row.dataset.id = id;
+  if (draggable) row.draggable = true;
+  
+  row.style = "margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff; list-style: none;";
+
+  row.innerHTML = `
+    <div class="row-header" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #f9f9f9; cursor: pointer;">
+      ${headerHtml}
+    </div>
+    ${contentHtml ? `
+    <div class="row-expansion ${isExpanded ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd;">
+      ${contentHtml}
+    </div>` : ''}
+  `;
+
+  const header = row.querySelector('.row-header');
+  header.onclick = (e) => {
+    // Prevent toggling when clicking interactive elements inside the header
+    if (e.target.closest('button, input, select, label')) return;
+    if (onHeaderClick) onHeaderClick(e);
+  };
+
+  container.appendChild(row);
+  return row;
+}
+
+/**
+ * Enables drag-and-drop reordering for a list of elements.
+ * @param {HTMLElement} container - The parent element containing the items.
+ * @param {Object} options - Configuration options.
+ * @param {string} options.itemSelector - CSS selector for the draggable items.
+ * @param {Function} options.onReorder - Callback when order changes, receiving the new array of IDs.
+ */
+export function setupSortableList(container, { itemSelector, onReorder }) {
+  let draggedItem = null;
+
+  container.addEventListener('dragstart', (e) => {
+    draggedItem = e.target.closest(itemSelector);
+    if (draggedItem) draggedItem.style.opacity = '0.5';
+  });
+
+  container.addEventListener('dragend', (e) => {
+    if (draggedItem) {
+      draggedItem.style.opacity = '';
+      if (onReorder) {
+        const ids = Array.from(container.querySelectorAll(itemSelector))
+          .map(el => el.dataset.id);
+        onReorder(ids);
+      }
+    }
+    draggedItem = null;
+  });
+
+  container.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const overItem = e.target.closest(itemSelector);
+    if (overItem && overItem !== draggedItem) {
+      const rect = overItem.getBoundingClientRect();
+      const midpoint = rect.top + rect.height / 2;
+      if (e.clientY < midpoint) container.insertBefore(draggedItem, overItem);
+      else container.insertBefore(draggedItem, overItem.nextSibling);
+    }
+  });
+}

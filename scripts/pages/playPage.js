@@ -1,7 +1,12 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js';
 import { formatNumber, applyScoreFormatting } from '@scripts/utils.js';
-import { createSearchableSelect, showPlayerSelectionDialog } from '@ui/uiComponents.js';
+import { 
+  createSearchableSelect, 
+  showPlayerSelectionDialog, 
+  createExpandableRow, 
+  setupSortableList 
+} from '@ui/uiComponents.js';
 
 export async function initPlayPage() {
   const form = document.getElementById('quick-play-form');
@@ -43,8 +48,6 @@ export async function initPlayPage() {
 
   function renderExistingSessions() {
     if (!sessionsList) return;
-    sessionsList.innerHTML = '';
-    
     const nameQuery = nameInput.value.toLowerCase().trim();
     const locQuery = Number(locSelect.value);
 
@@ -59,26 +62,30 @@ export async function initPlayPage() {
       return;
     }
 
-    sessionsList.innerHTML = '';
     filtered.forEach(event => {
-      const div = document.createElement('div');
-      div.className = 'session-item';
-      div.style = "padding: 12px; cursor: pointer; margin-bottom: 8px; background: #fff; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;";
-      div.innerHTML = `
-        <div><strong>${event.eventName}</strong><br><small>${event.locationName || 'No Location'} | ${event.eventDate}</small></div>
-        <div style="display: flex; gap: 6px;">
-          <button class="scoreboard-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Scoreboard</button>
-          <button class="join-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Join</button>
-          <button class="play-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Play</button>
-        </div>
-      `;
+      const row = createExpandableRow(sessionsList, {
+        id: event.id,
+        className: 'session-item',
+        headerHtml: `
+          <div style="flex: 1;"><strong>${event.eventName}</strong><br><small>${event.locationName || 'No Location'} | ${event.eventDate}</small></div>
+          <div style="display: flex; gap: 6px;">
+            <button class="scoreboard-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Scoreboard</button>
+            <button class="join-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Join</button>
+            <button class="play-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Play</button>
+          </div>
+        `,
+        contentHtml: '', // Sessions do not expand
+        onHeaderClick: () => {
+          window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}`;
+        }
+      });
 
-      div.querySelector('.scoreboard-btn').onclick = (e) => {
+      row.querySelector('.scoreboard-btn').onclick = (e) => {
         e.stopPropagation();
         window.location.href = `standings?eventId=${event.id}&leagueId=${event.leagueId}`;
       };
 
-      div.querySelector('.join-btn').onclick = async (e) => {
+      row.querySelector('.join-btn').onclick = async (e) => {
         e.stopPropagation();
         const joinedIds = new Set(event.roster.map(p => p.id));
         const available = allPlayersCache.filter(p => !joinedIds.has(p.id));
@@ -96,7 +103,7 @@ export async function initPlayPage() {
         }
       };
 
-      div.querySelector('.play-btn').onclick = async (e) => {
+      row.querySelector('.play-btn').onclick = async (e) => {
         e.stopPropagation();
         const roster = event.roster || [];
         
@@ -111,12 +118,6 @@ export async function initPlayPage() {
           window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`;
         }
       };
-
-      div.onclick = (e) => {
-        if (e.target.closest('button')) return;
-        window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}`;
-      };
-      sessionsList.appendChild(div);
     });
   }
 
@@ -170,7 +171,15 @@ export async function initPlayPage() {
   }
 
   // Initialize dragging listeners on the container once
-  setupDragging(framesList);
+  setupSortableList(framesList, {
+    itemSelector: '.frame-preview-item',
+    onReorder: (tidOrder) => {
+      const newArray = tidOrder.map(tid => generatedFrames.find(f => f.tempId === String(tid)));
+      generatedFrames = newArray.map((f, i) => ({ ...f, order: i + 1 }));
+      
+      renderPreview();
+    }
+  });
 
   form.onsubmit = (e) => {
     e.preventDefault();
@@ -250,16 +259,10 @@ export async function initPlayPage() {
   function renderPreview() {
     framesList.innerHTML = '';
     generatedFrames.forEach((frame, index) => {
-      const row = document.createElement('div');
-      row.className = 'frame-preview-item';
-      row.draggable = true;
-      row.dataset.tempId = frame.tempId;
       const isExpanded = expandedTempId === frame.tempId;
       const engine = getScoringEngine('bowling');
 
-      row.style = "margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff;";
-      row.innerHTML = `
-        <div class="frame-row-header" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #f9f9f9; cursor: pointer;">
+      const headerHtml = `
           <div class="drag-handle" style="cursor: grab; color: #888; padding: 0 4px; font-size: 1.2rem;">☰</div>
           <span style="font-weight: bold; min-width: 30px; text-align: center;">${frame.orderNumber}</span>
           <span style="flex: 1; font-weight: bold;" class="machine-name-display">${frame.machineName}</span>
@@ -273,8 +276,9 @@ export async function initPlayPage() {
               <input type="text" class="score1-input" value="${formatNumber(frame.score1)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
             </div>
           </div>
-        </div>
-        <div class="frame-expansion ${isExpanded ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd;">
+      `;
+
+      const contentHtml = `
           <div class="form-row">
             <label style="font-size: 0.85rem;">Change Machine</label>
             <input type="text" class="row-machine-search" placeholder="Filter machines..." style="width: 100%; box-sizing: border-box; margin-bottom: 5px;">
@@ -298,8 +302,20 @@ export async function initPlayPage() {
               .join('')
             }
           </div>
-        </div>
       `;
+
+      const row = createExpandableRow(framesList, {
+        id: frame.tempId,
+        className: 'frame-preview-item',
+        draggable: true,
+        headerHtml,
+        contentHtml,
+        isExpanded,
+        onHeaderClick: () => {
+          expandedTempId = (expandedTempId === frame.tempId) ? null : frame.tempId;
+          renderPreview();
+        }
+      });
 
       const s10 = row.querySelector('.score10-input');
       const s1 = row.querySelector('.score1-input');
@@ -324,12 +340,6 @@ export async function initPlayPage() {
 
       s10.oninput = updateValues;
       s1.oninput = updateValues;
-
-      // Expand on click
-      row.querySelector('.frame-row-header').onclick = () => {
-        expandedTempId = (expandedTempId === frame.tempId) ? null : frame.tempId;
-        renderPreview();
-      };
 
       // Searchable Select initialization (only if expanded)
       if (isExpanded) {
@@ -386,45 +396,6 @@ export async function initPlayPage() {
             }
           }
         });
-      }
-
-      framesList.appendChild(row);
-    });
-  }
-
-  /**
-   * Implements drag-and-drop reordering for frames.
-   * Matches the behavior found in configPage.js for tournament setup.
-   */
-  function setupDragging(container) {
-    let draggedItem = null;
-
-    container.addEventListener('dragstart', (e) => {
-      draggedItem = e.target.closest('.frame-preview-item');
-      if (draggedItem) draggedItem.style.opacity = '0.5';
-    });
-
-    container.addEventListener('dragend', (e) => {
-      if (draggedItem) draggedItem.style.opacity = '';
-      
-      // Update the data array to match the new DOM order
-      const tidOrder = Array.from(container.querySelectorAll('.frame-preview-item'))
-        .map(el => el.dataset.tempId);
-      
-      const newArray = tidOrder.map(tid => generatedFrames.find(f => f.tempId === tid));
-      generatedFrames = newArray.map((f, i) => ({ ...f, order: i + 1 }));
-      
-      renderPreview();
-    });
-
-    container.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      const overItem = e.target.closest('.frame-preview-item');
-      if (overItem && overItem !== draggedItem) {
-        const rect = overItem.getBoundingClientRect();
-        const midpoint = rect.top + rect.height / 2;
-        if (e.clientY < midpoint) container.insertBefore(draggedItem, overItem);
-        else container.insertBefore(draggedItem, overItem.nextSibling);
       }
     });
   }
