@@ -337,27 +337,27 @@ export async function showAuthDialog() {
       const form = card.querySelector('#auth-modal-form');
       form.onsubmit = async (e) => {
         e.preventDefault();
-        const email = card.querySelector('#auth-email').value;
+        const username = card.querySelector('#auth-username').value;
         const password = card.querySelector('#auth-pass').value;
         
         try {
           let user;
           if (isRegister) {
             const playerName = card.querySelector('#auth-name').value;
-            let regResult = await PB_API.register({ email, password, playerName });
+            let regResult = await PB_API.register({ username, password, playerName });
             
             // Handle existing player profile claim
             if (regResult && regResult.claimRequired) {
               const confirmed = await showConfirm(regResult.message, 'Claim Profile');
               if (confirmed) {
-                await PB_API.register({ email, password, playerName, confirmClaim: true });
+                await PB_API.register({ username, password, playerName, confirmClaim: true });
               } else {
                 return; // Exit and keep modal open for name change
               }
             }
-            user = await PB_API.login(email, password);
+            user = await PB_API.login(username, password);
           } else {
-            user = await PB_API.login(email, password);
+            user = await PB_API.login(username, password);
           }
           document.body.removeChild(backdrop);
           resolve(user);
