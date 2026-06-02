@@ -272,7 +272,6 @@ export async function initPlayPage() {
               <label style="font-size: 0.7rem; color: #666;">1:</label>
               <input type="text" class="score1-input" value="${formatNumber(frame.score1)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
             </div>
-            <button type="button" class="row-save-btn secondary" style="padding: 3px 8px; font-size: 0.75rem;">Save</button>
           </div>
         </div>
         <div class="frame-expansion ${isExpanded ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd;">
@@ -329,12 +328,6 @@ export async function initPlayPage() {
       // Expand on click
       row.querySelector('.frame-row-header').onclick = () => {
         expandedTempId = (expandedTempId === frame.tempId) ? null : frame.tempId;
-        renderPreview();
-      };
-
-      row.querySelector('.row-save-btn').onclick = (e) => {
-        e.stopPropagation();
-        expandedTempId = null;
         renderPreview();
       };
 
