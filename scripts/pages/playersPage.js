@@ -164,6 +164,10 @@ export async function initPlayersPage() {
     onFilter: onFilterUpdate
   });
 
+  // Ensure validation and button states are updated when metadata fields change
+  ifpaIdInput.addEventListener('input', () => filterInstance.performFilter());
+  matchplayIdInput.addEventListener('input', () => filterInstance.performFilter());
+
   async function refresh() {
     const data = await PB_API.getPlayers();
     // Update array in-place to keep the filter reference valid

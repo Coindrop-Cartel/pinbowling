@@ -1,17 +1,30 @@
 <?php $pageTitle = 'Manage Machines'; ?>
   <main class="page-container">
-    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <header>
       <h1>Manage Machines</h1>
     </header>
 
     <section class="card">
+      <h2 id="machine-form-title">Add New Machine</h2>
       <form id="machine-form" autocomplete="off">
+        <input type="hidden" id="editing-machine-id" value="" />
         <div class="form-row">
           <label for="machine-name">Machine Name</label>
-          <input id="machine-name" type="text" placeholder="Filter registry or enter new name..." required />
+          <input id="machine-name" type="text" placeholder="Enter machine name" required />
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 2fr; gap: 15px;">
+          <div class="form-row">
+            <label for="machine-year">Year</label>
+            <input id="machine-year" type="number" placeholder="e.g. 1992" />
+          </div>
+          <div class="form-row">
+            <label for="machine-manufacturer">Manufacturer</label>
+            <input id="machine-manufacturer" type="text" placeholder="e.g. Williams" />
+          </div>
         </div>
         <div class="form-actions">
-          <button type="submit" id="add-machine-btn" disabled>Add Machine</button>
+          <button type="submit" id="save-machine-button">Save Machine</button>
+          <button type="button" id="cancel-edit-button" class="secondary hidden">Cancel Edit</button>
         </div>
       </form>
     </section>

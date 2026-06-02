@@ -155,7 +155,9 @@ function initializeDatabaseSchema($pdo) {
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `machines` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
-        `machine_name` VARCHAR(255) NOT NULL UNIQUE
+        `machine_name` VARCHAR(255) NOT NULL UNIQUE,
+        `year` INT DEFAULT NULL,
+        `manufacturer` VARCHAR(255) DEFAULT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `players` (
@@ -261,6 +263,15 @@ function initializeDatabaseSchema($pdo) {
             if (!$checkNew) {
                 $pdo->exec("RENAME TABLE `$old` TO `$new` ");
             }
+        }
+    }
+
+    // Ensure 'machines' table has year and manufacturer
+    $checkMachines = $pdo->query("SHOW TABLES LIKE 'machines'")->fetch();
+    if ($checkMachines) {
+        $checkYear = $pdo->query("SHOW COLUMNS FROM `machines` LIKE 'year'")->fetch();
+        if (!$checkYear) {
+            $pdo->exec("ALTER TABLE `machines` ADD COLUMN `year` INT DEFAULT NULL AFTER `machine_name`, ADD COLUMN `manufacturer` VARCHAR(255) DEFAULT NULL AFTER `year` ");
         }
     }
 

@@ -46,6 +46,8 @@ function serializeMasterMachine($row) {
         'id' => (int)$row['id'],
         'machineId' => (int)$row['id'],
         'machineName' => $row['machine_name'],
+        'year' => $row['year'] ? (int)$row['year'] : null,
+        'manufacturer' => $row['manufacturer'] ?? null,
     ];
 }
 
@@ -80,7 +82,7 @@ try {
             $stmt->execute([$eventId]);
             $machines = array_map('serializeTargetScore', $stmt->fetchAll());
         } else { // Fetch master list of machines (titles only)
-            $stmt = $pdo->query('SELECT id, machine_name FROM machines ORDER BY machine_name ASC');
+            $stmt = $pdo->query('SELECT id, machine_name, year, manufacturer FROM machines ORDER BY machine_name ASC');
             $machines = array_map('serializeMasterMachine', $stmt->fetchAll());
         }
         sendJson($machines);
@@ -206,12 +208,23 @@ try {
         if (!$name) {
             sendJson(['error' => 'machineName is required'], 400);
         }
+        $year = isset($input['year']) ? (int)$input['year'] : null;
+        $mfg = $input['manufacturer'] ?? null;
 
-        $stmt = $pdo->prepare('INSERT INTO machines (machine_name) VALUES (?)');
-        $stmt->execute([$name]);
+        try {
+            $stmt = $pdo->prepare('INSERT INTO machines (machine_name, year, manufacturer) VALUES (?, ?, ?)');
+            $stmt->execute([$name, $year, $mfg]);
+        } catch (PDOException $error) {
+            if ($error->errorInfo[1] === 1062) {
+                $stmt = $pdo->prepare('SELECT id, machine_name, year, manufacturer FROM machines WHERE machine_name = ?');
+                $stmt->execute([$name]);
+                sendJson(serializeMasterMachine($stmt->fetch()), 409);
+            }
+            throw $error;
+        }
         $id = (int)$pdo->lastInsertId();
 
-        $stmt = $pdo->prepare('SELECT id, machine_name FROM machines WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT id, machine_name, year, manufacturer FROM machines WHERE id = ?');
         $stmt->execute([$id]);
         $row = $stmt->fetch();
         if (!$row) {
@@ -250,18 +263,26 @@ try {
             }
             sendJson(serializeTargetScore($row));
         } else { // Update a master machine (title only)
-            // Master DB modification: Admin access required
-            validateAdminAccess();
+            // Master DB modification: TD or Admin access required
+            validateTDAccess();
 
             $name = $input['machineName'] ?? $input['name'] ?? null;
             if (!$name) sendJson(['error' => 'machineName is required'], 400);
+            $year = isset($input['year']) ? (int)$input['year'] : null;
+            $mfg = $input['manufacturer'] ?? null;
 
-            $sql = 'UPDATE machines SET machine_name = ? WHERE id = ?';
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([$name, $id]);
+            try {
+                $sql = 'UPDATE machines SET machine_name = ?, year = ?, manufacturer = ? WHERE id = ?';
+                $pdo->prepare($sql)->execute([$name, $year, $mfg, $id]);
+            } catch (PDOException $error) {
+                if ($error->errorInfo[1] === 1062) {
+                    sendJson(['error' => 'Machine name already exists'], 409);
+                }
+                throw $error;
+            }
 
             // Fetch the updated master machine
-            $stmt = $pdo->prepare('SELECT id, machine_name FROM machines WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT id, machine_name, year, manufacturer FROM machines WHERE id = ?');
             $stmt->execute([$id]);
             $row = $stmt->fetch();
             if (!$row) {

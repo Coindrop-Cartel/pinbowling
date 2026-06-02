@@ -108,11 +108,11 @@ export const PB_API = {
   },
   saveScore: (score) => fetchJSON('service/scoreService.php', { method: 'POST', body: JSON.stringify(score) }), // score object should contain eventId
   deletePlayer: (id) => fetchJSON(`service/playerService.php?id=${id}`, { method: 'DELETE' }),
-  createMachine: (machineName) => fetchJSON('service/machineService.php', { method: 'POST', body: JSON.stringify({ machineName }) }), // Create master machine
+  createMachine: (machine) => fetchJSON('service/machineService.php', { method: 'POST', body: JSON.stringify(machine) }), // Create master machine
   updatePlayer: (id, player) => fetchJSON(`service/playerService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(player) }),
   updateUserPassword: (userId, password) => fetchJSON(`service/authService.php?task=reset&id=${userId}`, { method: 'POST', body: JSON.stringify({ password }) }),
   updateUserRole: (userId, role) => fetchJSON(`service/playerService.php?task=role&id=${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
-  updateMachine: (id, machineName) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'PUT', body: JSON.stringify({ machineName }) }), // Update master machine
+  updateMachine: (id, machine) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(machine) }), // Update master machine
   deleteMachine: (id) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'DELETE' }),
   createPlayer: (player) => fetchJSON('service/playerService.php', { method: 'POST', body: JSON.stringify(player) }),
   clearScores: (playerId) => fetchJSON(`service/scoreService.php?playerId=${playerId}`, { method: 'DELETE' }),
