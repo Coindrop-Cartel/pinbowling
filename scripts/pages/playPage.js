@@ -5,7 +5,8 @@ import {
   createSearchableSelect, 
   showPlayerSelectionDialog, 
   createExpandableRow, 
-  setupSortableList 
+  setupSortableList,
+  renderThresholdGrid
 } from '@ui/uiComponents.js';
 
 export async function initPlayPage() {
@@ -295,13 +296,7 @@ export async function initPlayPage() {
                <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'}" data-scale="curved" style="font-size: 0.7rem; padding: 2px 8px;">Curved</button>
             </div>
           </div>
-          <div class="preview-values-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; font-size: 0.75rem; background: #f0f0f0; padding: 8px; border-radius: 4px;">
-            ${Object.entries(frame.values || {})
-              .sort((a, b) => Number(b[0]) - Number(a[0]))
-              .map(([rank, val]) => `<div><strong>${rank}:</strong> ${formatNumber(val)}</div>`)
-              .join('')
-            }
-          </div>
+          <div class="preview-values-container">${renderThresholdGrid(frame.values, formatNumber)}</div>
       `;
 
       const row = createExpandableRow(framesList, {
@@ -329,12 +324,9 @@ export async function initPlayPage() {
         frame.values = engine.buildRoundValues(frame.score10, frame.score1, frame.scaling);
 
         // Update the visual grid without re-rendering the whole row to maintain input focus
-        const grid = row.querySelector('.preview-values-grid');
-        if (grid) {
-            grid.innerHTML = Object.entries(frame.values || {})
-                .sort((a, b) => Number(b[0]) - Number(a[0]))
-                .map(([rank, val]) => `<div><strong>${rank}:</strong> ${formatNumber(val)}</div>`)
-                .join('');
+        const container = row.querySelector('.preview-values-container');
+        if (container) {
+            container.innerHTML = renderThresholdGrid(frame.values, formatNumber);
         }
       };
 

@@ -44,6 +44,7 @@ function serializeTargetScore($row) {
 function serializeMasterMachine($row) {
     return [
         'id' => (int)$row['id'],
+        'machineId' => (int)$row['id'],
         'machineName' => $row['machine_name'],
     ];
 }
@@ -158,20 +159,32 @@ try {
                 $stmtL->execute([(int)$firstEventId]);
                 validateLeagueAccess($pdo, $stmtL->fetchColumn());
 
+                // If batch updating, shift all current records to high range to avoid unique key collisions during reorder
+                if (count($batch) > 1) {
+                    $eventIds = array_unique(array_column($batch, 'eventId'));
+                    foreach ($eventIds as $eid) {
+                        $pdo->prepare('UPDATE target_scores SET order_number = order_number + 1000 WHERE event_id = ?')->execute([(int)$eid]);
+                        $pdo->prepare('UPDATE scores SET order_number = order_number + 1000 WHERE event_id = ?')->execute([(int)$eid]);
+                    }
+                }
+
                 foreach ($batch as $item) {
                     if (empty($item['eventId']) || empty($item['machineId'])) throw new Exception('eventId and machineId are required');
                     $id = (int)($item['id'] ?? 0);
                     if ($id) {
-                        $stmtOrig = $pdo->prepare('SELECT order_number, event_id FROM target_scores WHERE id = ?');
+                        // Find the "shifted" original order number to correctly update the scores table
+                        $stmtOrig = $pdo->prepare('SELECT order_number FROM target_scores WHERE id = ?');
                         $stmtOrig->execute([$id]);
-                        $orig = $stmtOrig->fetch();
+                        $shiftedOldOrder = (int)$stmtOrig->fetchColumn();
+
                         $sql = 'UPDATE target_scores SET machine_id = ?, order_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
                         $params = [(int)$item['machineId'], (int)$item['orderNumber']];
                         for ($i = 1; $i <= 10; $i++) $params[] = (int)($item['values'][$i] ?? 0);
                         $params[] = $id;
-                        if ($orig && (int)$orig['order_number'] !== (int)$item['orderNumber']) {
-                            $pdo->prepare('UPDATE scores SET order_number = ? WHERE event_id = ? AND order_number = ?')->execute([(int)$item['orderNumber'], (int)$orig['event_id'], (int)$orig['order_number']]);
-                        }
+
+                        // Update Scores table to match the new order number
+                        $stmtScores = $pdo->prepare('UPDATE scores SET order_number = ? WHERE event_id = ? AND order_number = ?');
+                        $stmtScores->execute([(int)$item['orderNumber'], (int)$item['eventId'], $shiftedOldOrder]);
                     } else {
                         $sql = 'INSERT INTO target_scores (event_id, machine_id, order_number, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5), score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
                         $params = [(int)$item['eventId'], (int)$item['machineId'], (int)$item['orderNumber']];

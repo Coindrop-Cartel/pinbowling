@@ -1,7 +1,15 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js';
 import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormatting, formatNumber } from '@scripts/utils.js';
-import { createSearchableSelect, showPrompt, showAlert, initReadOnlyTournamentDisplay } from '@ui/uiComponents.js';
+import { 
+  createSearchableSelect, 
+  showPrompt, 
+  showAlert, 
+  initReadOnlyTournamentDisplay, 
+  createExpandableRow, 
+  setupSortableList,
+  renderThresholdGrid
+} from '@ui/uiComponents.js';
 import { printMachineScores } from '@ui/printing.js';
 import { requireAdmin, isManagementAuthorized } from '@services/auth.js';
 import {navigateTo} from '@scripts/utils.js';
@@ -20,10 +28,13 @@ export async function initConfigPage() {
   const displayOrder = document.getElementById('display-order');
   const form = document.getElementById('round-form');
   const submitBtn = document.getElementById('save-round-btn');
-  const roundsTable = document.getElementById('rounds-table');
+  const roundsList = document.getElementById('rounds-list');
   const reorderActions = document.getElementById('reorder-actions');
   const listEmpty = document.getElementById('list-empty');
   let editingMachineId = null;
+  let expandedTargetId = null;
+  let isListDirty = false;
+  let originalEventTargets = [];
   const printMachinesBtn = document.getElementById('print-machines-btn');
   let machineSearch;
 
@@ -82,6 +93,14 @@ export async function initConfigPage() {
   const updatePreviewAndDirty = () => {
     renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast(), currentScaling);
     markDirty();
+  };
+
+  document.getElementById('cancel-order-btn').onclick = () => {
+    // Rollback to the snapshot we took on page load or last successful save
+    eventTargets = JSON.parse(JSON.stringify(originalEventTargets));
+    isListDirty = false;
+    render();
+    reorderActions.classList.add('hidden');
   };
 
   if (score10Input) applyScoreFormatting(score10Input);
@@ -157,13 +176,43 @@ export async function initConfigPage() {
   score1Input.addEventListener('input', updatePreviewAndDirty);
   document.getElementById('machine-name').addEventListener('input', markDirty);
 
+  // Initialize dragging listeners on the container once
+  setupSortableList(roundsList, {
+    itemSelector: '.round-item',
+    onReorder: (ids) => {
+      // Map the new DOM order back to our data array
+      const newOrder = ids.map(id => eventTargets.find(t => String(t.id) === String(id)));
+      eventTargets = newOrder.map((target, idx) => ({ ...target, orderNumber: idx + 1 }));
+      checkListDirty();
+      render();
+    }
+  });
+
+  // Helper to compare current state with original for "Dirty" check
+  function checkListDirty() {
+    // Create a normalized version of the objects to avoid false positives from key ordering
+    const normalize = (arr) => arr.map(t => ({
+      machineId: Number(t.machineId),
+      orderNumber: Number(t.orderNumber),
+      v10: t.values[10],
+      v1: t.values[1]
+    }));
+
+    const current = JSON.stringify(normalize(eventTargets));
+    const original = JSON.stringify(normalize(originalEventTargets));
+    isListDirty = current !== original;
+    
+    reorderActions.classList.toggle('hidden', !isListDirty);
+    const saveBtn = document.getElementById('save-order-btn');
+    if (saveBtn) saveBtn.disabled = !isListDirty;
+  }
+
   async function render() {
     const eventId = getActiveEventId();
-    const tbody = roundsTable.querySelector('tbody');
-    tbody.innerHTML = '';
+    roundsList.innerHTML = '';
 
     if (!eventId) {
-      roundsTable.classList.add('hidden');
+      roundsList.classList.add('hidden');
       reorderActions.classList.add('hidden');
       listEmpty.classList.remove('hidden');
       listEmpty.textContent = 'Select a league and event to manage target scores.';
@@ -173,104 +222,161 @@ export async function initConfigPage() {
     // Show management actions even if the list is empty (for new setups)
     listEmpty.classList.toggle('hidden', eventTargets.length > 0);
     listEmpty.textContent = 'No targets defined for this event yet.';
-    roundsTable.classList.toggle('hidden', eventTargets.length === 0);
-    reorderActions.classList.toggle('hidden', eventTargets.length === 0);
+    roundsList.classList.toggle('hidden', eventTargets.length === 0);
+    checkListDirty(); // Ensure buttons show/hide based on current state
 
     eventTargets.sort((a, b) => a.orderNumber - b.orderNumber);
     const maxOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.orderNumber)) : 0;
 
     eventTargets.forEach((round) => {
       const bonusHtml = Engine.getBonusTargetHtml(round, round.orderNumber === maxOrder, formatNumber);
+      const isExpanded = expandedTargetId === round.id;
 
-      const row = document.createElement('tr');
-      row.draggable = true;
-      row.dataset.id = round.id;
-      row.innerHTML = `
-        <td class="drag-handle" style="cursor: grab; color: #888;">☰</td>
-        <td>${round.orderNumber}</td>
-        <td>${round.machineName}</td>
-        <td class="targets-cell" style="cursor: pointer;">
-          <div class="targets-summary">10: <strong>${formatNumber(round.values[10])}</strong> <small>▾</small></div>
-          <div class="score-list hidden" style="margin-top: 5px; font-size: 0.9em;">
-            ${Object.entries(round.values)
-              .sort((a, b) => Number(b[0]) - Number(a[0]))
-              .map(([key, value]) => `<div>${key}: ${formatNumber(value)}</div>`)
-              .join('')}
-            ${bonusHtml}
+      // Detect scaling from data to sync inline toggles
+      const gapStart = (round.values[2] || 0) - (round.values[1] || 0);
+      const gapEnd = (round.values[10] || 0) - (round.values[9] || 0);
+      const scaling = (gapEnd > gapStart * 1.5) ? 'curved' : 'flat';
+
+      const row = createExpandableRow(roundsList, {
+        id: round.id,
+        className: 'round-item',
+        draggable: true,
+        isExpanded,
+        headerHtml: `
+          <div class="drag-handle" style="cursor: grab; color: #888; padding: 0 4px; font-size: 1.2rem;">☰</div>
+          <span style="font-weight: bold; min-width: 30px; text-align: center;">${round.orderNumber}</span>
+          <span style="flex: 1; font-weight: bold;" class="machine-name-display">${round.machineName}</span>
+          <div style="display: flex; align-items: center; gap: 10px;" onclick="event.stopPropagation()">
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <label style="font-size: 0.7rem; color: #666;">10:</label>
+              <input type="text" class="score10-input" value="${formatNumber(round.values[10])}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <label style="font-size: 0.7rem; color: #666;">1:</label>
+              <input type="text" class="score1-input" value="${formatNumber(round.values[1])}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
+            </div>
           </div>
-        </td>
-        <td><button type="button" class="edit-button" data-id="${round.id}">Edit</button></td>
-      `;
-      row.querySelector('.targets-cell').addEventListener('click', () => {
-        row.querySelector('.score-list').classList.toggle('hidden');
-      });
-      tbody.appendChild(row);
-    });
-
-    tbody.querySelectorAll('.edit-button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const round = eventTargets.find(item => item.id === Number(btn.dataset.id));
-        if (!round) return;
-        editingMachineId = round.id;
-        orderInput.value = round.orderNumber;
-        displayOrder.textContent = round.orderNumber;
-        document.getElementById('machine-name').value = round.machineName;
-        score10Input.value = round.values[10] ? formatNumber(round.values[10]) : '';
-        score1Input.value = round.values[1] ? formatNumber(round.values[1]) : '';
-
-        // Detect scaling type from existing values to sync UI buttons
-        const gapStart = (round.values[2] || 0) - (round.values[1] || 0);
-        const gapEnd = (round.values[10] || 0) - (round.values[9] || 0);
-        currentScaling = (gapEnd > gapStart * 1.5) ? 'curved' : 'flat';
-        if (window.updateScalingUI) window.updateScalingUI();
-
-        machineSearch.updateOptions(round.machineName);
-        updateQuickFillState(round.machineName);
-        renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast(), currentScaling);
-        configCard.classList.remove('hidden');
-        window.scrollTo(0, 0);
-      });
-    });
-
-    setupDragging(tbody);
-  }
-
-  function setupDragging(tbody) {
-    let draggedRow = null;
-    tbody.addEventListener('dragstart', (e) => {
-      draggedRow = e.target.closest('tr');
-      e.target.style.opacity = '0.5';
-    });
-    tbody.addEventListener('dragend', (e) => {
-      e.target.style.opacity = '';
-    });
-    tbody.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      const overRow = e.target.closest('tr');
-      if (overRow && overRow !== draggedRow) {
-        const rect = overRow.getBoundingClientRect();
-        const midpoint = rect.top + rect.height / 2;
-        if (e.clientY < midpoint) {
-          tbody.insertBefore(draggedRow, overRow);
-        } else {
-          tbody.insertBefore(draggedRow, overRow.nextSibling);
+        `,
+        contentHtml: `
+          <div class="form-row">
+            <label style="font-size: 0.85rem;">Change Machine</label>
+            <input type="text" class="row-machine-search" placeholder="Filter machines..." style="width: 100%; box-sizing: border-box; margin-bottom: 5px;">
+            <select class="row-machine-select" style="width: 100%; box-sizing: border-box;"></select>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div style="display: flex; gap: 6px;">
+               <button type="button" class="qfill secondary" data-type="easy" style="font-size: 0.75rem; padding: 2px 10px;">Easy</button>
+               <button type="button" class="qfill secondary" data-type="med" style="font-size: 0.75rem; padding: 2px 10px;">Med</button>
+               <button type="button" class="qfill secondary" data-type="hard" style="font-size: 0.75rem; padding: 2px 10px;">Hard</button>
+            </div>
+            <div style="display: flex; gap: 4px;">
+               <button type="button" class="scaling-btn ${scaling === 'flat' ? 'btn-standard' : 'secondary'}" data-scale="flat" style="font-size: 0.7rem; padding: 2px 8px;">Flat</button>
+               <button type="button" class="scaling-btn ${scaling === 'curved' ? 'btn-standard' : 'secondary'}" data-scale="curved" style="font-size: 0.7rem; padding: 2px 8px;">Curved</button>
+            </div>
+          </div>
+          <div class="preview-values-container">${renderThresholdGrid(round.values, formatNumber)}</div>
+          ${bonusHtml ? `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd;">${bonusHtml}</div>` : ''}
+        `,
+        onHeaderClick: (e) => {
+          expandedTargetId = (expandedTargetId === round.id) ? null : round.id;
+          render();
         }
+      });
+
+      const s10 = row.querySelector('.score10-input');
+      const s1 = row.querySelector('.score1-input');
+      applyScoreFormatting(s10);
+      applyScoreFormatting(s1);
+
+      const updateValues = () => {
+        const s10Val = Number(s10.value.replace(/\D/g, '')) || 0;
+        const s1Val = Number(s1.value.replace(/\D/g, '')) || 0;
+        const currentScaling = row.querySelector('.scaling-btn.btn-standard').dataset.scale;
+        round.values = Engine.buildRoundValues(s10Val, s1Val, currentScaling);
+        
+        const container = row.querySelector('.preview-values-container');
+        if (container) container.innerHTML = renderThresholdGrid(round.values, formatNumber);
+        
+        checkListDirty();
+      };
+
+      s10.oninput = updateValues;
+      s1.oninput = updateValues;
+
+      if (isExpanded) {
+        const mSearch = row.querySelector('.row-machine-search');
+        const mSelect = row.querySelector('.row-machine-select');
+        
+        const mSearchInstance = createSearchableSelect(mSearch, mSelect, currentSuggestedMachines, {
+          valueKey: 'machineId',
+          labelKey: 'machineName',
+          placeholder: '-- Select Machine --',
+          onSelect: (val) => {
+            const match = currentSuggestedMachines.find(m => String(m.machineId) === String(val));
+            if (match) {
+              round.machineName = match.machineName;
+              round.machineId = Number(match.machineId);
+              updateValues();
+              checkListDirty();
+              render();
+            }
+          }
+        });
+
+        // Ensure dropdown populates immediately on focus
+        mSearch.value = '';
+        mSearchInstance.updateOptions('');
+        mSearch.addEventListener('focus', (e) => e.target.select());
+
+        row.querySelectorAll('.qfill').forEach(btn => {
+          btn.onclick = () => {
+            const type = btn.dataset.type;
+            const match = currentSuggestedMachines.find(m => String(m.id) === String(round.machineId));
+            const val = match ? match['target' + type.charAt(0).toUpperCase() + type.slice(1)] : null;
+            if (val) {
+              s10.value = formatNumber(val);
+              s1.value = formatNumber(Math.floor(val / 10));
+              updateValues();
+              checkListDirty();
+            }
+          };
+        });
+
+        row.querySelectorAll('.scaling-btn').forEach(btn => {
+          btn.onclick = () => {
+            row.querySelectorAll('.scaling-btn').forEach(b => b.classList.replace('btn-standard', 'secondary'));
+            btn.classList.replace('secondary', 'btn-standard');
+            updateValues();
+            checkListDirty();
+          }
+        });
       }
     });
   }
 
   document.getElementById('save-order-btn').addEventListener('click', async () => {
-    const rows = Array.from(roundsTable.querySelectorAll('tbody tr'));
-    const updates = rows.map((row, index) => ({
-      id: Number(row.dataset.id),
-      orderNumber: index + 1
-    }));
+    const rows = Array.from(roundsList.querySelectorAll('.round-item'));
+    const eventId = Number(getActiveEventId());
+
+    // Prepare payload, converting temporary IDs to null for the API to treat as new inserts
+    const payload = eventTargets.map((round, index) => {
+      return {
+        id: String(round.id).startsWith('temp_') ? null : round.id,
+        eventId: eventId,
+        machineId: round.machineId,
+        orderNumber: index + 1,
+        values: round.values
+      };
+    });
 
     try {
-      await PB_API.bulkUpdateTargetOrder(updates);
+      await PB_API.saveTargetScore(payload);
+      isListDirty = false;
+      originalEventTargets = JSON.parse(JSON.stringify(eventTargets));
+      expandedTargetId = null;
       await refresh();
     } catch (err) {
-      alert('Failed to update order: ' + err.message);
+      alert('Failed to save changes: ' + err.message);
     }
   });
 
@@ -304,7 +410,9 @@ export async function initConfigPage() {
     machineSearch.updateOptions('');
     updateQuickFillState('');
 
+    isListDirty = false;
     eventTargets = eventId ? await PB_API.getTargetScores(eventId) : [];
+    originalEventTargets = JSON.parse(JSON.stringify(eventTargets));
     await render();
   };
 
@@ -326,7 +434,7 @@ export async function initConfigPage() {
   }
   document.getElementById('cancel-config-btn').onclick = resetForm;
 
-  form.addEventListener('submit', async (e) => {
+  form.addEventListener('submit', async function(e) {
     e.preventDefault();
     const orderNumber = Number(orderInput.value);
     const machineName = document.getElementById('machine-name').value.trim();

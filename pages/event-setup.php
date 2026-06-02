@@ -66,19 +66,9 @@
         <button type="button" id="add-target-btn" class="btn-standard">+ Add New Target</button>
       </div>
       <div id="list-empty" class="notice">Select a league and event to manage target scores.</div>
-      <table id="rounds-table" class="data-table hidden">
-        <thead>
-          <tr>
-            <th style="width: 50px;"></th>
-            <th style="width: 80px;">Order</th>
-            <th>Machine</th>
-            <th>Target Scores</th>
-            <th style="width: 100px;">Actions</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div id="rounds-list" class="hidden" style="margin-bottom: 1rem;"></div>
       <div id="reorder-actions" class="form-actions hidden" style="margin-top: 1rem; justify-content: flex-end;">
+        <button type="button" id="cancel-order-btn" class="secondary" style="margin-right: 8px;">Cancel</button>
         <button type="button" id="save-order-btn">Save</button>
       </div>
     </section>
