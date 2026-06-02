@@ -145,8 +145,11 @@ try {
         }
     }
 
-    // POST: Create new League or Event (Protected by API Secret)
+    // POST: Create new League or Event (Protected by API Secret and Role)
     if ($method === 'POST') {
+        // Enforce that only TDs or Admins can perform creation tasks
+        validateTDAccess();
+
         if ($task === 'member') {
             if (empty($input['leagueId']) || empty($input['playerId'])) {
                 sendJson(['error' => 'leagueId and playerId are required'], 400);
@@ -158,7 +161,6 @@ try {
             if (empty($input['leagueId']) || empty($input['eventName'])) {
                 sendJson(['error' => 'leagueId and eventName are required'], 400);
             }
-            validateLeagueAccess($pdo, $input['leagueId']);
             $sql = 'INSERT INTO events (league_id, location_id, event_name, event_date) VALUES (?, ?, ?, ?)';
             $params = [
                 (int)$input['leagueId'], 
@@ -196,13 +198,15 @@ try {
         }
     }
 
-    // PUT: Update League or Event (Protected by API Secret)
+    // PUT: Update League or Event (Protected by API Secret and Role)
     if ($method === 'PUT') {
+        // Enforce that only TDs or Admins can perform update tasks
+        validateTDAccess();
+
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
 
         if ($task === 'fixture') {
-            validateLeagueAccess($pdo, $input['leagueId']);
             $sql = 'UPDATE events SET league_id = ?, location_id = ?, event_name = ?, event_date = ? WHERE id = ?';
             $params = [
                 (int)$input['leagueId'], 
@@ -217,15 +221,12 @@ try {
         } else {
             // Handle password reset separately (Requires Global Admin)
             if (isset($input['resetPassword'])) {
-                validateApiSecret();
                 // Resetting a league password is a system-wide administrative task
                 validateAdminAccess();
                 $newPass = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
                 $pdo->prepare('UPDATE leagues SET password = ? WHERE id = ?')->execute([$newPass, $id]);
                 sendJson(['success' => true]);
             }
-
-            validateLeagueAccess($pdo, $id);
             $sql = 'UPDATE leagues SET name = ?, start_date = ? WHERE id = ?';
             $params = [$input['name'], $input['startDate'] ?? null, $id];
             $stmt = $pdo->prepare($sql);
@@ -245,11 +246,13 @@ try {
         }
     }
 
-    // DELETE: Remove League or Event (Protected by API Secret)
+    // DELETE: Remove League or Event (Protected by API Secret and Role)
     if ($method === 'DELETE') {
         if ($task === 'member') {
+            // Removing players from a roster requires TD access
+            validateTDAccess();
+
             $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
-            validateLeagueAccess($pdo, $leagueId);
             $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
 
             // Remove player scores for all events within this specific league
@@ -270,9 +273,9 @@ try {
                 if ($eventLeagueId === false) {
                     sendJson(['error' => 'Event not found'], 404);
                 }
-                validateLeagueAccess($pdo, $eventLeagueId);
+                validateTDAccess(); // TDs can delete events
             } else {
-                validateLeagueAccess($pdo, $id); // Deleting a League (Allows League Pass OR Global Admin)
+                validateAdminAccess(); // Only Admins can delete a whole league
             }
 
             $table = ($task === 'fixture') ? 'events' : 'leagues';

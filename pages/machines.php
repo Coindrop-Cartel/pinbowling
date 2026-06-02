@@ -1,6 +1,6 @@
 <?php $pageTitle = 'Manage Machines'; ?>
   <main class="page-container">
-    <header>
+    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h1>Manage Machines</h1>
     </header>
 

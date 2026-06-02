@@ -9,6 +9,7 @@ vi.mock('@services/api.js', () => ({
     createPlayer: vi.fn(),
     updatePlayer: vi.fn(),
     deletePlayer: vi.fn(),
+    getCurrentUser: vi.fn(),
   },
 }));
 
@@ -22,6 +23,8 @@ vi.mock('@ui/uiComponents.js', () => ({
   })),
   showConfirm: vi.fn(() => Promise.resolve(true)),
   showPrompt: vi.fn(),
+  showChoiceDialog: vi.fn(),
+  showAlert: vi.fn(),
 }));
 
 vi.mock('@services/auth.js', () => ({
@@ -35,17 +38,19 @@ describe('Player Management Page (playersPage.js)', () => {
     Element.prototype.scrollIntoView = vi.fn();
 
     document.body.innerHTML = `
-      <h2 id="player-form-title">Add</h2>
-      <form id="player-form">
-        <input id="editing-player-id" />
-        <input id="player-name" />
-        <div class="form-row"><input id="ifpa-id" /></div>
-        <div class="form-row"><input id="matchplay-id" /></div>
-        <div class="form-actions">
-          <button id="save-player-button">Save</button>
-          <button id="cancel-edit-button">Cancel</button>
-        </div>
-      </form>
+      <section class="card">
+        <h2 id="player-form-title">Add</h2>
+        <form id="player-form">
+          <input id="editing-player-id" />
+          <input id="player-name" />
+          <div class="form-row"><input id="ifpa-id" /></div>
+          <div class="form-row"><input id="matchplay-id" /></div>
+          <div class="form-actions">
+            <button id="save-player-button">Save</button>
+            <button id="cancel-edit-button">Cancel</button>
+          </div>
+        </form>
+      </section>
       <ul id="player-list"></ul>
     `;
 
@@ -54,6 +59,7 @@ describe('Player Management Page (playersPage.js)', () => {
       { id: 10, playerName: 'Alice', ifpaId: '123' },
       { id: 11, playerName: 'Bob' }
     ]);
+    PB_API.getCurrentUser.mockResolvedValue({ id: 1, role: 'admin', player_name: 'Admin User' });
   });
 
   it('should load and render players', async () => {

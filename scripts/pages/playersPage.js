@@ -1,11 +1,16 @@
 import { PB_API } from '@services/api.js';
-import { setupLiveFilter, showConfirm, showPrompt } from '@ui/uiComponents.js';
+import { setupLiveFilter, showConfirm, showPrompt, showChoiceDialog, showAlert } from '@ui/uiComponents.js';
 import { requireAdmin } from '@services/auth.js';
 
 /**
  * Initializes the Player Management page.
  */
 export async function initPlayersPage() {
+  const currentUser = await PB_API.getCurrentUser();
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const isTD = currentUser && currentUser.role === 'td';
+  const hasElevatedPrivileges = isAdmin || isTD;
+
   const playerFormTitle = document.getElementById('player-form-title');
   const playerForm = document.getElementById('player-form');
   const editingPlayerIdInput = document.getElementById('editing-player-id');
@@ -31,6 +36,11 @@ export async function initPlayersPage() {
   createToggle.style.marginTop = '10px';
   playerNameInput.after(createToggle);
 
+  if (!hasElevatedPrivileges) {
+    createToggle.classList.add('hidden');
+    playerForm.closest('.card').classList.add('hidden');
+  }
+
   createToggle.onclick = () => {
     const isHidden = ifpaRow.classList.contains('hidden');
     ifpaRow.classList.toggle('hidden', !isHidden);
@@ -54,6 +64,9 @@ export async function initPlayersPage() {
       playerList.innerHTML = `<li>${allPlayers.length === 0 ? 'No players registered yet.' : 'No matching players found.'}</li>`;
     } else {
       filtered.forEach(p => {
+        const isSelf = currentUser && String(p.id) === String(currentUser.player_id);
+        const canEdit = hasElevatedPrivileges || isSelf;
+
         const li = document.createElement('li');
         li.style.padding = '6px 12px';
         li.style.marginBottom = '5px';
@@ -63,19 +76,68 @@ export async function initPlayersPage() {
         li.style.justifyContent = 'space-between';
         li.style.alignItems = 'center';
         li.innerHTML = `
-          <span>
-            ${p.playerName} 
-            ${p.ifpaId ? `<small>(IFPA: ${p.ifpaId})</small>` : ''}
-            ${p.matchplayId ? `<small>(Matchplay: ${p.matchplayId})</small>` : ''}
-          </span>
+          <div style="flex: 1;">
+            <strong>${p.playerName}</strong> 
+            ${p.userRole ? `<span class="badge" style="background:#000; color:#fff; font-size:0.7rem; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle; font-weight: bold;">${p.userRole.toUpperCase()}</span>` : ''}
+            <br>
+            ${p.ifpaId ? `<small style="margin-right:10px;">IFPA: ${p.ifpaId}</small>` : ''}
+            ${p.matchplayId ? `<small>Matchplay: ${p.matchplayId}</small>` : ''}
+          </div>
           <div style="display: flex; gap: 8px;">
-            <button type="button" class="edit-player-btn secondary" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.85rem;">Edit</button>
-            <button type="button" class="delete-player-btn-inline" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
+            ${(isAdmin || isTD) && p.userId ? `<button type="button" class="pass-reset-btn secondary" data-user-id="${p.userId}" style="padding: 4px 10px; font-size: 0.85rem;">Reset Pass</button>` : ''}
+            ${(isAdmin || isTD) && p.userId ? `<button type="button" class="role-btn secondary" data-user-id="${p.userId}" data-role="${p.userRole}" style="padding: 4px 10px; font-size: 0.85rem;">Role</button>` : ''}
+            ${canEdit ? `<button type="button" class="edit-player-btn secondary" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.85rem;">Edit</button>` : ''}
+            ${isAdmin ? `<button type="button" class="delete-player-btn-inline" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>` : ''}
           </div>
         `;
         playerList.appendChild(li);
       });
       // Attach row action listeners
+      playerList.querySelectorAll('.pass-reset-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const userId = Number(e.target.dataset.userId);
+          const playerName = e.target.closest('li').querySelector('strong').textContent;
+          const newPass = await showPrompt(`Enter a new temporary password for ${playerName}:`, 'Reset User Password', false);
+          
+          if (newPass) {
+             try {
+               // Reusing updateLeague logic style: pass password update to auth service
+               await PB_API.updateUserPassword(userId, newPass);
+               showAlert(`Password updated successfully for ${playerName}.`, 'Success');
+             } catch (err) {
+               showAlert(err.message, 'Update Failed');
+             }
+          }
+        });
+      });
+
+      playerList.querySelectorAll('.role-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const userId = Number(e.target.dataset.userId);
+          const currentRole = e.target.dataset.role;
+          const playerName = e.target.closest('li').querySelector('strong').textContent;
+          
+          const choices = [
+            { value: 'player', label: 'Player' },
+            { value: 'td', label: 'TD' }
+          ];
+
+          if (isAdmin) {
+            choices.push({ value: 'admin', label: 'Admin' });
+          }
+
+          const newRole = await showChoiceDialog('Change User Role', `Assign a new role for ${playerName}:`, choices, currentRole);
+          
+          if (newRole && newRole !== currentRole) {
+            try {
+              await PB_API.updateUserRole(userId, newRole);
+              await refresh();
+            } catch (err) {
+              showAlert(err.message, 'Update Failed');
+            }
+          }
+        });
+      });
       playerList.querySelectorAll('.edit-player-btn').forEach(btn => {
         btn.addEventListener('click', (e) => editPlayer(Number(e.target.dataset.playerId)));
       });
@@ -131,6 +193,11 @@ export async function initPlayersPage() {
     createToggle.textContent = 'Create New Player';
     createToggle.style.marginTop = '10px';
     playerNameInput.after(createToggle);
+    
+    playerNameInput.disabled = false;
+    if (!hasElevatedPrivileges) {
+      playerForm.closest('.card').classList.add('hidden');
+    }
 
     if (filterInstance) filterInstance.performFilter();
   }
@@ -142,9 +209,18 @@ export async function initPlayersPage() {
   async function editPlayer(playerId) {
     const player = allPlayers.find(p => p.id === playerId);
     if (!player) return;
+    
+    const isSelf = currentUser && String(player.id) === String(currentUser.player_id);
+    if (!hasElevatedPrivileges && !isSelf) return;
+
+    playerForm.closest('.card').classList.remove('hidden');
 
     editingPlayerIdInput.value = player.id;
     playerNameInput.value = player.playerName;
+    
+    // Lock name for non-privileged users
+    playerNameInput.disabled = !hasElevatedPrivileges;
+    
     ifpaIdInput.value = player.ifpaId || '';
     matchplayIdInput.value = player.matchplayId || '';
     if (playerFormTitle) playerFormTitle.textContent = `Edit Player: ${player.playerName}`;
@@ -173,7 +249,14 @@ export async function initPlayersPage() {
     const ifpaId = ifpaIdInput.value.trim() || null;
     const matchplayId = matchplayIdInput.value.trim() || null;
 
-    if (!name || !await requireAdmin(`Enter Admin Password to ${id ? 'update' : 'create'} player "${name}":`)) {
+    if (!name) return;
+
+    const isSelfUpdate = id && currentUser && String(id) === String(currentUser.player_id);
+    const playerBeingEdited = id ? allPlayers.find(p => p.id === id) : null;
+    const nameChanged = playerBeingEdited && name !== playerBeingEdited.playerName;
+    const implicitlyAuthorized = hasElevatedPrivileges || (isSelfUpdate && !nameChanged);
+
+    if (!implicitlyAuthorized && !await requireAdmin(`Enter Admin Password to ${id ? 'update' : 'create'} player "${name}":`)) {
       return;
     }
 

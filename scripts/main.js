@@ -14,6 +14,7 @@ import { initStandingsPage } from '@pages/standingsPage.js';
 import { initLeaguesPage } from '@pages/leaguesPage.js';
 import { initPlayPage } from '@pages/playPage.js';
 import { initManagementPage } from '@pages/managementPage.js';
+import { initAuthHeader } from '@services/auth.js';
 import { fitTVModeToScreen } from '@ui/uiComponents.js';
 
 /**
@@ -24,7 +25,7 @@ import { fitTVModeToScreen } from '@ui/uiComponents.js';
  * PHP pages while ensuring only the necessary module logic is executed 
  * for the current view context.
  */
-function ready() {
+async function ready() {
   // Restore debug mode from local storage if previously toggled in Management UI
   const storedDebug = localStorage.getItem('pb_debug_enabled');
   if (storedDebug !== null) {
@@ -39,6 +40,7 @@ function ready() {
   }
 
   initNavigation('.nav-container'); 
+  await initAuthHeader();
 
   const pageInitializers = {
     'machine-form': initMachinesPage,

@@ -28,6 +28,7 @@ vi.mock('@scripts/utils.js', () => ({
 
 vi.mock('@services/auth.js', () => ({
   requireAdmin: vi.fn(),
+  isManagementAuthorized: vi.fn(() => Promise.resolve(true)),
 }));
 
 vi.mock('@ui/uiComponents.js', () => ({

@@ -22,17 +22,25 @@ function serializePlayer($row) {
         'id' => (int)$row['id'],
         'playerName' => $row['player_name'],
         'ifpaId' => $row['ifpa_id'],
-        'matchplayId' => $row['matchplay_id']
+        'matchplayId' => $row['matchplay_id'],
+        'userRole' => $row['user_role'] ?? null,
+        'userId' => isset($row['user_id']) ? (int)$row['user_id'] : null
     ];
 }
 
 try {
     $pdo = getDbConnection();
     $method = $_SERVER['REQUEST_METHOD'];
+    $task = $_GET['task'] ?? null;
 
     // GET: Retrieve all registered players alphabetically
     if ($method === 'GET') {
-        $stmt = $pdo->query('SELECT * FROM players ORDER BY player_name ASC');
+        $stmt = $pdo->query('
+            SELECT p.*, u.role as user_role, u.id as user_id 
+            FROM players p 
+            LEFT JOIN users u ON p.id = u.player_id 
+            ORDER BY p.player_name ASC
+        ');
         sendJson(array_map('serializePlayer', $stmt->fetchAll()));
     }
 
@@ -72,22 +80,60 @@ try {
 
     // PUT: Update an existing player (Protected by API Secret)
     if ($method === 'PUT') {
-        validateApiSecret();
-        
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id) {
             sendJson(['error' => 'id query parameter is required'], 400);
         }
-        if (empty($input['playerName'])) {
-            sendJson(['error' => 'playerName is required'], 400);
+
+        if ($task === 'role') {
+            validateTDAccess();
+            $newRole = $input['role'] ?? 'player';
+            if (!in_array($newRole, ['player', 'td', 'admin'])) {
+                sendJson(['error' => 'Invalid role'], 400);
+            }
+
+            $user = getCurrentUser();
+            if ($user && $user['role'] === 'td' && $newRole === 'admin') {
+                sendJson(['error' => 'Unauthorized: TDs cannot assign Admin role'], 403);
+            }
+
+            // $id here is the user_id passed in the URL
+            $stmt = $pdo->prepare('UPDATE users SET role = ? WHERE id = ?');
+            $stmt->execute([$newRole, $id]);
+            sendJson(['success' => true]);
         }
 
+        // Fetch existing record to check if name is changing
+        $stmt = $pdo->prepare('SELECT player_name FROM players WHERE id = ?');
+        $stmt->execute([$id]);
+        $existing = $stmt->fetch();
+        if (!$existing) {
+            sendJson(['error' => 'Player not found'], 404);
+        }
+
+        $newName = $input['playerName'] ?? $existing['player_name'];
         $ifpa_id = $input['ifpaId'] ?? null;
         $matchplay_id = $input['matchplayId'] ?? null;
 
+        // Rule: Changing the name requires TD or Admin Access. 
+        if ($newName !== $existing['player_name']) {
+            validateTDAccess();
+        } else {
+            // Updating IDs only: restricted to the profile owner, a TD, or an Admin
+            $user = getCurrentUser();
+            $isOwner = $user && (int)$user['player_id'] === $id;
+            if (!$isOwner) {
+                validateTDAccess();
+            }
+        }
+
+        if (empty($newName)) {
+            sendJson(['error' => 'playerName is required'], 400);
+        }
+
         try {
             $stmt = $pdo->prepare('UPDATE players SET player_name = ?, ifpa_id = ?, matchplay_id = ? WHERE id = ?');
-            $stmt->execute([$input['playerName'], $ifpa_id, $matchplay_id, $id]);
+            $stmt->execute([$newName, $ifpa_id, $matchplay_id, $id]);
         } catch (PDOException $error) {
             if ($error->errorInfo[1] === 1062) { // Duplicate entry
                 sendJson(['error' => 'Player name already exists'], 409);
@@ -106,7 +152,7 @@ try {
 
     // DELETE: Remove a player and their associated scores (Protected by API Secret)
     if ($method === 'DELETE') {
-        validateApiSecret();
+        validateAdminAccess();
         
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id) {

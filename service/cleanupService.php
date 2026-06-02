@@ -11,7 +11,7 @@ try {
     
     // This operation is restricted to global admins only.
     // Trigger via CRON or CLI: curl -H "X-PB-SECRET: <SECRET>" https://yoursite.com/service/cleanupService.php
-    validateApiSecret();
+    validateAdminAccess();
 
     // Check for optional retention period override via query string or JSON body
     $input = getJsonInput();

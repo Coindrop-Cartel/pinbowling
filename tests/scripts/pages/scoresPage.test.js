@@ -12,6 +12,7 @@ vi.mock('@services/api.js', () => ({
     getTargetScores: vi.fn(),
     getScores: vi.fn(),
     saveScore: vi.fn(),
+    getCurrentUser: vi.fn(),
   },
 }));
 
@@ -72,6 +73,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
     PB_API.getLeague.mockResolvedValue({ id: 1, players: [] });
     PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineName: 'M1', machineId: 5, values: { 10: 100 } }]);
     PB_API.getScores.mockResolvedValue([]);
+    PB_API.getCurrentUser.mockResolvedValue(null);
   });
 
   it('should hide selector and show summary when event is active', async () => {
