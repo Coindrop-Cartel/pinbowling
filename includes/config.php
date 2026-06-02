@@ -340,8 +340,8 @@ function validateLeagueAccess($pdo, $leagueId) {
     $providedSecret = $_SERVER['HTTP_X_PB_SECRET'] ?? $headers['X-PB-SECRET'] ?? $headers['x-pb-secret'] ?? $_SERVER['REDIRECT_HTTP_X_PB_SECRET'] ?? null;
     $providedLeaguePass = $_SERVER['HTTP_X_LEAGUE_PASSWORD'] ?? $headers['X-LEAGUE-PASSWORD'] ?? $headers['x-league-password'] ?? null;
 
-    // 1. Check if the provided League Pass matches the Global Admin Password (Master Override)
-    if ($providedLeaguePass === $adminPassword) return;
+    // 1. Global Master Bypass: Authenticated via API Secret OR Admin Password
+    if ($providedSecret === $apiSecret || $providedLeaguePass === $adminPassword) return;
 
     // 2. Check League Specific Password
     if (!$leagueId) sendJson(['error' => 'League ID required for validation'], 400);
