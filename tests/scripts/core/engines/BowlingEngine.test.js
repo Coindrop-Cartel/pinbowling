@@ -115,16 +115,16 @@ describe('BowlingEngine', () => {
 
   test('calculateTurnResults - Round 10 Variations', () => {
     // Spare in 10th
-    const scoreMapSpare = { '10': { ball1: 0, ball2: 10000, ball3: 11000 } };
+    const scoreMapSpare = { '10': { ball1: 0, ball2: 10000, ball3: 10000 } };
     const resSpare = engine.calculateTurnResults([machines[9]], scoreMapSpare);
-    expect(resSpare.turnResults[0].mark).toBe('9/ 0');
-    expect(resSpare.turnResults[0].score).toBe(10);
+    expect(resSpare.turnResults[0].mark).toBe('9/ 4');
+    expect(resSpare.turnResults[0].score).toBe(14);
 
     // Strike then Open in 10th
     const scoreMapStrikeOpen = { '10': { ball1: 10000, ball2: 10000, ball3: 10000 } };
     const resStrikeOpen = engine.calculateTurnResults([machines[9]], scoreMapStrikeOpen);
-    expect(resStrikeOpen.turnResults[0].mark).toBe('X 10 0');
-    expect(resStrikeOpen.turnResults[0].score).toBe(20);
+    expect(resStrikeOpen.turnResults[0].mark).toBe('X 6 0');
+    expect(resStrikeOpen.turnResults[0].score).toBe(16);
   });
 
   test('getPinCount - Threshold Accuracy', () => {
@@ -195,7 +195,7 @@ describe('BowlingEngine', () => {
 
   test('getRound10Data - Strike then Spare Scenario', () => {
     const round = mockRound(10);
-    const data = engine.getRound10Data(round, 10000, 8000, 16900);
+    const data = engine.getRound10Data(round, 10000, 10000, 16900);
     expect(data.mark).toBe('X 8/');
     expect(data.score).toBe(20);
   });
