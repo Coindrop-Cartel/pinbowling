@@ -28,20 +28,43 @@ export class BowlingEngine extends ScoringEngine {
   /**
    * Calculates Target 1 (1.3x strike) and Target 2 (1.3x Target 1) for the last round.
    * @param {Object} round The round object containing scoring values.
+   * @param {string} [scalingType] Optional explicit scaling type ('flat' or 'curved').
    * @returns {{t1: number, t2: number}} An object with calculated Target 1 and Target 2 scores.
    */
-  getBonusTargets(round) {
-    const t1 = Math.round((round.values[10] || 0) * 1.3);
-    const t2 = Math.round(t1 * 1.3);
-    return { t1, t2 };
+  getBonusTargets(round, scalingType) {
+    const s1 = round.values?.[1];
+    const s10 = round.values?.[10];
+
+    if (!s1 || !s10 || s1 >= s10) {
+      const t1 = Math.round((s10 || 0) * 1.3);
+      const t2 = Math.round(t1 * 1.3);
+      return { t1, t2 };
+    }
+
+    // Use provided scalingType, or infer: if gap at end is > 1.5x gap at start, it's curved
+    let isCurved = scalingType === 'curved';
+    if (!scalingType) {
+      const gapStart = (round.values[2] || s1) - s1;
+      const gapEnd = s10 - (round.values[9] || s10);
+      isCurved = gapEnd > gapStart * 1.5;
+    }
+
+    const range = s10 - s1;
+    const m1 = isCurved ? Math.pow(10 / 9, 2) : (10 / 9);
+    const m2 = isCurved ? Math.pow(11 / 9, 2) : (11 / 9);
+
+    return {
+      t1: Math.round(s1 + range * m1),
+      t2: Math.round(s1 + range * m2)
+    };
   }
 
   /**
    * Generates format-specific HTML for bonus targets (e.g., Round 10 Targets).
    */
-  getBonusTargetHtml(round, isLastRound, formatFn) {
+  getBonusTargetHtml(round, isLastRound, formatFn, scalingType) {
     if (!isLastRound || !round.values || !round.values[10]) return '';
-    const { t1, t2 } = this.getBonusTargets(round);
+    const { t1, t2 } = this.getBonusTargets(round, scalingType);
     return `
       <div style="margin-top: 8px; border-top: 1px dashed #bbb; padding-top: 4px; font-size: 0.8rem; color: #000;">
         <div><b>Target 1:</b> ${formatFn(t1)}</div>
@@ -54,13 +77,12 @@ export class BowlingEngine extends ScoringEngine {
    * Complex logic for Round 10.
    */
   getRound10Data(round, raw1, raw2, raw3) {
-    const target1 = Number(round.values[10] || 0);
-    const target2 = Math.round(target1 * 1.3);
-    const target3 = Math.round(target2 * 1.3);
-    const hit1 = raw1 >= target1;
-    const hit2 = raw2 >= target2;
-    const hit3 = raw3 >= target3;
-    const spare2 = !hit1 && raw2 >= target1;
+    const { t1, t2 } = this.getBonusTargets(round);
+    const threshold10 = Number(round.values[10] || 0);
+    const hit1 = raw1 >= threshold10;
+    const hit2 = raw2 >= t1;
+    const hit3 = raw3 >= t2;
+    const spare2 = !hit1 && raw2 >= threshold10;
 
     const c1 = this.getPinCount(round, raw1);
     const c2 = this.getPinCount(round, raw2);
@@ -176,12 +198,14 @@ export class BowlingEngine extends ScoringEngine {
     return { turnResults: results, total };
   }
 
-  buildRoundValues(score10, score1) {
+  buildRoundValues(score10, score1, scalingType) {
     const values = {};
     if (score10 > 0 && score1 > 0) {
+      const range = score10 - score1;
       for (let rank = 10; rank >= 1; rank -= 1) {
         const fraction = (rank - 1) / 9;
-        values[rank] = Math.round(score1 + (score10 - score1) * fraction);
+        const multiplier = (scalingType === 'curved') ? Math.pow(fraction, 2) : fraction;
+        values[rank] = Math.round(score1 + range * multiplier);
       }
       return values;
     }
