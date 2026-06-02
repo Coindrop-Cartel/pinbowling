@@ -271,7 +271,7 @@ try {
                 }
                 validateLeagueAccess($pdo, $eventLeagueId);
             } else {
-                validateLeagueAccess($pdo, $id); // Deleting a League
+                validateLeagueAccess($pdo, $id); // Deleting a League (Allows League Pass OR Global Admin)
             }
 
             $table = ($task === 'fixture') ? 'events' : 'leagues';

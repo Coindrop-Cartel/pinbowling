@@ -47,6 +47,13 @@
             <option value="hard">Hard</option>
           </select>
         </div>
+        <div style="flex: 1;">
+          <label for="qp-scaling">Scoring Profile</label>
+          <select id="qp-scaling">
+            <option value="flat">Flat</option>
+            <option value="curved" selected>Curved</option>
+          </select>
+        </div>
       </div>
 
       <div class="form-actions">
@@ -66,7 +73,7 @@
 
   <!-- Preview Section (Populated after Generation) -->
   <section id="qp-preview-section" class="card hidden">
-    <h2>Review Lineup</h2>
+    <h2>Review Lineup & Targets</h2>
     <div id="qp-frames-list" style="margin-bottom: 20px;"></div>
     <div class="form-actions">
       <button id="finalize-qp-btn" class="primary">Create Session</button>

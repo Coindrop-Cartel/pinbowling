@@ -65,12 +65,17 @@ export async function fetchJSON(url, options = {}) {
   
   // Prepare fetch options, ensuring a body is sent for POST requests (even if tunneled)
   // to prevent server-side resets for bodyless POSTs.
-  const fetchOptions = {
+  const fetchOptions = { 
     ...options,
     method,
-    headers: finalHeaders,
-    body: options.body || (method === 'POST' ? JSON.stringify({}) : undefined)
+    headers: finalHeaders
   };
+
+  // CRITICAL: The fetch spec prohibits 'body' on GET/HEAD requests.
+  // We must only attach the body if the method is intended to carry one.
+  if (method === 'POST') {
+    fetchOptions.body = options.body || JSON.stringify({});
+  }
 
   try {
     const response = await fetch(fullUrl, fetchOptions);

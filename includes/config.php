@@ -424,7 +424,7 @@ function validateLeagueAccess($pdo, $leagueId) {
     if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
         return;
     }
-
+  
     // 2. League Specific Password Check
     if (!$leagueId) sendJson(['error' => 'League ID required for validation'], 400);
 

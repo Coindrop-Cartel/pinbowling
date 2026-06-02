@@ -42,7 +42,13 @@
           </div>
         </div>
         <div id="preview-container" style="margin-top: 10px;">
-          <label>Calculated Thresholds Preview:</label>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0;">Calculated Thresholds Preview:</label>
+            <div style="display: flex; gap: 5px;">
+              <button type="button" id="scaling-flat" class="secondary" style="padding: 4px 10px; font-size: 0.75rem;">Flat</button>
+              <button type="button" id="scaling-curved" class="btn-standard" style="padding: 4px 10px; font-size: 0.75rem;">Curved</button>
+            </div>
+          </div>
           <div id="preview-values" class="notice">
             Enter a 10 score or a 1 score to preview values for 9–2.
           </div>

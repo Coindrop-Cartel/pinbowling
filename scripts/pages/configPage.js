@@ -23,6 +23,10 @@ export async function initConfigPage() {
   const btnEasy = document.getElementById('fill-easy');
   const btnMed = document.getElementById('fill-med');
   const btnHard = document.getElementById('fill-hard');
+  const btnFlat = document.getElementById('scaling-flat');
+  const btnCurved = document.getElementById('scaling-curved');
+  let currentScaling = 'curved'; // Default state
+
   let selectedMachineTargets = null;
 
   const score10Input = document.getElementById('value-10');
@@ -68,6 +72,11 @@ export async function initConfigPage() {
 
   const markDirty = () => { if (orderInput.value) submitBtn.disabled = false; };
 
+  const updatePreviewAndDirty = () => {
+    renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast(), currentScaling);
+    markDirty();
+  };
+
   if (score10Input) applyScoreFormatting(score10Input);
   if (score1Input) applyScoreFormatting(score1Input);
 
@@ -109,21 +118,37 @@ export async function initConfigPage() {
       const val = selectedMachineTargets?.[type];
       if (val) {
         score10Input.value = formatNumber(val);
-        renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast());
-        markDirty();
+        updatePreviewAndDirty();
       }
     });
   });
 
-  score10Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast()));
-  score1Input.addEventListener('input', () => renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast()));
+  if (btnFlat && btnCurved) {
+    window.updateScalingUI = () => {
+      btnFlat.classList.toggle('btn-standard', currentScaling === 'flat');
+      btnFlat.classList.toggle('secondary', currentScaling !== 'flat');
+      btnCurved.classList.toggle('btn-standard', currentScaling === 'curved');
+      btnCurved.classList.toggle('secondary', currentScaling !== 'curved');
+    };
 
-  document.getElementById('machine-name').addEventListener('input', (e) => {
-    markDirty();
-  });
+    btnFlat.addEventListener('click', () => {
+      currentScaling = 'flat';
+      window.updateScalingUI();
+      updatePreviewAndDirty();
+    });
 
-  score10Input.addEventListener('input', markDirty);
-  score1Input.addEventListener('input', markDirty);
+    btnCurved.addEventListener('click', () => {
+      currentScaling = 'curved';
+      window.updateScalingUI();
+      updatePreviewAndDirty();
+    });
+
+    window.updateScalingUI();
+  }
+
+  score10Input.addEventListener('input', updatePreviewAndDirty);
+  score1Input.addEventListener('input', updatePreviewAndDirty);
+  document.getElementById('machine-name').addEventListener('input', markDirty);
 
   async function render() {
     const eventId = getActiveEventId();
@@ -185,9 +210,16 @@ export async function initConfigPage() {
         document.getElementById('machine-name').value = round.machineName;
         score10Input.value = round.values[10] ? formatNumber(round.values[10]) : '';
         score1Input.value = round.values[1] ? formatNumber(round.values[1]) : '';
+
+        // Detect scaling type from existing values to sync UI buttons
+        const gapStart = (round.values[2] || 0) - (round.values[1] || 0);
+        const gapEnd = (round.values[10] || 0) - (round.values[9] || 0);
+        currentScaling = (gapEnd > gapStart * 1.5) ? 'curved' : 'flat';
+        if (window.updateScalingUI) window.updateScalingUI();
+
         machineSearch.updateOptions(round.machineName);
         updateQuickFillState(round.machineName);
-        renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast());
+        renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast(), currentScaling);
         configCard.classList.remove('hidden');
         window.scrollTo(0, 0);
       });
@@ -276,7 +308,14 @@ export async function initConfigPage() {
     submitBtn.disabled = true;
     machineSearch.updateOptions('');
     updateQuickFillState('');
-    renderPreview(score10Input, score1Input, previewValues, Engine);
+
+    currentScaling = 'curved';
+    if (btnFlat && btnCurved) {
+      btnFlat.classList.replace('btn-standard', 'secondary');
+      btnCurved.classList.replace('secondary', 'btn-standard');
+    }
+
+    renderPreview(score10Input, score1Input, previewValues, Engine, false, currentScaling);
   }
   document.getElementById('cancel-config-btn').onclick = resetForm;
 
@@ -290,7 +329,7 @@ export async function initConfigPage() {
 
     if (!orderNumber || !machineName || (!score10 && !score1) || !eventId) return;
 
-    const values = Engine.buildRoundValues(score10, score1);
+    const values = Engine.buildRoundValues(score10, score1, currentScaling);
     if (!await requireAdmin(`Enter Admin Password to save changes for Round ${orderNumber}:`)) {
       return;
     }
