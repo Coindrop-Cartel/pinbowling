@@ -238,17 +238,17 @@ describe('Utility Functions (utils.js)', () => {
   });
 
   describe('renderPreview', () => {
-    let score10Input, score1Input, previewValues;
+    let highScoreInput, lowScoreInput, previewValues;
     let mockEngineBuildRoundValues;
 
     beforeEach(() => {
       document.body.innerHTML = `
-        <input id="score10" value="10000" />
-        <input id="score1" value="1000" />
+        <input id="highScore" value="10000" />
+        <input id="lowScore" value="1000" />
         <div id="preview"></div>
       `;
-      score10Input = document.getElementById('score10');
-      score1Input = document.getElementById('score1');
+      highScoreInput = document.getElementById('highScore');
+      lowScoreInput = document.getElementById('lowScore');
       previewValues = document.getElementById('preview');
 
       // Get the mocked engine's methods
@@ -268,28 +268,28 @@ describe('Utility Functions (utils.js)', () => {
       });
     });
 
-    it('should display "Enter a 10 score or a 1 score" if buildRoundValues returns null', () => {
+    it('should display "Enter a High Score and a Low Score" if buildRoundValues returns null', () => {
       mockEngineBuildRoundValues.mockImplementation(() => null);
-      Utils.renderPreview(score10Input, score1Input, previewValues, getScoringEngine());
-      expect(previewValues.innerHTML).toContain('Enter a 10 score or a 1 score');
+      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine());
+      expect(previewValues.innerHTML).toContain('Enter a High Score and a Low Score');
     });
 
     it('should render score values correctly', () => {
       mockEngineBuildRoundValues.mockImplementation(() => ({ 10: 10000, 5: 5000, 1: 1000 }));
-      Utils.renderPreview(score10Input, score1Input, previewValues, getScoringEngine());
-      expect(previewValues.innerHTML).toContain('<strong>10:</strong> 10,000');
+      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine());
+      expect(previewValues.innerHTML).toContain('<strong>High:</strong> 10,000');
       expect(previewValues.innerHTML).toContain('<strong>5:</strong> 5,000');
-      expect(previewValues.innerHTML).toContain('<strong>1:</strong> 1,000');
+      expect(previewValues.innerHTML).toContain('<strong>Low:</strong> 1,000');
     });
 
     it('should include bonus targets if isLastRound is true and values[10] exists', () => {
-      Utils.renderPreview(score10Input, score1Input, previewValues, getScoringEngine(), true);
+      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine(), true);
       expect(previewValues.innerHTML).toContain('<strong>Target 1:</strong>');
       expect(previewValues.innerHTML).toContain('13,000');
     });
 
     it('should not include bonus targets if isLastRound is false', () => {
-      Utils.renderPreview(score10Input, score1Input, previewValues, getScoringEngine(), false);
+      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine(), false);
       expect(previewValues.innerHTML).not.toContain('<strong>Target 1:</strong>');
     });
 

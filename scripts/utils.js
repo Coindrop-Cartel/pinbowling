@@ -162,25 +162,28 @@ export function initNavigation(containerSelector = '.nav-container') {
 /**
  * Renders a preview of calculated pinball-to-pin mapping on the config page.
  * Also displays bonus targets for Frame 10.
- * @param {HTMLInputElement} score10Input 
- * @param {HTMLInputElement} score1Input 
+ * @param {HTMLInputElement} highScoreInput 
+ * @param {HTMLInputElement} lowScoreInput 
  * @param {HTMLElement} previewValues 
  * @param {Object} Engine
  * @param {boolean} isLastRound
  */
-export function renderPreview(score10Input, score1Input, previewValues, Engine, isLastRound = false, currentScaling) {
-  const score10 = Number(score10Input.value.replace(/\D/g, ''));
-  const score1 = Number(score1Input.value.replace(/\D/g, ''));
-  const values = Engine.buildRoundValues(score10, score1, currentScaling);
+export function renderPreview(highScoreInput, lowScoreInput, previewValues, Engine, isLastRound = false, currentScaling) {
+  const highScore = Number(highScoreInput.value.replace(/\D/g, ''));
+  const lowScore = Number(lowScoreInput.value.replace(/\D/g, ''));
+  const values = Engine.buildRoundValues(highScore, lowScore, currentScaling);
 
   if (!values) {
-    previewValues.innerHTML = "<div>Enter a 10 score or a 1 score to preview values for 9–2.</div>";
+    previewValues.innerHTML = "<div>Enter a High Score and a Low Score to preview interpolation values.</div>";
     return;
   }
 
   let html = Object.entries(values)
     .sort((a, b) => Number(b[0]) - Number(a[0]))
-    .map(([rank, value]) => `<div><strong>${rank}:</strong> ${formatNumber(value)}</div>`)
+    .map(([rank, value]) => {
+      const label = rank == 10 ? 'High' : (rank == 1 ? 'Low' : rank);
+      return `<div><strong>${label}:</strong> ${formatNumber(value)}</div>`;
+    })
     .join("");
 
   if (isLastRound && values[10]) {

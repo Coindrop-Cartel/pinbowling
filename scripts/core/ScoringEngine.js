@@ -1,52 +1,65 @@
 /**
- * Base class for all scoring logic in the PinBowling application.
+ * Base class for all Scoring Engines.
+ * Defines the interface for score calculation and UI terminology.
  */
 export class ScoringEngine {
   /**
-   * Interface method: The primary orchestration method for calculating a complete game's results.
-   * @param {Array<Object>} machines 
-   * @param {Object} scoreMap 
-   * @throws {Error} If not implemented by subclass.
+   * Returns the label for a single unit of play (e.g., "Frame" for Bowling, "Hole" for Golf).
+   */
+  getRoundLabel() {
+    return 'Round';
+  }
+
+  /**
+   * Returns the prefix used in headers (e.g., "Frame 1").
+   */
+  getTurnHeaderPrefix() {
+    return 'Round';
+  }
+
+  /**
+   * Returns the label for the primary success state (e.g., "Strike" or "Par").
+   */
+  getPrimaryTargetLabel() {
+    return 'Target';
+  }
+
+  /**
+   * Returns the label for the maximum score threshold (e.g., "Strike (10 Pins)").
+   */
+  getHighScoreLabel() {
+    return 'High Score';
+  }
+
+  /**
+   * Returns the label for the minimum score threshold (e.g., "1 Pin").
+   */
+  getLowScoreLabel() {
+    return 'Low Score';
+  }
+
+  /**
+   * Interface method: Must be implemented by subclasses to calculate results.
    */
   calculateTurnResults(machines, scoreMap) {
-    throw new Error('calculateTurnResults must be implemented by subclass');
+    throw new Error('calculateTurnResults must be implemented by the scoring engine.');
   }
 
   /**
-   * Interface method: Linearly interpolates threshold values.
-   * @param {number} target 
-   * @param {number} base 
+   * Interface method: Must be implemented to interpolate scores between high and low.
    */
-  buildRoundValues(target, base) {
-    throw new Error('buildRoundValues must be implemented by subclass');
+  buildRoundValues(highScore, lowScore, scalingType) {
+    throw new Error('buildRoundValues must be implemented by the scoring engine.');
   }
 
   /**
-   * Interface method: Formats the visual representation of a frame.
-   * @param {Object} turn 
+   * Optional: Returns calculated bonus targets (e.g. for the final round).
    */
-  formatMark(turn) {
-    throw new Error('formatMark must be implemented by subclass');
+  getBonusTargets() {
+    return { t1: 0, t2: 0 };
   }
 
-  getBonusTargets() { return { t1: 0, t2: 0 }; }
-  getBonusTargetHtml() { return ''; }
-
-  /**
-   * Returns the terminology used for an individual round (e.g., "Round", "Frame", "Hole").
-   * @returns {string}
-   */
-  getRoundLabel() { return 'Round'; }
-
-  /**
-   * Returns the terminology used for columns in a summary table.
-   * @returns {string}
-   */
-  getTurnHeaderPrefix() { return 'Round'; }
-
-  /**
-   * Returns the label for the primary goal score (e.g., "Strike", "Target", "Par").
-   * @returns {string}
-   */
-  getPrimaryTargetLabel() { return 'Target'; }
+  getBonusTargetHtml() {
+    return '';
+  }
 }

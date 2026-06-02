@@ -246,4 +246,6 @@ export class BowlingEngine extends ScoringEngine {
   getRoundLabel() { return 'Frame'; }
   getTurnHeaderPrefix() { return 'Frame'; }
   getPrimaryTargetLabel() { return 'Strike'; }
+  getHighScoreLabel() { return 'Strike (10 Pins)'; }
+  getLowScoreLabel() { return '1 Pin'; }
 }
