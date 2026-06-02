@@ -18,6 +18,7 @@ vi.mock('@services/auth.js', () => {
   const requireAdmin = vi.fn();
   return {
     requireAdmin,
+    isManagementAuthorized: vi.fn(() => Promise.resolve(true)),
     // Ensure the wrapper mock actually calls the requireAdmin mock to reflect real behavior
     runAuthorizedLeagueAction: vi.fn(async (id, action) => (await requireAdmin()) ? action() : null),
   };

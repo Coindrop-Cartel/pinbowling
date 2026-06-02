@@ -15,6 +15,12 @@ vi.mock('@services/api.js', () => ({
   },
 }));
 
+vi.mock('@services/auth.js', () => ({
+  requireAdmin: vi.fn(() => Promise.resolve(true)),
+  isManagementAuthorized: vi.fn(() => Promise.resolve(true)),
+  runAuthorizedLeagueAction: vi.fn((id, cb) => cb()),
+}));
+
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
     buildRoundValues: vi.fn(() => ({ 10: 1000, 1: 100 })),
@@ -47,6 +53,9 @@ describe('Quick Play Page (playPage.js)', () => {
         <div id="qp-generator-options" class="hidden">
            <select id="qp-frames"><option value="10">10</option></select>
            <select id="qp-difficulty"><option value="med">Med</option></select>
+           <select id="qp-scaling">
+             <option value="curved">Curved</option>
+           </select>
         </div>
         <button type="button" id="create-new-toggle">Create</button>
         <button id="generate-qp-btn" class="hidden">Generate</button>
