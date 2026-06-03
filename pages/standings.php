@@ -1,16 +1,22 @@
 <?php $pageTitle = 'Standings'; ?>
   <main class="page-container standings-page">
-    <div class="tournament-selector-container no-print"></div>
-
-    <header style="margin-bottom: 20px;">
+    <header>
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <h1>Standings</h1>
-        <div style="display: flex; align-items: center; gap: 15px;">
-          <button id="tv-mode-btn" class="btn-standard secondary no-print">TV Mode</button>
-        </div>
+        <button id="tv-mode-btn" class="btn-standard secondary no-print">TV Mode</button>
       </div>
       <p class="no-print">See the current player rankings and frame-by-frame scores.</p>
     </header>
+
+    <div id="tournament-context-area" class="no-print">
+      <div id="tournament-selector-ui" class="tournament-selector-container"></div>
+      <div id="tournament-summary" class="card hidden no-tv" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; margin-bottom: 5px;">
+        <span id="tournament-summary-text" style="font-weight: bold; font-size: 1.1rem;"></span>
+        <div style="display: flex; gap: 8px;">
+          <button id="change-tournament-btn" class="secondary" style="padding: 4px 10px; font-size: 0.85rem;">Change</button>
+        </div>
+      </div>
+    </div>
 
     <section class="card">
       <h2 id="tv-title" class="hidden"></h2>

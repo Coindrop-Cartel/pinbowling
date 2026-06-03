@@ -30,9 +30,9 @@ export async function initPlayersPage() {
   let filterInstance = null;
 
   // Setup "Create Player" toggle
-  const ifpaRow = ifpaIdInput.closest('.form-row');
-  const matchplayRow = matchplayIdInput.closest('.form-row');
-  const actionsRow = savePlayerButton.closest('.form-actions');
+  const ifpaRow = document.getElementById('player-ifpa-row');
+  const matchplayRow = document.getElementById('player-matchplay-row');
+  const actionsRow = document.getElementById('player-form-actions');
 
   const createToggle = document.createElement('button');
   createToggle.type = 'button';

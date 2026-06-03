@@ -10,18 +10,18 @@
           <label for="league-name">League Name</label>
           <input id="league-name" type="text" placeholder="e.g., Summer 2024 League" required style="width: 100%; box-sizing: border-box;" />
         </div>
-        <div class="form-row">
+        <div id="league-date-row" class="form-row hidden">
           <label for="league-start-date">Start Date</label>
           <input id="league-start-date" type="date" required style="width: 100%; box-sizing: border-box;" />
         </div>
-        <div class="form-row">
+        <div id="league-format-row" class="form-row hidden">
           <label for="league-scoring-format">Default Scoring Format</label>
           <select id="league-scoring-format" style="width: 100%; box-sizing: border-box;">
             <option value="bowling">Bowling (Marks & Frames)</option>
             <option value="classic">Classic (Points Only)</option>
           </select>
         </div>
-        <div class="form-actions">
+        <div class="form-actions hidden">
           <button type="submit" id="create-league-btn" disabled>Create League</button>
         </div>
       </form>

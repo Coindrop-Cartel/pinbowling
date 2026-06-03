@@ -9,7 +9,13 @@ import { ROUTES } from '@scripts/routes.js';
  * Logic for managing Leagues and Events.
  */
 export async function initLeaguesPage() {
-  const isAuthorized = await isManagementAuthorized();
+  // Batch initial data fetch and auth check to improve load performance
+  const [authorized, initialLeagues, initialPlayers] = await Promise.all([
+    isManagementAuthorized(),
+    PB_API.getLeagues({ type: 'standard' }),
+    PB_API.getPlayers()
+  ]);
+  const isAuthorized = authorized;
   const leagueForm = document.getElementById('league-form');
   const leagueNameInput = document.getElementById('league-name');
   const leagueDateInput = document.getElementById('league-start-date');
@@ -24,14 +30,9 @@ export async function initLeaguesPage() {
   let filterInstance = null;
 
   // Setup "Create League" toggle behavior
-  const dateRow = leagueDateInput.closest('.form-row');
-  const formatRow = leagueFormatInput ? leagueFormatInput.closest('.form-row') : null;
+  const dateRow = document.getElementById('league-date-row');
+  const formatRow = document.getElementById('league-format-row');
   const actionsRow = createBtn.closest('.form-actions');
-  
-  // Initially hide the creation fields
-  if (dateRow) dateRow.classList.add('hidden');
-  if (formatRow) formatRow.classList.add('hidden');
-  if (actionsRow) actionsRow.classList.add('hidden');
 
   let createToggle = null;
   if (isAuthorized) {
@@ -181,14 +182,16 @@ export async function initLeaguesPage() {
 
   leagueDateInput.addEventListener('input', () => filterInstance.performFilter());
 
-  const refresh = async () => {
+  const refresh = async (leagues = null, players = null) => {
     try {
-      // Fetch standard leagues only for management (one-off sessions are handled by cleanup)
-      const data = await PB_API.getLeagues({ type: 'standard' });
+      const [fetchedLeagues, fetchedPlayers] = (leagues && players) 
+        ? [leagues, players] 
+        : await Promise.all([PB_API.getLeagues({ type: 'standard' }), PB_API.getPlayers()]);
+
       allLeagues.length = 0;
-      allLeagues.push(...data);
-      // Also refresh the global player cache for selection dialogs
-      allPlayersCache = await PB_API.getPlayers();
+      allLeagues.push(...fetchedLeagues);
+      allPlayersCache = fetchedPlayers;
+
       filterInstance.performFilter();
     } catch (err) {
       console.error('Failed to load leagues:', err);
@@ -463,5 +466,6 @@ export async function initLeaguesPage() {
     }
   };
 
-  await refresh();
+  // Initialize UI with pre-fetched data
+  await refresh(initialLeagues, initialPlayers);
 }
