@@ -94,9 +94,13 @@ $dbDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset={$dbChars
  * Established a singleton PDO connection to the MySQL database.
  * @return PDO
  */
-function getDbConnection() {
+function getDbConnection($mockPdo = null) {
     global $dbDsn, $dbUser, $dbPass;
     static $pdo = null;
+    if ($mockPdo !== null) {
+        $pdo = $mockPdo;
+        return $pdo;
+    }
     if ($pdo === null) {
         $pdo = new PDO($dbDsn, $dbUser, $dbPass, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,

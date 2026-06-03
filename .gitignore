@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+vendor/
 
 # Security: Environment variables and secrets
 .env.*

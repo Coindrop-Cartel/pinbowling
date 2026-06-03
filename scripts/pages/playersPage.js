@@ -47,7 +47,7 @@ export async function initPlayersPage() {
   }
 
   createToggle.onclick = () => {
-    const isHidden = ifpaRow.classList.contains('hidden');
+    const isHidden = !ifpaRow || ifpaRow.classList.contains('hidden');
     ifpaRow.classList.toggle('hidden', !isHidden);
     matchplayRow.classList.toggle('hidden', !isHidden);
     actionsRow.classList.toggle('hidden', !isHidden);
@@ -157,7 +157,7 @@ export async function initPlayersPage() {
     
     // Hide the "Create" toggle if an exact match exists, unless the creation 
     // form is already open (in which case the button serves as "Cancel").
-    const isFormOpen = !ifpaRow.classList.contains('hidden');
+    const isFormOpen = ifpaRow && !ifpaRow.classList.contains('hidden');
     createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
 
     savePlayerButton.disabled = !query || (!!exactMatch && !isEditingThisPlayer);

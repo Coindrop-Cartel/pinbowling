@@ -160,11 +160,11 @@ export async function initLeaguesPage() {
 
     // Hide the "Create" toggle if an exact match exists, unless the creation 
     // form is already open (in which case the button serves as "Cancel").
-    const isFormOpen = !dateRow.classList.contains('hidden');
+    const isFormOpen = dateRow && !dateRow.classList.contains('hidden');
     if (createToggle) createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
 
-    const dateVal = leagueDateInput.value;
-    createBtn.disabled = !query || !dateVal || !!exactMatch;
+    const dateVal = leagueDateInput?.value;
+    if (createBtn) createBtn.disabled = !query || !dateVal || !!exactMatch;
     
     if (exactMatch) {
       createBtn.title = "A league with this name already exists.";
@@ -211,7 +211,7 @@ export async function initLeaguesPage() {
       leagueNameInput.value = '';
       leagueDateInput.value = '';
       // Collapse creation form back down
-      dateRow.classList.add('hidden');
+      if (dateRow) dateRow.classList.add('hidden');
       if (formatRow) formatRow.classList.add('hidden');
       actionsRow.classList.add('hidden');
       createToggle.textContent = 'Create New League';

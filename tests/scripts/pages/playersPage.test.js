@@ -43,9 +43,9 @@ describe('Player Management Page (playersPage.js)', () => {
         <form id="player-form">
           <input id="editing-player-id" />
           <input id="player-name" />
-          <div class="form-row"><input id="ifpa-id" /></div>
-          <div class="form-row"><input id="matchplay-id" /></div>
-          <div class="form-actions">
+          <div id="player-ifpa-row" class="form-row"><input id="ifpa-id" /></div>
+          <div id="player-matchplay-row" class="form-row"><input id="matchplay-id" /></div>
+          <div id="player-form-actions" class="form-actions">
             <button id="save-player-button">Save</button>
             <button id="cancel-edit-button">Cancel</button>
           </div>

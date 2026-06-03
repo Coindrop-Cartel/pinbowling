@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.0/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true">
+    <testsuites>
+        <testsuite name="Service Test Suite">
+            <directory>tests/service</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <env name="API_SECRET" value="bowl-2024-secret"/>
+        <const name="PHPUNIT_RUNNING" value="true"/>
+    </php>
+</phpunit>

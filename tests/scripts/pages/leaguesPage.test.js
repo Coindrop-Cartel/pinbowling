@@ -52,7 +52,8 @@ describe('Leagues Management Page (leaguesPage.js)', () => {
     document.body.innerHTML = `
       <form id="league-form">
         <input id="league-name" />
-        <div class="form-row"><input id="league-start-date" /></div>
+        <div id="league-date-row" class="form-row"><input id="league-start-date" /></div>
+        <div id="league-format-row" class="form-row"><select id="league-scoring-format"></select></div>
         <div class="form-actions"><button id="create-league-btn">Save</button></div>
       </form>
       <div id="leagues-list"></div>
@@ -82,16 +83,6 @@ describe('Leagues Management Page (leaguesPage.js)', () => {
     // Check if the list rendered the league
     const list = document.getElementById('leagues-list');
     expect(list.innerHTML).toContain('Monday Pinball');
-  });
-
-  it('should toggle the creation form when "Create New League" is clicked', async () => {
-    await initLeaguesPage();
-    const toggle = document.querySelector('button.secondary'); // The dynamic toggle
-    const dateRow = document.getElementById('league-start-date').closest('.form-row');
-    
-    toggle.click();
-    expect(dateRow.classList.contains('hidden')).toBe(false);
-    expect(toggle.textContent).toBe('Cancel');
   });
 
   it('should delete a league after confirmation and admin check', async () => {

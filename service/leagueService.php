@@ -59,6 +59,11 @@ function serializeLeague($row) {
     ];
 }
 
+// Prevent immediate execution during unit testing
+if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING === true) {
+    return;
+}
+
 try {
     $pdo = getDbConnection();
     $method = $_SERVER['REQUEST_METHOD'];
