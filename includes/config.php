@@ -225,6 +225,8 @@ function initializeDatabaseSchema($pdo) {
         `event_id` INT NOT NULL,
         `machine_id` INT NOT NULL,
         `order_number` INT NOT NULL,
+        `value1` BIGINT DEFAULT 0,
+        `value2` BIGINT DEFAULT 0,
         `score1` BIGINT DEFAULT 0, `score2` BIGINT DEFAULT 0, `score3` BIGINT DEFAULT 0, `score4` BIGINT DEFAULT 0, `score5` BIGINT DEFAULT 0,
         `score6` BIGINT DEFAULT 0, `score7` BIGINT DEFAULT 0, `score8` BIGINT DEFAULT 0, `score9` BIGINT DEFAULT 0, `score10` BIGINT DEFAULT 0,
         UNIQUE KEY `unique_event_round` (`event_id`, `order_number`),
@@ -237,6 +239,8 @@ function initializeDatabaseSchema($pdo) {
         `location_id` INT NOT NULL,
         `machine_id` INT NOT NULL,
         `note` TEXT DEFAULT NULL,
+        `value1` BIGINT DEFAULT 0,
+        `value2` BIGINT DEFAULT 0,
         `score1` BIGINT DEFAULT 0, `score2` BIGINT DEFAULT 0, `score3` BIGINT DEFAULT 0, `score4` BIGINT DEFAULT 0, `score5` BIGINT DEFAULT 0,
         `score6` BIGINT DEFAULT 0, `score7` BIGINT DEFAULT 0, `score8` BIGINT DEFAULT 0, `score9` BIGINT DEFAULT 0, `score10` BIGINT DEFAULT 0,
         `target_easy` BIGINT DEFAULT 0,
@@ -325,6 +329,17 @@ function initializeDatabaseSchema($pdo) {
                 ADD COLUMN `target_easy` BIGINT DEFAULT 0, ADD COLUMN `target_med` BIGINT DEFAULT 0, ADD COLUMN `target_hard` BIGINT DEFAULT 0,
                 ADD UNIQUE KEY `unique_location_machine` (`location_id`, `machine_id`) ");
         }
+    }
+
+    // Ensure 'target_scores' and 'location_machines' have value1 and value2 source columns
+    $checkTSValue1 = $pdo->query("SHOW COLUMNS FROM `target_scores` LIKE 'value1'")->fetch();
+    if (!$checkTSValue1) {
+        $pdo->exec("ALTER TABLE `target_scores` ADD COLUMN `value1` BIGINT DEFAULT 0 AFTER `order_number`, ADD COLUMN `value2` BIGINT DEFAULT 0 AFTER `value1` ");
+    }
+
+    $checkLMValue1 = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'value1'")->fetch();
+    if (!$checkLMValue1) {
+        $pdo->exec("ALTER TABLE `location_machines` ADD COLUMN `value1` BIGINT DEFAULT 0 AFTER `note`, ADD COLUMN `value2` BIGINT DEFAULT 0 AFTER `value1` ");
     }
 
     // Ensure 'locations' table has city and state columns

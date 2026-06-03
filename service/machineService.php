@@ -29,6 +29,8 @@ function serializeTargetScore($row) {
         'machineId' => (int)$row['machine_id'], // This is the ID of the master machine
         'machineName' => $row['machine_name'], // Joined from Machines table
         'orderNumber' => (int)$row['order_number'],
+        'value1' => (int)($row['value1'] ?? 0),
+        'value2' => (int)($row['value2'] ?? 0),
         'values' => [
             1 => (int)$row['score1'], 2 => (int)$row['score2'], 3 => (int)$row['score3'], 4 => (int)$row['score4'], 5 => (int)$row['score5'],
             6 => (int)$row['score6'], 7 => (int)$row['score7'], 8 => (int)$row['score8'], 9 => (int)$row['score9'], 10 => (int)$row['score10'],
@@ -179,8 +181,8 @@ try {
                         $stmtOrig->execute([$id]);
                         $shiftedOldOrder = (int)$stmtOrig->fetchColumn();
 
-                        $sql = 'UPDATE target_scores SET machine_id = ?, order_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
-                        $params = [(int)$item['machineId'], (int)$item['orderNumber']];
+                        $sql = 'UPDATE target_scores SET machine_id = ?, order_number = ?, value1 = ?, value2 = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
+                        $params = [(int)$item['machineId'], (int)$item['orderNumber'], (int)($item['value1'] ?? 0), (int)($item['value2'] ?? 0)];
                         for ($i = 1; $i <= 10; $i++) $params[] = (int)($item['values'][$i] ?? 0);
                         $params[] = $id;
 
@@ -188,8 +190,8 @@ try {
                         $stmtScores = $pdo->prepare('UPDATE scores SET order_number = ? WHERE event_id = ? AND order_number = ?');
                         $stmtScores->execute([(int)$item['orderNumber'], (int)$item['eventId'], $shiftedOldOrder]);
                     } else {
-                        $sql = 'INSERT INTO target_scores (event_id, machine_id, order_number, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5), score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
-                        $params = [(int)$item['eventId'], (int)$item['machineId'], (int)$item['orderNumber']];
+                        $sql = 'INSERT INTO target_scores (event_id, machine_id, order_number, value1, value2, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), value1=VALUES(value1), value2=VALUES(value2), score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5), score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
+                        $params = [(int)$item['eventId'], (int)$item['machineId'], (int)$item['orderNumber'], (int)($item['value1'] ?? 0), (int)($item['value2'] ?? 0)];
                         for ($i = 1; $i <= 10; $i++) $params[] = (int)($item['values'][$i] ?? 0);
                     }
                     $pdo->prepare($sql)->execute($params);
@@ -250,8 +252,8 @@ try {
             $lId = $stmtL->fetchColumn();
             validateLeagueAccess($pdo, $lId);
 
-            $sql = 'UPDATE target_scores SET machine_id = ?, order_number = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
-            $params = [(int)$input['machineId'], (int)$input['orderNumber']];
+            $sql = 'UPDATE target_scores SET machine_id = ?, order_number = ?, value1 = ?, value2 = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
+            $params = [(int)$input['machineId'], (int)$input['orderNumber'], (int)($input['value1'] ?? 0), (int)($input['value2'] ?? 0)];
             for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
             $params[] = $id;
             $pdo->prepare($sql)->execute($params);

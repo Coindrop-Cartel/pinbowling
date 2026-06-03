@@ -181,15 +181,15 @@ export function renderPreview(highScoreInput, lowScoreInput, previewValues, Engi
   let html = Object.entries(values)
     .sort((a, b) => Number(b[0]) - Number(a[0]))
     .map(([rank, value]) => {
-      const label = rank == 10 ? 'High' : (rank == 1 ? 'Low' : rank);
+      const isGolf = Engine.getRoundLabel() === 'Hole';
+      const label = (!isGolf && rank == 10) ? 'High' : ((!isGolf && rank == 1) ? 'Low' : rank);
       return `<div><strong>${label}:</strong> ${formatNumber(value)}</div>`;
     })
     .join("");
 
-  if (isLastRound && values[10]) {
-    const { t1, t2 } = Engine.getBonusTargets({ values }, currentScaling); // Pass values in an object to match frame structure
-    html += `<br><div><strong>Target 1:</strong> ${formatNumber(t1)}</div>`;
-    html += `<div><strong>Target 2:</strong> ${formatNumber(t2)}</div>`;
+  const bonusHtml = Engine.getBonusTargetHtml({ values }, isLastRound, formatNumber, currentScaling);
+  if (bonusHtml) {
+    html += `<br>${bonusHtml}`;
   }
 
   previewValues.innerHTML = html;

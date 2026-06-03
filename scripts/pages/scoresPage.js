@@ -118,7 +118,7 @@ export async function initScoresPage() {
     row.innerHTML = `
       <div class="round-info" style="cursor: pointer; flex: 1; min-width: 200px;">
         <div class="round-label"><b>${Engine.getRoundLabel()} ${round.orderNumber}:</b> ${round.machineName}</div>
-        <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;"><b>${Engine.getPrimaryTargetLabel()}:</b> ${formatNumber(round.values[10])}</div>
+        <div class="strike-target" style="font-size: 0.8rem; color: #000; margin-top: 4px;"><b>${Engine.getPrimaryTargetLabel()}:</b> ${formatNumber(round.value1)}</div>
         ${bonusHtml}
         <div class="target-details hidden" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;">
           <div style="font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; color: #666;">Scoring Thresholds</div>

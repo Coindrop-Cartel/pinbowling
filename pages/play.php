@@ -20,6 +20,14 @@
           </select>
         </div>
         <div class="form-row">
+          <label for="qp-format">Scoring Format</label>
+          <select id="qp-format">
+            <option value="bowling" selected>Bowling (Marks & Frames)</option>
+            <option value="classic">Classic (Points Only)</option>
+            <option value="golf">Golf (Strokes vs Par)</option>
+          </select>
+        </div>
+        <div class="form-row">
           <label for="qp-event-name">Session Name</label>
           <input type="text" id="qp-event-name" placeholder="e.g. Casual Friday Pinball">
         </div>

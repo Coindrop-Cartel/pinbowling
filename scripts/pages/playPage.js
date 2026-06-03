@@ -12,6 +12,7 @@ import {
 export async function initPlayPage() {
   const form = document.getElementById('quick-play-form');
   const locSelect = document.getElementById('qp-location');
+  const formatSelect = document.getElementById('qp-format');
   const nameInput = document.getElementById('qp-event-name');
   const generateBtn = document.getElementById('generate-qp-btn');
   const createToggleBtn = document.getElementById('create-new-toggle');
@@ -30,6 +31,7 @@ export async function initPlayPage() {
   const sessionsCard = document.getElementById('qp-sessions-card');
   let allPlayersCache = [];
   let todayEvents = [];
+  let currentSessionFormat = 'bowling';
 
   async function refreshSessionsData() {
     // Fetch only session-type leagues directly from the server
@@ -218,7 +220,8 @@ export async function initPlayPage() {
     const frameCount = Number(document.getElementById('qp-frames').value);
     const difficulty = document.getElementById('qp-difficulty').value;
     const globalScaling = document.getElementById('qp-scaling').value;
-    const engine = getScoringEngine('bowling');
+    currentSessionFormat = formatSelect?.value || 'bowling';
+    const engine = getScoringEngine(currentSessionFormat);
 
     const locMachines = location?.machines || [];
     currentLocMachines = locMachines;
@@ -265,7 +268,7 @@ export async function initPlayPage() {
     framesList.innerHTML = '';
     generatedFrames.forEach((frame, index) => {
       const isExpanded = expandedTempId === frame.tempId;
-      const engine = getScoringEngine('bowling');
+      const engine = getScoringEngine(currentSessionFormat);
 
       const headerHtml = `
           <div class="drag-handle" style="cursor: grab; color: #888; padding: 0 4px; font-size: 1.2rem;">☰</div>
@@ -417,7 +420,8 @@ export async function initPlayPage() {
       const newLeague = await PB_API.createLeague({ 
         name: eventName, 
         startDate: now.toISOString().split('T')[0],
-        type: 'session'
+        type: 'session',
+        scoringFormat: currentSessionFormat
       });
 
       if (!newLeague || !newLeague.id) {
@@ -430,7 +434,8 @@ export async function initPlayPage() {
         leagueId: qpLeague.id,
         eventName: eventName,
         eventDate: now.toISOString().split('T')[0],
-        locationId: locId
+        locationId: locId,
+        scoringFormat: currentSessionFormat
       });
 
       if (!newEvent || !newEvent.id) {

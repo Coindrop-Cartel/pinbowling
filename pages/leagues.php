@@ -19,6 +19,7 @@
           <select id="league-scoring-format" style="width: 100%; box-sizing: border-box;">
             <option value="bowling">Bowling (Marks & Frames)</option>
             <option value="classic">Classic (Points Only)</option>
+            <option value="golf">Golf (Strokes vs Par)</option>
           </select>
         </div>
         <div class="form-actions hidden">
@@ -61,6 +62,7 @@
           <select id="event-scoring-format" style="width: 100%; box-sizing: border-box;">
             <option value="bowling">Bowling (Marks & Frames)</option>
             <option value="classic">Classic (Points Only)</option>
+            <option value="golf">Golf (Strokes vs Par)</option>
           </select>
         </div>
         <div class="form-actions">

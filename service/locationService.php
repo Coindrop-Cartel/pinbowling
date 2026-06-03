@@ -14,6 +14,8 @@ function serializeLocationMachine($row) {
         'locationId' => (int)$row['location_id'],
         'machineId' => (int)$row['machine_id'],
         'machineName' => $row['machine_name'],
+        'value1' => (int)($row['value1'] ?? 0),
+        'value2' => (int)($row['value2'] ?? 0),
         'values' => [
             1 => (int)$row['score1'], 2 => (int)$row['score2'], 3 => (int)$row['score3'], 4 => (int)$row['score4'], 5 => (int)$row['score5'],
             6 => (int)$row['score6'], 7 => (int)$row['score7'], 8 => (int)$row['score8'], 9 => (int)$row['score9'], 10 => (int)$row['score10'],
@@ -113,13 +115,14 @@ try {
                 if (empty($input['locationId']) || empty($input['machineId'])) {
                     sendJson(['error' => 'locationId and machineId are required'], 400);
                 }
-                $sql = 'INSERT INTO location_machines (location_id, machine_id, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10, target_easy, target_med, target_hard) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                $sql = 'INSERT INTO location_machines (location_id, machine_id, value1, value2, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10, target_easy, target_med, target_hard) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON DUPLICATE KEY UPDATE 
+                            value1=VALUES(value1), value2=VALUES(value2),
                             score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5), 
                             score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10),
                             target_easy=VALUES(target_easy), target_med=VALUES(target_med), target_hard=VALUES(target_hard)';
-                $params = [(int)$input['locationId'], (int)$input['machineId']];
+                $params = [(int)$input['locationId'], (int)$input['machineId'], (int)($input['value1'] ?? 0), (int)($input['value2'] ?? 0)];
                 for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
                 
                 $params[] = (int)($input['targetEasy'] ?? 0);

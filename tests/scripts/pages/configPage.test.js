@@ -17,6 +17,9 @@ vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
     getBonusTargetHtml: vi.fn(() => ''),
     buildRoundValues: vi.fn(() => ({ 1: 100, 10: 1000 })),
+    getRoundLabel: vi.fn(() => 'Frame'),
+    getHighScoreLabel: vi.fn(() => 'High'),
+    getLowScoreLabel: vi.fn(() => 'Low'),
   }))
 }));
 

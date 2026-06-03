@@ -70,7 +70,7 @@ describe('Scores Page (scoresPage.js)', () => {
 
   it('should load machines and reveal player selection on init', async () => {
     PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'L1', events: [{ id: 101, eventName: 'W1' }] }]);
-    PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineName: 'M1', values: { 10: 1000 } }]);
+    PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineName: 'M1', value1: 1000, values: { 10: 1000 } }]);
     PB_API.getLeague.mockResolvedValue({ players: [] });
 
     await initScoresPage();
@@ -81,7 +81,7 @@ describe('Scores Page (scoresPage.js)', () => {
 
   it('should render input rows and results when a player is selected', async () => {
     PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'L1', events: [{ id: 101, eventName: 'W1' }] }]);
-    PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineId: 5, machineName: 'M1', values: { 10: 1000 } }]);
+    PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineId: 5, machineName: 'M1', value1: 1000, values: { 10: 1000 } }]);
     PB_API.getLeague.mockResolvedValue({ players: [{ id: 7, playerName: 'Kyle' }] });
     getCurrentPlayerId.mockReturnValue('7');
     PB_API.getScores.mockResolvedValue([]);
@@ -95,7 +95,7 @@ describe('Scores Page (scoresPage.js)', () => {
   it('should trigger save score API when save button is clicked', async () => {
     PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'L1' }]);
     PB_API.getLeague.mockResolvedValue({ players: [{ id: 7, playerName: 'Kyle' }] });
-    PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineId: 5, machineName: 'M1', values: { 10: 1000 } }]);
+    PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineId: 5, machineName: 'M1', value1: 1000, values: { 10: 1000 } }]);
     getCurrentPlayerId.mockReturnValue('7');
     PB_API.getScores.mockResolvedValue([]);
     

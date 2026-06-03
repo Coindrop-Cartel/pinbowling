@@ -6,6 +6,7 @@ const mockEngine = {
   buildRoundValues: vi.fn(),
   getBonusTargets: vi.fn(),
   getRoundLabel: vi.fn(),
+  getBonusTargetHtml: vi.fn(),
 };
 
 // Mock getScoringEngine for renderPreview and print functions
@@ -57,6 +58,7 @@ describe('Utility Functions (utils.js)', () => {
     });
     mockEngine.getBonusTargets.mockReturnValue({ t1: 13000, t2: 16900 });
     mockEngine.getRoundLabel.mockReturnValue('Frame');
+    mockEngine.getBonusTargetHtml.mockReturnValue('');
 
     vi.clearAllMocks();
   });
@@ -283,12 +285,17 @@ describe('Utility Functions (utils.js)', () => {
     });
 
     it('should include bonus targets if isLastRound is true and values[10] exists', () => {
+      mockEngine.getBonusTargetHtml.mockImplementation((round, isLast, formatFn) => {
+        return isLast ? `<div><strong>Target 1:</strong> ${formatFn(13000)}</div>` : '';
+      });
+
       Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine(), true);
       expect(previewValues.innerHTML).toContain('<strong>Target 1:</strong>');
       expect(previewValues.innerHTML).toContain('13,000');
     });
 
     it('should not include bonus targets if isLastRound is false', () => {
+      mockEngine.getBonusTargetHtml.mockReturnValue('');
       Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine(), false);
       expect(previewValues.innerHTML).not.toContain('<strong>Target 1:</strong>');
     });

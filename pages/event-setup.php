@@ -25,11 +25,11 @@
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
           <div class="form-row">
-            <label for="value-10">Target for a 10 (Strike)</label>
+            <label for="value-10">High Score Target</label>
             <input type="text" id="value-10" placeholder="e.g. 50,000,000" />
           </div>
           <div class="form-row">
-            <label for="value-1">Target for a 1</label>
+            <label for="value-1">Low Score Target</label>
             <input type="text" id="value-1" placeholder="e.g. 5,000,000" />
           </div>
         </div>

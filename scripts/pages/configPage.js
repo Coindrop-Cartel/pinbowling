@@ -54,6 +54,9 @@ export async function initConfigPage() {
 
   const score10Input = document.getElementById('value-10');
   const score1Input = document.getElementById('value-1');
+  const labelHigh = document.querySelector('label[for="value-10"]');
+  const labelLow = document.querySelector('label[for="value-1"]');
+
   const previewValues = document.getElementById('preview-values');
   let masterMachines = [];
   let eventTargets = [];
@@ -199,8 +202,8 @@ export async function initConfigPage() {
     const normalize = (arr) => arr.map(t => ({
       machineId: Number(t.machineId),
       orderNumber: Number(t.orderNumber),
-      v10: t.values[10],
-      v1: t.values[1]
+      v1: t.value1,
+      v2: t.value2
     }));
 
     const current = JSON.stringify(normalize(eventTargets));
@@ -253,12 +256,12 @@ export async function initConfigPage() {
           <span style="flex: 1; font-weight: bold;" class="machine-name-display">${round.machineName}</span>
           <div style="display: flex; align-items: center; gap: 10px;" onclick="event.stopPropagation()">
             <div style="display: flex; align-items: center; gap: 4px;">
-              <label style="font-size: 0.7rem; color: #666;">10:</label>
-              <input type="text" class="score10-input" value="${formatNumber(round.values[10])}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
+              <label style="font-size: 0.7rem; color: #666;">${Engine.getHighScoreLabel()}:</label>
+              <input type="text" class="score10-input" value="${formatNumber(round.value1)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
             </div>
             <div style="display: flex; align-items: center; gap: 4px;">
-              <label style="font-size: 0.7rem; color: #666;">1:</label>
-              <input type="text" class="score1-input" value="${formatNumber(round.values[1])}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
+              <label style="font-size: 0.7rem; color: #666;">${Engine.getLowScoreLabel()}:</label>
+              <input type="text" class="score1-input" value="${formatNumber(round.value2)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
             </div>
           </div>
         `,
@@ -294,10 +297,11 @@ export async function initConfigPage() {
       applyScoreFormatting(s1);
 
       const updateValues = () => {
-        const s10Val = Number(s10.value.replace(/\D/g, '')) || 0;
-        const s1Val = Number(s1.value.replace(/\D/g, '')) || 0;
+        round.value1 = Number(s10.value.replace(/\D/g, '')) || 0;
+        round.value2 = Number(s1.value.replace(/\D/g, '')) || 0;
+
         const currentScaling = row.querySelector('.scaling-btn.btn-standard').dataset.scale;
-        round.values = Engine.buildRoundValues(s10Val, s1Val, currentScaling);
+        round.values = Engine.buildRoundValues(round.value1, round.value2, currentScaling);
         
         const container = row.querySelector('.preview-values-container');
         if (container) container.innerHTML = renderThresholdGrid(round.values, formatNumber);
@@ -370,6 +374,8 @@ export async function initConfigPage() {
         eventId: eventId,
         machineId: round.machineId,
         orderNumber: index + 1,
+        value1: round.value1,
+        value2: round.value2,
         values: round.values
       };
     });
@@ -395,11 +401,25 @@ export async function initConfigPage() {
     ]);
 
     masterMachines = machines;
-    const league = leaguesData.find(l => String(l.id) === String(getActiveLeagueId()));
-    Engine = getScoringEngine(league?.scoringFormat || 'bowling');
-
-    // Resolve location and fetch targets in parallel
+    const leagueId = getActiveLeagueId();
+    const league = leaguesData.find(l => String(l.id) === String(leagueId));
     const eventMatch = league?.events?.find(e => String(e.id) === String(eventId));
+
+    // Prioritize the specific event's format, then the league default
+    const format = eventMatch?.scoringFormat || league?.scoringFormat || 'bowling';
+    Engine = getScoringEngine(format);
+
+    // Update UI labels based on the scoring engine
+    if (labelHigh) labelHigh.textContent = Engine.getHighScoreLabel();
+    if (labelLow) labelLow.textContent = Engine.getLowScoreLabel();
+
+    if (format === 'golf') {
+      if (!score1Input.value) score1Input.value = '3';
+      score1Input.placeholder = 'e.g. 3';
+    } else {
+      score1Input.placeholder = 'e.g. 5,000,000';
+    }
+
     const locationId = eventMatch?.locationId;
 
     const [suggestedData, targets] = await Promise.all([
@@ -430,6 +450,13 @@ export async function initConfigPage() {
     submitBtn.disabled = true;
     machineSearch.updateOptions('');
     updateQuickFillState('');
+
+    if (Engine.getRoundLabel() === 'Hole') {
+      score1Input.value = '3';
+      score1Input.placeholder = 'e.g. 3';
+    } else {
+      score1Input.placeholder = 'e.g. 5,000,000';
+    }
 
     currentScaling = 'curved';
     if (btnFlat && btnCurved) {
@@ -467,6 +494,8 @@ export async function initConfigPage() {
       eventId: Number(eventId), 
       machineId: masterMachine.id, 
       orderNumber, 
+      value1: score10,
+      value2: score1,
       values 
     };
 
