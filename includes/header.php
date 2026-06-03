@@ -5,7 +5,6 @@
       <span><?php echo $active['brand']; ?></span>
     </a>
     <ul class="nav-links">
-      <li class="nav-item"><a href="<?php echo rtrim($baseUrl, '/') . '/'; ?>" data-route="HOME" class="nav-link">Home</a></li>
       <li class="nav-item"><a href="<?php echo $baseUrl; ?>/play" class="nav-link" data-route="PLAY"><?php echo $active['cta']; ?></a></li>
       <li class="nav-item dropdown">
         <a href="javascript:void(0)" class="nav-link dropbtn">Leagues</a>

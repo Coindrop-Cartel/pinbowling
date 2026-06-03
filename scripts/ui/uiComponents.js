@@ -1,5 +1,7 @@
 import { PB_API } from '@services/api.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId } from '@scripts/utils.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, getCookie } from '@scripts/utils.js';
+import { getScoringEngine } from '@core/engine.js';
+
 /**
  * Creates a searchable selection interaction between a text input and a select dropdown.
  * 
@@ -227,6 +229,54 @@ export function showDialog({ title, message, showInput = false, isPassword = tru
       cancelBtn.onclick = () => finish(showInput ? null : false);
     }
   });
+}
+
+/**
+ * Dynamically updates the site-wide theme and branding elements based on 
+ * a scoring format (bowling vs golf).
+ * 
+ * @param {string} [overrideFormat] Optional format to force, otherwise reads from cookie.
+ */
+export function applyPreferredTheme(overrideFormat) {
+  const preferred = overrideFormat || getCookie('pb_preferred_format') || 'bowling';
+  const engine = getScoringEngine(preferred);
+
+  // Dynamically swap the theme stylesheet to change colors instantly
+  const themeLink = document.getElementById('theme-stylesheet');
+  if (themeLink) {
+    const currentHref = themeLink.getAttribute('href');
+    const lastSlash = currentHref.lastIndexOf('/');
+    const basePath = lastSlash !== -1 ? currentHref.substring(0, lastSlash + 1) : '';
+    themeLink.setAttribute('href', basePath + (preferred === 'golf' ? 'golf.css' : 'bowling.css'));
+  }
+
+  // Clear any previous theme classes and apply the current engine's theme
+  document.body.classList.remove('theme-golf', 'theme-bowling');
+  const themeClass = engine.getThemeClass();
+  if (themeClass) document.body.classList.add(themeClass);
+  
+  // Update dynamic logos (header/nav)
+  const logoImgs = document.querySelectorAll('.nav-logo img, .header-logo img, .site-logo img, #site-logo');
+  logoImgs.forEach(img => {
+    const lastSlash = img.src.lastIndexOf('/');
+    const basePath = lastSlash !== -1 ? img.src.substring(0, lastSlash + 1) : '';
+    img.src = basePath + engine.getLogoImage();
+    img.alt = engine.getBrandName() + ' Logo';
+  });
+
+  // Update the navigation brand name label
+  document.querySelectorAll('.nav-logo span').forEach(el => {
+    el.textContent = engine.getBrandName();
+  });
+
+  // Update all play CTA links (nav and home button)
+  document.querySelectorAll('[data-route="PLAY"]').forEach(link => {
+    link.textContent = engine.getPlayActionLabel();
+  });
+
+  // Update homepage descriptive text
+  const logicText = document.getElementById('scoring-logic-text');
+  if (logicText) logicText.textContent = engine.getScoringDescription();
 }
 
 export const showConfirm = (message, title = 'Confirm Action') => showDialog({ title, message, confirmText: 'Yes, Proceed', cancelText: 'Cancel' });

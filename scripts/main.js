@@ -18,7 +18,7 @@ import { getDebugEnabled } from '@services/state.js';
 import { getScoringEngine } from '@core/engine.js';
 import { getCookie } from '@scripts/utils.js';
 import { initAuthHeader } from '@services/auth.js';
-import { fitTVModeToScreen } from '@ui/uiComponents.js';
+import { fitTVModeToScreen, applyPreferredTheme } from '@ui/uiComponents.js';
 
 /**
  * Main entry point. Identifies which page is currently loaded 
@@ -29,69 +29,6 @@ import { fitTVModeToScreen } from '@ui/uiComponents.js';
  * for the current view context.
  */
 async function ready() {
-  // Handle global theme and format toggle
-  const applyPreferredTheme = () => {
-    const preferred = getCookie('pb_preferred_format') || 'bowling';
-    const engine = getScoringEngine(preferred);
-
-    // Dynamically swap the theme stylesheet to change colors instantly
-    const themeLink = document.getElementById('theme-stylesheet');
-    if (themeLink) {
-      const currentHref = themeLink.getAttribute('href');
-      const basePath = currentHref.substring(0, currentHref.lastIndexOf('/') + 1);
-      themeLink.setAttribute('href', basePath + (preferred === 'golf' ? 'golf.css' : 'bowling.css'));
-    }
-
-    // Clear any previous theme classes and apply the current engine's theme
-    document.body.classList.remove('theme-golf', 'theme-bowling');
-    const themeClass = engine.getThemeClass();
-    if (themeClass) document.body.classList.add(themeClass);
-    
-    // Update dynamic logos (header/nav) but skip the static selection logos on the home page
-    const logoImgs = document.querySelectorAll('.nav-logo img, .header-logo img, .site-logo img, #site-logo');
-    logoImgs.forEach(img => {
-      const basePath = img.src.substring(0, img.src.lastIndexOf('/') + 1);
-      img.src = basePath + engine.getLogoImage();
-      img.alt = engine.getBrandName() + ' Logo';
-    });
-
-    // Update the navigation brand name label
-    document.querySelectorAll('.nav-logo span').forEach(el => {
-      el.textContent = engine.getBrandName();
-    });
-
-    // Update all play CTA links (nav and home button)
-    document.querySelectorAll('[data-route="PLAY"]').forEach(link => {
-      link.textContent = engine.getPlayActionLabel();
-    });
-
-    // Update homepage descriptive text
-    const logicText = document.getElementById('scoring-logic-text');
-    if (logicText) {
-      logicText.textContent = engine.getScoringDescription();
-    }
-  };
-
-  const logoContainer = document.querySelector('.nav-logo, .header-logo, .site-logo, .logo-link');
-  if (logoContainer) {
-    logoContainer.style.cursor = 'pointer';
-    logoContainer.title = 'Click to toggle site-wide scoring mode';
-    logoContainer.onclick = (e) => {
-      e.preventDefault();
-      const current = getCookie('pb_preferred_format') || 'bowling';
-      const next = current === 'bowling' ? 'golf' : 'bowling';
-      document.cookie = `pb_preferred_format=${next}; path=/; max-age=31536000`; // Persist for 1 year
-      
-      applyPreferredTheme();
-
-      // We only reload if we are NOT on the homepage. Other pages (like Setup) 
-      // have internal logic tied to the engine that requires a fresh init.
-      if (!document.getElementById('scoring-logic-text')) {
-        window.location.reload(); 
-      }
-    };
-  }
-
   // Handle specific brand selection on the Home Page
   const heroLogoBtns = document.querySelectorAll('.hero-logo-btn');
   heroLogoBtns.forEach(btn => {

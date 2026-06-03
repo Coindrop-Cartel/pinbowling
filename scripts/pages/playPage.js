@@ -6,6 +6,8 @@ import {
   showPlayerSelectionDialog, 
   createExpandableRow, 
   setupSortableList,
+  getFormatBadgeHtml,
+  applyPreferredTheme,
 } from '@ui/uiComponents.js';
 
 export async function initPlayPage() {
@@ -42,6 +44,8 @@ export async function initPlayPage() {
     currentSessionFormat = formatSelect?.value || 'bowling';
     const engine = getScoringEngine(currentSessionFormat);
     const roundLabel = engine.getRoundLabel();
+    applyPreferredTheme(currentSessionFormat);
+
     const counts = engine.getRoundCountOptions();
 
     renderExistingSessions();
@@ -95,14 +99,19 @@ export async function initPlayPage() {
     filtered.forEach(event => {
       const row = createExpandableRow(sessionsList, {
         id: event.id,
-        format: event.scoringFormat,
         className: 'session-item',
         headerHtml: `
-          <div style="flex: 1;"><strong>${event.eventName}</strong><br><small>${event.locationName || 'No Location'} | ${event.eventDate}</small></div>
-          <div style="display: flex; gap: 6px;">
-            <button class="scoreboard-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Scoreboard</button>
-            <button class="join-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Join</button>
-            <button class="play-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Play</button>
+          <div style="flex: 1; display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <strong>${event.eventName}</strong>
+              ${getFormatBadgeHtml(event.scoringFormat)}
+            </div>
+            <small>${event.locationName || 'No Location'} | ${event.eventDate} | Players: ${event.roster?.length || 0}</small>
+            <div style="display: flex; gap: 6px; margin-top: 8px;">
+              <button class="join-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Join</button>
+              <button class="play-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Play</button>
+              <button class="scoreboard-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Scoreboard</button>
+            </div>
           </div>
         `,
         contentHtml: '', // Sessions do not expand
@@ -118,16 +127,29 @@ export async function initPlayPage() {
 
       row.querySelector('.join-btn').onclick = async (e) => {
         e.stopPropagation();
-        const joinedIds = new Set(event.roster.map(p => p.id));
-        const available = allPlayersCache.filter(p => !joinedIds.has(p.id));
+        
+        const currentUser = await PB_API.getCurrentUser();
+        let selectedId = null;
 
-        if (available.length === 0) {
-          alert('All registered players have already joined this session.');
-          return;
+        const joinedIds = new Set(event.roster.map(p => p.id));
+        
+        // Auto-join logic for logged-in users
+        if (currentUser?.player_id) {
+            if (joinedIds.has(currentUser.player_id)) {
+                window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${currentUser.player_id}`;
+                return;
+            }
+            selectedId = currentUser.player_id;
+        } else {
+            const available = allPlayersCache.filter(p => !joinedIds.has(p.id));
+            if (available.length === 0) {
+              alert('All registered players have already joined this session.');
+              return;
+            }
+            const options = available.map(p => ({ value: p.id, label: p.playerName }));
+            selectedId = await showPlayerSelectionDialog('Play Session', 'Select your name to start playing:', options, 'Play');
         }
 
-        const options = available.map(p => ({ value: p.id, label: p.playerName }));
-        const selectedId = await showPlayerSelectionDialog('Play Session', 'Select your name to start playing:', options, 'Play');
         if (selectedId) {
           await PB_API.addLeaguePlayer(event.leagueId, Number(selectedId));
           window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`;
@@ -136,15 +158,22 @@ export async function initPlayPage() {
 
       row.querySelector('.play-btn').onclick = async (e) => {
         e.stopPropagation();
-        const roster = event.roster || [];
         
-        if (roster.length === 0) {
-          alert('No players are assigned to this session yet. Use "Join" to add yourself.');
-          return;
+        const currentUser = await PB_API.getCurrentUser();
+        let selectedId = null;
+
+        if (currentUser?.player_id) {
+            selectedId = currentUser.player_id;
+        } else {
+            const roster = event.roster || [];
+            if (roster.length === 0) {
+              alert('No players are assigned to this session yet. Use "Join" to add yourself.');
+              return;
+            }
+            const options = roster.map(p => ({ value: p.id, label: p.playerName }));
+            selectedId = await showPlayerSelectionDialog('Play Session', 'Who is playing?', options, 'Play');
         }
 
-        const options = roster.map(p => ({ value: p.id, label: p.playerName }));
-        const selectedId = await showPlayerSelectionDialog('Play Session', 'Who is bowling?', options, 'Play');
         if (selectedId) {
           window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`;
         }

@@ -9,7 +9,8 @@ vi.mock('@services/api.js', () => ({
     getPlayers: vi.fn(),
     getScores: vi.fn(),
     saveScore: vi.fn(),
-    getTargetScores: vi.fn()
+    getTargetScores: vi.fn(),
+    getCurrentUser: vi.fn()
   }
 }));
 
@@ -68,6 +69,7 @@ describe('Scores Page (scoresPage.js)', () => {
       <div class="tournament-selector-container"></div>
     `;
     vi.clearAllMocks();
+    PB_API.getCurrentUser.mockResolvedValue({ role: 'player', player_id: '7' });
   });
 
   it('should load machines and reveal player selection on init', async () => {
@@ -116,6 +118,70 @@ describe('Scores Page (scoresPage.js)', () => {
         playerId: 7,
         machineId: 5
       }));
+    });
+  });
+
+  describe('Permissions & Security', () => {
+    it('Admin should be able to edit existing scores in standard leagues', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'admin', player_id: '1' });
+      PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'L1', type: 'standard' }]);
+      PB_API.getLeague.mockResolvedValue({ id: 1, players: [{ id: 7, playerName: 'Kyle', userId: 123 }] });
+      PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineId: 5, machineName: 'M1', value1: 1000, values: { 10: 1000 } }]);
+      PB_API.getScores.mockResolvedValue([{ orderNumber: 1, ball1: 500, ball2: 0, ball3: 0 }]); // Existing score
+      getCurrentPlayerId.mockReturnValue('7');
+
+      await initScoresPage();
+
+      const saveBtn = document.querySelector('.save-round-button');
+      expect(saveBtn.style.display).not.toBe('none');
+      expect(document.body.innerHTML).not.toContain('Updates locked');
+    });
+
+    it('Regular User should be locked from editing existing scores in standard leagues', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'player', player_id: '7' });
+      PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'L1', type: 'standard' }]);
+      PB_API.getLeague.mockResolvedValue({ id: 1, players: [{ id: 7, playerName: 'Kyle', userId: 777 }] });
+      PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineId: 5, machineName: 'M1', value1: 1000, values: { 10: 1000 } }]);
+      PB_API.getScores.mockResolvedValue([{ orderNumber: 1, ball1: 500, ball2: 0, ball3: 0 }]); // Existing score
+      getCurrentPlayerId.mockReturnValue('7');
+
+      await initScoresPage();
+
+      expect(document.body.innerHTML).toContain('Updates locked');
+      const saveBtn = document.querySelector('.save-round-button');
+      expect(saveBtn.style.display).toBe('none');
+    });
+
+    it('Regular User can edit an unregistered user score', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'player', player_id: '7' });
+      PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'L1', type: 'session' }]);
+      // Player 8 has no userId (unregistered guest)
+      PB_API.getLeague.mockResolvedValue({ id: 1, players: [{ id: 8, playerName: 'Guest', userId: null }] });
+      PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineId: 5, machineName: 'M1', value1: 1000, values: { 10: 1000 } }]);
+      PB_API.getScores.mockResolvedValue([]);
+      getCurrentPlayerId.mockReturnValue('8');
+
+      await initScoresPage();
+
+      const saveBtn = document.querySelector('.save-round-button');
+      expect(saveBtn.style.display).not.toBe('none');
+      expect(document.body.innerHTML).not.toContain('Guest Only');
+    });
+
+    it('Regular User cannot edit another registered user score', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'player', player_id: '7' });
+      PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'L1', type: 'session' }]);
+      // Player 9 is registered (has userId) but is not the current user (7)
+      PB_API.getLeague.mockResolvedValue({ id: 1, players: [{ id: 9, playerName: 'Other', userId: 999 }] });
+      PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineId: 5, machineName: 'M1', value1: 1000, values: { 10: 1000 } }]);
+      PB_API.getScores.mockResolvedValue([]);
+      getCurrentPlayerId.mockReturnValue('9');
+
+      await initScoresPage();
+
+      expect(document.body.innerHTML).toContain('Guest Only');
+      const saveBtn = document.querySelector('.save-round-button');
+      expect(saveBtn.style.display).toBe('none');
     });
   });
 });

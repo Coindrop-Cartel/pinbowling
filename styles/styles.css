@@ -23,7 +23,7 @@ body {
   padding: 0;
   position: sticky;
   top: 0;
-  z-index: 1000;
+  z-index: 9999; /* Ensure navbar is above all page content and dynamic components */
 }
 
 .nav-container {
@@ -34,6 +34,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  overflow: visible !important; /* Prevent clipping of dropdown menus on desktop */
 }
 
 .nav-logo {
@@ -66,6 +67,7 @@ body {
   margin: 0;
   padding: 0;
   align-items: center;
+  overflow: visible !important; /* Ensure children can pop out vertically */
 }
 
 .nav-link {
@@ -94,19 +96,45 @@ body {
 .dropdown-content {
   display: none;
   position: absolute;
-  right: 0;
+  left: 0;
   top: 100%;
   background-color: var(--pb-white);
-  min-width: 180px;
+  min-width: 200px;
   box-shadow: var(--pb-shadow);
   border: var(--pb-border);
-  z-index: 1001;
+  z-index: 10000; /* Ensure menu items are above the navbar itself */
+}
+
+.dropdown:hover .dropdown-content,
+.dropdown.is-open .dropdown-content {
+  display: block;
+}
+
+/* Auth Header Components */
+.auth-header-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Ensure container doesn't clip child descenders */
+  padding: 4px 0;
+}
+
+.auth-user-greeting {
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.2; 
+  white-space: nowrap;
+  display: inline-flex; /* Changed from inline-block to flex for correct alignment */
+  align-items: center; /* Vertically centers text relative to the logout button */
+  color: var(--pb-black);
+  vertical-align: middle;
+  padding-bottom: 1px; /* Subtle buffer for descenders like y, g, p */
 }
 
 /* Header Authentication Buttons */
 #header-logout-btn, 
-#header-login-btn, #header-logout-btn {
-  background-color: var(--pb-primary);
+#header-login-btn {
+  background-color: var(--pb-black);
   color: var(--pb-white);
   border: none;
   padding: 8px 16px;
@@ -115,21 +143,31 @@ body {
   text-transform: uppercase;
   cursor: pointer;
   transition: background-color 0.2s;
+  border-radius: 4px;
+  line-height: 1;
 }
 
-#header-logout-btn:hover, 
-#header-login-btn:hover, #header-logout-btn:hover {
-  background-color: var(--pb-primary-hover);
+#header-logout-btn:hover, #header-login-btn:hover {
+  background-color: #333;
+}
+
+/* Indicators for Dropdowns */
+.dropbtn::after {
+  content: ' ▼';
+  font-size: 0.6rem;
+  vertical-align: middle;
+  margin-left: 4px;
+  opacity: 0.7;
 }
 
 .dropdown-content a {
   color: var(--pb-black) !important;
-  padding: 12px 16px;
+  padding: 14px 18px;
   text-decoration: none;
   display: block;
   font-weight: 800;
   text-transform: uppercase;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   border-bottom: 1px solid var(--pb-gray);
 }
 
@@ -140,10 +178,6 @@ body {
 .dropdown-content a:hover {
   background-color: var(--pb-primary) !important;
   color: var(--pb-white) !important;
-}
-
-.dropdown:hover .dropdown-content {
-  display: block;
 }
 
 /* Layout & Containers */

@@ -1,6 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { SCORING_FORMATS } from '@core/engine.js';
-import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog, getFormatBadgeHtml } from '@ui/uiComponents.js';
+import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog, getFormatBadgeHtml, applyPreferredTheme } from '@ui/uiComponents.js';
 import { setActiveLeagueId, setActiveEventId, getActiveLeagueId, getCookie } from '@scripts/utils.js';
 import { requireAdmin, runAuthorizedLeagueAction, isManagementAuthorized } from '@services/auth.js';
 import { navigateTo } from '@scripts/utils.js';
@@ -141,6 +141,7 @@ export async function initLeaguesPage() {
             details.classList.remove('hidden');
             renderPlayersForLeague(league.id, league.players, allPlayersCache);
             setActiveLeagueId(league.id);
+            applyPreferredTheme(league.scoringFormat);
           } else {
             setActiveLeagueId(null);
           }

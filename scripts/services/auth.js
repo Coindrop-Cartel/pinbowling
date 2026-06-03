@@ -55,12 +55,29 @@ export async function initAuthHeader() {
         adminNav.classList.remove('hidden');
         const maintenanceLink = adminNav.querySelector('#nav-maintenance');
         if (maintenanceLink) maintenanceLink.classList.toggle('hidden', !isAdmin);
+
+        // Enhance dropdown for mobile: Use click to toggle instead of relying on hover
+        const dropBtn = adminNav.querySelector('.dropbtn');
+        if (dropBtn) {
+          dropBtn.onclick = (e) => {
+            if (window.innerWidth <= 768) {
+              e.stopPropagation();
+              const isOpen = adminNav.classList.toggle('is-open');
+              
+              // Prevent the scrolling nav container from clipping the vertical dropdown
+              const navLinks = adminNav.closest('.nav-links');
+              if (navLinks) {
+                navLinks.classList.toggle('dropdown-active', isOpen);
+              }
+            }
+          };
+        }
       }
 
       container.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 15px;">
-          <span style="font-size: 0.85rem; font-weight: 500;">Hi, ${user.player_name || user.username}</span>
-          <button id="header-logout-btn" style="padding: 8px 16px; background: #000; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">Log Out</button>
+        <div class="auth-header-wrapper">
+          <span class="auth-user-greeting">Hi, ${user.player_name || user.username}</span>
+          <button id="header-logout-btn">Log Out</button>
         </div>
       `;
       container.querySelector('#header-logout-btn').onclick = async () => {
@@ -68,7 +85,7 @@ export async function initAuthHeader() {
         window.location.reload();
       };
     } else {
-      container.innerHTML = `<button id="header-login-btn" style="padding: 8px 16px; background: #000; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">Login</button>`;
+      container.innerHTML = `<button id="header-login-btn">Login</button>`;
       container.querySelector('#header-login-btn').onclick = async () => {
         const loggedIn = await showAuthDialog();
         if (loggedIn) window.location.reload();
