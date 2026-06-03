@@ -68,7 +68,7 @@ describe('GolfEngine', () => {
     expect(engine.getTurnHeaderPrefix()).toBe('H');
     expect(engine.getPrimaryTargetLabel()).toBe('Target Score');
     expect(engine.getPlayActionLabel()).toBe("Let's Golf!");
-    expect(engine.getBrandName()).toBe('Pingolf');
+    expect(engine.getBrandName()).toBe('PinGolf');
   });
 
   test('calculateTurnResults - Cumulative balls', () => {

@@ -170,19 +170,19 @@ export class GolfEngine extends ScoringEngine {
     if (diff === -1) return `<div style="${baseStyle} border: 1px solid var(--pb-primary); border-radius: 50%;">${strokes}</div>`;
 
     // Eagle: Solid circle
-    if (diff === -2) return `<div style="${baseStyle} background: var(--pb-primary); color: #fff; border-radius: 50%;">${strokes}</div>`;
+    if (diff === -2) return `<div style="${baseStyle} background: var(--pb-primary); color: var(--pb-white); border-radius: 50%;">${strokes}</div>`;
 
     // Albatross or better: Solid circle with frame
-    if (diff <= -3) return `<div style="display: inline-flex; border: 1px solid var(--pb-primary); padding: 1px; border-radius: 50%; margin: 0 auto;"><div style="${baseStyle} background: var(--pb-primary); color: #fff; border-radius: 50%; width: 22px; height: 22px;">${strokes}</div></div>`;
+    if (diff <= -3) return `<div style="display: inline-flex; border: 1px solid var(--pb-primary); padding: 1px; border-radius: 50%; margin: 0 auto;"><div style="${baseStyle} background: var(--pb-primary); color: var(--pb-white); border-radius: 50%; width: 22px; height: 22px;">${strokes}</div></div>`;
 
     // Bogey: Square
     if (diff === 1) return `<div style="${baseStyle} border: 1px solid var(--pb-primary);">${strokes}</div>`;
 
     // Double bogey: Solid square
-    if (diff === 2) return `<div style="${baseStyle} background: var(--pb-primary); color: #fff;">${strokes}</div>`;
+    if (diff === 2) return `<div style="${baseStyle} background: var(--pb-primary); color: var(--pb-white);">${strokes}</div>`;
 
     // Triple bogey or worse: Solid square with frame
-    if (diff >= 3) return `<div style="display: inline-flex; border: 1px solid var(--pb-primary); padding: 1px; margin: 0 auto;"><div style="${baseStyle} background: var(--pb-primary); color: #fff; width: 22px; height: 22px;">${strokes}</div></div>`;
+    if (diff >= 3) return `<div style="display: inline-flex; border: 1px solid var(--pb-primary); padding: 1px; margin: 0 auto;"><div style="${baseStyle} background: var(--pb-primary); color: var(--pb-white); width: 22px; height: 22px;">${strokes}</div></div>`;
 
     return String(strokes);
   }

@@ -43,11 +43,12 @@ async function ready() {
     const themeClass = engine.getThemeClass();
     if (themeClass) document.body.classList.add(themeClass);
     
-    const logoImg = document.querySelector('.nav-logo img, .header-logo img, .site-logo img, #site-logo');
-    if (logoImg) {
-      const basePath = logoImg.src.substring(0, logoImg.src.lastIndexOf('/') + 1);
-      logoImg.src = basePath + engine.getLogoImage();
-    }
+    const logoImgs = document.querySelectorAll('.nav-logo img, .header-logo img, .site-logo img, #site-logo, .hero-logo-img');
+    logoImgs.forEach(img => {
+      const basePath = img.src.substring(0, img.src.lastIndexOf('/') + 1);
+      img.src = basePath + engine.getLogoImage();
+      img.alt = engine.getBrandName() + ' Logo';
+    });
 
     const logoText = document.querySelector('.nav-logo span');
     if (logoText) {
