@@ -1,23 +1,3 @@
-<?php
-// Retrieve site-wide preference from cookie (shared with JS)
-$preferredFormat = $_COOKIE['pb_preferred_format'] ?? 'bowling';
-
-// Data-driven metadata lookup (mirrors JS engine properties)
-$engineMeta = [
-    'bowling' => [
-        'logo'  => 'pinbowling.png',
-        'brand' => 'PinBowling',
-        'cta'   => "Let's Bowl!"
-    ],
-    'golf' => [
-        'logo'  => 'pingolf.png',
-        'brand' => 'PinGolf',
-        'cta'   => "Let's Golf!"
-    ]
-];
-
-$active = $engineMeta[$preferredFormat] ?? $engineMeta['bowling'];
-?>
 <nav class="navbar">
   <div class="nav-container">
     <a href="<?php echo rtrim($baseUrl, '/') . '/'; ?>" class="nav-logo">

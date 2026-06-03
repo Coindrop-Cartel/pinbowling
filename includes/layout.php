@@ -1,18 +1,6 @@
 <?php
 // Apply theme class server-side to prevent UI flicker
-$preferredFormat = $_COOKIE['pb_preferred_format'] ?? 'bowling';
-
-// Data-driven metadata lookup (mirrors JS engine properties)
-$engineMeta = [
-    'bowling' => [
-        'logo'  => 'pinbowling.png',
-    ],
-    'golf' => [
-        'logo'  => 'pingolf.png',
-    ]
-];
-$activeEngineMeta = $engineMeta[$preferredFormat] ?? $engineMeta['bowling'];
-$themeStyle = ($preferredFormat === 'golf') ? 'golf.css' : 'bowling.css'; // Still used for CSS file loading
+$themeStyle = ($preferredFormat === 'golf') ? 'golf.css' : 'bowling.css';
 $mergedBodyClass = trim(($bodyClass ?? '') . ' ' . $themeClass);
 ?>
 <!DOCTYPE html>
@@ -27,7 +15,7 @@ $mergedBodyClass = trim(($bodyClass ?? '') . ' ' . $themeClass);
   ?>
   <link rel="stylesheet" href="<?php echo versionedAsset($cssBase . '/styles.css'); ?>" />
   <link rel="stylesheet" href="<?php echo versionedAsset($cssBase . '/' . $themeStyle); ?>" />
-  <link rel="icon" type="image/png" href="<?php echo versionedAsset($baseUrl . '/images/' . $activeEngineMeta['logo']); ?>" />
+  <link rel="icon" type="image/png" href="<?php echo versionedAsset($baseUrl . '/images/' . $active['logo']); ?>" />
   <script>
     // Bridge PHP calculated base path to JavaScript
     window.APP_BASE = "<?php echo $baseUrl; ?>";

@@ -171,11 +171,37 @@ body {
   flex: 1;
 }
 
-.hero-logo-img {
-  height: 250px;
-  width: 250px;
+.hero-brand-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  margin-bottom: 20px;
+}
+
+.hero-logo-btn {
+  height: 180px;
+  width: 180px;
   object-fit: contain;
+  transition: transform 0.2s, opacity 0.3s, filter 0.3s;
   display: block;
+}
+
+.hero-logo-btn:hover {
+  transform: scale(1.1);
+}
+
+.hero-brand-name {
+  font-size: 3rem;
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* Visual feedback: Fade out the format that isn't active */
+body:not(.theme-golf) .hero-logo-btn[data-format="golf"],
+body.theme-golf .hero-logo-btn[data-format="bowling"] {
+  opacity: 0.3;
+  filter: grayscale(1);
 }
 
 h1, h2, h3 {

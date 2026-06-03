@@ -43,14 +43,16 @@ async function ready() {
     const themeClass = engine.getThemeClass();
     if (themeClass) document.body.classList.add(themeClass);
     
-    const logoImgs = document.querySelectorAll('.nav-logo img, .header-logo img, .site-logo img, #site-logo, .hero-logo-img');
+    // Update dynamic logos (header/nav) but skip the static selection logos on the home page
+    const logoImgs = document.querySelectorAll('.nav-logo img, .header-logo img, .site-logo img, #site-logo');
     logoImgs.forEach(img => {
       const basePath = img.src.substring(0, img.src.lastIndexOf('/') + 1);
       img.src = basePath + engine.getLogoImage();
       img.alt = engine.getBrandName() + ' Logo';
     });
 
-    const logoText = document.querySelector('.nav-logo span');
+    // Update both the nav logo text and the hero section brand name
+    const logoText = document.querySelector('.nav-logo span, .hero-brand-name');
     if (logoText) {
       logoText.textContent = engine.getBrandName();
     }
@@ -74,6 +76,17 @@ async function ready() {
       window.location.reload(); 
     };
   }
+
+  // Handle specific brand selection on the Home Page
+  const heroLogoBtns = document.querySelectorAll('.hero-logo-btn');
+  heroLogoBtns.forEach(btn => {
+    btn.style.cursor = 'pointer';
+    btn.onclick = () => {
+      const format = btn.dataset.format; // bowling or golf
+      document.cookie = `pb_preferred_format=${format}; path=/; max-age=31536000`;
+      window.location.reload();
+    };
+  });
 
   // Restore debug mode from local storage if previously toggled in Management UI
   window.PB_DEBUG_MODE = getDebugEnabled();

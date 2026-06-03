@@ -92,6 +92,33 @@ $uiVersionSource = $isReadable ? 'version.txt' : 'Hardcoded Fallback';
 $adminPassword = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');
 $debugMode = false; // Initial state; toggled via Management UI and persisted in localStorage.
 
+// --- Shared Branding Metadata ---
+// Retrieve site-wide preference from cookie (shared with JS)
+$preferredFormat = $_COOKIE['pb_preferred_format'] ?? 'bowling';
+$themeClass = ($preferredFormat === 'golf') ? 'theme-golf' : '';
+
+// Global project text (Format Agnostic)
+$siteBrand   = 'PinStuff';
+$siteSlogan  = "Don't say stuff.";
+$aboutProject = "This system bridges the gap between competitive pinball and traditional sporting formats. It provides a robust management platform for tracking player performance, machine targets, and historical data across multiple leagues and venues.";
+
+$engineMeta = [
+    'bowling' => [
+        'logo'  => 'pinbowling.png',
+        'brand' => 'PinBowling',
+        'cta'   => "Let's Bowl!",
+        'logic' => "Each machine has target scores corresponding to pin counts. Reaching the target on ball 1 is a strike (X). Reaching it on ball 2 is a 9-count spare (9/). Reaching it on ball 3 is a spare based on your cumulative progress from balls 1 & 2 (capped at 8/). Total scores are calculated following standard bowling rules, including strike and spare bonuses from subsequent frames."
+    ],
+    'golf' => [
+        'logo'  => 'pingolf.png',
+        'brand' => 'PinGolf',
+        'cta'   => "Let's Golf!",
+        'logic' => "Strokes 1, 2, or 3 are awarded based on which ball reached the Target Score. If the target is not met within three balls, a score of 4-10 is assigned based on the final cumulative score relative to interpolated thresholds."
+    ]
+];
+
+$active = $engineMeta[$preferredFormat] ?? $engineMeta['bowling'];
+
 $dbDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset={$dbCharset}";
 
 /**
