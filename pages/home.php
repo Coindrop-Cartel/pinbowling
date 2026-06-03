@@ -2,14 +2,15 @@
 <main class="page-container">
   <header class="hero-section" style="position: relative;">
     <div class="hero-text">
+      <div class="hero-brand-text" style="text-align: center; margin-bottom: 2rem;">
+        <h1 class="hero-brand-name" style="margin-bottom: 0.5rem;"><?php echo $siteBrand; ?></h1>
+        <p class="hero-subtitle" style="font-size: 1.2rem; opacity: 0.8;"><?php echo $siteSlogan; ?></p>
+      </div>
       <div class="hero-brand-selector">
         <img src="images/pinbowling.png" class="hero-logo-btn" data-format="bowling" alt="PinBowling">
-        <div class="hero-brand-text" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-          <h1 class="hero-brand-name"><?php echo $siteBrand; ?></h1>
-          <p class="hero-subtitle"><?php echo $siteSlogan; ?></p>
-        </div>
         <img src="images/pingolf.png" class="hero-logo-btn" data-format="golf" alt="PinGolf">
       </div>
+    </div>
   </header>
 
   <section class="card">

@@ -6,6 +6,8 @@
 }
 
 body {
+  max-width: 100vw;
+  overflow-x: hidden;
   background-color: var(--pb-white);
   color: var(--pb-black);
   margin: 0;
@@ -193,7 +195,7 @@ body {
 
 .hero-brand-name {
   font-size: 3rem;
-  margin: 0;
+  margin: 0 auto;
   white-space: nowrap;
 }
 
@@ -475,4 +477,95 @@ body.tv-mode-active .standings-total {
   font-weight: 900;
   font-size: 1.4rem;
   background-color: var(--pb-gray) !important;
+}
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 768px) {
+  .nav-container {
+    flex-wrap: wrap;
+    min-height: auto;
+    padding: 10px 15px;
+    gap: 5px;
+  }
+
+  .nav-logo {
+    flex: 1;
+    order: 1;
+    font-size: 1.2rem;
+  }
+
+  .nav-logo img {
+    height: 56px;
+    width: 56px;
+  }
+
+  .nav-logo span {
+    display: none;
+  }
+
+  #auth-header-container {
+    order: 2;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  #header-logout-btn, #header-login-btn {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+
+  .nav-links {
+    width: 100%;
+    order: 3;
+    justify-content: flex-start;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 8px;
+    /* Hide scrollbar while maintaining functionality */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Position the dropdown relative to the whole navbar, not the scrolling row */
+  .dropdown-content {
+    position: fixed; /* Break out of all parent overflow containers */
+    top: 105px;      /* Position exactly below the 2-row mobile header */
+    left: 0;
+    right: 0;
+    width: 100%;
+    min-width: 100%;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+    border-left: none;
+    border-right: none;
+    background-color: var(--pb-white);
+    z-index: 1001;
+  }
+
+  .dropdown-content a {
+    white-space: normal; /* Allow text to wrap if names are long */
+    padding: 15px 20px;  /* Larger touch targets for fingers */
+    border-bottom: 1px solid var(--pb-gray);
+  }
+
+  .nav-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-link {
+    padding: 10px 15px;
+    font-size: 0.9rem;
+  }
+
+  .hero-brand-selector {
+    gap: 15px;
+  }
+
+  .hero-logo-btn {
+    width: 40%;
+    height: auto;
+  }
 }
