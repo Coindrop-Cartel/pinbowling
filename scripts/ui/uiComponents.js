@@ -69,7 +69,7 @@ export function createSearchableSelect(searchInput, selectElement, data, {
  * @param {HTMLElement} container The DOM element to render the display into.
  * @param {Function} onRefresh Callback to execute after the display is rendered.
  */
-export async function initReadOnlyTournamentDisplay(container, onRefresh) {
+export async function initReadOnlyTournamentDisplay(container, onRefresh, existingLeagues = null) {
   if (!container) return;
 
   const activeLeagueId = getActiveLeagueId();
@@ -87,7 +87,7 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh) {
   if (activeEventId) {
     try {
       // Fetch all leagues to ensure we can resolve metadata for session-based redirects
-      const leagues = await PB_API.getLeagues();
+      const leagues = existingLeagues || await PB_API.getLeagues();
       let activeLeague = null;
       let activeEvent = null;
 
@@ -484,7 +484,7 @@ export function fitTVModeToScreen() {
  * @param {string|null} options.typeFilter 'standard', 'session', or null for all.
  * @param {boolean} options.showEvents Whether to include the event selection dropdown.
  */
-export async function initTournamentSelector(container, { onRefresh, typeFilter = 'standard', showEvents = true } = {}) {
+export async function initTournamentSelector(container, { onRefresh, typeFilter = 'standard', showEvents = true, existingLeagues = null } = {}) {
   const target = typeof container === 'string' ? document.querySelector(container) : container;
   if (!target) return;
 
@@ -493,13 +493,13 @@ export async function initTournamentSelector(container, { onRefresh, typeFilter 
 
   // Fetch all leagues to ensure metadata resolution works for redirects.
   // We filter the list for the dropdown specifically to keep the UI clean.
-  const allLeagues = await PB_API.getLeagues();
+  const allLeagues = existingLeagues || await PB_API.getLeagues();
   const leagues = typeFilter 
     ? allLeagues.filter(l => l.type === typeFilter || String(l.id) === String(activeLeagueId))
     : allLeagues;
 
   target.innerHTML = `
-    <section class="tournament-selector" style="margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; background: #fff; padding: 12px 15px;">
+    <section class="card tournament-selector" style="margin-bottom: 5px; padding: 12px 15px;">
       <div style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%; box-sizing: border-box;" autocomplete="off">
         <div style="width: 100%;">
           <label style="display: block; margin-bottom: 5px;">League Search</label>

@@ -17,7 +17,12 @@ import { ROUTES } from '@scripts/routes.js';
 
 export async function initConfigPage() {
   // Verify authorization before initializing the page logic
-  if (!await isManagementAuthorized()) {
+  const [authorized, initialLeagues] = await Promise.all([
+    isManagementAuthorized(),
+    PB_API.getLeagues()
+  ]);
+
+  if (!authorized) {
     showAlert('Unauthorized: Management access is required to view the setup page.', 'Access Denied');
     navigateTo(ROUTES.HOME);
     return;
@@ -382,27 +387,29 @@ export async function initConfigPage() {
 
   const refresh = async () => {
     const eventId = getActiveEventId();
-    masterMachines = await PB_API.getMachines();
-    const leaguesData = await PB_API.getLeagues();
+    
+    // Batch the initial global data fetches
+    const [machines, leaguesData] = await Promise.all([
+      PB_API.getMachines(),
+      PB_API.getLeagues()
+    ]);
+
+    masterMachines = machines;
     const league = leaguesData.find(l => String(l.id) === String(getActiveLeagueId()));
     Engine = getScoringEngine(league?.scoringFormat || 'bowling');
 
-    // Find the location associated with the current event to filter machine suggestions
-    let locationId = null;
-    if (eventId) {
-      for (const l of leaguesData) {
-        const eventMatch = (l.events || []).find(e => String(e.id) === String(eventId));
-        if (eventMatch) {
-          locationId = eventMatch.locationId;
-          break;
-        }
-      }
-    }
+    // Resolve location and fetch targets in parallel
+    const eventMatch = league?.events?.find(e => String(e.id) === String(eventId));
+    const locationId = eventMatch?.locationId;
 
-    const newData = locationId ? await PB_API.getLocationMachines(locationId) : masterMachines;
+    const [suggestedData, targets] = await Promise.all([
+      locationId ? PB_API.getLocationMachines(locationId) : Promise.resolve(masterMachines),
+      eventId ? PB_API.getTargetScores(eventId) : Promise.resolve([])
+    ]);
+
     // Update the array in-place so the searchable select component sees the new data
     currentSuggestedMachines.length = 0;
-    currentSuggestedMachines.push(...newData);
+    currentSuggestedMachines.push(...suggestedData);
     currentSuggestedMachines.sort((a, b) => a.machineName.localeCompare(b.machineName));
     
     // Clear search text on fresh load/navigation
@@ -411,7 +418,7 @@ export async function initConfigPage() {
     updateQuickFillState('');
 
     isListDirty = false;
-    eventTargets = eventId ? await PB_API.getTargetScores(eventId) : [];
+    eventTargets = targets;
     originalEventTargets = JSON.parse(JSON.stringify(eventTargets));
     await render();
   };
@@ -474,5 +481,6 @@ export async function initConfigPage() {
     }
   });
 
-  await initReadOnlyTournamentDisplay(document.querySelector('.tournament-selector-container'), refresh);
+  // Pass the already-fetched leagues to the display component to avoid a redundant fetch
+  await initReadOnlyTournamentDisplay(document.querySelector('.tournament-selector-container'), refresh, initialLeagues);
 }

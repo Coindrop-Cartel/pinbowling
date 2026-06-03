@@ -368,30 +368,24 @@ export async function initScoresPage() {
       return;
     }
     
-    // Reset visibility of lower cards while we load the new event context
-    scoringCard.classList.add('hidden');
-    resultsCard.classList.add('hidden');
+    // Fetch leagues and machine targets in parallel
+    const [leagues, eventTargets] = await Promise.all([
+      PB_API.getLeagues(),
+      PB_API.getTargetScores(eventId)
+    ]);
 
-    // Fetch all leagues so we can resolve metadata for both standard and session types
-    const leagues = await PB_API.getLeagues();
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
     const event = league?.events?.find(e => String(e.id) === String(eventId));
 
     const isSession = league?.type === 'session';
-    if (changeTournamentBtn) {
-      changeTournamentBtn.classList.toggle('hidden', isSession);
-    }
+    if (changeTournamentBtn) changeTournamentBtn.classList.toggle('hidden', isSession);
 
     const leagueLabel = isSession ? '' : `${league?.name} - `;
     tournamentSummaryText.textContent = `${leagueLabel}${event?.eventName || 'Event'}`;
-    tournamentSelectorUI.classList.add('hidden');
-    tournamentSummary.classList.remove('hidden');
 
     Engine = getScoringEngine(event?.scoringFormat || league?.scoringFormat || 'bowling');
 
-    machines = await PB_API.getTargetScores(eventId);
-
-    playerSelectionCard.classList.remove('hidden');
+    machines = eventTargets;
 
     if (machines.length === 0) {
       warning.textContent = 'No target scores have been configured for the selected event.';
@@ -399,6 +393,9 @@ export async function initScoresPage() {
       roundsInput.innerHTML = '';
       return;
     }
+
+    // Only reveal the player card once we know we have machines to score
+    playerSelectionCard.classList.remove('hidden');
     await refreshPlayerSelection();
 
     // Update the results table header to use "Frame" (mapping data from order_number)

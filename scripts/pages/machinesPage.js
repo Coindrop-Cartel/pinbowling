@@ -12,7 +12,12 @@ import { ROUTES } from '@scripts/routes.js';
  * administrative protection for deletions.
  */
 export async function initMachinesPage() {
-  const currentUser = await PB_API.getCurrentUser();
+  // Batch initial user check and data fetch
+  const [currentUser, machinesData] = await Promise.all([
+    PB_API.getCurrentUser(),
+    PB_API.getMachines()
+  ]);
+
   const isAdmin = currentUser && currentUser.role === 'admin';
   const isTD = currentUser && currentUser.role === 'td';
   const hasElevatedPrivileges = isAdmin || isTD;
@@ -24,7 +29,6 @@ export async function initMachinesPage() {
   const yearInput = document.getElementById('machine-year');
   const mfgInput = document.getElementById('machine-manufacturer');
   const saveMachineButton = document.getElementById('save-machine-button');
-  const cancelEditButton = document.getElementById('cancel-edit-button');
   const machineList = document.getElementById('machines-list');
   const emptyNotice = document.getElementById('machines-list-empty');
 
@@ -32,7 +36,7 @@ export async function initMachinesPage() {
   let filterInstance = null;
 
   // Setup "Create Machine" toggle
-  const metadataRow = yearInput.closest('.form-row').parentElement;
+  const metadataRow = document.getElementById('machine-metadata-row');
   const actionsRow = saveMachineButton.closest('.form-actions');
 
   const createToggle = document.createElement('button');
@@ -49,15 +53,13 @@ export async function initMachinesPage() {
 
   createToggle.onclick = () => {
     const isHidden = metadataRow.classList.contains('hidden');
-    toggleFormVisibility(!isHidden);
     if (isHidden) {
+      toggleFormVisibility(false);
       createToggle.textContent = 'Cancel';
       createToggle.style.marginTop = '0';
       actionsRow.appendChild(createToggle);
     } else {
-      createToggle.textContent = 'Create New Machine';
-      createToggle.style.marginTop = '10px';
-      machineNameInput.after(createToggle);
+      resetForm();
     }
   };
 
@@ -139,7 +141,6 @@ export async function initMachinesPage() {
 
     if (machineFormTitle) machineFormTitle.textContent = `Edit Machine: ${m.machineName}`;
     saveMachineButton.textContent = 'Update Machine';
-    cancelEditButton.classList.remove('hidden');
 
     // Expand fields for editing
     toggleFormVisibility(false);
@@ -172,7 +173,6 @@ export async function initMachinesPage() {
     machineNameInput.after(createToggle);
 
     saveMachineButton.textContent = 'Save Machine';
-    cancelEditButton.classList.add('hidden');
     if (filterInstance) filterInstance.performFilter();
   };
 
@@ -185,11 +185,11 @@ export async function initMachinesPage() {
   yearInput.addEventListener('input', () => filterInstance.performFilter());
   mfgInput.addEventListener('input', () => filterInstance.performFilter());
 
-  async function refresh() {
+  async function refresh(data = null) {
     try {
-      const data = await PB_API.getMachines();
+      const machines = data || await PB_API.getMachines();
       allMachines.length = 0;
-      allMachines.push(...data);
+      allMachines.push(...machines);
       filterInstance.performFilter();
       resetForm();
     } catch (err) {
@@ -236,7 +236,6 @@ export async function initMachinesPage() {
     }
   }
 
-  cancelEditButton.addEventListener('click', resetForm);
-
-  await refresh();
+  // Initial render with batched data
+  refresh(machinesData);
 }

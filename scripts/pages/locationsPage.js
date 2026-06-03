@@ -8,8 +8,13 @@ import { ROUTES } from '@scripts/routes.js';
  * Logic for managing league locations/venues.
  */
 export async function initLocationsPage() {
-  const isAuthorized = await isManagementAuthorized();
-  if (!isAuthorized) {
+  // Batch authorization and initial data fetch to prevent sequential loading "pop"
+  const [authorized, locationsData] = await Promise.all([
+    isManagementAuthorized(),
+    PB_API.getLocations()
+  ]);
+
+  if (!authorized) {
     showAlert('Unauthorized: Management access is required to view locations.', 'Access Denied');
     navigateTo(ROUTES.HOME);
     return;
@@ -27,26 +32,11 @@ export async function initLocationsPage() {
   const saveBtn = document.getElementById('save-location-button');
   const cancelBtn = document.getElementById('cancel-loc-edit-button');
 
-  // Group City and State into one row for a more compact layout
-  const cityRow = cityInput.closest('.form-row');
-  const stateRow = stateInput.closest('.form-row');
-  let cityStateContainer = null;
-  if (cityRow && stateRow) {
-    cityStateContainer = document.createElement('div');
-    cityStateContainer.style = "display: flex; gap: 15px; margin-bottom: 15px;";
-    cityRow.style.flex = "2";
-    cityRow.style.marginBottom = "0";
-    stateRow.style.flex = "1";
-    stateRow.style.marginBottom = "0";
-    cityRow.before(cityStateContainer);
-    cityStateContainer.appendChild(cityRow);
-    cityStateContainer.appendChild(stateRow);
-  }
+  // Access the pre-defined City and State row
+  const cityStateContainer = document.getElementById('location-city-state-row');
 
   // Setup "Create Location" toggle behavior
   const actionsRow = saveBtn.closest('.form-actions');
-  if (cityStateContainer) cityStateContainer.classList.add('hidden');
-  if (actionsRow) actionsRow.classList.add('hidden');
 
   const createToggle = document.createElement('button');
   createToggle.type = 'button';
@@ -56,7 +46,7 @@ export async function initLocationsPage() {
   nameInput.after(createToggle);
 
   createToggle.onclick = () => {
-    const isHidden = cityStateContainer.classList.contains('hidden');
+    const isHidden = !cityStateContainer || cityStateContainer.classList.contains('hidden');
     cityStateContainer.classList.toggle('hidden', !isHidden);
     actionsRow.classList.toggle('hidden', !isHidden);
     if (isHidden) {
@@ -177,9 +167,9 @@ export async function initLocationsPage() {
    * Fetches all registered venues and refreshes the UI.
    * @async
    */
-  const renderLocations = async () => {
+  const refresh = async (data = null) => {
     try {
-      allLocations = await PB_API.getLocations();
+      allLocations = data || await PB_API.getLocations();
       onFilterUpdate();
       resetForm();
     } catch (err) {
@@ -282,7 +272,7 @@ export async function initLocationsPage() {
       item.querySelector('.remove-mach-btn').onclick = async () => {
         if (await showConfirm(`Remove ${m.machineName} from this location?`, 'Remove Machine')) {
           await PB_API.removeLocationMachine(locationId, m.machineId);
-          renderLocations();
+          refresh();
         }
       };
       inner.appendChild(item);
@@ -357,7 +347,7 @@ export async function initLocationsPage() {
       try {
         await PB_API.addLocationMachine(locationId, machineId, extra);
         machineFormCard.classList.add('hidden');
-        renderLocations();
+        refresh();
       } catch (err) {
         alert(`Failed to save machine: ${err.message}`);
       }
@@ -382,7 +372,7 @@ export async function initLocationsPage() {
       } else {
         await PB_API.createLocation(payload);
       }
-      renderLocations();
+      refresh();
     } catch (err) {
       alert(`Failed to save location: ${err.message}`);
     }
@@ -403,7 +393,7 @@ export async function initLocationsPage() {
 
     try {
       await PB_API.deleteLocation(id);
-      renderLocations();
+      refresh();
     } catch (err) {
       alert(`Failed to delete location: ${err.message}`);
     }
@@ -411,5 +401,6 @@ export async function initLocationsPage() {
 
   cancelBtn.onclick = resetForm;
 
-  renderLocations();
+  // Initialize the list with the pre-fetched data
+  refresh(locationsData);
 }

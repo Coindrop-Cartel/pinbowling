@@ -6,7 +6,12 @@ import { requireAdmin } from '@services/auth.js';
  * Initializes the Player Management page.
  */
 export async function initPlayersPage() {
-  const currentUser = await PB_API.getCurrentUser();
+  // Batch initial user check and data fetch
+  const [currentUser, playersData] = await Promise.all([
+    PB_API.getCurrentUser(),
+    PB_API.getPlayers()
+  ]);
+
   const isAdmin = currentUser && currentUser.role === 'admin';
   const isTD = currentUser && currentUser.role === 'td';
   const hasElevatedPrivileges = isAdmin || isTD;
@@ -168,11 +173,11 @@ export async function initPlayersPage() {
   ifpaIdInput.addEventListener('input', () => filterInstance.performFilter());
   matchplayIdInput.addEventListener('input', () => filterInstance.performFilter());
 
-  async function refresh() {
-    const data = await PB_API.getPlayers();
+  async function refresh(data = null) {
+    const players = data || await PB_API.getPlayers();
     // Update array in-place to keep the filter reference valid
     allPlayers.length = 0;
-    allPlayers.push(...data);
+    allPlayers.push(...players);
     filterInstance.performFilter();
     resetForm();
   }
@@ -301,5 +306,6 @@ export async function initPlayersPage() {
 
   cancelEditButton.addEventListener('click', cancelEdit);
 
-  await refresh();
+  // Initial render with batched data
+  refresh(playersData);
 }

@@ -10,7 +10,7 @@
 $pageTitle = 'Manage Locations';
 ?>
   <main class="page-container">
-    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <header>
       <h1>Manage Locations</h1>
     </header>
 
@@ -21,15 +21,17 @@ $pageTitle = 'Manage Locations';
           <label for="location-name">Location Name</label>
           <input id="location-name" type="text" placeholder="e.g. The Silver Ballroom" required />
         </div>
-        <div class="form-row">
-          <label for="location-city">City</label>
-          <input id="location-city" type="text" placeholder="e.g. St. Louis" />
+        <div id="location-city-state-row" class="form-row hidden" style="display: flex; gap: 15px; margin-bottom: 15px;">
+          <div class="form-row" style="flex: 2; margin-bottom: 0;">
+            <label for="location-city">City</label>
+            <input id="location-city" type="text" placeholder="e.g. St. Louis" />
+          </div>
+          <div class="form-row" style="flex: 1; margin-bottom: 0;">
+            <label for="location-state">State</label>
+            <input id="location-state" type="text" placeholder="e.g. MO" />
+          </div>
         </div>
-        <div class="form-row">
-          <label for="location-state">State</label>
-          <input id="location-state" type="text" placeholder="e.g. MO" />
-        </div>
-        <div class="form-actions">
+        <div class="form-actions hidden">
           <button type="submit" id="save-location-button">Add Location</button>
           <button type="button" id="cancel-loc-edit-button" class="secondary hidden">Cancel Edit</button>
         </div>

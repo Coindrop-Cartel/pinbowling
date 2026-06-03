@@ -119,32 +119,6 @@ function initializeDatabaseSchema($pdo) {
     // We use CREATE TABLE IF NOT EXISTS to ensure the database can be rebuilt 
     // automatically if tables are dropped or if starting a fresh installation.
     
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `users` (
-        `id` INT AUTO_INCREMENT PRIMARY KEY,
-        `player_id` INT UNIQUE,
-        `username` VARCHAR(255) UNIQUE NOT NULL,
-        `password_hash` VARCHAR(255) NOT NULL,
-        `role` ENUM('player', 'td', 'admin') DEFAULT 'player',
-        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT `fk_user_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `league_staff` (
-        `league_id` INT NOT NULL,
-        `user_id` INT NOT NULL,
-        PRIMARY KEY (`league_id`, `user_id`),
-        CONSTRAINT `fk_staff_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE,
-        CONSTRAINT `fk_staff_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `leagues` (
-        `id` INT AUTO_INCREMENT PRIMARY KEY,
-        `name` VARCHAR(255) NOT NULL,
-        `type` ENUM('standard', 'session') DEFAULT 'standard',
-        `start_date` DATE DEFAULT NULL,
-        `scoring_format` VARCHAR(50) DEFAULT 'bowling'
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
     $pdo->exec("CREATE TABLE IF NOT EXISTS `locations` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(255) NOT NULL,
@@ -165,6 +139,32 @@ function initializeDatabaseSchema($pdo) {
         `player_name` VARCHAR(255) NOT NULL UNIQUE,
         `ifpa_id` VARCHAR(50) DEFAULT NULL,
         `matchplay_id` VARCHAR(50) DEFAULT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `leagues` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `name` VARCHAR(255) NOT NULL,
+        `type` ENUM('standard', 'session') DEFAULT 'standard',
+        `start_date` DATE DEFAULT NULL,
+        `scoring_format` VARCHAR(50) DEFAULT 'bowling'
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `users` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `player_id` INT UNIQUE,
+        `username` VARCHAR(255) UNIQUE NOT NULL,
+        `password_hash` VARCHAR(255) NOT NULL,
+        `role` ENUM('player', 'td', 'admin') DEFAULT 'player',
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT `fk_user_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `league_staff` (
+        `league_id` INT NOT NULL,
+        `user_id` INT NOT NULL,
+        PRIMARY KEY (`league_id`, `user_id`),
+        CONSTRAINT `fk_staff_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_staff_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `events` (

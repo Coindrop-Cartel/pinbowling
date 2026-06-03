@@ -15,12 +15,16 @@ export async function initManagementPage() {
   /**
    * Verifies admin credentials before displaying management tools.
    */
-  const checkAuth = async () => {
-    const user = await PB_API.getCurrentUser();
+  const initialize = async () => {
+    const [user] = await Promise.all([
+      PB_API.getCurrentUser()
+    ]);
+
     const isAuthorized = user && (user.role === 'admin' || user.role === 'td');
     if (isAuthorized) {
       revealTools(user);
     }
+    renderVersionInfo();
   };
 
   const revealTools = (user) => {
@@ -77,8 +81,7 @@ export async function initManagementPage() {
 
   // Perform an initial check on load. If no password is set or the user is already
   // authenticated, we reveal the tools immediately without a prompt.
-  checkAuth();
-  renderVersionInfo();
+  initialize();
 
   /**
    * Manually triggers the cleanup service to prune old session data.

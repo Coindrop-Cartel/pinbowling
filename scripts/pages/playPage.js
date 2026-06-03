@@ -127,9 +127,14 @@ export async function initPlayPage() {
   let currentLocMachines = [];
   let expandedTempId = null; // Tracks which row is expanded for machine selection
 
-  const locations = await PB_API.getLocations();
+  // Batch initial data fetches for smoother loading
+  const [locations] = await Promise.all([
+    PB_API.getLocations(),
+    refreshSessionsData()
+  ]);
+
   locationsCache = locations;
-  locations.forEach(loc => {
+  locationsCache.forEach(loc => {
     const opt = document.createElement('option');
     opt.value = loc.id;
     opt.textContent = `${loc.name}${loc.city ? ` (${loc.city})` : ''}`;
@@ -187,7 +192,6 @@ export async function initPlayPage() {
     generatePreview();
   };
 
-  await refreshSessionsData();
   renderExistingSessions();
 
   function generatePreview() {
