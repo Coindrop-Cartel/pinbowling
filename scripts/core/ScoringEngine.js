@@ -4,6 +4,27 @@
  */
 export class ScoringEngine {
   /**
+   * Returns the brand name associated with the scoring format.
+   */
+  getBrandName() {
+    return 'PinBowling';
+  }
+
+  /**
+   * Returns the CSS class applied to the body for theme overrides.
+   */
+  getThemeClass() {
+    return '';
+  }
+
+  /**
+   * Returns the filename for the branding logo.
+   */
+  getLogoImage() {
+    return 'pinbowling.png';
+  }
+
+  /**
    * Returns the label for a single unit of play (e.g., "Frame" for Bowling, "Hole" for Golf).
    */
   getRoundLabel() {
@@ -36,6 +57,13 @@ export class ScoringEngine {
    */
   getLowScoreLabel() {
     return 'Low Score';
+  }
+
+  /**
+   * Returns the call-to-action text for the play navigation link.
+   */
+  getPlayActionLabel() {
+    return 'Play';
   }
 
   /**

@@ -4,6 +4,14 @@ import { ScoringEngine } from '../ScoringEngine.js';
  * Placeholder for future Golf scoring format.
  */
 export class GolfEngine extends ScoringEngine {
+  getBrandName() {
+    return 'PinGolf';
+  }
+
+  getThemeClass() { return 'theme-golf'; }
+
+  getLogoImage() { return 'pingolf.png'; }
+
   calculateTurnResults(machines, scoreMap) {
     const results = machines.map((round) => {
       const entry = scoreMap[String(round.orderNumber)] || { ball1: 0, ball2: 0, ball3: 0 };
@@ -138,7 +146,7 @@ export class GolfEngine extends ScoringEngine {
   getThresholdRowStyle(rank, value1, value2) {
     const isParRank = Number(rank) === Number(value2);
     if (isParRank) {
-      return 'border: 2px solid #333; padding: 2px 8px; border-radius: 4px; display: inline-block; background: rgba(0,0,0,0.05); font-weight: bold; margin: 2px 0;';
+      return 'border: 2px solid var(--pb-primary); padding: 2px 8px; border-radius: 4px; display: inline-block; background: rgba(0,0,0,0.05); font-weight: bold; margin: 2px 0;';
     }
     return 'margin: 2px 0;';
   }
@@ -159,22 +167,22 @@ export class GolfEngine extends ScoringEngine {
     if (diff === 0) return `<span style="${baseStyle}">${strokes}</span>`;
 
     // Birdie: Circle
-    if (diff === -1) return `<div style="${baseStyle} border: 1px solid #333; border-radius: 50%;">${strokes}</div>`;
+    if (diff === -1) return `<div style="${baseStyle} border: 1px solid var(--pb-primary); border-radius: 50%;">${strokes}</div>`;
 
     // Eagle: Solid circle
-    if (diff === -2) return `<div style="${baseStyle} background: #333; color: #fff; border-radius: 50%;">${strokes}</div>`;
+    if (diff === -2) return `<div style="${baseStyle} background: var(--pb-primary); color: #fff; border-radius: 50%;">${strokes}</div>`;
 
     // Albatross or better: Solid circle with frame
-    if (diff <= -3) return `<div style="display: inline-flex; border: 1px solid #333; padding: 1px; border-radius: 50%; margin: 0 auto;"><div style="${baseStyle} background: #333; color: #fff; border-radius: 50%; width: 22px; height: 22px;">${strokes}</div></div>`;
+    if (diff <= -3) return `<div style="display: inline-flex; border: 1px solid var(--pb-primary); padding: 1px; border-radius: 50%; margin: 0 auto;"><div style="${baseStyle} background: var(--pb-primary); color: #fff; border-radius: 50%; width: 22px; height: 22px;">${strokes}</div></div>`;
 
     // Bogey: Square
-    if (diff === 1) return `<div style="${baseStyle} border: 1px solid #333;">${strokes}</div>`;
+    if (diff === 1) return `<div style="${baseStyle} border: 1px solid var(--pb-primary);">${strokes}</div>`;
 
     // Double bogey: Solid square
-    if (diff === 2) return `<div style="${baseStyle} background: #333; color: #fff;">${strokes}</div>`;
+    if (diff === 2) return `<div style="${baseStyle} background: var(--pb-primary); color: #fff;">${strokes}</div>`;
 
     // Triple bogey or worse: Solid square with frame
-    if (diff >= 3) return `<div style="display: inline-flex; border: 1px solid #333; padding: 1px; margin: 0 auto;"><div style="${baseStyle} background: #333; color: #fff; width: 22px; height: 22px;">${strokes}</div></div>`;
+    if (diff >= 3) return `<div style="display: inline-flex; border: 1px solid var(--pb-primary); padding: 1px; margin: 0 auto;"><div style="${baseStyle} background: var(--pb-primary); color: #fff; width: 22px; height: 22px;">${strokes}</div></div>`;
 
     return String(strokes);
   }
@@ -197,5 +205,9 @@ export class GolfEngine extends ScoringEngine {
 
   getLowScoreLabel() {
     return 'Par';
+  }
+
+  getPlayActionLabel() {
+    return "Let's Golf!";
   }
 }

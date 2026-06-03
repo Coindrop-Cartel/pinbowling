@@ -77,6 +77,10 @@ $dbName = envValue($loadedEnv, ['DB_NAME', 'MYSQL_DATABASE'], 'pinbowling');
 $dbUser = envValue($loadedEnv, ['DB_USER', 'MYSQL_USER'], 'username');
 $dbPass = envValue($loadedEnv, ['DB_PASS', 'MYSQL_PASSWORD'], 'password');
 $dbCharset = 'utf8mb4';
+
+// Asset Configuration
+$stylesDir = 'styles'; // Folder name for CSS files. Set to '' if files are in the root.
+
 $apiSecret = envValue($loadedEnv, ['API_SECRET'], 'bowl-2024-secret');
 // UI_VERSION is used for asset cache-busting. 
 // It is read from version.txt to allow cache-busting updates without touching environment secrets.

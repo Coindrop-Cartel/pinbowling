@@ -66,7 +66,7 @@ export class BowlingEngine extends ScoringEngine {
     if (!isLastRound || !round.values || !round.values[10]) return '';
     const { t1, t2 } = this.getBonusTargets(round, scalingType);
     return `
-      <div style="margin-top: 8px; border-top: 1px dashed #bbb; padding-top: 4px; font-size: 0.8rem; color: #000;">
+      <div style="margin-top: 8px; border-top: 1px dashed var(--pb-primary); padding-top: 4px; font-size: 0.8rem; color: var(--pb-primary);">
         <div><b>Target 1:</b> ${formatFn(t1)}</div>
         <div><b>Target 2:</b> ${formatFn(t2)}</div>
       </div>
@@ -243,6 +243,12 @@ export class BowlingEngine extends ScoringEngine {
     return null;
   }
 
+  getBrandName() { return 'PinBowling'; }
+
+  getThemeClass() { return ''; }
+
+  getLogoImage() { return 'pinbowling.png'; }
+
   getThresholdLabel(rank) {
     const r = Number(rank);
     if (r === 10) return 'High';
@@ -255,4 +261,5 @@ export class BowlingEngine extends ScoringEngine {
   getPrimaryTargetLabel() { return 'Strike'; }
   getHighScoreLabel() { return 'Strike'; }
   getLowScoreLabel() { return '1 Pin'; }
+  getPlayActionLabel() { return "Let's Bowl!"; }
 }

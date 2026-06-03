@@ -1,11 +1,32 @@
+<?php
+// Retrieve site-wide preference from cookie (shared with JS)
+$preferredFormat = $_COOKIE['pb_preferred_format'] ?? 'bowling';
+
+// Data-driven metadata lookup (mirrors JS engine properties)
+$engineMeta = [
+    'bowling' => [
+        'logo'  => 'pinbowling.png',
+        'brand' => 'PinBowling',
+        'cta'   => "Let's Bowl!"
+    ],
+    'golf' => [
+        'logo'  => 'pingolf.png',
+        'brand' => 'PinGolf',
+        'cta'   => "Let's Golf!"
+    ]
+];
+
+$active = $engineMeta[$preferredFormat] ?? $engineMeta['bowling'];
+?>
 <nav class="navbar">
   <div class="nav-container">
     <a href="<?php echo rtrim($baseUrl, '/') . '/'; ?>" class="nav-logo">
-      <img src="<?php echo $baseUrl; ?>/images/logo.png" alt="PinBowling Logo">
-      <span>PinBowling</span>
+      <img src="<?php echo $baseUrl; ?>/images/<?php echo $active['logo']; ?>" alt="<?php echo $active['brand']; ?> Logo">
+      <span><?php echo $active['brand']; ?></span>
     </a>
     <ul class="nav-links">
-      <li class="nav-item"><a href="<?php echo $baseUrl; ?>/play" class="nav-link" data-route="PLAY">Let's Bowl!</a></li>
+      <li class="nav-item"><a href="/" data-route="HOME" class="nav-link">Home</a></li>
+      <li class="nav-item"><a href="<?php echo $baseUrl; ?>/play" class="nav-link" data-route="PLAY"><?php echo $active['cta']; ?></a></li>
       <li class="nav-item dropdown">
         <a href="javascript:void(0)" class="nav-link dropbtn">Leagues</a>
         <div class="dropdown-content">

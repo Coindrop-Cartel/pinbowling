@@ -35,7 +35,7 @@ export async function initPlayPage() {
   // Populate session format dropdown from central list
   if (formatSelect) {
     formatSelect.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
-    formatSelect.value = 'bowling';
+    formatSelect.value = sessionStorage.getItem('pb_preferred_format') || 'bowling';
   }
 
   const updateRoundOptions = () => {
@@ -301,16 +301,16 @@ export async function initPlayPage() {
       const engine = getScoringEngine(currentSessionFormat);
 
       const headerHtml = `
-          <div class="drag-handle" style="cursor: grab; color: #888; padding: 0 4px; font-size: 1.2rem;">☰</div>
+          <div class="drag-handle" style="cursor: grab; color: var(--pb-primary); opacity: 0.5; padding: 0 4px; font-size: 1.2rem;">☰</div>
           <span style="font-weight: bold; min-width: 30px; text-align: center;">${frame.orderNumber}</span>
           <span style="flex: 1; font-weight: bold;" class="machine-name-display">${frame.machineName}</span>
           <div style="display: flex; align-items: center; gap: 10px;" onclick="event.stopPropagation()">
             <div style="display: flex; align-items: center; gap: 4px;">
-              <label style="font-size: 0.7rem; color: #666;">${engine.getHighScoreLabel()}:</label>
+              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8;">${engine.getHighScoreLabel()}:</label>
               <input type="text" class="score10-input" value="${formatNumber(frame.value1)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
             </div>
             <div style="display: flex; align-items: center; gap: 4px;">
-              <label style="font-size: 0.7rem; color: #666;">${engine.getLowScoreLabel()}:</label>
+              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8;">${engine.getLowScoreLabel()}:</label>
               <input type="text" class="score1-input" value="${formatNumber(frame.value2)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
             </div>
           </div>

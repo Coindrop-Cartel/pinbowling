@@ -21,7 +21,7 @@ export async function initStandingsPage() {
   let refreshInterval = null;
   let scrollInterval = null;
 
-  let Engine = getScoringEngine('bowling');
+  let Engine = getScoringEngine();
 
   if (tvBtn) {
     tvBtn.addEventListener('click', toggleTvMode);
@@ -97,7 +97,7 @@ export async function initStandingsPage() {
    */
   const renderLeagueSummary = async (leagueId, leagues) => {
     const league = leagues.find(l => String(l.id) === String(leagueId));
-    const engine = getScoringEngine(league?.scoringFormat || 'bowling');
+    const engine = getScoringEngine(league?.scoringFormat);
     const players = league?.players || [];
     const events = league?.events || [];
 
@@ -195,7 +195,7 @@ export async function initStandingsPage() {
     const league = leagues.find(l => String(l.id) === String(leagueId));
     const event = eventId === 'summary' ? { eventName: 'Season Summary' } : league?.events?.find(e => String(e.id) === String(eventId));
     
-    Engine = getScoringEngine(event?.scoringFormat || league?.scoringFormat || 'bowling');
+    Engine = getScoringEngine(event?.scoringFormat || league?.scoringFormat);
 
     if (tournamentSelectorUI && tournamentSummary) {
       if (league?.type === 'session') {

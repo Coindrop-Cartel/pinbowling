@@ -15,6 +15,7 @@ import { initLeaguesPage } from '@pages/leaguesPage.js';
 import { initPlayPage } from '@pages/playPage.js';
 import { initManagementPage } from '@pages/managementPage.js';
 import { getDebugEnabled } from '@services/state.js';
+import { getScoringEngine } from '@core/engine.js';
 import { initAuthHeader } from '@services/auth.js';
 import { fitTVModeToScreen } from '@ui/uiComponents.js';
 
@@ -27,6 +28,52 @@ import { fitTVModeToScreen } from '@ui/uiComponents.js';
  * for the current view context.
  */
 async function ready() {
+  const getCookie = (name) => {
+    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? match[2] : null;
+  };
+
+  // Handle global theme and format toggle
+  const applyPreferredTheme = () => {
+    const preferred = getCookie('pb_preferred_format') || 'bowling';
+    const engine = getScoringEngine(preferred);
+    
+    // Clear any previous theme classes and apply the current engine's theme
+    document.body.classList.remove('theme-golf');
+    const themeClass = engine.getThemeClass();
+    if (themeClass) document.body.classList.add(themeClass);
+    
+    const logoImg = document.querySelector('.nav-logo img, .header-logo img, .site-logo img, #site-logo');
+    if (logoImg) {
+      const basePath = logoImg.src.substring(0, logoImg.src.lastIndexOf('/') + 1);
+      logoImg.src = basePath + engine.getLogoImage();
+    }
+
+    const logoText = document.querySelector('.nav-logo span');
+    if (logoText) {
+      logoText.textContent = engine.getBrandName();
+    }
+
+    // Update play CTA text based on the active engine
+    const playLink = document.querySelector('[data-route="PLAY"]');
+    if (playLink) {
+      playLink.textContent = engine.getPlayActionLabel();
+    }
+  };
+
+  const logoContainer = document.querySelector('.nav-logo, .header-logo, .site-logo, .logo-link');
+  if (logoContainer) {
+    logoContainer.style.cursor = 'pointer';
+    logoContainer.title = 'Click to toggle site-wide scoring mode';
+    logoContainer.onclick = (e) => {
+      e.preventDefault();
+      const current = getCookie('pb_preferred_format') || 'bowling';
+      const next = current === 'bowling' ? 'golf' : 'bowling';
+      document.cookie = `pb_preferred_format=${next}; path=/; max-age=31536000`; // Persist for 1 year
+      window.location.reload(); 
+    };
+  }
+
   // Restore debug mode from local storage if previously toggled in Management UI
   window.PB_DEBUG_MODE = getDebugEnabled();
 
@@ -37,6 +84,7 @@ async function ready() {
   }
 
   initNavigation('.nav-container'); 
+  applyPreferredTheme();
   await initAuthHeader();
 
   const pageInitializers = {

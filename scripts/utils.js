@@ -194,7 +194,7 @@ export function renderPreview(highScoreInput, lowScoreInput, previewValues, Engi
 export function renderThresholdGrid(values, formatFn = (v) => v, engine = null, value1 = 0, value2 = 0) {
   if (!values || Object.keys(values).length === 0) return '<div class="notice">Enter scores to see thresholds.</div>';
   return `
-    <div class="threshold-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; font-size: 0.75rem; background: #f0f0f0; padding: 8px; border-radius: 4px;">
+    <div class="threshold-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; font-size: 0.75rem; background: var(--pb-gray); padding: 8px; border-radius: 4px;">
       ${Object.entries(values)
         .sort(engine ? engine.getThresholdSort() : (a, b) => Number(b[0]) - Number(a[0]))
         .map(([rank, val]) => {

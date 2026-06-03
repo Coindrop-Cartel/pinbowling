@@ -1,10 +1,17 @@
+<?php
+// Apply theme class server-side to prevent UI flicker
+$preferredFormat = $_COOKIE['pb_preferred_format'] ?? 'bowling';
+$themeStyle = ($preferredFormat === 'golf') ? 'golf.css' : 'bowling.css';
+$mergedBodyClass = trim(($bodyClass ?? '') . ' ' . $themeClass);
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><?php echo isset($pageTitle) ? "PinBowling - $pageTitle" : 'PinBowling'; ?></title>
-  <link rel="stylesheet" href="<?php echo versionedAsset($baseUrl . '/styles.css'); ?>" />
+  <link rel="stylesheet" href="<?php echo versionedAsset($baseUrl . '/styles/styles.css'); ?>" />
+  <link rel="stylesheet" href="<?php echo versionedAsset($baseUrl . '/styles/' . $themeStyle); ?>" />
   <link rel="icon" type="image/png" href="<?php echo versionedAsset($baseUrl . '/images/logo.png'); ?>" />
   <script>
     // Bridge PHP calculated base path to JavaScript
@@ -23,7 +30,7 @@
   }
   </script>
 </head>
-<body class="<?php echo $bodyClass ?? ''; ?>">
+<body class="<?php echo $mergedBodyClass; ?>">
   <?php include __DIR__ . '/header.php'; ?>
 
   <?php echo $pageContent; ?>

@@ -6,8 +6,12 @@ export const SCORING_FORMATS = [
   { value: 'golf', label: 'Golf (Strokes vs Par)' }
 ];
 
-export function getScoringEngine(format = 'bowling') {
-  switch (format) {
+export function getScoringEngine(format = null) {
+  const match = document.cookie.match(new RegExp('(^| )pb_preferred_format=([^;]+)'));
+  const preferred = (match ? match[2] : null) || 'bowling';
+  const activeFormat = format || preferred;
+
+  switch (activeFormat) {
     case 'bowling':
       return new BowlingEngine();
     case 'golf':

@@ -93,7 +93,7 @@ export async function initPlayersPage() {
         li.innerHTML = `
           <div style="flex: 1;">
             <strong>${p.playerName}</strong> 
-            ${p.userRole ? `<span class="badge" style="background:#000; color:#fff; font-size:0.7rem; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle; font-weight: bold;">${p.userRole.toUpperCase()}</span>` : ''}
+            ${p.userRole ? `<span class="badge" style="background:var(--pb-primary); color:#fff; font-size:0.7rem; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle; font-weight: bold;">${p.userRole.toUpperCase()}</span>` : ''}
             <br>
             ${p.ifpaId ? `<small style="margin-right:10px;">IFPA: ${p.ifpaId}</small>` : ''}
             ${p.matchplayId ? `<small>Matchplay: ${p.matchplayId}</small>` : ''}
@@ -201,7 +201,7 @@ export async function initPlayersPage() {
     playerNameInput.value = '';
     ifpaIdInput.value = '';
     matchplayIdInput.value = '';
-    if (scoringFormatInput) scoringFormatInput.value = 'bowling';
+    if (scoringFormatInput) scoringFormatInput.value = sessionStorage.getItem('pb_preferred_format') || 'bowling';
     if (playerFormTitle) playerFormTitle.textContent = 'Add New Player';
     savePlayerButton.textContent = 'Save Player';
     cancelEditButton.classList.add('hidden');
