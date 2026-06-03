@@ -610,6 +610,16 @@ export async function initTournamentSelector(container, { onRefresh, typeFilter 
 }
 
 /**
+ * Returns a stylized badge HTML string for a scoring format.
+ */
+export function getFormatBadgeHtml(format) {
+  if (!format) return '';
+  const color = format === 'golf' ? 'var(--pb-primary)' : '#666';
+  const label = format === 'golf' ? 'Golf' : 'Bowling';
+  return `<span class="badge" style="background:${color}; color:#fff; font-size:0.65rem; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle; font-weight: bold; text-transform: uppercase; border: none;">${label}</span>`;
+}
+
+/**
  * Creates a standardized expandable row component.
  * @param {HTMLElement} container - The parent element to append to.
  * @param {Object} options - Configuration options.
@@ -624,7 +634,8 @@ export function createExpandableRow(container, options) {
     onHeaderClick, 
     draggable = false, 
     className = '', 
-    tag = 'div' 
+    tag = 'div',
+    format = null
   } = options;
 
   const row = document.createElement(tag);
@@ -637,6 +648,7 @@ export function createExpandableRow(container, options) {
   row.innerHTML = `
     <div class="row-header" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #f9f9f9; cursor: pointer;">
       ${headerHtml}
+      ${getFormatBadgeHtml(format)}
     </div>
     ${contentHtml ? `
     <div class="row-expansion ${isExpanded ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd;">

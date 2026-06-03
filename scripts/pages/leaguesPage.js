@@ -1,6 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { SCORING_FORMATS } from '@core/engine.js';
-import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog } from '@ui/uiComponents.js';
+import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog, getFormatBadgeHtml } from '@ui/uiComponents.js';
 import { setActiveLeagueId, setActiveEventId, getActiveLeagueId, getCookie } from '@scripts/utils.js';
 import { requireAdmin, runAuthorizedLeagueAction, isManagementAuthorized } from '@services/auth.js';
 import { navigateTo } from '@scripts/utils.js';
@@ -100,7 +100,7 @@ export async function initLeaguesPage() {
           <div class="league-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 6px 12px; background: #f9f9f9;">
             <div>
               <h3 style="margin: 0; font-size: 1.05rem;">${league.name}</h3>
-              <small>Started: ${league.startDate || 'N/A'} | Format: ${league.scoringFormat || 'bowling'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
+              <small>Started: ${league.startDate || 'N/A'} | ${getFormatBadgeHtml(league.scoringFormat)} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
             </div>
             <div style="display: flex; gap: 8px;">
               ${isAuthorized ? '<button class="delete-league-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>' : ''}
@@ -243,8 +243,11 @@ export async function initLeaguesPage() {
     const eventsListEl = card.querySelector('.league-events-list');
 
     eventsListEl.innerHTML = (leagueEvents || []).map(e => `
-      <li style="display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
-        <span>${e.eventName} <small>(${e.eventDate || 'No Date'}) [${e.scoringFormat || 'bowling'}]</small></span>
+      <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>${e.eventName} <small>(${e.eventDate || 'No Date'})</small></span>
+          ${getFormatBadgeHtml(e.scoringFormat)}
+        </div>
         <div style="display: flex; gap: 4px;">
           ${isAuthorized ? `<button class="setup-event-btn secondary" data-league-id="${leagueId}" data-event-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Setup</button>` : ''}
           ${isAuthorized ? `<button class="edit-event-btn secondary" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>` : ''}

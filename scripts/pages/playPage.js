@@ -30,7 +30,7 @@ export async function initPlayPage() {
   const sessionsCard = document.getElementById('qp-sessions-card');
   let allPlayersCache = [];
   let todayEvents = [];
-  let currentSessionFormat = 'bowling';
+  let currentSessionFormat = getCookie('pb_preferred_format') || 'bowling';
 
   // Populate session format dropdown from central list
   if (formatSelect) {
@@ -44,6 +44,7 @@ export async function initPlayPage() {
     const roundLabel = engine.getRoundLabel();
     const counts = engine.getRoundCountOptions();
 
+    renderExistingSessions();
     const label = document.querySelector('label[for="qp-frames"]');
     if (label) label.textContent = `Number of ${roundLabel}s`;
 
@@ -65,7 +66,8 @@ export async function initPlayPage() {
     sessionLeagues.forEach(league => {
       const matches = (league.events || []).filter(e => e.eventDate === today);
       matches.forEach(event => {
-        todayEvents.push({ ...event, leagueId: league.id, roster: league.players || [] });
+        const format = event.scoringFormat || league.scoringFormat || 'bowling';
+        todayEvents.push({ ...event, leagueId: league.id, roster: league.players || [], scoringFormat: format });
       });
     });
 
@@ -74,13 +76,15 @@ export async function initPlayPage() {
 
   function renderExistingSessions() {
     if (!sessionsList) return;
+    sessionsList.innerHTML = ''; // Clear previous results before re-rendering
     const nameQuery = nameInput.value.toLowerCase().trim();
     const locQuery = Number(locSelect.value);
 
     const filtered = todayEvents.filter(e => {
       const matchesName = !nameQuery || e.eventName.toLowerCase().includes(nameQuery);
       const matchesLoc = !locQuery || Number(e.locationId) === locQuery;
-      return matchesName && matchesLoc;
+      const matchesFormat = e.scoringFormat === currentSessionFormat;
+      return matchesName && matchesLoc && matchesFormat;
     });
 
     if (filtered.length === 0) {
@@ -91,6 +95,7 @@ export async function initPlayPage() {
     filtered.forEach(event => {
       const row = createExpandableRow(sessionsList, {
         id: event.id,
+        format: event.scoringFormat,
         className: 'session-item',
         headerHtml: `
           <div style="flex: 1;"><strong>${event.eventName}</strong><br><small>${event.locationName || 'No Location'} | ${event.eventDate}</small></div>
