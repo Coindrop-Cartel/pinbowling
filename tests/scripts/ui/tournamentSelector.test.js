@@ -62,6 +62,19 @@ describe('Tournament Selector Component (tournamentSelector.js)', () => {
     expect(leagueSelect.innerHTML).not.toContain('Quick Play Sessions');
   });
 
+  it('should resolve the league ID automatically if an event ID is provided', async () => {
+    // Scenario: User bookmarks a specific event page
+    Utils.getActiveLeagueId.mockReturnValue('');
+    Utils.getActiveEventId.mockReturnValue('101');
+
+    await initTournamentSelector();
+
+    // League 1 contains Event 101, so it should be resolved
+    expect(Utils.setActiveLeagueId).toHaveBeenCalledWith('1');
+    const leagueSelect = document.getElementById('league-select-global');
+    expect(leagueSelect.value).toBe('1');
+  });
+
   it('should update global state and populate events when a league is selected', async () => {
     await initTournamentSelector();
     

@@ -22,6 +22,8 @@ vi.hoisted(() => {
 vi.mock('@services/api.js', () => ({
   PB_API: {
     getLeagues: vi.fn(),
+    login: vi.fn(),
+    register: vi.fn(),
   },
 }));
 
@@ -32,7 +34,7 @@ vi.mock('@scripts/utils.js', () => ({
   setActiveEventId: vi.fn(),
 }));
 
-import { createSearchableSelect, initReadOnlyTournamentDisplay, showDialog, showConfirm, showPrompt, showPlayerSelectionDialog, initTournamentSelector, setupLiveFilter, renderThresholdGrid } from '@ui/uiComponents.js';
+import { createSearchableSelect, initReadOnlyTournamentDisplay, showDialog, showConfirm, showPrompt, showPlayerSelectionDialog, initTournamentSelector, setupLiveFilter, renderThresholdGrid, showChoiceDialog, showAuthDialog, fitTVModeToScreen, createExpandableRow, setupSortableList } from '@ui/uiComponents.js';
 import { PB_API } from '@services/api.js';
 import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId } from '@scripts/utils.js';
 
