@@ -249,6 +249,10 @@ export class BowlingEngine extends ScoringEngine {
 
   getLogoImage() { return 'pinbowling.png'; }
 
+  getScoringDescription() {
+    return "Each machine has target scores corresponding to pin counts. Reaching the target on ball 1 is a strike (X). Reaching it on ball 2 is a 9-count spare (9/). Reaching it on ball 3 is a spare based on your cumulative progress from balls 1 & 2 (capped at 8/). Total scores are calculated following standard bowling rules, including strike and spare bonuses from subsequent frames.";
+  }
+
   getThresholdLabel(rank) {
     const r = Number(rank);
     if (r === 10) return 'High';

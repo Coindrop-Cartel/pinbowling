@@ -24,6 +24,6 @@
 
   <section class="card">
     <h2>Scoring Logic</h2>
-    <p><?php echo $active['logic']; ?></p>
+    <p id="scoring-logic-text"><?php echo $active['logic']; ?></p>
   </section>
 </main>

@@ -29,6 +29,7 @@ vi.mock('@scripts/utils.js', () => ({
   formatNumber: vi.fn(n => n?.toLocaleString() || '0'),
   applyScoreFormatting: vi.fn(),
   renderThresholdGrid: vi.fn(() => 'Grid'),
+  getCookie: vi.fn(() => 'bowling'),
 }));
 
 vi.mock('@ui/uiComponents.js', () => ({

@@ -45,7 +45,8 @@ vi.mock('@ui/uiComponents.js', () => ({
   showConfirm: vi.fn(),
   showPrompt: vi.fn(),
   showPlayerSelectionDialog: vi.fn(),
-  showAlert: vi.fn()
+  showAlert: vi.fn(),
+  getFormatBadgeHtml: vi.fn((f) => `<span>${f || 'bowling'}</span>`),
 }));
 
 import { initLeaguesPage } from '@scripts/pages/leaguesPage.js';

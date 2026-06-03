@@ -8,13 +8,21 @@ $mergedBodyClass = trim(($bodyClass ?? '') . ' ' . $themeClass);
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title><?php echo isset($pageTitle) ? "PinBowling - $pageTitle" : 'PinBowling'; ?></title>
+  <title>
+    <?php 
+      if (isset($pageTitle) && $pageTitle === 'Home') {
+        echo "$siteBrand - $siteSlogan";
+      } else {
+        echo $siteBrand . (isset($pageTitle) ? " - $pageTitle" : "");
+      }
+    ?>
+  </title>
   <?php 
     $cssBase = $baseUrl . '/' . trim($stylesDir, '/');
     $cssBase = str_replace('//', '/', $cssBase); 
   ?>
   <link rel="stylesheet" href="<?php echo versionedAsset($cssBase . '/styles.css'); ?>" />
-  <link rel="stylesheet" href="<?php echo versionedAsset($cssBase . '/' . $themeStyle); ?>" />
+  <link id="theme-stylesheet" rel="stylesheet" href="<?php echo versionedAsset($cssBase . '/' . $themeStyle); ?>" />
   <link rel="icon" type="image/png" href="<?php echo versionedAsset($baseUrl . '/images/' . $active['logo']); ?>" />
   <script>
     // Bridge PHP calculated base path to JavaScript

@@ -105,13 +105,11 @@ $aboutProject = "This system bridges the gap between competitive pinball and tra
 $engineMeta = [
     'bowling' => [
         'logo'  => 'pinbowling.png',
-        'brand' => 'PinBowling',
         'cta'   => "Let's Bowl!",
         'logic' => "Each machine has target scores corresponding to pin counts. Reaching the target on ball 1 is a strike (X). Reaching it on ball 2 is a 9-count spare (9/). Reaching it on ball 3 is a spare based on your cumulative progress from balls 1 & 2 (capped at 8/). Total scores are calculated following standard bowling rules, including strike and spare bonuses from subsequent frames."
     ],
     'golf' => [
         'logo'  => 'pingolf.png',
-        'brand' => 'PinGolf',
         'cta'   => "Let's Golf!",
         'logic' => "Strokes 1, 2, or 3 are awarded based on which ball reached the Target Score. If the target is not met within three balls, a score of 4-10 is assigned based on the final cumulative score relative to interpolated thresholds."
     ]

@@ -11,6 +11,13 @@ export class ScoringEngine {
   }
 
   /**
+   * Returns the descriptive scoring logic text for the homepage.
+   */
+  getScoringDescription() {
+    return '';
+  }
+
+  /**
    * Returns the CSS class applied to the body for theme overrides.
    */
   getThemeClass() {

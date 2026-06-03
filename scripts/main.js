@@ -16,6 +16,7 @@ import { initPlayPage } from '@pages/playPage.js';
 import { initManagementPage } from '@pages/managementPage.js';
 import { getDebugEnabled } from '@services/state.js';
 import { getScoringEngine } from '@core/engine.js';
+import { getCookie } from '@scripts/utils.js';
 import { initAuthHeader } from '@services/auth.js';
 import { fitTVModeToScreen } from '@ui/uiComponents.js';
 
@@ -28,18 +29,21 @@ import { fitTVModeToScreen } from '@ui/uiComponents.js';
  * for the current view context.
  */
 async function ready() {
-  const getCookie = (name) => {
-    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return match ? match[2] : null;
-  };
-
   // Handle global theme and format toggle
   const applyPreferredTheme = () => {
     const preferred = getCookie('pb_preferred_format') || 'bowling';
     const engine = getScoringEngine(preferred);
-    
+
+    // Dynamically swap the theme stylesheet to change colors instantly
+    const themeLink = document.getElementById('theme-stylesheet');
+    if (themeLink) {
+      const currentHref = themeLink.getAttribute('href');
+      const basePath = currentHref.substring(0, currentHref.lastIndexOf('/') + 1);
+      themeLink.setAttribute('href', basePath + (preferred === 'golf' ? 'golf.css' : 'bowling.css'));
+    }
+
     // Clear any previous theme classes and apply the current engine's theme
-    document.body.classList.remove('theme-golf');
+    document.body.classList.remove('theme-golf', 'theme-bowling');
     const themeClass = engine.getThemeClass();
     if (themeClass) document.body.classList.add(themeClass);
     
@@ -51,16 +55,20 @@ async function ready() {
       img.alt = engine.getBrandName() + ' Logo';
     });
 
-    // Update both the nav logo text and the hero section brand name
-    const logoText = document.querySelector('.nav-logo span, .hero-brand-name');
-    if (logoText) {
-      logoText.textContent = engine.getBrandName();
-    }
+    // Update the navigation brand name label
+    document.querySelectorAll('.nav-logo span').forEach(el => {
+      el.textContent = engine.getBrandName();
+    });
 
-    // Update play CTA text based on the active engine
-    const playLink = document.querySelector('[data-route="PLAY"]');
-    if (playLink) {
-      playLink.textContent = engine.getPlayActionLabel();
+    // Update all play CTA links (nav and home button)
+    document.querySelectorAll('[data-route="PLAY"]').forEach(link => {
+      link.textContent = engine.getPlayActionLabel();
+    });
+
+    // Update homepage descriptive text
+    const logicText = document.getElementById('scoring-logic-text');
+    if (logicText) {
+      logicText.textContent = engine.getScoringDescription();
     }
   };
 
@@ -73,7 +81,14 @@ async function ready() {
       const current = getCookie('pb_preferred_format') || 'bowling';
       const next = current === 'bowling' ? 'golf' : 'bowling';
       document.cookie = `pb_preferred_format=${next}; path=/; max-age=31536000`; // Persist for 1 year
-      window.location.reload(); 
+      
+      applyPreferredTheme();
+
+      // We only reload if we are NOT on the homepage. Other pages (like Setup) 
+      // have internal logic tied to the engine that requires a fresh init.
+      if (!document.getElementById('scoring-logic-text')) {
+        window.location.reload(); 
+      }
     };
   }
 
@@ -99,7 +114,11 @@ async function ready() {
 
   initNavigation('.nav-container'); 
   applyPreferredTheme();
-  await initAuthHeader();
+
+  // Optimization: Do NOT await the auth header. It populates navigation elements 
+  // (like the username) but it should not block the main page logic from 
+  // loading leagues, machines, or scores.
+  initAuthHeader();
 
   const pageInitializers = {
     'machine-form': initMachinesPage,
