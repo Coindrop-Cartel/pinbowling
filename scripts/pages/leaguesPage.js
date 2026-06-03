@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { SCORING_FORMATS } from '@core/engine.js';
 import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog } from '@ui/uiComponents.js';
-import { setActiveLeagueId, setActiveEventId, getActiveLeagueId } from '@scripts/utils.js';
+import { setActiveLeagueId, setActiveEventId, getActiveLeagueId, getCookie } from '@scripts/utils.js';
 import { requireAdmin, runAuthorizedLeagueAction, isManagementAuthorized } from '@services/auth.js';
 import { navigateTo } from '@scripts/utils.js';
 import { ROUTES } from '@scripts/routes.js';
@@ -28,10 +28,13 @@ export async function initLeaguesPage() {
   const eventFormCard = document.getElementById('event-form-card');
   let allPlayersCache = []; // Cache all players for selection dialogs
 
+  const preferredFormat = getCookie('pb_preferred_format') || 'bowling';
+
   // Populate scoring format dropdowns from centralized list
   [leagueFormatInput, eventFormatInput].forEach(select => {
     if (select) {
       select.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
+      select.value = preferredFormat;
     }
   });
 

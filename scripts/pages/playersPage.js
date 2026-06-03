@@ -1,5 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { SCORING_FORMATS } from '@core/engine.js';
+import { getCookie } from '@scripts/utils.js';
 import { setupLiveFilter, showConfirm, showPrompt, showChoiceDialog, showAlert } from '@ui/uiComponents.js';
 import { requireAdmin } from '@services/auth.js';
 
@@ -30,6 +31,7 @@ export async function initPlayersPage() {
   // Populate format dropdown from centralized list
   if (scoringFormatInput) {
     scoringFormatInput.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
+    scoringFormatInput.value = getCookie('pb_preferred_format') || 'bowling';
   }
 
   const playerList = document.getElementById('player-list');
@@ -201,7 +203,7 @@ export async function initPlayersPage() {
     playerNameInput.value = '';
     ifpaIdInput.value = '';
     matchplayIdInput.value = '';
-    if (scoringFormatInput) scoringFormatInput.value = sessionStorage.getItem('pb_preferred_format') || 'bowling';
+    if (scoringFormatInput) scoringFormatInput.value = getCookie('pb_preferred_format') || 'bowling';
     if (playerFormTitle) playerFormTitle.textContent = 'Add New Player';
     savePlayerButton.textContent = 'Save Player';
     cancelEditButton.classList.add('hidden');

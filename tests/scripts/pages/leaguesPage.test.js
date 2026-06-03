@@ -22,16 +22,21 @@ vi.mock('@services/auth.js', () => ({
   runAuthorizedLeagueAction: vi.fn((id, cb) => cb())
 }));
 
-vi.mock('@scripts/utils.js', () => ({
-  setActiveLeagueId: vi.fn(),
-  setActiveEventId: vi.fn(),
-  getActiveLeagueId: vi.fn(),
-  navigateTo: vi.fn(),
-  ROUTES: {
-    HOME: '/',
-    LEAGUE_SETUP: (o) => `/setup?l=${o.leagueId}&e=${o.eventId}`
-  }
-}));
+vi.mock('@scripts/utils.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    setActiveLeagueId: vi.fn(),
+    setActiveEventId: vi.fn(),
+    getActiveLeagueId: vi.fn(),
+    navigateTo: vi.fn(),
+    getCookie: vi.fn(() => 'bowling'), // Mock getCookie to return a default value for tests
+    ROUTES: {
+      HOME: '/',
+      LEAGUE_SETUP: (o) => `/setup?l=${o.leagueId}&e=${o.eventId}`
+    }
+  };
+});
 
 vi.mock('@ui/uiComponents.js', () => ({
   setupLiveFilter: vi.fn((input, data, options) => ({

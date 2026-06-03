@@ -18,6 +18,15 @@ function getUrlParam(key) {
   return new URLSearchParams(window.location.search).get(key);
 }
 
+/**
+ * Helper to retrieve a cookie value by name.
+ * @param {string} name 
+ */
+export function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? match[2] : null;
+}
+
 function setUrlParam(key, value) {
   const url = new URL(window.location);
   if (value) url.searchParams.set(key, value);

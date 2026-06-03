@@ -1,6 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
-import { formatNumber, applyScoreFormatting, renderThresholdGrid } from '@scripts/utils.js';
+import { formatNumber, applyScoreFormatting, renderThresholdGrid, getCookie } from '@scripts/utils.js';
 import { 
   createSearchableSelect, 
   showPlayerSelectionDialog, 
@@ -35,7 +35,7 @@ export async function initPlayPage() {
   // Populate session format dropdown from central list
   if (formatSelect) {
     formatSelect.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
-    formatSelect.value = sessionStorage.getItem('pb_preferred_format') || 'bowling';
+    formatSelect.value = getCookie('pb_preferred_format') || 'bowling';
   }
 
   const updateRoundOptions = () => {
