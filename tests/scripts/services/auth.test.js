@@ -7,8 +7,6 @@ import * as UI from '@ui/uiComponents.js';
 vi.mock('@services/state.js', () => ({
   getAdminSessionPassword: vi.fn(),
   setAdminSessionPassword: vi.fn(),
-  getLeaguePassword: vi.fn(),
-  setLeaguePassword: vi.fn(),
 }));
 
 vi.mock('@ui/uiComponents.js', () => ({
@@ -72,41 +70,6 @@ describe('Authorization Helpers (auth.js)', () => {
       const result = await runAuthorizedLeagueAction(1, action);
       expect(result).toBe(true);
       expect(action).toHaveBeenCalled();
-    });
-
-    it('should prompt for password if none found', async () => {
-      State.getAdminSessionPassword.mockReturnValue(null);
-      State.getLeaguePassword.mockReturnValue(null);
-      UI.showPrompt.mockResolvedValue('league-pass');
-      
-      const action = vi.fn();
-      const result = await runAuthorizedLeagueAction(5, action);
-      
-      expect(result).toBe(true);
-      expect(UI.showPrompt).toHaveBeenCalled();
-      expect(State.setLeaguePassword).toHaveBeenCalledWith(5, 'league-pass');
-      expect(action).toHaveBeenCalled();
-    });
-
-    it('should allow admin password in the league prompt', async () => {
-        State.getAdminSessionPassword.mockReturnValue(null);
-        UI.showPrompt.mockResolvedValue('admin-secret');
-        
-        const result = await runAuthorizedLeagueAction(5, vi.fn());
-        expect(result).toBe(true);
-        expect(State.setAdminSessionPassword).toHaveBeenCalledWith('admin-secret');
-    });
-
-    it('should clear passwords and alert if action returns 401 Unauthorized', async () => {
-      State.getLeaguePassword.mockReturnValue('stored-pass');
-      const action = vi.fn().mockRejectedValue(new Error('Unauthorized access'));
-      
-      const result = await runAuthorizedLeagueAction(1, action);
-      
-      expect(result).toBe(false);
-      expect(State.setLeaguePassword).toHaveBeenCalledWith(1, null);
-      expect(State.setAdminSessionPassword).toHaveBeenCalledWith(null);
-      expect(UI.showAlert).toHaveBeenCalledWith('The password provided was invalid for both this league and the global administrator.', 'Unauthorized');
     });
 
     it('should re-throw non-authorization errors', async () => {

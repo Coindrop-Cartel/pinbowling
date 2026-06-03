@@ -397,7 +397,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $methodOverride) {
 // Set global CORS headers to prevent NetworkErrors during preflighted requests (DELETE, PUT, etc.)
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-PB-SECRET, X-LEAGUE-PASSWORD, X-HTTP-Method-Override');
+header('Access-Control-Allow-Headers: Content-Type, X-PB-SECRET, X-HTTP-Method-Override');
 
 // Handle CORS preflight requests globally. This is required because custom 
 // headers like X-PB-SECRET trigger an OPTIONS request for ALL method types.

@@ -174,30 +174,6 @@ describe('API Client (api.js)', () => {
       expect(callArgs.body).toBe(JSON.stringify({}));
     });
 
-    it('should include X-LEAGUE-PASSWORD if leagueId is in query params', async () => {
-      setLeaguePassword(5, 'league-access-code');
-      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-
-      await fetchJSON('service/scoreService.php?leagueId=5');
-
-      const headers = fetch.mock.calls[0][1].headers;
-      expect(headers['X-LEAGUE-PASSWORD']).toBe('league-access-code');
-    });
-
-    it('should include X-LEAGUE-PASSWORD if league_id is in request body', async () => {
-      setLeaguePassword(7, 'body-secret');
-      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-
-      await fetchJSON('service/scoreService.php', { 
-        method: 'POST', 
-        body: JSON.stringify({ leagueId: 7, other: 'data' }) 
-      });
-
-      const headers = fetch.mock.calls[0][1].headers;
-      expect(headers['X-LEAGUE-PASSWORD']).toBe('body-secret');
-    });
-  });
-
   describe('PB_API Helper Methods', () => {
     it('getScores should return an empty array if no event or league ID is provided', async () => {
       const result = await PB_API.getScores();

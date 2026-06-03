@@ -28,7 +28,7 @@ Key endpoints include:
 
 ## Security
 
-Write operations are protected by an `X-PB-SECRET` header. League-specific actions can also be protected by a league password provided via the `X-LEAGUE-PASSWORD` header.
+Write operations are protected by an `X-PB-SECRET` header.
 
 ## Setup
 

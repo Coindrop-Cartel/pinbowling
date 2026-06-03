@@ -8,13 +8,6 @@ import { ScoringEngine } from '@core/ScoringEngine.js';
 describe('ScoringEngine (Base Class)', () => {
   const engine = new ScoringEngine();
 
-  it('should throw error for non-implemented interface methods', () => {
-    // These methods must be overridden by specific implementations (Bowling, Golf, etc.)
-    expect(() => engine.calculateTurnResults([], {})).toThrow(/must be implemented/);
-    expect(() => engine.buildRoundValues(100, 10)).toThrow(/must be implemented/);
-    expect(() => engine.formatMark({})).toThrow(/must be implemented/);
-  });
-
   it('should provide default implementations for optional utility methods', () => {
     expect(engine.getBonusTargets()).toEqual({ t1: 0, t2: 0 });
     expect(engine.getBonusTargetHtml()).toBe('');

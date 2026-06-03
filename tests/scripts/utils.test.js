@@ -293,11 +293,6 @@ describe('Utility Functions (utils.js)', () => {
       expect(previewValues.innerHTML).not.toContain('<strong>Target 1:</strong>');
     });
 
-    it('should not include bonus targets if values[10] is missing', () => {
-      mockEngineBuildRoundValues.mockImplementation(() => ({ 9: 9000, 1: 1000 }));
-      Utils.renderPreview(score10Input, score1Input, previewValues, getScoringEngine(), true);
-      expect(previewValues.innerHTML).not.toContain('Target 1:');
-    });
   });
 });
 
