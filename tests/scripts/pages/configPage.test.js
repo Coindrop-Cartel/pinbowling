@@ -35,7 +35,12 @@ vi.mock('@services/auth.js', () => ({
 }));
 
 vi.mock('@ui/uiComponents.js', () => ({
-  createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() })),
+  createSearchableSelect: vi.fn((input, select, data, options) => {
+    if (options.onSelect) {
+      input.addEventListener('input', () => options.onSelect(input.value));
+    }
+    return { updateOptions: vi.fn() };
+  }),
   showPrompt: vi.fn(),
   showAlert: vi.fn(),
   initReadOnlyTournamentDisplay: vi.fn(async (container, onRefresh) => {
@@ -164,5 +169,72 @@ describe('Config Page (configPage.js)', () => {
     await vi.waitFor(() => {
       expect(PB_API.saveTargetScore).toHaveBeenCalled();
     });
+  });
+
+  it('should populate inputs when Quick Fill buttons are clicked', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.getLeagues.mockResolvedValue([{ 
+      id: 1, 
+      name: 'L1', 
+      events: [{ id: 101, locationId: 5 }] 
+    }]);
+    getActiveLeagueId.mockReturnValue('1');
+    getActiveEventId.mockReturnValue('101');
+    // Mock machine data that includes templates
+    PB_API.getMachines.mockResolvedValue([]);
+    PB_API.getLocationMachines.mockResolvedValue([{ 
+      machineId: 1, 
+      machineName: 'M1', 
+      targetEasy: 500, 
+      targetMed: 1000, 
+      targetHard: 2000 
+    }]);
+
+    await initConfigPage();
+    
+    // Select the machine to enable Quick Fill buttons
+    const nameInput = document.getElementById('machine-name');
+    nameInput.value = 'M1';
+    nameInput.dispatchEvent(new Event('input'));
+
+    const btnMed = document.getElementById('fill-med');
+    btnMed.click();
+
+    expect(document.getElementById('value-10').value).toBe('1,000');
+  });
+
+  it('should toggle scaling mode between curved and flat', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    await initConfigPage();
+
+    const btnFlat = document.getElementById('scaling-flat');
+    const btnCurved = document.getElementById('scaling-curved');
+
+    btnFlat.click();
+    expect(btnFlat.classList.contains('btn-standard')).toBe(true);
+    expect(btnCurved.classList.contains('secondary')).toBe(true);
+
+    btnCurved.click();
+    expect(btnCurved.classList.contains('btn-standard')).toBe(true);
+    expect(btnFlat.classList.contains('secondary')).toBe(true);
+  });
+
+  it('should reset the form and hide the config card on cancel', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    await initConfigPage();
+
+    // Open card
+    document.getElementById('add-target-btn').click();
+    const configCard = document.getElementById('config-card');
+    expect(configCard.classList.contains('hidden')).toBe(false);
+
+    // Fill some data
+    document.getElementById('machine-name').value = 'Test';
+    
+    // Cancel
+    document.getElementById('cancel-config-btn').click();
+
+    expect(configCard.classList.contains('hidden')).toBe(true);
+    expect(document.getElementById('machine-name').value).toBe('');
   });
 });

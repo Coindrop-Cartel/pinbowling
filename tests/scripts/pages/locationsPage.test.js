@@ -35,7 +35,7 @@ import { initLocationsPage } from '@scripts/pages/locationsPage.js';
 import { PB_API } from '@services/api.js';
 import { isManagementAuthorized } from '@services/auth.js';
 import { navigateTo } from '@scripts/utils.js';
-import { showAlert } from '@ui/uiComponents.js';
+import { showAlert, showConfirm } from '@ui/uiComponents.js';
 
 describe('Locations Page (locationsPage.js)', () => {
   beforeEach(() => {
@@ -109,5 +109,64 @@ describe('Locations Page (locationsPage.js)', () => {
     expect(PB_API.createLocation).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Pinball Wizard'
     }));
+  });
+
+  it('should populate the form when editing an existing location', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const mockLoc = { id: 1, name: 'The Sanctum', city: 'Meriden', state: 'CT', machines: [] };
+    PB_API.getLocations.mockResolvedValue([mockLoc]);
+
+    await initLocationsPage();
+
+    const editBtn = document.querySelector('.edit-loc-btn');
+    editBtn.click();
+
+    expect(document.getElementById('location-name').value).toBe('The Sanctum');
+    expect(document.getElementById('editing-location-id').value).toBe('1');
+    expect(document.getElementById('save-location-button').textContent).toBe('Update Location');
+  });
+
+  it('should open machine form and allow adding a machine to a venue', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const mockLoc = { id: 1, name: 'L1', machines: [] };
+    PB_API.getLocations.mockResolvedValue([mockLoc]);
+    PB_API.getMachines.mockResolvedValue([{ id: 10, machineName: 'M1' }]);
+
+    await initLocationsPage();
+
+    // Expand location to see add button
+    document.querySelector('.location-header').click();
+    
+    const addMachBtn = document.querySelector('.add-mach-btn');
+    addMachBtn.click();
+
+    // Wait for async machine fetch and render
+    await vi.waitFor(() => {
+      expect(document.getElementById('loc-mach-select')).not.toBeNull();
+    });
+
+    const select = document.getElementById('loc-mach-select');
+    select.value = '10';
+    document.getElementById('target-med').value = '1,000';
+    
+    const saveBtn = document.getElementById('save-loc-mach');
+    saveBtn.click();
+
+    await vi.waitFor(() => {
+      expect(PB_API.addLocationMachine).toHaveBeenCalledWith(1, '10', expect.objectContaining({
+        targetMed: 1000
+      }));
+    });
+  });
+
+  it('should call delete API when global deleteLocation is triggered', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.getLocations.mockResolvedValue([{ id: 1, name: 'L1' }]);
+    showConfirm.mockResolvedValue(true);
+
+    await initLocationsPage();
+    await window.deleteLocation(1);
+
+    expect(PB_API.deleteLocation).toHaveBeenCalledWith(1);
   });
 });
