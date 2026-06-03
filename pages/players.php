@@ -20,6 +20,10 @@
           <label for="matchplay-id">Matchplay ID (Optional)</label>
           <input id="matchplay-id" type="text" placeholder="e.g., 67890" />
         </div>
+        <div id="player-format-row" class="form-row hidden">
+          <label for="player-scoring-format">Preferred Scoring Format</label>
+          <select id="player-scoring-format" style="width: 100%; box-sizing: border-box;"></select>
+        </div>
         <div id="player-form-actions" class="form-actions hidden">
           <button type="submit" id="save-player-button">Save Player</button>
           <button type="button" id="cancel-edit-button" class="secondary hidden">Cancel Edit</button>

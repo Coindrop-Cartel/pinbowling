@@ -87,6 +87,39 @@ export class ScoringEngine {
   }
 
   /**
+   * Returns a comparator for sorting players by their total score.
+   * Default: Descending (Higher is better).
+   */
+  compareTotals(a, b) {
+    return b - a;
+  }
+
+  /**
+   * Returns the label for the final aggregate column.
+   * @param {number} anchorValue - Typically the total Par or baseline score.
+   */
+  getTotalColumnLabel(anchorValue) {
+    return 'Total';
+  }
+
+  /**
+   * Formats the final aggregate score for display.
+   * @param {number} total - The player's total cumulative score.
+   * @param {number} anchorValue - The total Par or baseline for the event.
+   * @param {Function} formatFn - Standard number formatter.
+   */
+  formatTotalScore(total, anchorValue, formatFn) {
+    return formatFn(total);
+  }
+
+  /**
+   * Determines if individual round points should be shown in the table cell.
+   */
+  shouldShowRoundScore() {
+    return true;
+  }
+
+  /**
    * Interface method: Must be implemented by subclasses to calculate results.
    */
   calculateTurnResults(machines, scoreMap) {

@@ -112,6 +112,11 @@ export async function initStandingsPage() {
       return acc;
     }, {});
 
+    const leagueTotalPar = events.reduce((sum, e) => {
+      const evTargets = targetsByEvent[e.id] || [];
+      return sum + evTargets.reduce((s, t) => s + Number(t.value2 || 0), 0);
+    }, 0);
+
     const scoresByEventAndPlayer = allLeagueScores.reduce((acc, s) => {
       if (!acc[s.eventId]) acc[s.eventId] = {};
       if (!acc[s.eventId][s.playerId]) acc[s.eventId][s.playerId] = [];
@@ -136,30 +141,26 @@ export async function initStandingsPage() {
         } else { eventTotals[event.id] = null; }
       });
       return { player, eventTotals, totalSeasonPoints };
-    }).sort((a, b) => {
-      const isGolf = engine.getRoundLabel() === 'Hole';
-      if (isGolf) {
-        if (a.totalSeasonPoints === 0) return 1;
-        if (b.totalSeasonPoints === 0) return -1;
-        return a.totalSeasonPoints - b.totalSeasonPoints;
-      }
-      return b.totalSeasonPoints - a.totalSeasonPoints;
-    });
+    }).sort((a, b) => engine.compareTotals(a.totalSeasonPoints, b.totalSeasonPoints));
 
     if (tvTitle) {
       const league = leagues.find(l => String(l.id) === String(leagueId));
       tvTitle.textContent = `${league?.name || 'League'} - Season Summary`;
     }
 
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${events.map(e => `<th>${e.eventName}</th>`).join('')}<th>Total</th></tr>`;
-    if (standingsBody) standingsBody.innerHTML = rows.map((row, idx) => `
+    const totalColLabel = engine.getTotalColumnLabel(leagueTotalPar);
+
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${events.map(e => `<th>${e.eventName}</th>`).join('')}<th>${totalColLabel}</th></tr>`;
+    if (standingsBody) standingsBody.innerHTML = rows.map((row, idx) => {
+      const displayTotal = engine.formatTotalScore(row.totalSeasonPoints, leagueTotalPar, formatNumber);
+      return `
       <tr>
         <td style="text-align: center;">${idx + 1}</td>
         <td class="player-name-cell"></td>
         ${events.map(e => `<td>${row.eventTotals[e.id] !== null ? formatNumber(row.eventTotals[e.id]) : '−'}</td>`).join('')}
-        <td class="standings-total">${formatNumber(row.totalSeasonPoints)}</td>
+        <td class="standings-total" style="font-weight: bold;">${displayTotal}</td>
       </tr>
-    `).join('');
+    `}).join('');
 
     if (standingsBody) {
       standingsBody.querySelectorAll('.player-name-cell').forEach((cell, i) => { cell.textContent = rows[i].player.playerName; });
@@ -236,19 +237,14 @@ export async function initStandingsPage() {
       const ordersWithScores = new Set(scores.filter(s => Number(s.ball1) > 0 || Number(s.ball2) > 0 || Number(s.ball3) > 0).map(s => s.orderNumber));
       const { turnResults, total } = Engine.calculateTurnResults(machines, scoreMap);
       return { player, turnResults, total, ordersWithScores };
-    }).sort((a, b) => {
-      const isGolf = Engine.getRoundLabel() === 'Hole';
-      if (isGolf) {
-        if (a.total === 0) return 1;
-        if (b.total === 0) return -1;
-        return a.total - b.total;
-      }
-      return b.total - a.total;
-    });
+    }).sort((a, b) => Engine.compareTotals(a.total, b.total));
 
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${machines.map(m => `<th>${Engine.getTurnHeaderPrefix()} ${m.orderNumber}</th>`).join('')}<th>Total</th></tr>`;
+    const eventTotalPar = machines.reduce((sum, t) => sum + Number(t.value2 || 0), 0);
+    const totalColLabel = Engine.getTotalColumnLabel(eventTotalPar);
+
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${machines.map(m => `<th>${Engine.getTurnHeaderPrefix()} ${m.orderNumber}</th>`).join('')}<th>${totalColLabel}</th></tr>`;
     if (standingsBody) standingsBody.innerHTML = rows.map((res, idx) => {
-      const isGolf = Engine.getRoundLabel() === 'Hole';
+      const displayTotal = Engine.formatTotalScore(res.total, eventTotalPar, formatNumber);
       return `
       <tr>
         <td>${idx + 1}</td>
@@ -256,9 +252,9 @@ export async function initStandingsPage() {
         ${res.turnResults.map(t => `
           <td class="standings-round ${res.ordersWithScores.has(t.orderNumber) ? 'has-score' : 'no-score'}">
             <div class="standings-mark">${res.ordersWithScores.has(t.orderNumber) ? t.mark : '−'}</div>
-            ${!isGolf ? `<div class="standings-round-score">${res.ordersWithScores.has(t.orderNumber) ? formatNumber(t.score) : ''}</div>` : ''}
+            ${Engine.shouldShowRoundScore() ? `<div class="standings-round-score">${res.ordersWithScores.has(t.orderNumber) ? formatNumber(t.score) : ''}</div>` : ''}
           </td>`).join('')}
-        <td class="standings-total">${formatNumber(res.total)}</td>
+        <td class="standings-total" style="font-weight: bold;">${displayTotal}</td>
       </tr>`;
     }).join('');
 

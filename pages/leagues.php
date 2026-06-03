@@ -16,11 +16,7 @@
         </div>
         <div id="league-format-row" class="form-row hidden">
           <label for="league-scoring-format">Default Scoring Format</label>
-          <select id="league-scoring-format" style="width: 100%; box-sizing: border-box;">
-            <option value="bowling">Bowling (Marks & Frames)</option>
-            <option value="classic">Classic (Points Only)</option>
-            <option value="golf">Golf (Strokes vs Par)</option>
-          </select>
+          <select id="league-scoring-format" style="width: 100%; box-sizing: border-box;"></select>
         </div>
         <div class="form-actions hidden">
           <button type="submit" id="create-league-btn" disabled>Create League</button>
@@ -59,11 +55,7 @@
         </div>
         <div class="form-row">
           <label for="event-scoring-format">Scoring Format</label>
-          <select id="event-scoring-format" style="width: 100%; box-sizing: border-box;">
-            <option value="bowling">Bowling (Marks & Frames)</option>
-            <option value="classic">Classic (Points Only)</option>
-            <option value="golf">Golf (Strokes vs Par)</option>
-          </select>
+          <select id="event-scoring-format" style="width: 100%; box-sizing: border-box;"></select>
         </div>
         <div class="form-actions">
           <button type="submit">Save Event</button>

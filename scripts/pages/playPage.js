@@ -1,5 +1,5 @@
 import { PB_API } from '@services/api.js';
-import { getScoringEngine } from '@core/engine.js';
+import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
 import { formatNumber, applyScoreFormatting, renderThresholdGrid } from '@scripts/utils.js';
 import { 
   createSearchableSelect, 
@@ -31,6 +31,12 @@ export async function initPlayPage() {
   let allPlayersCache = [];
   let todayEvents = [];
   let currentSessionFormat = 'bowling';
+
+  // Populate session format dropdown from central list
+  if (formatSelect) {
+    formatSelect.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
+    formatSelect.value = 'bowling';
+  }
 
   const updateRoundOptions = () => {
     currentSessionFormat = formatSelect?.value || 'bowling';

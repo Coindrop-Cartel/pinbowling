@@ -1,4 +1,5 @@
 import { PB_API } from '@services/api.js';
+import { SCORING_FORMATS } from '@core/engine.js';
 import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog } from '@ui/uiComponents.js';
 import { setActiveLeagueId, setActiveEventId, getActiveLeagueId } from '@scripts/utils.js';
 import { requireAdmin, runAuthorizedLeagueAction, isManagementAuthorized } from '@services/auth.js';
@@ -21,10 +22,18 @@ export async function initLeaguesPage() {
   const leagueDateInput = document.getElementById('league-start-date');
   const leagueFormatInput = document.getElementById('league-scoring-format');
   const createBtn = document.getElementById('create-league-btn');
+  const eventFormatInput = document.getElementById('event-scoring-format');
   const leaguesList = document.getElementById('leagues-list');
   const emptyNotice = document.getElementById('leagues-list-empty');
   const eventFormCard = document.getElementById('event-form-card');
   let allPlayersCache = []; // Cache all players for selection dialogs
+
+  // Populate scoring format dropdowns from centralized list
+  [leagueFormatInput, eventFormatInput].forEach(select => {
+    if (select) {
+      select.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
+    }
+  });
 
   let allLeagues = [];
   let filterInstance = null;

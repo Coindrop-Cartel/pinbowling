@@ -16,6 +16,10 @@ vi.mock('@core/engine.js', () => ({
     calculateTurnResults: vi.fn(() => ({ turnResults: [], total: 100 })),
     getRoundLabel: vi.fn(() => 'Frame'),
     getThresholdSort: vi.fn(() => (a, b) => b[0] - a[0]),
+    compareTotals: vi.fn((a, b) => b - a),
+    getTotalColumnLabel: vi.fn(() => 'Total'),
+    formatTotalScore: vi.fn((total, anchor, formatFn) => formatFn(total)),
+    shouldShowRoundScore: vi.fn(() => true),
   }))
 }));
 

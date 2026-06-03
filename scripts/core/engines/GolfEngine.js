@@ -8,6 +8,7 @@ export class GolfEngine extends ScoringEngine {
     const results = machines.map((round) => {
       const entry = scoreMap[String(round.orderNumber)] || { ball1: 0, ball2: 0, ball3: 0 };
       const target = Number(round.value1 || 0);
+      const par = Number(round.value2 || 3);
       
       let strokes = 10;
 
@@ -43,7 +44,7 @@ export class GolfEngine extends ScoringEngine {
       return {
         orderNumber: round.orderNumber,
         machineName: round.machineName,
-        mark: String(strokes),
+        mark: this.formatMark({ score: strokes, par: par }),
         score: strokes
       };
     });
@@ -111,6 +112,29 @@ export class GolfEngine extends ScoringEngine {
     return (a, b) => Number(a[0]) - Number(b[0]);
   }
 
+  compareTotals(a, b) {
+    // Handle players with 0 strokes (didn't play) by moving them to the bottom
+    if (a === 0) return 1;
+    if (b === 0) return -1;
+    return a - b;
+  }
+
+  getTotalColumnLabel(anchorValue) {
+    return `Par: ${anchorValue}`;
+  }
+
+  formatTotalScore(total, anchorValue, formatFn) {
+    if (total === 0) return formatFn(0);
+    const diff = total - anchorValue;
+    if (diff === 0) return 'E';
+    if (diff > 0) return `+${diff}`;
+    return String(diff);
+  }
+
+  shouldShowRoundScore() {
+    return false;
+  }
+
   getThresholdRowStyle(rank, value1, value2) {
     const isParRank = Number(rank) === Number(value2);
     if (isParRank) {
@@ -119,8 +143,40 @@ export class GolfEngine extends ScoringEngine {
     return 'margin: 2px 0;';
   }
 
+  /**
+   * Returns the stylized HTML for a golf score based on its relation to par.
+   */
   formatMark(turn) {
-    return String(turn.score);
+    const strokes = Number(turn.score);
+    const par = Number(turn.par || 0);
+    if (!strokes || !par) return String(strokes || '−');
+
+    const diff = strokes - par;
+    // Shared container for symbols to ensure consistent alignment in tables
+    const baseStyle = "display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; margin: 0 auto; font-weight: bold; font-size: 0.85rem; box-sizing: border-box;";
+
+    // Par: No symbol
+    if (diff === 0) return `<span style="${baseStyle}">${strokes}</span>`;
+
+    // Birdie: Circle
+    if (diff === -1) return `<div style="${baseStyle} border: 1px solid #333; border-radius: 50%;">${strokes}</div>`;
+
+    // Eagle: Solid circle
+    if (diff === -2) return `<div style="${baseStyle} background: #333; color: #fff; border-radius: 50%;">${strokes}</div>`;
+
+    // Albatross or better: Solid circle with frame
+    if (diff <= -3) return `<div style="display: inline-flex; border: 1px solid #333; padding: 1px; border-radius: 50%; margin: 0 auto;"><div style="${baseStyle} background: #333; color: #fff; border-radius: 50%; width: 22px; height: 22px;">${strokes}</div></div>`;
+
+    // Bogey: Square
+    if (diff === 1) return `<div style="${baseStyle} border: 1px solid #333;">${strokes}</div>`;
+
+    // Double bogey: Solid square
+    if (diff === 2) return `<div style="${baseStyle} background: #333; color: #fff;">${strokes}</div>`;
+
+    // Triple bogey or worse: Solid square with frame
+    if (diff >= 3) return `<div style="display: inline-flex; border: 1px solid #333; padding: 1px; margin: 0 auto;"><div style="${baseStyle} background: #333; color: #fff; width: 22px; height: 22px;">${strokes}</div></div>`;
+
+    return String(strokes);
   }
 
   getRoundLabel() {
