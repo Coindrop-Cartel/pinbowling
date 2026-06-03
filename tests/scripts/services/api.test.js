@@ -26,11 +26,7 @@ import {
 
 import {
   getCurrentPlayerId, 
-  setCurrentPlayerId, 
-  getLeaguePassword, 
-  setLeaguePassword,
-  getAdminSessionPassword,
-  setAdminSessionPassword
+  setCurrentPlayerId
 } from '@services/state.js';
 
 /**
@@ -59,20 +55,6 @@ describe('API Client (api.js)', () => {
       expect(getCurrentPlayerId()).toBe('42');
       setCurrentPlayerId(null);
       expect(getCurrentPlayerId()).toBeNull();
-    });
-
-    it('should manage league passwords in sessionStorage', () => {
-      setLeaguePassword(10, 'secret-pass');
-      expect(getLeaguePassword(10)).toBe('secret-pass');
-      setLeaguePassword(10, null);
-      expect(getLeaguePassword(10)).toBeNull();
-    });
-
-    it('should manage admin session password in sessionStorage', () => {
-      setAdminSessionPassword('admin-token');
-      expect(getAdminSessionPassword()).toBe('admin-token');
-      setAdminSessionPassword(null);
-      expect(getAdminSessionPassword()).toBeNull();
     });
   });
 

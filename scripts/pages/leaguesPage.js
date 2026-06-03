@@ -1,7 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog } from '@ui/uiComponents.js';
 import { setActiveLeagueId, setActiveEventId, getActiveLeagueId } from '@scripts/utils.js';
-import { setLeaguePassword, getLeaguePassword, getAdminSessionPassword, setAdminSessionPassword } from '@services/state.js';
 import { requireAdmin, runAuthorizedLeagueAction, isManagementAuthorized } from '@services/auth.js';
 import { navigateTo } from '@scripts/utils.js';
 import { ROUTES } from '@scripts/routes.js';

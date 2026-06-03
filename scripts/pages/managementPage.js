@@ -1,5 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { requireAdmin } from '@services/auth.js';
+import { setDebugEnabled } from '@services/state.js';
 import { showPrompt, showConfirm, showAlert } from '@ui/uiComponents.js';
 
 /**
@@ -62,7 +63,7 @@ export async function initManagementPage() {
       const isEnabled = debugToggle.checked;
       if (window.PB_DEBUG_MODE || isEnabled) console.log('[Management] Debug toggle changed. New state:', isEnabled);
       window.PB_DEBUG_MODE = isEnabled;
-      localStorage.setItem('pb_debug_enabled', isEnabled);
+      setDebugEnabled(isEnabled);
     };
 
     const versionText = document.createElement('span');
@@ -81,7 +82,7 @@ export async function initManagementPage() {
 
   // Perform an initial check on load. If no password is set or the user is already
   // authenticated, we reveal the tools immediately without a prompt.
-  initialize();
+  await initialize();
 
   /**
    * Manually triggers the cleanup service to prune old session data.

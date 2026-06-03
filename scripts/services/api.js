@@ -33,9 +33,6 @@ export async function fetchJSON(url, options = {}) {
 
   if (window.PB_DEBUG_MODE) console.log(`[API] Constructing ${method} request to: ${url}`, { params: options.params, finalUrl });
 
-  const urlObj = new URL(finalUrl.startsWith('http') ? finalUrl : `http://localhost/${finalUrl}`);
-  const leagueId = urlObj.searchParams.get('leagueId') || (options.body ? JSON.parse(options.body).leagueId : null);
-
   // Tunnel DELETE and PUT via POST to bypass potential server-level method blocking.
   // This ensures the project setup is synchronized and robust across different hosts.
   const headers = { ...options.headers };

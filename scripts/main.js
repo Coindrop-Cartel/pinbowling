@@ -14,6 +14,7 @@ import { initStandingsPage } from '@pages/standingsPage.js';
 import { initLeaguesPage } from '@pages/leaguesPage.js';
 import { initPlayPage } from '@pages/playPage.js';
 import { initManagementPage } from '@pages/managementPage.js';
+import { getDebugEnabled } from '@services/state.js';
 import { initAuthHeader } from '@services/auth.js';
 import { fitTVModeToScreen } from '@ui/uiComponents.js';
 
@@ -27,14 +28,10 @@ import { fitTVModeToScreen } from '@ui/uiComponents.js';
  */
 async function ready() {
   // Restore debug mode from local storage if previously toggled in Management UI
-  const storedDebug = localStorage.getItem('pb_debug_enabled');
-  if (storedDebug !== null) {
-    window.PB_DEBUG_MODE = (storedDebug === 'true');
-  }
+  window.PB_DEBUG_MODE = getDebugEnabled();
 
   if (window.PB_DEBUG_MODE) {
     console.log('[Main] Application ready() triggered.');
-    console.log('[Main] localStorage lookup (pb_debug_enabled):', storedDebug);
     console.log('[Main] Cache-Busting Version Active:', window.PB_UI_VERSION);
     console.log('[Main] Global window.PB_DEBUG_MODE finalized to:', window.PB_DEBUG_MODE);
   }
