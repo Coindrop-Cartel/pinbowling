@@ -1,5 +1,4 @@
-import { getAdminSessionPassword, setAdminSessionPassword, getLeaguePassword, setLeaguePassword } from '@services/state.js';
-import { showPrompt, showAlert, showAuthDialog } from '@ui/uiComponents.js';
+import { showAlert, showAuthDialog } from '@ui/uiComponents.js';
 import { PB_API } from '@services/api.js';
 
 /**
@@ -24,8 +23,6 @@ export async function requireAdmin() {
  * Handles prompting and automatic session clearing if the API returns 401.
  */
 export async function runAuthorizedLeagueAction(leagueId, actionCallback) {
-  if (window.PB_DEBUG_MODE) console.log('[Auth] runAuthorizedLeagueAction triggered for league:', leagueId);
-
   const isAuth = await isManagementAuthorized();
   if (!isAuth) {
     showAlert('You do not have permission to perform management actions for this league.', 'Unauthorized');

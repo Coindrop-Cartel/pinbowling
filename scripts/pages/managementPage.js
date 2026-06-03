@@ -76,7 +76,7 @@ export async function initManagementPage() {
   if (loginBtn) {
     // Use addEventListener for better reliability and wrap the call 
     // to ensure the MouseEvent isn't passed as the prompt message.
-    loginBtn.addEventListener('click', () => checkAuth());
+    loginBtn.addEventListener('click', () => initialize());
   }
 
   // Perform an initial check on load. If no password is set or the user is already

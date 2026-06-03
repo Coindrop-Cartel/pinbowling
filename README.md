@@ -21,6 +21,7 @@ The project includes a comprehensive OpenAPI 3.0 specification. You can find the
 
 Key endpoints include:
 - `service/leagueService.php`: Manage bowling leagues, seasonal events, and rosters.
+- `service/authService.php`: Handle user authentication, registration, and session management.
 - `service/machineService.php`: Manage the global machine registry and event-specific target scores.
 - `service/playerService.php`: Manage the global player database.
 - `service/locationService.php`: Manage physical venues and their machine lineups (templates).

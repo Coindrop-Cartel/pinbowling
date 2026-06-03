@@ -173,6 +173,7 @@ describe('API Client (api.js)', () => {
       const callArgs = fetch.mock.calls[0][1];
       expect(callArgs.body).toBe(JSON.stringify({}));
     });
+  });
 
   describe('PB_API Helper Methods', () => {
     it('getScores should return an empty array if no event or league ID is provided', async () => {

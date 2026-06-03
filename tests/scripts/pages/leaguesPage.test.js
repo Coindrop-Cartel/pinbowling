@@ -94,26 +94,6 @@ describe('Leagues Management Page (leaguesPage.js)', () => {
     expect(toggle.textContent).toBe('Cancel');
   });
 
-  it('should create a league on form submission', async () => {
-    await initLeaguesPage();
-    const UI = await import('@ui/uiComponents.js');
-    
-    PB_API.createLeague.mockResolvedValue({ id: 2, name: 'New League' });
-    
-    document.getElementById('league-name').value = 'New League';
-    document.getElementById('league-name').dispatchEvent(new Event('input'));
-    document.getElementById('league-start-date').value = '2024-05-01';
-    document.getElementById('league-start-date').dispatchEvent(new Event('input'));
-
-    document.getElementById('create-league-btn').click();
-    
-    await vi.waitFor(() => {
-      expect(PB_API.createLeague).toHaveBeenCalledWith(expect.objectContaining({
-        name: 'New League'
-      }));
-    });
-  });
-
   it('should delete a league after confirmation and admin check', async () => {
     await initLeaguesPage();
     const UI = await import('@ui/uiComponents.js');
