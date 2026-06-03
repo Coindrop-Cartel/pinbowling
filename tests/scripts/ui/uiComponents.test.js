@@ -17,7 +17,7 @@ vi.hoisted(() => {
   global.fetch = vi.fn(); 
 });
 
-// Mock external dependencies used by the components.
+// Mock external dependencies used by the components. 
 // These are hoisted but must be defined outside of vi.hoisted().
 vi.mock('@services/api.js', () => ({
   PB_API: {
@@ -32,7 +32,7 @@ vi.mock('@scripts/utils.js', () => ({
   setActiveEventId: vi.fn(),
 }));
 
-import { createSearchableSelect, initReadOnlyTournamentDisplay, showDialog, showConfirm, showPrompt, showPlayerSelectionDialog, initTournamentSelector } from '@ui/uiComponents.js';
+import { createSearchableSelect, initReadOnlyTournamentDisplay, showDialog, showConfirm, showPrompt, showPlayerSelectionDialog, initTournamentSelector, setupLiveFilter, renderThresholdGrid } from '@ui/uiComponents.js';
 import { PB_API } from '@services/api.js';
 import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId } from '@scripts/utils.js';
 
@@ -326,5 +326,48 @@ describe('initTournamentSelector', () => {
 
     // 1 Placeholder + 1 Standard League + 1 Session League (active override) = 3
     expect(select.options.length).toBe(3);
+  });
+});
+
+describe('UI Utilities', () => {
+  describe('setupLiveFilter', () => {
+    it('should filter data and trigger onFilter callback', () => {
+      const input = document.createElement('input');
+      const data = [{ name: 'Medieval Madness' }, { name: 'Monster Bash' }, { name: 'Iron Man' }];
+      const onFilter = vi.fn();
+
+      setupLiveFilter(input, data, { labelKey: 'name', onFilter });
+
+      input.value = 'Mon';
+      input.dispatchEvent(new Event('input'));
+
+      expect(onFilter).toHaveBeenCalledWith([{ name: 'Monster Bash' }], 'mon');
+    });
+  });
+
+  describe('renderThresholdGrid', () => {
+    it('should render a notice when no values are provided', () => {
+      const html = renderThresholdGrid({});
+      expect(html).toContain('Enter scores to see thresholds');
+    });
+
+    it('should render ranks in descending order', () => {
+      const values = {
+        1: 1000,
+        2: 2000,
+        10: 10000
+      };
+      
+      const html = renderThresholdGrid(values, (v) => v.toLocaleString());
+      
+      // Should contain formatted strings
+      expect(html).toContain('<strong>10:</strong> 10,000');
+      expect(html).toContain('<strong>2:</strong> 2,000');
+      expect(html).toContain('<strong>1:</strong> 1,000');
+      
+      // Check descending order via index position
+      expect(html.indexOf('10:')).toBeLessThan(html.indexOf('2:'));
+      expect(html.indexOf('2:')).toBeLessThan(html.indexOf('1:'));
+    });
   });
 });

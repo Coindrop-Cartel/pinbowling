@@ -10,6 +10,7 @@ vendor/
 # Testing
 coverage/
 *.log
+.phpunit.result.cache
 
 # Editor/OS specific
 .vscode/

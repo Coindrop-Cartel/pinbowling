@@ -469,7 +469,6 @@ export async function initConfigPage() {
       orderNumber, 
       values 
     };
-    console.log('Saving Target Score Payload:', payload);
 
     try {
       await PB_API.saveTargetScore(payload);

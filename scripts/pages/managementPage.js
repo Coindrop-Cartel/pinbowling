@@ -61,7 +61,6 @@ export async function initManagementPage() {
 
     debugToggle.onchange = () => {
       const isEnabled = debugToggle.checked;
-      if (window.PB_DEBUG_MODE || isEnabled) console.log('[Management] Debug toggle changed. New state:', isEnabled);
       window.PB_DEBUG_MODE = isEnabled;
       setDebugEnabled(isEnabled);
     };

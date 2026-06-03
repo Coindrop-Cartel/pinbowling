@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.0/phpunit.xsd"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/13.1/phpunit.xsd"
          bootstrap="vendor/autoload.php"
          colors="true">
     <testsuites>
@@ -8,8 +8,20 @@
             <directory>tests/service</directory>
         </testsuite>
     </testsuites>
+    <coverage>
+        <report>
+            <html outputDirectory="tests/coverage-html"/>
+            <text outputFile="php://stdout" showUncoveredFiles="true"/>
+        </report>
+    </coverage>
     <php>
         <env name="API_SECRET" value="bowl-2024-secret"/>
         <const name="PHPUNIT_RUNNING" value="true"/>
     </php>
+    <source>
+        <include>
+            <directory>service</directory>
+            <directory>includes</directory>
+        </include>
+    </source>
 </phpunit>

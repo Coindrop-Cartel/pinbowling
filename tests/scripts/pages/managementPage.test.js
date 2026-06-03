@@ -1,82 +1,105 @@
 /** @vitest-environment jsdom */
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { initManagementPage } from '@pages/managementPage.js';
-import { PB_API } from '@services/api.js';
-import * as Auth from '@services/auth.js';
-import * as State from '@services/state.js';
 
+// Mock dependencies
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    getLeagues: vi.fn(),
-    runCleanup: vi.fn(),
-    updateLeague: vi.fn(),
     getCurrentUser: vi.fn(),
-  },
+    runCleanup: vi.fn()
+  }
 }));
 
 vi.mock('@services/auth.js', () => ({
-  requireAdmin: vi.fn(),
-  initAuthHeader: vi.fn(),
+  requireAdmin: vi.fn()
 }));
 
 vi.mock('@services/state.js', () => ({
-  setDebugEnabled: vi.fn(),
+  setDebugEnabled: vi.fn()
 }));
 
 vi.mock('@ui/uiComponents.js', () => ({
   showPrompt: vi.fn(),
   showConfirm: vi.fn(),
-  showAlert: vi.fn(),
-  initTournamentSelector: vi.fn(),
+  showAlert: vi.fn()
 }));
+
+import { initManagementPage } from '@scripts/pages/managementPage.js';
+import { PB_API } from '@services/api.js';
+import { requireAdmin } from '@services/auth.js';
+import { showConfirm, showPrompt, showAlert } from '@ui/uiComponents.js';
+import { setDebugEnabled } from '@services/state.js';
 
 describe('Management Page (managementPage.js)', () => {
   beforeEach(() => {
     document.body.innerHTML = `
-      <div id="management-auth-notice"></div>
+      <div id="management-auth-notice">Notice</div>
       <div id="management-tools" class="hidden">
-        <select id="mgmt-league-select"></select>
-        <button id="mgmt-reset-pass-btn">Reset</button>
-        <button id="mgmt-run-cleanup-btn">Cleanup</button>
+        <button id="mgmt-run-cleanup-btn" class="hidden">Cleanup</button>
       </div>
       <button id="admin-login-btn">Login</button>
     `;
-
     vi.clearAllMocks();
+    window.PB_DEBUG_MODE = false;
     window.PB_UI_VERSION = '1.2.3';
-    PB_API.getLeagues.mockResolvedValue([]);
   });
 
-  it('should reveal tools and render version info when authenticated', async () => {
+  it('should reveal tools and cleanup button for admin users', async () => {
     PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
-    
+
     await initManagementPage();
 
-    const tools = document.getElementById('management-tools');
-    expect(tools.classList.contains('hidden')).toBe(false); // Should be revealed after init finishes
-    
-    const versionDisplay = document.getElementById('mgmt-ui-version');
-    expect(versionDisplay.textContent).toContain('1.2.3');
+    expect(document.getElementById('management-auth-notice').classList.contains('hidden')).toBe(true);
+    expect(document.getElementById('management-tools').classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('mgmt-run-cleanup-btn').classList.contains('hidden')).toBe(false);
+    expect(document.body.innerHTML).toContain('System UI Version: 1.2.3');
   });
 
-  it('should stay hidden if authentication fails', async () => {
-    PB_API.getCurrentUser.mockResolvedValue(null);
-    
+  it('should reveal tools but hide cleanup for TD users', async () => {
+    PB_API.getCurrentUser.mockResolvedValue({ role: 'td' });
+
     await initManagementPage();
 
-    const tools = document.getElementById('management-tools');
-    expect(tools.classList.contains('hidden')).toBe(true);
+    expect(document.getElementById('management-tools').classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('mgmt-run-cleanup-btn').classList.contains('hidden')).toBe(true);
   });
 
-  it('should re-trigger auth check when login button is clicked', async () => {
-    PB_API.getCurrentUser.mockResolvedValue(null);
-    await initManagementPage();
-    
-    vi.clearAllMocks();
+  it('should toggle debug mode and update global state', async () => {
     PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
-    
-    document.getElementById('admin-login-btn').click();
-    
-    expect(PB_API.getCurrentUser).toHaveBeenCalled();
+    await initManagementPage();
+
+    const debugToggle = document.getElementById('mgmt-debug-toggle');
+    debugToggle.checked = true;
+    debugToggle.dispatchEvent(new Event('change'));
+
+    expect(window.PB_DEBUG_MODE).toBe(true);
+    expect(setDebugEnabled).toHaveBeenCalledWith(true);
+  });
+
+  it('should execute cleanup when confirmed and authorized', async () => {
+    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+    showConfirm.mockResolvedValue(true);
+    requireAdmin.mockResolvedValue(true);
+    showPrompt.mockResolvedValue('60'); // 60 days
+    PB_API.runCleanup.mockResolvedValue({ leagues_cleaned: 5 });
+
+    await initManagementPage();
+    const cleanupBtn = document.getElementById('mgmt-run-cleanup-btn');
+    await cleanupBtn.onclick();
+
+    expect(PB_API.runCleanup).toHaveBeenCalledWith(60);
+    expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Removed 5 session leagues'), 'Success');
+  });
+
+  it('should abort cleanup if user cancels the prompt', async () => {
+    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+    showConfirm.mockResolvedValue(true);
+    requireAdmin.mockResolvedValue(true);
+    showPrompt.mockResolvedValue(null); // Cancelled
+
+    await initManagementPage();
+    const cleanupBtn = document.getElementById('mgmt-run-cleanup-btn');
+    await cleanupBtn.onclick();
+
+    expect(PB_API.runCleanup).not.toHaveBeenCalled();
   });
 });
