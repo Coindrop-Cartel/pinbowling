@@ -136,7 +136,15 @@ export async function initStandingsPage() {
         } else { eventTotals[event.id] = null; }
       });
       return { player, eventTotals, totalSeasonPoints };
-    }).sort((a, b) => b.totalSeasonPoints - a.totalSeasonPoints);
+    }).sort((a, b) => {
+      const isGolf = engine.getRoundLabel() === 'Hole';
+      if (isGolf) {
+        if (a.totalSeasonPoints === 0) return 1;
+        if (b.totalSeasonPoints === 0) return -1;
+        return a.totalSeasonPoints - b.totalSeasonPoints;
+      }
+      return b.totalSeasonPoints - a.totalSeasonPoints;
+    });
 
     if (tvTitle) {
       const league = leagues.find(l => String(l.id) === String(leagueId));
@@ -184,10 +192,11 @@ export async function initStandingsPage() {
     ]);
 
     const league = leagues.find(l => String(l.id) === String(leagueId));
-    Engine = getScoringEngine(league?.scoringFormat || 'bowling');
+    const event = eventId === 'summary' ? { eventName: 'Season Summary' } : league?.events?.find(e => String(e.id) === String(eventId));
+    
+    Engine = getScoringEngine(event?.scoringFormat || league?.scoringFormat || 'bowling');
 
     if (tournamentSelectorUI && tournamentSummary) {
-      const event = eventId === 'summary' ? { eventName: 'Season Summary' } : league?.events?.find(e => String(e.id) === String(eventId));
       if (league?.type === 'session') {
         tournamentSummaryText.textContent = event?.eventName || 'Session Scoreboard';
       } else {
@@ -227,20 +236,31 @@ export async function initStandingsPage() {
       const ordersWithScores = new Set(scores.filter(s => Number(s.ball1) > 0 || Number(s.ball2) > 0 || Number(s.ball3) > 0).map(s => s.orderNumber));
       const { turnResults, total } = Engine.calculateTurnResults(machines, scoreMap);
       return { player, turnResults, total, ordersWithScores };
-    }).sort((a, b) => b.total - a.total);
+    }).sort((a, b) => {
+      const isGolf = Engine.getRoundLabel() === 'Hole';
+      if (isGolf) {
+        if (a.total === 0) return 1;
+        if (b.total === 0) return -1;
+        return a.total - b.total;
+      }
+      return b.total - a.total;
+    });
 
     if (standingsHeader) standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${machines.map(m => `<th>${Engine.getTurnHeaderPrefix()} ${m.orderNumber}</th>`).join('')}<th>Total</th></tr>`;
-    if (standingsBody) standingsBody.innerHTML = rows.map((res, idx) => `
+    if (standingsBody) standingsBody.innerHTML = rows.map((res, idx) => {
+      const isGolf = Engine.getRoundLabel() === 'Hole';
+      return `
       <tr>
         <td>${idx + 1}</td>
         <td class="player-name-cell"></td>
         ${res.turnResults.map(t => `
           <td class="standings-round ${res.ordersWithScores.has(t.orderNumber) ? 'has-score' : 'no-score'}">
             <div class="standings-mark">${res.ordersWithScores.has(t.orderNumber) ? t.mark : '−'}</div>
-            <div class="standings-round-score">${res.ordersWithScores.has(t.orderNumber) ? formatNumber(t.score) : ''}</div>
+            ${!isGolf ? `<div class="standings-round-score">${res.ordersWithScores.has(t.orderNumber) ? formatNumber(t.score) : ''}</div>` : ''}
           </td>`).join('')}
         <td class="standings-total">${formatNumber(res.total)}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
 
     if (standingsBody) {
       standingsBody.querySelectorAll('.player-name-cell').forEach((cell, i) => { cell.textContent = rows[i].player.playerName; });

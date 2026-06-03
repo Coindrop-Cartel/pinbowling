@@ -7,6 +7,14 @@ const mockEngine = {
   getBonusTargets: vi.fn(),
   getRoundLabel: vi.fn(),
   getBonusTargetHtml: vi.fn(),
+  filterThresholds: vi.fn((v) => v),
+  getThresholdLabel: vi.fn((r) => {
+    if (Number(r) === 10) return 'High';
+    if (Number(r) === 1) return 'Low';
+    return r;
+  }),
+  getThresholdRowStyle: vi.fn(() => 'margin: 2px 0;'),
+  getThresholdSort: vi.fn(() => (a, b) => Number(b[0]) - Number(a[0])),
 };
 
 // Mock getScoringEngine for renderPreview and print functions

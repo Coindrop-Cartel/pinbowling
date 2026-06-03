@@ -243,6 +243,13 @@ export class BowlingEngine extends ScoringEngine {
     return null;
   }
 
+  getThresholdLabel(rank) {
+    const r = Number(rank);
+    if (r === 10) return 'High';
+    if (r === 1) return 'Low';
+    return rank;
+  }
+
   getRoundLabel() { return 'Frame'; }
   getTurnHeaderPrefix() { return 'Frame'; }
   getPrimaryTargetLabel() { return 'Strike'; }

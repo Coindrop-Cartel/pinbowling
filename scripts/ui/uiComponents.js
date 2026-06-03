@@ -693,22 +693,3 @@ export function setupSortableList(container, { itemSelector, onReorder }) {
     }
   });
 }
-
-/**
- * Renders a standardized grid of score thresholds for 1-10.
- * @param {Object} values Map of rank to score value.
- * @param {Function} formatFn Optional function to format values.
- * @returns {string} HTML string.
- */
-export function renderThresholdGrid(values, formatFn = (v) => v) {
-  if (!values || Object.keys(values).length === 0) return '<div class="notice">Enter scores to see thresholds.</div>';
-  return `
-    <div class="threshold-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; font-size: 0.75rem; background: #f0f0f0; padding: 8px; border-radius: 4px;">
-      ${Object.entries(values)
-        .sort((a, b) => Number(b[0]) - Number(a[0]))
-        .map(([rank, val]) => `<div><strong>${rank}:</strong> ${formatFn(val)}</div>`)
-        .join('')
-      }
-    </div>
-  `;
-}

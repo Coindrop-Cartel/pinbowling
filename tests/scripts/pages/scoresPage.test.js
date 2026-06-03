@@ -18,7 +18,8 @@ vi.mock('@core/engine.js', () => ({
     getRoundLabel: vi.fn(() => 'Frame'),
     getPrimaryTargetLabel: vi.fn(() => 'Strike'),
     getBonusTargetHtml: vi.fn(() => ''),
-    calculateTurnResults: vi.fn(() => ({ turnResults: [{ orderNumber: 1, mark: 'X', score: 30 }], total: 30 }))
+    calculateTurnResults: vi.fn(() => ({ turnResults: [{ orderNumber: 1, mark: 'X', score: 30 }], total: 30 })),
+    filterThresholds: vi.fn((v) => v),
   }))
 }));
 
@@ -28,7 +29,8 @@ vi.mock('@scripts/utils.js', () => ({
   getActiveEventId: vi.fn(() => '101'),
   getActiveLeagueId: vi.fn(() => '1'),
   getCurrentPlayerId: vi.fn(),
-  setCurrentPlayerId: vi.fn()
+  setCurrentPlayerId: vi.fn(),
+  renderThresholdGrid: vi.fn(() => 'Grid'),
 }));
 
 vi.mock('@ui/uiComponents.js', () => ({

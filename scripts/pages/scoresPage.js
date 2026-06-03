@@ -1,6 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js';
-import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, setCurrentPlayerId, getCurrentPlayerId } from '@scripts/utils.js';
+import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, setCurrentPlayerId, getCurrentPlayerId, renderThresholdGrid } from '@scripts/utils.js';
 import { initTournamentSelector, createSearchableSelect } from '@ui/uiComponents.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
 
@@ -122,12 +122,7 @@ export async function initScoresPage() {
         ${bonusHtml}
         <div class="target-details hidden" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc;">
           <div style="font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; color: #666;">Scoring Thresholds</div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
-            ${Object.entries(round.values)
-              .sort((a, b) => Number(b[0]) - Number(a[0]))
-              .map(([rank, val]) => `<div style="font-size: 0.8rem;"><b>${rank}:</b> ${formatNumber(val)}</div>`)
-              .join('')}
-          </div>
+          ${renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2)}
         </div>
       </div>
       <div class="round-inputs-container" style="display: flex; gap: 0.5rem; align-items: center;"></div>

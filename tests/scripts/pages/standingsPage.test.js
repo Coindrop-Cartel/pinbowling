@@ -13,7 +13,9 @@ vi.mock('@services/api.js', () => ({
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
     getTurnHeaderPrefix: vi.fn(() => 'F'),
-    calculateTurnResults: vi.fn(() => ({ turnResults: [], total: 100 }))
+    calculateTurnResults: vi.fn(() => ({ turnResults: [], total: 100 })),
+    getRoundLabel: vi.fn(() => 'Frame'),
+    getThresholdSort: vi.fn(() => (a, b) => b[0] - a[0]),
   }))
 }));
 

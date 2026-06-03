@@ -1,5 +1,4 @@
 /** @vitest-environment jsdom */
-/** @vitest-environment jsdom */ 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 /**
@@ -27,16 +26,20 @@ vi.mock('@services/api.js', () => ({
   },
 }));
 
-vi.mock('@scripts/utils.js', () => ({
-  getActiveLeagueId: vi.fn(),
-  getActiveEventId: vi.fn(),
-  setActiveLeagueId: vi.fn(),
-  setActiveEventId: vi.fn(),
-}));
+vi.mock('@scripts/utils.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    getActiveLeagueId: vi.fn(),
+    getActiveEventId: vi.fn(),
+    setActiveLeagueId: vi.fn(),
+    setActiveEventId: vi.fn(),
+  };
+});
 
-import { createSearchableSelect, initReadOnlyTournamentDisplay, showDialog, showConfirm, showPrompt, showPlayerSelectionDialog, initTournamentSelector, setupLiveFilter, renderThresholdGrid, showChoiceDialog, showAuthDialog, fitTVModeToScreen, createExpandableRow, setupSortableList } from '@ui/uiComponents.js';
+import { createSearchableSelect, initReadOnlyTournamentDisplay, showDialog, showConfirm, showPrompt, showPlayerSelectionDialog, initTournamentSelector, setupLiveFilter, showChoiceDialog, showAuthDialog, fitTVModeToScreen, createExpandableRow, setupSortableList } from '@ui/uiComponents.js';
 import { PB_API } from '@services/api.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId } from '@scripts/utils.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, renderThresholdGrid } from '@scripts/utils.js';
 
 /**
  * Tests for reusable UI components. 

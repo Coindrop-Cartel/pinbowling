@@ -7,37 +7,39 @@ describe('GolfEngine', () => {
   const mockHole = (order) => ({
     orderNumber: order,
     machineName: `Hole ${order}`,
+    value1: 10000,
+    value2: 3,
     values: {
-      1: 10000, 2: 8000, 3: 5000, 4: 4000, 5: 3000,
-      6: 2500, 7: 2000, 8: 1500, 9: 1000, 10: 500
+      1: 20000, 2: 15000, 3: 10000, 4: 8000, 5: 6000,
+      6: 4000, 7: 3000, 8: 2000, 9: 1000, 10: 500
     }
   });
 
-  test('getStrokeCount - Inverse Thresholds', () => {
-    const hole = mockHole(1);
-
-    // High scores yield low strokes
-    expect(engine.getStrokeCount(hole, 15000)).toBe(1);
-    expect(engine.getStrokeCount(hole, 10000)).toBe(1);
-    expect(engine.getStrokeCount(hole, 5500)).toBe(3); // Better than 3 (5000) but not a 2 (8000)
-    expect(engine.getStrokeCount(hole, 500)).toBe(10);
-    expect(engine.getStrokeCount(hole, 100)).toBe(10); // Failed all thresholds
-  });
-
-  test('calculateTurnResults - Summation of Strokes', () => {
+  test('calculateTurnResults - Ball Sequence Timing', () => {
     const holes = [mockHole(1), mockHole(2), mockHole(3)];
     const scoreMap = {
-      '1': { ball1: 12000 }, // Stroke 1
-      '2': { ball1: 5500 },  // Stroke 3
-      '3': { ball1: 100 }    // Stroke 10
+      '1': { ball1: 12000 }, // Reached target on Ball 1 -> 1 Stroke
+      '2': { ball1: 5000, ball2: 10000 }, // Reached target on Ball 2 -> 2 Strokes
+      '3': { ball1: 2000, ball2: 5000, ball3: 11000 } // Reached target on Ball 3 -> 3 Strokes
     };
 
     const { turnResults, total } = engine.calculateTurnResults(holes, scoreMap);
 
     expect(turnResults[0].score).toBe(1);
-    expect(turnResults[1].score).toBe(3);
-    expect(turnResults[2].score).toBe(10);
-    expect(total).toBe(14); // 1 + 3 + 10
+    expect(turnResults[1].score).toBe(2);
+    expect(turnResults[2].score).toBe(3);
+    expect(total).toBe(6);
+  });
+
+  test('calculateTurnResults - Fallback to 4-10 thresholds', () => {
+    const hole = mockHole(1);
+    // Target 10,000 never reached. Max is 8,000.
+    const scoreMap = { '1': { ball1: 2000, ball2: 5000, ball3: 8000 } };
+    
+    const { turnResults } = engine.calculateTurnResults([hole], scoreMap);
+    
+    // 8000 is the exact threshold for Rank 4 in mockHole
+    expect(turnResults[0].score).toBe(4);
   });
 
   test('buildRoundValues - Inverse Linear Interpolation', () => {
@@ -71,6 +73,6 @@ describe('GolfEngine', () => {
     const holes = [mockHole(1)];
     const scoreMap = { '1': { ball1: 2000, ball2: 6000, ball3: 10000 } };
     const { total } = engine.calculateTurnResults(holes, scoreMap);
-    expect(total).toBe(1); // Hits the highest target (ball 3)
+    expect(total).toBe(3); // Hits target on ball 3
   });
 });

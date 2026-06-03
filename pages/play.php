@@ -40,11 +40,8 @@
 
       <div id="qp-generator-options" class="form-row hidden" style="display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px;">
         <div style="flex: 1;">
-          <label for="qp-frames">Number of Frames</label>
+          <label for="qp-frames">Number of Rounds</label>
           <select id="qp-frames">
-            <option value="3">3 Frames</option>
-            <option value="5">5 Frames</option>
-            <option value="10" selected>10 Frames</option>
           </select>
         </div>
         <div style="flex: 1;">

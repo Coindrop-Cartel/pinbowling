@@ -20,6 +20,7 @@ vi.mock('@core/engine.js', () => ({
     getRoundLabel: vi.fn(() => 'Frame'),
     getHighScoreLabel: vi.fn(() => 'High'),
     getLowScoreLabel: vi.fn(() => 'Low'),
+    filterThresholds: vi.fn((v) => v),
   }))
 }));
 
@@ -30,6 +31,7 @@ vi.mock('@scripts/utils.js', () => ({
   applyScoreFormatting: vi.fn(),
   formatNumber: vi.fn(n => n?.toLocaleString() || ''),
   navigateTo: vi.fn(),
+  renderThresholdGrid: vi.fn(() => 'Grid'),
 }));
 
 vi.mock('@services/auth.js', () => ({

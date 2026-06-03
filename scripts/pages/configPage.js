@@ -1,6 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js';
-import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormatting, formatNumber } from '@scripts/utils.js';
+import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormatting, formatNumber, renderThresholdGrid } from '@scripts/utils.js';
 import { 
   createSearchableSelect, 
   showPrompt, 
@@ -8,7 +8,6 @@ import {
   initReadOnlyTournamentDisplay, 
   createExpandableRow, 
   setupSortableList,
-  renderThresholdGrid
 } from '@ui/uiComponents.js';
 import { printMachineScores } from '@ui/printing.js';
 import { requireAdmin, isManagementAuthorized } from '@services/auth.js';
@@ -282,7 +281,7 @@ export async function initConfigPage() {
                <button type="button" class="scaling-btn ${scaling === 'curved' ? 'btn-standard' : 'secondary'}" data-scale="curved" style="font-size: 0.7rem; padding: 2px 8px;">Curved</button>
             </div>
           </div>
-          <div class="preview-values-container">${renderThresholdGrid(round.values, formatNumber)}</div>
+          <div class="preview-values-container">${renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2)}</div>
           ${bonusHtml ? `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd;">${bonusHtml}</div>` : ''}
         `,
         onHeaderClick: (e) => {
@@ -304,7 +303,7 @@ export async function initConfigPage() {
         round.values = Engine.buildRoundValues(round.value1, round.value2, currentScaling);
         
         const container = row.querySelector('.preview-values-container');
-        if (container) container.innerHTML = renderThresholdGrid(round.values, formatNumber);
+        if (container) container.innerHTML = renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2);
         
         checkListDirty();
       };

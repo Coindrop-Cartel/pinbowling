@@ -15,13 +15,20 @@ vi.mock('@services/api.js', () => ({
 
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
-    buildRoundValues: vi.fn(() => ({ 1: 100, 10: 1000 }))
+    buildRoundValues: vi.fn(() => ({ 1: 100, 10: 1000 })),
+    getInitialValues: vi.fn((score) => ({ value1: score, value2: score / 10 })),
+    getHighScoreLabel: vi.fn(() => 'Strike'),
+    getLowScoreLabel: vi.fn(() => '1 Pin'),
+    getRoundLabel: vi.fn(() => 'Frame'),
+    filterThresholds: vi.fn((v) => v),
+    getRoundCountOptions: vi.fn(() => [3, 5, 10]),
   }))
 }));
 
 vi.mock('@scripts/utils.js', () => ({
   formatNumber: vi.fn(n => n?.toLocaleString() || '0'),
   applyScoreFormatting: vi.fn(),
+  renderThresholdGrid: vi.fn(() => 'Grid'),
 }));
 
 vi.mock('@ui/uiComponents.js', () => ({

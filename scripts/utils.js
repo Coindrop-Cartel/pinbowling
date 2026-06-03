@@ -178,14 +178,7 @@ export function renderPreview(highScoreInput, lowScoreInput, previewValues, Engi
     return;
   }
 
-  let html = Object.entries(values)
-    .sort((a, b) => Number(b[0]) - Number(a[0]))
-    .map(([rank, value]) => {
-      const isGolf = Engine.getRoundLabel() === 'Hole';
-      const label = (!isGolf && rank == 10) ? 'High' : ((!isGolf && rank == 1) ? 'Low' : rank);
-      return `<div><strong>${label}:</strong> ${formatNumber(value)}</div>`;
-    })
-    .join("");
+  let html = renderThresholdGrid(Engine.filterThresholds(values), formatNumber, Engine, highScore, lowScore);
 
   const bonusHtml = Engine.getBonusTargetHtml({ values }, isLastRound, formatNumber, currentScaling);
   if (bonusHtml) {
@@ -193,4 +186,24 @@ export function renderPreview(highScoreInput, lowScoreInput, previewValues, Engi
   }
 
   previewValues.innerHTML = html;
+}
+
+/**
+ * Renders a standardized grid of score thresholds for 1-10.
+ */
+export function renderThresholdGrid(values, formatFn = (v) => v, engine = null, value1 = 0, value2 = 0) {
+  if (!values || Object.keys(values).length === 0) return '<div class="notice">Enter scores to see thresholds.</div>';
+  return `
+    <div class="threshold-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; font-size: 0.75rem; background: #f0f0f0; padding: 8px; border-radius: 4px;">
+      ${Object.entries(values)
+        .sort(engine ? engine.getThresholdSort() : (a, b) => Number(b[0]) - Number(a[0]))
+        .map(([rank, val]) => {
+          const label = engine ? engine.getThresholdLabel(rank, value1, value2) : rank;
+          const style = engine ? engine.getThresholdRowStyle(rank, value1, value2) : 'margin: 2px 0;';
+          return `<div style="${style}"><strong>${label}:</strong> ${formatFn(val)}</div>`;
+        })
+        .join('')
+      }
+    </div>
+  `;
 }

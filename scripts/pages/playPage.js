@@ -1,12 +1,11 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js';
-import { formatNumber, applyScoreFormatting } from '@scripts/utils.js';
+import { formatNumber, applyScoreFormatting, renderThresholdGrid } from '@scripts/utils.js';
 import { 
   createSearchableSelect, 
   showPlayerSelectionDialog, 
   createExpandableRow, 
   setupSortableList,
-  renderThresholdGrid
 } from '@ui/uiComponents.js';
 
 export async function initPlayPage() {
@@ -32,6 +31,24 @@ export async function initPlayPage() {
   let allPlayersCache = [];
   let todayEvents = [];
   let currentSessionFormat = 'bowling';
+
+  const updateRoundOptions = () => {
+    currentSessionFormat = formatSelect?.value || 'bowling';
+    const engine = getScoringEngine(currentSessionFormat);
+    const roundLabel = engine.getRoundLabel();
+    const counts = engine.getRoundCountOptions();
+
+    const label = document.querySelector('label[for="qp-frames"]');
+    if (label) label.textContent = `Number of ${roundLabel}s`;
+
+    const framesSelect = document.getElementById('qp-frames');
+    if (framesSelect) {
+      const currentVal = framesSelect.value;
+      framesSelect.innerHTML = counts.map(c => 
+        `<option value="${c}" ${String(c) === currentVal ? 'selected' : (c === 10 || c === 18 ? 'selected' : '')}>${c} ${roundLabel}s</option>`
+      ).join('');
+    }
+  };
 
   async function refreshSessionsData() {
     // Fetch only session-type leagues directly from the server
@@ -150,6 +167,11 @@ export async function initPlayPage() {
 
   if (nameInput) nameInput.oninput = () => renderExistingSessions();
 
+  if (formatSelect) {
+    formatSelect.addEventListener('change', updateRoundOptions);
+    updateRoundOptions(); // Initial sync
+  }
+
   if (createToggleBtn && generatorOptions && generateBtn) {
     createToggleBtn.onclick = () => {
       const isHidden = generatorOptions.classList.contains('hidden');
@@ -239,8 +261,10 @@ export async function initPlayPage() {
     }
 
       generatedFrames = selected.map((m, index) => {
-        const score10 = m['target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1)] || 1000000;
-        const score1 = Math.floor(score10 / 10);
+        const difficultyKey = 'target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+        const baseScore = m[difficultyKey] || 1000000;
+        const { value1, value2 } = engine.getInitialValues(baseScore);
+
         return {
             machineId: Number(m.machineId),
             machineName: m.machineName,
@@ -249,10 +273,10 @@ export async function initPlayPage() {
                 med: m.targetMed || 2000000,
                 hard: m.targetHard || 3000000
             },
-            score10,
-            score1,
+            value1,
+            value2,
             scaling: globalScaling,
-            values: engine.buildRoundValues(score10, score1, globalScaling),
+            values: engine.buildRoundValues(value1, value2, globalScaling),
             orderNumber: index + 1,
             tempId: Math.random().toString(36).substr(2, 9)
         };
@@ -276,12 +300,12 @@ export async function initPlayPage() {
           <span style="flex: 1; font-weight: bold;" class="machine-name-display">${frame.machineName}</span>
           <div style="display: flex; align-items: center; gap: 10px;" onclick="event.stopPropagation()">
             <div style="display: flex; align-items: center; gap: 4px;">
-              <label style="font-size: 0.7rem; color: #666;">10:</label>
-              <input type="text" class="score10-input" value="${formatNumber(frame.score10)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
+              <label style="font-size: 0.7rem; color: #666;">${engine.getHighScoreLabel()}:</label>
+              <input type="text" class="score10-input" value="${formatNumber(frame.value1)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
             </div>
             <div style="display: flex; align-items: center; gap: 4px;">
-              <label style="font-size: 0.7rem; color: #666;">1:</label>
-              <input type="text" class="score1-input" value="${formatNumber(frame.score1)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
+              <label style="font-size: 0.7rem; color: #666;">${engine.getLowScoreLabel()}:</label>
+              <input type="text" class="score1-input" value="${formatNumber(frame.value2)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
             </div>
           </div>
       `;
@@ -303,7 +327,7 @@ export async function initPlayPage() {
                <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'}" data-scale="curved" style="font-size: 0.7rem; padding: 2px 8px;">Curved</button>
             </div>
           </div>
-          <div class="preview-values-container">${renderThresholdGrid(frame.values, formatNumber)}</div>
+          <div class="preview-values-container">${renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2)}</div>
       `;
 
       const row = createExpandableRow(framesList, {
@@ -326,14 +350,14 @@ export async function initPlayPage() {
 
       // Immediate data updates as user types
       const updateValues = () => {
-        frame.score10 = Number(s10.value.replace(/\D/g, '')) || 0;
-        frame.score1 = Number(s1.value.replace(/\D/g, '')) || 0;
-        frame.values = engine.buildRoundValues(frame.score10, frame.score1, frame.scaling);
+        frame.value1 = Number(s10.value.replace(/\D/g, '')) || 0;
+        frame.value2 = Number(s1.value.replace(/\D/g, '')) || 0;
+        frame.values = engine.buildRoundValues(frame.value1, frame.value2, frame.scaling);
 
         // Update the visual grid without re-rendering the whole row to maintain input focus
         const container = row.querySelector('.preview-values-container');
         if (container) {
-            container.innerHTML = renderThresholdGrid(frame.values, formatNumber);
+            container.innerHTML = renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2);
         }
       };
 
@@ -374,10 +398,11 @@ export async function initPlayPage() {
             const type = btn.dataset.type;
             const val = frame.targets?.[type];
             if (val) {
-              frame.score10 = val;
-              frame.score1 = Math.floor(val / 10);
-              s10.value = formatNumber(frame.score10);
-              s1.value = formatNumber(frame.score1);
+              const { value1, value2 } = engine.getInitialValues(val);
+              frame.value1 = value1;
+              frame.value2 = value2;
+              s10.value = formatNumber(frame.value1);
+              s1.value = formatNumber(frame.value2);
               updateValues();
               renderPreview();
             }
@@ -451,6 +476,8 @@ export async function initPlayPage() {
             eventId: Number(event.id),
             machineId: Number(frame.machineId),
             orderNumber: frame.orderNumber,
+            value1: frame.value1,
+            value2: frame.value2,
             values: frame.values
           };
         });
