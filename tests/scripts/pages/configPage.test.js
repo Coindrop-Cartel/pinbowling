@@ -35,8 +35,13 @@ vi.mock('@scripts/utils.js', () => ({
 }));
 
 vi.mock('@services/auth.js', () => ({
-  isManagementAuthorized: vi.fn(),
-  requireAdmin: vi.fn()
+  isManagementAuthorized: vi.fn(() => Promise.resolve(true)),
+  requireAdmin: vi.fn(() => Promise.resolve(true)),
+  can: vi.fn(() => Promise.resolve(true)),
+  PERMISSIONS: {
+    MANAGE_MACHINES: 'MANAGE_MACHINES',
+    MANAGE_LEAGUES: 'MANAGE_LEAGUES'
+  }
 }));
 
 vi.mock('@ui/uiComponents.js', () => ({

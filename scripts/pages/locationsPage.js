@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { applyScoreFormatting, formatNumber, navigateTo } from '@scripts/utils.js';
 import { showConfirm, showPrompt, showAlert } from '@ui/uiComponents.js';
-import { requireAdmin, isManagementAuthorized } from '@services/auth.js';
+import { requireAdmin, can, PERMISSIONS } from '@services/auth.js';
 import { ROUTES } from '@scripts/routes.js';
 
 /**
@@ -10,12 +10,14 @@ import { ROUTES } from '@scripts/routes.js';
 export async function initLocationsPage() {
   // Batch authorization and initial data fetch to prevent sequential loading "pop"
   const [authorized, locationsData] = await Promise.all([
-    isManagementAuthorized(),
+    can(PERMISSIONS.CREATE_SESSION), // Registered User Access (Player, TD, Admin)
     PB_API.getLocations()
   ]);
 
-  if (!authorized) {
-    showAlert('Unauthorized: Management access is required to view locations.', 'Access Denied');
+  const isTD = await can(PERMISSIONS.MANAGE_LEAGUES);
+
+  if (!authorized || !locationsData) {
+    showAlert('Unauthorized access.', 'Access Denied');
     navigateTo(ROUTES.HOME);
     return;
   }
@@ -45,21 +47,26 @@ export async function initLocationsPage() {
   createToggle.style.marginTop = '10px';
   nameInput.after(createToggle);
 
-  createToggle.onclick = () => {
-    const isHidden = !cityStateContainer || cityStateContainer.classList.contains('hidden');
-    cityStateContainer.classList.toggle('hidden', !isHidden);
-    actionsRow.classList.toggle('hidden', !isHidden);
-    if (isHidden) {
-      createToggle.textContent = 'Cancel';
-      createToggle.style.marginTop = '0';
-      actionsRow.appendChild(createToggle);
-    } else {
-      createToggle.textContent = 'Create New Location';
-      createToggle.style.marginTop = '10px';
-      nameInput.after(createToggle);
-    }
-  };
-
+  if (isTD) {
+      createToggle.onclick = () => {
+      const isHidden = !cityStateContainer || cityStateContainer.classList.contains('hidden');
+      cityStateContainer.classList.toggle('hidden', !isHidden);
+      actionsRow.classList.toggle('hidden', !isHidden);
+      if (isHidden) {
+        createToggle.textContent = 'Cancel';
+        createToggle.style.marginTop = '0';
+        actionsRow.appendChild(createToggle);
+      } else {
+        createToggle.textContent = 'Create New Location';
+        createToggle.style.marginTop = '10px';
+        nameInput.after(createToggle);
+      }
+    };
+  } else {
+    createToggle.classList.add('hidden');
+    form.classList.add('hidden');
+  }
+  
   let allLocations = [];
   let expandedLocationId = null;
 
@@ -99,8 +106,8 @@ export async function initLocationsPage() {
               <small>Machines: (${loc.machines?.length || 0})</small>
             </h3>
             <div style="display: flex; gap: 8px;">
-              <button class="edit-loc-btn secondary" style="padding: 4px 10px; font-size: 0.85rem;">Edit</button>
-              <button class="delete-loc-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
+              ${isTD ? '<button class="edit-loc-btn secondary" style="padding: 4px 10px; font-size: 0.85rem;">Edit</button>' : ''}
+              ${isTD ? '<button class="delete-loc-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>' : ''}
             </div>
           </div>
           <div class="location-details ${isExpanded ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd; background: #fff;">
@@ -133,9 +140,11 @@ export async function initLocationsPage() {
           }
         };
 
-        locDiv.querySelector('.edit-loc-btn').onclick = () => editLocation(loc.id);
+        if (isTD) {
+          locDiv.querySelector('.edit-loc-btn').onclick = () => editLocation(loc.id);
+          locDiv.querySelector('.delete-loc-btn').onclick = () => window.deleteLocation(loc.id);
+        }
         locDiv.querySelector('.add-mach-btn').onclick = () => showMachineForm(loc.id, loc.name);
-        locDiv.querySelector('.delete-loc-btn').onclick = () => window.deleteLocation(loc.id);
 
         renderMachinesForLocation(loc.id, loc.name, loc.machines);
       });
@@ -265,11 +274,12 @@ export async function initLocationsPage() {
         </span>
         <div style="display: flex; gap: 4px;">
           <button class="edit-mach-btn secondary" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>
-          <button class="remove-mach-btn" style="padding: 2px 8px; font-size: 0.8rem;">Remove</button>
+          ${isTD ? '<button class="remove-mach-btn" style="padding: 2px 8px; font-size: 0.8rem;">Remove</button>' : ''}
         </div>
       `;
       item.querySelector('.edit-mach-btn').onclick = () => showMachineForm(locationId, locationName, m);
-      item.querySelector('.remove-mach-btn').onclick = async () => {
+      const removeBtn = item.querySelector('.remove-mach-btn');
+      if (removeBtn) removeBtn.onclick = async () => {
         if (await showConfirm(`Remove ${m.machineName} from this location?`, 'Remove Machine')) {
           await PB_API.removeLocationMachine(locationId, m.machineId);
           refresh();
@@ -384,6 +394,10 @@ export async function initLocationsPage() {
    * @param {number} id 
    */
   window.deleteLocation = async (id) => {
+    if (!isTD) {
+      showAlert('You do not have permission to delete locations.', 'Access Denied');
+      return;
+    }
     const loc = allLocations.find(l => l.id === id);
     const locName = loc ? loc.name : 'this location';
 

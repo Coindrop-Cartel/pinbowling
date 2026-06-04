@@ -27,4 +27,9 @@
     <h2>Scoring Logic</h2>
     <p id="scoring-logic-text"><?php echo $active['logic']; ?></p>
   </section>
+
+  <section class="card">
+    <h2>AI Disclosure</h2>
+    <p><?php echo $aiDisclosure; ?></p>
+  </section>
 </main>

@@ -100,20 +100,42 @@ $themeClass = ($preferredFormat === 'golf') ? 'theme-golf' : '';
 // Global project text (Format Agnostic)
 $siteBrand   = 'Pinball And Stuff';
 $siteSlogan  = "Don't say \"and stuff\", just say \"There is pinball here\".";
-$aboutProject = "This system bridges the gap between competitive pinball and traditional sporting formats. It provides a robust management platform for tracking player performance, machine targets, and historical data across multiple leagues and venues.";
+$aboutProject = "Like Pinball, but wish it was scored like Bowling?  Like Pinball, but wish it was scored more like Golf? Like Pinball, but wish it was scored more like Basketball?  
+                Well if it's the first two, we've got a site for you (if it's the 3rd one, find an NBA Fastbreak machine, perferablely linked.  I know a guy). 
+                <br><br> 
+                This project is a free and open-source web application to let folks manage leagues or create one off sessions to kill time at a bar.  
+                At some point the links to the source code on github will be on some other page, but I haven't gotten to that.";
+$aiDisclosure = "I don't feel like AI \"generated\" this site, but at this point it's pretty hard to code without it being involved in some part of your workflow.  
+                I don't consider that \"generating\" code because the design, structure, layout and logos were all designed and reviewed by a human (one human to be specific), 
+                but I also don't want to be misleading about the fact that it was used to help generate the backend, stardized pages and track down issues and syntax.  
+                <br><br>
+                Unfortunately this means that some text in some locations may have been overriden and I didn't notice (but I'm working tracking that down).  
+                AI has a tendancy left unchecked to overstep bounds and include dumb corporate speak when I just want it track down some syntax issue or find out why a dropdown won't go away.  
+                If you have questions about how it was used, feel free to ask.  I have a complicated relationship with AI so be prepared for a long rambling answer. 
+                <br><br>
+                <b>If given all this you feel like it was and that makes it a hard pass for you, I totally undersatnd.</b>";
 
 $engineMeta = [
     'bowling' => [
         'brand' => 'PinBowling',
         'logo'  => 'pinbowling.png',
         'cta'   => "Let's Bowl!",
-        'logic' => "Each machine has target scores corresponding to pin counts. Reaching the target on ball 1 is a strike (X). Reaching it on ball 2 is a 9-count spare (9/). Reaching it on ball 3 is a spare based on your cumulative progress from balls 1 & 2 (capped at 8/). Total scores are calculated following standard bowling rules, including strike and spare bonuses from subsequent frames."
+        'hint'  => "Enter the cumulative score after each ball. If you reach the target score for that round, you can stop entering scores and move on to the next frame. 
+                    DO NOT PLAY EXTRA BALLS",
+        'lastFrameHint' => "In the last frame, you can get up to 3 strikes.  Keep playing until you hit the additional target scores or you run out of balls.",
+        'logic' => "Each machine has target scores corresponding to pin counts. Reaching the target on ball 1 is a strike (X). Reaching it on ball 2 is a 9-count spare (9/). 
+        Reaching it on ball 3 is a spare based on your cumulative progress from balls 1 & 2 (capped at 8/). Total scores are calculated following standard bowling rules, 
+        if you don't know how Bowling Score works I'm not gonna explain it to you, but I will say higher is better."
     ],
     'golf' => [
         'brand' => 'PinGolf',
         'logo'  => 'pingolf.png',
         'cta'   => "Let's Golf!",
-        'logic' => "Strokes 1, 2, or 3 are awarded based on which ball reached the Target Score. If the target is not met within three balls, a score of 4-10 is assigned based on the final cumulative score relative to interpolated thresholds."
+        'hint'  => "Enter the cumulative score after each ball. When you hit the target score you can stop entering scores for that round and move on to the next hole.
+                    DO NOT PLAY EXTRA BALLS",
+        'logic' => "Strokes 1, 2, or 3 are awarded based on which ball reached the Target Score. If the target is not met within three balls, 
+        a score of 4-10 is assigned based on the final cumulative score relative the target scores for that hole and then scored relative to the par value (-1, +2, etc).  
+        If you don't know how Golf scoring works, I don't really know what to tell you, but I will say lower is better."
     ]
 ];
 

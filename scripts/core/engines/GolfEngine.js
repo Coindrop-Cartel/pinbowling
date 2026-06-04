@@ -4,17 +4,7 @@ import { ScoringEngine } from '../ScoringEngine.js';
  * Placeholder for future Golf scoring format.
  */
 export class GolfEngine extends ScoringEngine {
-  getBrandName() {
-    return 'PinGolf';
-  }
-
   getThemeClass() { return 'theme-golf'; }
-
-  getLogoImage() { return 'pingolf.png'; }
-
-  getScoringDescription() {
-    return "Strokes 1, 2, or 3 are awarded based on which ball reached the Target Score. If the target is not met within three balls, a score of 4-10 is assigned based on the final cumulative score relative to interpolated thresholds.";
-  }
 
   calculateTurnResults(machines, scoreMap) {
     const results = machines.map((round) => {
@@ -205,13 +195,5 @@ export class GolfEngine extends ScoringEngine {
 
   getHighScoreLabel() {
     return 'Target Score';
-  }
-
-  getLowScoreLabel() {
-    return 'Par';
-  }
-
-  getPlayActionLabel() {
-    return "Let's Golf!";
   }
 }

@@ -1,8 +1,9 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js';
-import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, setActiveEventId, setCurrentPlayerId, getCurrentPlayerId, renderThresholdGrid } from '@scripts/utils.js';
+import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, setActiveEventId, setActiveLeagueId, setCurrentPlayerId, getCurrentPlayerId, renderThresholdGrid } from '@scripts/utils.js';
 import { initTournamentSelector, createSearchableSelect, applyPreferredTheme, renderActionSummary } from '@ui/uiComponents.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
+import { can, PERMISSIONS } from '@services/auth.js';
 
 /**
  * Initializes the Player Scoring page.
@@ -26,8 +27,32 @@ export async function initScoresPage() {
   const scoringCard = document.getElementById('scoring-card');
   const resultsCard = document.getElementById('results-card');
 
+  // Fetch leagues and current user once at the start. 
+  const [rawLeagues, user] = await Promise.all([
+    PB_API.getLeagues(),
+    PB_API.getCurrentUser()
+  ]);
+
+  // Requirement: Unregistered users only see leagues that have at least one guest player.
+  const initialLeagues = !user 
+    ? rawLeagues.filter(l => (l.players || []).some(p => !p.userId))
+    : rawLeagues;
+
+  // If we land on the scores page with a session/non-standard league active, 
+  // we clear it so the selector resets and refreshes to show standard leagues.
+  // EXCEPTION: If we have both leagueId and eventId, we are deep-linking from "Let's Bowl".
+  const initialLeagueId = getActiveLeagueId();
+  const initialEventId = getActiveEventId();
+  if (initialLeagueId && !initialEventId) {
+    const active = initialLeagues.find(l => String(l.id) === String(initialLeagueId));
+    if (active && active.type !== 'standard') {
+      setActiveLeagueId('');
+      setActiveEventId('');
+    }
+  }
+
   let playerSearchInstance = null;
-  let currentUser = null;
+  let currentUser = user;
   let activeLeague = null;
   let allPlayersCache = [];
   let machines = [];
@@ -94,13 +119,11 @@ export async function initScoresPage() {
    * @param {Object} targetPlayer The player being scored.
    * @returns {HTMLElement} The row element.
    */
-  function buildRoundRow(round, turnValues, isLastRound = false, targetPlayer = null) {
+  async function buildRoundRow(round, turnValues, isLastRound = false, targetPlayer = null) {
     const row = document.createElement('div');
     
-    // Security Logic Check
-    const isAdmin = currentUser?.role === 'admin';
-    const isTD = currentUser?.role === 'td';
-    const hasElevatedPrivileges = isAdmin || isTD;
+    // Centralized Security Logic
+    const canUpdateAny = await can(PERMISSIONS.UPDATE_ANY_SCORE);
     
     const isUpdate = !!(turnValues?.ball1 || turnValues?.ball2 || turnValues?.ball3);
     const isStandardLeague = activeLeague?.type === 'standard';
@@ -108,10 +131,21 @@ export async function initScoresPage() {
     const isSelf = currentUser && String(targetPlayer?.id) === String(currentUser.player_id);
     const isTargetUnregistered = !targetPlayer?.userId;
     
-    // 1. In standard leagues, non-admins can only ADD, not UPDATE.
-    const updateForbidden = !hasElevatedPrivileges && isStandardLeague && isUpdate;
-    // 2. Users can only edit themselves or unregistered guests. Guests can edit any guest.
-    const targetForbidden = !hasElevatedPrivileges && (currentUser ? (!isSelf && !isTargetUnregistered) : !isTargetUnregistered);
+    // Rule: Non-TDs/Admins can only ADD scores, never UPDATE (especially in standard leagues).
+    let accessDenied = false;
+    let msg = '';
+
+    if (isUpdate && !canUpdateAny) {
+        accessDenied = true;
+        msg = 'Updates locked';
+    } else if (!canUpdateAny) {
+        // If they can't manage all, they can only score self or unregistered guests.
+        const isAuthorizedToScore = isSelf || isTargetUnregistered;
+        if (!isAuthorizedToScore) {
+            accessDenied = true;
+            msg = 'Guest Only';
+        }
+    }
 
     row.className = 'round-row';
     row.style = "display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 8px 12px; margin-bottom: 5px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;";
@@ -129,12 +163,11 @@ export async function initScoresPage() {
           ${renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2)}
         </div>
       </div>
-      <div class="round-inputs-container" style="display: flex; gap: 0.5rem; align-items: center; ${updateForbidden || targetForbidden ? 'opacity: 0.5; pointer-events: none;' : ''}"></div>
-      <button class="save-round-button" ${updateForbidden || targetForbidden ? 'style="display:none;"' : 'disabled'}>Save</button>
+      <div class="round-inputs-container" style="display: flex; gap: 0.5rem; align-items: center; ${accessDenied ? 'opacity: 0.5; pointer-events: none;' : ''}"></div>
+      <button class="save-round-button" ${accessDenied ? 'style="display:none;"' : 'disabled'}>Save</button>
     `;
 
-    if (updateForbidden || targetForbidden) {
-        const msg = updateForbidden ? 'Updates locked' : 'Guest Only';
+    if (accessDenied) {
         row.querySelector('.round-inputs-container').insertAdjacentHTML('afterend', `<span style="font-size: 0.7rem; color: #888; text-transform: uppercase;">${msg}</span>`);
     }
 
@@ -211,6 +244,11 @@ export async function initScoresPage() {
         players = (await PB_API.getPlayers()) || [];
       }
 
+      // Requirement: Unregistered users can only select players that are unregistered guests
+      if (!currentUser) {
+        players = players.filter(p => !p.userId);
+      }
+
       allPlayersCache.length = 0;
       allPlayersCache.push(...players);
 
@@ -265,7 +303,7 @@ export async function initScoresPage() {
    * @param {Array<Object>} scoreRows Raw score data from the database.
    * @param {Object} player The player being scored.
    */
-  function loadScoresIntoForm(scoreRows, player) {
+  async function loadScoresIntoForm(scoreRows, player) {
     const scoreMap = scoreRows.reduce((map, row) => {
       map[String(row.orderNumber)] = row;
       return map;
@@ -274,10 +312,25 @@ export async function initScoresPage() {
     const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
     roundsInput.innerHTML = '';
-    machines.forEach((round) => {
+    for (const round of machines) {
+      const isLastRound = round.orderNumber === maxOrder;
       const turnValues = scoreMap[String(round.orderNumber)];
-      roundsInput.appendChild(buildRoundRow(round, turnValues, round.orderNumber === maxOrder, player));
-    });
+
+      // Inject last-frame specific hint if defined for this format
+      if (isLastRound) {
+        const lfHint = Engine.getLastFrameHint?.();
+        if (lfHint) {
+          const hintDiv = document.createElement('div');
+          hintDiv.className = 'hint';
+          hintDiv.style = "font-size: 0.75rem; padding: 8px 12px; margin-bottom: 5px; border-left-width: 4px;";
+          hintDiv.innerHTML = lfHint;
+          roundsInput.appendChild(hintDiv);
+        }
+      }
+
+      const row = await buildRoundRow(round, turnValues, isLastRound, player);
+      roundsInput.appendChild(row);
+    }
   }
 
   /**
@@ -326,7 +379,7 @@ export async function initScoresPage() {
     roundsInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
     
     const scores = await PB_API.getScores(Number(activePlayerId), Number(getActiveEventId()));
-    loadScoresIntoForm(scores, player);
+    await loadScoresIntoForm(scores, player);
     renderCurrentResults();
   }
 
@@ -392,11 +445,10 @@ export async function initScoresPage() {
       return;
     }
     
-    // Fetch leagues and machine targets in parallel
-    const [leagues, eventTargets, user] = await Promise.all([
+    // Fetch leagues and machine targets in parallel. User is already fetched at init.
+    const [leagues, eventTargets] = await Promise.all([
       PB_API.getLeagues(),
-      PB_API.getTargetScores(eventId),
-      PB_API.getCurrentUser()
+      PB_API.getTargetScores(eventId)
     ]);
 
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
@@ -413,11 +465,22 @@ export async function initScoresPage() {
       { text: 'Print Blank Score Sheet', onclick: () => printBlankScoreSheet(machines, league?.name, event?.eventName, format), hidden: eventTargets.length === 0 }
     ]);
 
-    currentUser = user;
     activeLeague = league;
     const format = event?.scoringFormat || league?.scoringFormat || 'bowling';
     Engine = getScoringEngine(format);
     applyPreferredTheme(format);
+
+    // Update the scoring section title using the Engine's specific terminology (Frame vs Hole)
+    const scoringHeader = scoringCard.querySelector('h2');
+    if (scoringHeader) {
+      scoringHeader.textContent = `Enter ${Engine.getRoundLabel()} Scores`;
+    }
+
+    // Update the general hint text based on the active engine
+    const scoringHint = document.getElementById('scoring-hint');
+    if (scoringHint) {
+      scoringHint.textContent = Engine.getScoringHint?.() || '';
+    }
 
     machines = eventTargets;
 
@@ -442,5 +505,5 @@ export async function initScoresPage() {
     }
   };
 
-  await initTournamentSelector('.tournament-selector-container', { onRefresh: refresh });
+  await initTournamentSelector('.tournament-selector-container', { onRefresh: refresh, existingLeagues: initialLeagues });
 }

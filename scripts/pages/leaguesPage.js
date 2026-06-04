@@ -18,6 +18,12 @@ export async function initLeaguesPage() {
   ]);
   const isAuthorized = authorized;
   const leagueForm = document.getElementById('league-form');
+
+  // Requirement: Hide the entire management card for non-TDs/Admins
+  if (!isAuthorized && leagueForm) {
+    leagueForm.closest('.card')?.classList.add('hidden');
+  }
+
   const leagueNameInput = document.getElementById('league-name');
   const leagueDateInput = document.getElementById('league-start-date');
   const leagueFormatInput = document.getElementById('league-scoring-format');
@@ -206,8 +212,10 @@ export async function initLeaguesPage() {
     // Hide the "Create" toggle if an exact match exists, unless the creation 
     // form is already open (in which case the button serves as "Cancel").
     const isFormOpen = dateRow && !dateRow.classList.contains('hidden');
-    if (createToggle) createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
-
+    if (createToggle) {
+      createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
+    }
+    
     const dateVal = leagueDateInput?.value;
     if (createBtn) createBtn.disabled = !query || !dateVal || !!exactMatch;
     
@@ -258,10 +266,12 @@ export async function initLeaguesPage() {
     actionsRow.classList.add('hidden');
     deleteLeagueMgmtBtn.classList.add('hidden');
     
-    createBtn.textContent = 'Create';
-    createToggle.textContent = 'Create';
-    createToggle.style.marginTop = '10px';
-    leagueNameInput.after(createToggle);
+    if (createBtn) createBtn.textContent = 'Create';
+    if (createToggle) {
+      createToggle.textContent = 'Create';
+      createToggle.style.marginTop = '10px';
+      leagueNameInput.after(createToggle);
+    }
   };
 
   const refresh = async (leagues = null, players = null) => {

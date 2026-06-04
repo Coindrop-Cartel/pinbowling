@@ -9,7 +9,16 @@ vi.mock('@services/api.js', () => ({
     getLocations: vi.fn(),
     createLeague: vi.fn(),
     createEvent: vi.fn(),
-    saveTargetScore: vi.fn()
+    saveTargetScore: vi.fn(),
+    getCurrentUser: vi.fn()
+  }
+}));
+
+vi.mock('@services/auth.js', () => ({
+  can: vi.fn(() => Promise.resolve(true)),
+  PERMISSIONS: {
+    CREATE_SESSION: 'CREATE_SESSION',
+    JOIN_SESSION: 'JOIN_SESSION'
   }
 }));
 

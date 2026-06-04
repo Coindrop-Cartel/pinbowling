@@ -31,7 +31,17 @@ vi.mock('@scripts/utils.js', () => ({
   getActiveLeagueId: vi.fn(() => '1'),
   getCurrentPlayerId: vi.fn(),
   setCurrentPlayerId: vi.fn(),
+  setActiveLeagueId: vi.fn(),
+  setActiveEventId: vi.fn(),
   renderThresholdGrid: vi.fn(() => 'Grid'),
+}));
+
+vi.mock('@services/auth.js', () => ({
+  can: vi.fn(() => Promise.resolve(true)),
+  resetAuthCache: vi.fn(),
+  PERMISSIONS: {
+    UPDATE_ANY_SCORE: 'UPDATE_ANY_SCORE'
+  }
 }));
 
 vi.mock('@ui/uiComponents.js', () => ({
@@ -47,11 +57,13 @@ vi.mock('@ui/uiComponents.js', () => ({
 }));
 
 import { initScoresPage } from '@scripts/pages/scoresPage.js';
+import { resetAuthCache, can } from '@scripts/services/auth.js';
 import { PB_API } from '@services/api.js';
 import { getCurrentPlayerId } from '@scripts/utils.js';
 
 describe('Scores Page (scoresPage.js)', () => {
   beforeEach(() => {
+    resetAuthCache();
     document.body.innerHTML = `
       <div id="scoring-card" class="hidden">
         <div id="rounds-input"></div>
@@ -128,6 +140,7 @@ describe('Scores Page (scoresPage.js)', () => {
 
   describe('Permissions & Security', () => {
     it('Admin should be able to edit existing scores in standard leagues', async () => {
+      can.mockResolvedValue(true); // Ensure permission check passes
       PB_API.getCurrentUser.mockResolvedValue({ role: 'admin', player_id: '1' });
       PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'L1', type: 'standard' }]);
       PB_API.getLeague.mockResolvedValue({ id: 1, players: [{ id: 7, playerName: 'Kyle', userId: 123 }] });
@@ -143,6 +156,7 @@ describe('Scores Page (scoresPage.js)', () => {
     });
 
     it('Regular User should be locked from editing existing scores in standard leagues', async () => {
+      can.mockResolvedValue(false); // Explicitly deny update permission for players
       PB_API.getCurrentUser.mockResolvedValue({ role: 'player', player_id: '7' });
       PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'L1', type: 'standard' }]);
       PB_API.getLeague.mockResolvedValue({ id: 1, players: [{ id: 7, playerName: 'Kyle', userId: 777 }] });

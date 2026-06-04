@@ -64,13 +64,12 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
   const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
   const instructions = `
-    <p style="margin: 5px 0;"><strong>Do NOT Play Extra balls.</strong></p>
-    <p style="margin: 5px 0;">Enter your score after each ball until you hit the target score, or run out of balls.
-    ${isBowling ? ' Except on the last frame where you should keep playing until you hit the Target 2 score or run out of balls.' : ''}</p>
+    <p style="margin: 5px 0;">${Engine.getScoringHint() || 'Enter your score after each ball until you hit the target score, or run out of balls.'}</p>
   `;
 
   const framesHtml = machines.map((m) => {
     const isLast = m.orderNumber === maxOrder;
+    const lfHint = isLast ? Engine.getLastFrameHint() : null;
     let targetsHtml = '';
     if (isBowling) {
       targetsHtml = `<span>Strike: <strong>${formatNumber(m.values[10])}</strong></span>`;
@@ -90,6 +89,7 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
     }
 
     return `
+    ${lfHint ? `<div style="margin-bottom: 4px; font-size: 0.8rem; font-style: italic;">${lfHint}</div>` : ''}
     <div style="border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; page-break-inside: avoid;">
       <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px;">
         <span style="font-weight: bold;">${Engine.getRoundLabel()} ${m.orderNumber}</span>
@@ -109,11 +109,10 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
       <head><style>body { font-family: sans-serif; padding: 20px; line-height: 1.2; }</style></head>
       <body>
         <div style="border-bottom: 2px solid #000; margin-bottom: 12px; padding-bottom: 6px;">
-          <h1 style="margin: 0 0 10px 0;">Pinball Scoring Sheet</h1>
           <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-            <div>
-              ${leagueName ? `<div><strong>League:</strong> ${leagueName}</div>` : ''}
-              <div><strong>Event:</strong> ${eventName}</div>
+            <div style="font-size: 1.4rem;">
+              ${leagueName ? `<div style="margin-bottom: 4px;"><strong>League:</strong> ${leagueName}</div>` : ''}
+              <div style="margin-bottom: 4px;"><strong>Event:</strong> ${eventName}</div>
             </div>
             <div style="text-align: right;">
               <div>Player: __________________________</div>

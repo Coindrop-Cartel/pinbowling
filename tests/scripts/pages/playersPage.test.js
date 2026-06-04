@@ -29,6 +29,11 @@ vi.mock('@ui/uiComponents.js', () => ({
 
 vi.mock('@services/auth.js', () => ({
   requireAdmin: vi.fn(() => Promise.resolve(true)),
+  can: vi.fn(() => Promise.resolve(true)),
+  PERMISSIONS: {
+    MANAGE_PLAYERS: 'MANAGE_PLAYERS',
+    UPDATE_SELF: 'UPDATE_SELF'
+  }
 }));
 
 describe('Player Management Page (playersPage.js)', () => {

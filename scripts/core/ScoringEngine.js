@@ -4,17 +4,25 @@
  */
 export class ScoringEngine {
   /**
+   * Internal helper to identify the format key (e.g., 'bowling', 'golf')
+   * derived automatically from the engine's class name.
+   */
+  getFormatKey() {
+    return this.constructor.name.replace('Engine', '').toLowerCase();
+  }
+
+  /**
    * Returns the brand name associated with the scoring format.
    */
   getBrandName() {
-    return 'PinBowling';
+    return window.PB_ENGINE_META?.[this.getFormatKey()]?.brand || 'PinBowling';
   }
 
   /**
    * Returns the descriptive scoring logic text for the homepage.
    */
   getScoringDescription() {
-    return '';
+    return window.PB_ENGINE_META?.[this.getFormatKey()]?.logic || '';
   }
 
   /**
@@ -28,7 +36,7 @@ export class ScoringEngine {
    * Returns the filename for the branding logo.
    */
   getLogoImage() {
-    return 'pinbowling.png';
+    return window.PB_ENGINE_META?.[this.getFormatKey()]?.logo || 'pinbowling.png';
   }
 
   /**
@@ -70,7 +78,7 @@ export class ScoringEngine {
    * Returns the call-to-action text for the play navigation link.
    */
   getPlayActionLabel() {
-    return 'Play';
+    return window.PB_ENGINE_META?.[this.getFormatKey()]?.cta || 'Play';
   }
 
   /**
@@ -177,5 +185,26 @@ export class ScoringEngine {
 
   getBonusTargetHtml() {
     return '';
+  }
+
+  /**
+   * Returns format-specific scoring instructions or notes.
+   */
+  getScoringInstructions() {
+    return '';
+  }
+
+  /**
+   * Returns a brief hint on how to use the input fields, pulled from config.
+   */
+  getScoringHint() {
+    return window.PB_ENGINE_META?.[this.getFormatKey()]?.hint;
+  }
+
+  /**
+   * Returns a specialized hint for the final frame/round, pulled from config.
+   */
+  getLastFrameHint() {
+    return window.PB_ENGINE_META?.[this.getFormatKey()]?.lastFrameHint;
   }
 }

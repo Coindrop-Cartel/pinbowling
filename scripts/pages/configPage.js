@@ -249,6 +249,24 @@ export async function initConfigPage() {
         className: 'round-item',
         draggable: true,
         isExpanded,
+        onMoveUp: round.orderNumber > 1 ? () => {
+          const idx = eventTargets.indexOf(round);
+          if (idx > 0) {
+            [eventTargets[idx], eventTargets[idx - 1]] = [eventTargets[idx - 1], eventTargets[idx]];
+            eventTargets.forEach((t, i) => t.orderNumber = i + 1);
+            checkListDirty();
+            render();
+          }
+        } : null,
+        onMoveDown: round.orderNumber < maxOrder ? () => {
+          const idx = eventTargets.indexOf(round);
+          if (idx < eventTargets.length - 1) {
+            [eventTargets[idx], eventTargets[idx + 1]] = [eventTargets[idx + 1], eventTargets[idx]];
+            eventTargets.forEach((t, i) => t.orderNumber = i + 1);
+            checkListDirty();
+            render();
+          }
+        } : null,
         headerHtml: `
         <div style="display: flex; align-items: center; gap: 12px; width: 100%; flex-wrap: wrap;">
           <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">

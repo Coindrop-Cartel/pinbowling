@@ -711,6 +711,8 @@ export function createExpandableRow(container, options) {
     contentHtml, 
     isExpanded = false, 
     onHeaderClick, 
+    onMoveUp,
+    onMoveDown,
     draggable = false, 
     className = '', 
     tag = 'div',
@@ -736,9 +738,35 @@ export function createExpandableRow(container, options) {
   `;
 
   const header = row.querySelector('.row-header');
+
+  // Handle reorder buttons if callbacks are provided
+  if (onMoveUp || onMoveDown) {
+    const reorderContainer = document.createElement('div');
+    reorderContainer.className = 'reorder-btns';
+    reorderContainer.style = 'display: flex; flex-direction: column; gap: 2px; margin-left: 8px; align-items: center; justify-content: center;';
+    reorderContainer.innerHTML = `
+      <button type="button" class="move-up-btn" style="padding: 2px; line-height: 1; background: none !important; color: var(--pb-primary) !important; border: none !important; font-size: 0.8rem; cursor: pointer;" title="Move Up">▲</button>
+      <button type="button" class="move-down-btn" style="padding: 2px; line-height: 1; background: none !important; color: var(--pb-primary) !important; border: none !important; font-size: 0.8rem; cursor: pointer;" title="Move Down">▼</button>
+    `;
+
+    // Anchor to machine name for better visual placement, fallback to end of header
+    const anchor = row.querySelector('.machine-name-display');
+    if (anchor) anchor.after(reorderContainer);
+    else header.appendChild(reorderContainer);
+
+    const up = reorderContainer.querySelector('.move-up-btn');
+    const down = reorderContainer.querySelector('.move-down-btn');
+
+    if (onMoveUp) up.onclick = (e) => { e.stopPropagation(); onMoveUp(e); };
+    else up.style.visibility = 'hidden'; // Use visibility to maintain flex spacing
+
+    if (onMoveDown) down.onclick = (e) => { e.stopPropagation(); onMoveDown(e); };
+    else down.style.visibility = 'hidden';
+  }
+
   header.onclick = (e) => {
     // Prevent toggling when clicking interactive elements inside the header
-    if (e.target.closest('button, input, select, label')) return;
+    if (e.target.closest('button, input, select, label, .reorder-btns')) return;
     if (onHeaderClick) onHeaderClick(e);
   };
 

@@ -27,6 +27,8 @@ $mergedBodyClass = trim(($bodyClass ?? '') . ' ' . $themeClass);
   <script>
     // Bridge PHP calculated base path to JavaScript
     window.APP_BASE = "<?php echo $baseUrl; ?>";
+    // Export engine metadata from config.php to JavaScript
+    window.PB_ENGINE_META = <?php echo json_encode($engineMeta); ?>;
   </script>
   <script type="importmap">
   {

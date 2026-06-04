@@ -1,6 +1,4 @@
 import { PB_API } from '@services/api.js';
-import { SCORING_FORMATS } from '@core/engine.js';
-import { getCookie } from '@scripts/utils.js';
 import { setupLiveFilter, showConfirm, showPrompt, showChoiceDialog, showAlert } from '@ui/uiComponents.js';
 import { requireAdmin } from '@services/auth.js';
 
@@ -26,13 +24,6 @@ export async function initPlayersPage() {
   const matchplayIdInput = document.getElementById('matchplay-id');
   const savePlayerButton = document.getElementById('save-player-button');
   const cancelEditButton = document.getElementById('cancel-edit-button');
-  const scoringFormatInput = document.getElementById('player-scoring-format');
-
-  // Populate format dropdown from centralized list
-  if (scoringFormatInput) {
-    scoringFormatInput.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
-    scoringFormatInput.value = getCookie('pb_preferred_format') || 'bowling';
-  }
 
   const playerList = document.getElementById('player-list');
 
@@ -42,7 +33,6 @@ export async function initPlayersPage() {
   // Setup "Create Player" toggle
   const ifpaRow = document.getElementById('player-ifpa-row');
   const matchplayRow = document.getElementById('player-matchplay-row');
-  const formatRow = document.getElementById('player-format-row');
   const actionsRow = document.getElementById('player-form-actions');
 
   // Create management buttons for the form (only visible during edit)
@@ -82,7 +72,6 @@ export async function initPlayersPage() {
     const isHidden = !ifpaRow || ifpaRow.classList.contains('hidden');
     ifpaRow.classList.toggle('hidden', !isHidden);
     matchplayRow.classList.toggle('hidden', !isHidden);
-    if (formatRow) formatRow.classList.toggle('hidden', !isHidden);
     actionsRow.classList.toggle('hidden', !isHidden);
     if (isHidden) {
       createToggle.textContent = 'Cancel';
@@ -178,7 +167,6 @@ export async function initPlayersPage() {
     playerNameInput.value = '';
     ifpaIdInput.value = '';
     matchplayIdInput.value = '';
-    if (scoringFormatInput) scoringFormatInput.value = getCookie('pb_preferred_format') || 'bowling';
     if (playerFormTitle) playerFormTitle.textContent = 'Add New Player';
     savePlayerButton.textContent = 'Save Player';
     
@@ -189,7 +177,6 @@ export async function initPlayersPage() {
     // Collapse creation fields
     if (ifpaRow) ifpaRow.classList.add('hidden');
     if (matchplayRow) matchplayRow.classList.add('hidden');
-    if (formatRow) formatRow.classList.add('hidden');
     if (actionsRow) actionsRow.classList.add('hidden');
     createToggle.textContent = 'Create New Player';
     createToggle.style.marginTop = '10px';
@@ -219,19 +206,17 @@ export async function initPlayersPage() {
     editingPlayerIdInput.value = player.id;
     playerNameInput.value = player.playerName;
     
-    // Lock name for non-privileged users
-    playerNameInput.disabled = !hasElevatedPrivileges;
+    // Lock name for non-privileged users UNLESS it is their own profile
+    playerNameInput.disabled = !hasElevatedPrivileges && !isSelf;
     
     ifpaIdInput.value = player.ifpaId || '';
     matchplayIdInput.value = player.matchplayId || '';
-    if (scoringFormatInput) scoringFormatInput.value = player.preferredFormat || 'bowling';
     if (playerFormTitle) playerFormTitle.textContent = `Edit Player: ${player.playerName}`;
     savePlayerButton.textContent = 'Update Player';
 
     // Expand fields for editing
     if (ifpaRow) ifpaRow.classList.remove('hidden');
     if (matchplayRow) matchplayRow.classList.remove('hidden');
-    if (formatRow) formatRow.classList.remove('hidden');
     if (actionsRow) actionsRow.classList.remove('hidden');
     createToggle.textContent = 'Cancel';
     createToggle.style.marginTop = '0';
@@ -289,7 +274,6 @@ export async function initPlayersPage() {
     const name = playerNameInput.value.trim();
     const ifpaId = ifpaIdInput.value.trim() || null;
     const matchplayId = matchplayIdInput.value.trim() || null;
-    const preferredFormat = scoringFormatInput ? scoringFormatInput.value : 'bowling';
 
     if (!name) return;
 
@@ -305,8 +289,7 @@ export async function initPlayersPage() {
     const payload = { 
       playerName: name, 
       ifpaId: ifpaId, 
-      matchplayId: matchplayId,
-      preferredFormat
+      matchplayId: matchplayId
     };
 
     try {

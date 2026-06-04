@@ -10,7 +10,11 @@ vi.mock('@services/api.js', () => ({
 }));
 
 vi.mock('@services/auth.js', () => ({
-  requireAdmin: vi.fn()
+  requireAdmin: vi.fn(),
+  can: vi.fn(() => Promise.resolve(true)),
+  PERMISSIONS: {
+    RUN_CLEANUP: 'RUN_CLEANUP'
+  }
 }));
 
 vi.mock('@services/state.js', () => ({
@@ -28,6 +32,7 @@ import { PB_API } from '@services/api.js';
 import { requireAdmin } from '@services/auth.js';
 import { showConfirm, showPrompt, showAlert } from '@ui/uiComponents.js';
 import { setDebugEnabled } from '@services/state.js';
+import { can } from '@services/auth.js';
 
 describe('Management Page (managementPage.js)', () => {
   beforeEach(() => {
@@ -39,6 +44,7 @@ describe('Management Page (managementPage.js)', () => {
       <button id="admin-login-btn">Login</button>
     `;
     vi.clearAllMocks();
+    can.mockResolvedValue(true);
     window.PB_DEBUG_MODE = false;
     window.PB_UI_VERSION = '1.2.3';
   });
@@ -56,6 +62,7 @@ describe('Management Page (managementPage.js)', () => {
 
   it('should reveal tools but hide cleanup for TD users', async () => {
     PB_API.getCurrentUser.mockResolvedValue({ role: 'td' });
+    can.mockResolvedValue(true); // Authorized for page but maybe not cleanup
 
     await initManagementPage();
 

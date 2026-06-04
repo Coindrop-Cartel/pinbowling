@@ -29,8 +29,9 @@
     </section>
 
     <section id="scoring-card" class="card hidden" style="margin-bottom: 5px; padding: 12px 15px;">
-      <h2 style="margin-top: 0;">Enter Round Scores</h2>
-      <p class="hint">Enter the cumulative pinbowling score after each ball. We will do the rest.</p>
+      <h2 style="margin-top: 0;">Enter Scores</h2>
+      <div id="scoring-instruction-notice" class="hint hidden" style="font-size: 0.85rem; margin-bottom: 1rem;"></div>
+      <p id="scoring-hint" class="hint">Enter the cumulative score after each ball. We will do the rest.</p>
       <div id="player-warning" class="notice hidden"></div>
       <form id="player-form">
         <div id="rounds-input"></div>
@@ -44,7 +45,7 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Round</th>
+              <th>#</th>
               <th>Machine</th>
               <th>Score</th>
               <th>Total</th>

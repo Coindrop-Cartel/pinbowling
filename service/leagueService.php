@@ -95,7 +95,13 @@ try {
                     $stmt->execute([$id]);
                     $league['events'] = $stmt->fetchAll();
 
-                    $stmt = $pdo->prepare('SELECT p.* FROM players p JOIN league_players lp ON p.id = lp.player_id WHERE lp.league_id = ? ORDER BY p.player_name ASC');
+                    $stmt = $pdo->prepare('
+                        SELECT p.*, u.id as user_id 
+                        FROM players p 
+                        JOIN league_players lp ON p.id = lp.player_id 
+                        LEFT JOIN users u ON p.id = u.player_id 
+                        WHERE lp.league_id = ? 
+                        ORDER BY p.player_name ASC');
                     $stmt->execute([$id]);
                     $league['players'] = $stmt->fetchAll();
 
@@ -124,7 +130,12 @@ try {
             $allEvents = $eventsStmt->fetchAll();
 
             // Fetch all league players
-            $lpStmt = $pdo->query('SELECT lp.league_id, p.* FROM players p JOIN league_players lp ON p.id = lp.player_id ORDER BY p.player_name ASC');
+            $lpStmt = $pdo->query('
+                SELECT lp.league_id, p.*, u.id as user_id 
+                FROM players p 
+                JOIN league_players lp ON p.id = lp.player_id 
+                LEFT JOIN users u ON p.id = u.player_id 
+                ORDER BY p.player_name ASC');
             $allLeaguePlayers = $lpStmt->fetchAll();
 
             // Group events by their league_id

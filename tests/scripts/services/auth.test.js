@@ -14,17 +14,19 @@ vi.mock('@ui/uiComponents.js', () => ({
   showAuthDialog: vi.fn(() => Promise.resolve(true))
 }));
 
-import { requireAdmin, runAuthorizedLeagueAction, initAuthHeader, isManagementAuthorized } from '@scripts/services/auth.js';
+import { requireAdmin, runAuthorizedLeagueAction, initAuthHeader, isManagementAuthorized, resetAuthCache } from '@scripts/services/auth.js';
 import { PB_API } from '@services/api.js';
 import { showAlert, showAuthDialog } from '@ui/uiComponents.js';
 
 describe('Auth Service (auth.js)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetAuthCache();
     // Setup DOM for auth header tests
     document.body.innerHTML = `
       <div id="auth-header-container"></div>
       <div id="admin-nav-item" class="hidden">
+        <a id="nav-leagues" class="hidden">Leagues</a>
         <a id="nav-maintenance" class="hidden">Maintenance</a>
       </div>
     `;

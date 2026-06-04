@@ -35,12 +35,22 @@ try {
 
     // GET: Retrieve all registered players alphabetically
     if ($method === 'GET') {
-        $stmt = $pdo->query('
-            SELECT p.*, u.role as user_role, u.id as user_id 
-            FROM players p 
-            LEFT JOIN users u ON p.id = u.player_id 
-            ORDER BY p.player_name ASC
-        ');
+        $user = getCurrentUser();
+        if ($user && $user['role'] === 'player') {
+            // Requirement: Players only see their own info
+            $stmt = $pdo->prepare('
+                SELECT p.*, u.role as user_role, u.id as user_id 
+                FROM players p 
+                LEFT JOIN users u ON p.id = u.player_id 
+                WHERE p.id = ?');
+            $stmt->execute([$user['player_id']]);
+        } else {
+            $stmt = $pdo->query('
+                SELECT p.*, u.role as user_role, u.id as user_id 
+                FROM players p 
+                LEFT JOIN users u ON p.id = u.player_id 
+                ORDER BY p.player_name ASC');
+        }
         sendJson(array_map('serializePlayer', $stmt->fetchAll()));
     }
 
@@ -115,16 +125,14 @@ try {
         $ifpa_id = $input['ifpaId'] ?? null;
         $matchplay_id = $input['matchplayId'] ?? null;
 
-        // Rule: Changing the name requires TD or Admin Access. 
+        $user = getCurrentUser();
+        $isOwner = $user && (int)$user['player_id'] === $id;
+
+        // Rule: Changing the name requires TD/Admin Access OR being the profile owner.
         if ($newName !== $existing['player_name']) {
+            if (!$isOwner) validateTDAccess();
+        } else if (!$isOwner) {
             validateTDAccess();
-        } else {
-            // Updating IDs only: restricted to the profile owner, a TD, or an Admin
-            $user = getCurrentUser();
-            $isOwner = $user && (int)$user['player_id'] === $id;
-            if (!$isOwner) {
-                validateTDAccess();
-            }
         }
 
         if (empty($newName)) {

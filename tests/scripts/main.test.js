@@ -12,10 +12,18 @@ vi.mock('@pages/scoresPage.js', () => ({ initScoresPage: vi.fn() }));
 vi.mock('@pages/standingsPage.js', () => ({ initStandingsPage: vi.fn() }));
 vi.mock('@pages/leaguesPage.js', () => ({ initLeaguesPage: vi.fn() }));
 vi.mock('@pages/playPage.js', () => ({ initPlayPage: vi.fn() }));
+vi.mock('@services/auth.js', () => ({ 
+  initAuthHeader: vi.fn(() => Promise.resolve()),
+  resetAuthCache: vi.fn() 
+}));
+vi.mock('@services/api.js', () => ({
+  PB_API: { getCurrentUser: vi.fn(() => Promise.resolve(null)) }
+}));
 
 // Import the mocks so we can inspect their call counts
 import { initNavigation } from '@ui/navigation.js';
 import { initMachinesPage } from '@pages/machinesPage.js';
+import { initAuthHeader } from '@services/auth.js';
 import { initLocationsPage } from '@pages/locationsPage.js';
 import { initConfigPage } from '@pages/configPage.js';
 import { initPlayersPage } from '@pages/playersPage.js';

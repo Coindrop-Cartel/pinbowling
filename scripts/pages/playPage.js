@@ -1,6 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
 import { formatNumber, applyScoreFormatting, renderThresholdGrid, getCookie, loadPage } from '@scripts/utils.js';
+import { can, PERMISSIONS } from '@services/auth.js';
 import { 
   createSearchableSelect, 
   showPlayerSelectionDialog, 
@@ -212,6 +213,12 @@ export async function initPlayPage() {
     updateRoundOptions(); // Initial sync
   }
 
+  // Hide session generator for unregistered users
+  const canCreate = await can(PERMISSIONS.CREATE_SESSION);
+  if (!canCreate && createToggleBtn) {
+    createToggleBtn.classList.add('hidden');
+  }
+
   if (createToggleBtn && generatorOptions && generateBtn) {
     createToggleBtn.onclick = () => {
       const isHidden = generatorOptions.classList.contains('hidden');
@@ -381,12 +388,27 @@ export async function initPlayPage() {
         headerHtml,
         contentHtml,
         isExpanded,
+        onMoveUp: frame.orderNumber > 1 ? () => {
+          const idx = generatedFrames.indexOf(frame);
+          if (idx > 0) {
+            [generatedFrames[idx], generatedFrames[idx - 1]] = [generatedFrames[idx - 1], generatedFrames[idx]];
+            generatedFrames.forEach((f, i) => f.orderNumber = i + 1);
+            renderPreview();
+          }
+        } : null,
+        onMoveDown: frame.orderNumber < generatedFrames.length ? () => {
+          const idx = generatedFrames.indexOf(frame);
+          if (idx < generatedFrames.length - 1) {
+            [generatedFrames[idx], generatedFrames[idx + 1]] = [generatedFrames[idx + 1], generatedFrames[idx]];
+            generatedFrames.forEach((f, i) => f.orderNumber = i + 1);
+            renderPreview();
+          }
+        } : null,
         onHeaderClick: () => {
           expandedTempId = (expandedTempId === frame.tempId) ? null : frame.tempId;
           renderPreview();
         }
       });
-
       const s10 = row.querySelector('.score10-input');
       const s1 = row.querySelector('.score1-input');
       applyScoreFormatting(s10);

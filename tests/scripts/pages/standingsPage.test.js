@@ -35,6 +35,7 @@ vi.mock('@ui/uiComponents.js', () => ({
   initTournamentSelector: vi.fn(async (selector, options) => {
     if (options.onRefresh) await options.onRefresh();
   }),
+  applyPreferredTheme: vi.fn(),
   renderActionSummary: vi.fn((container, title) => {
     if (container) container.innerHTML = title;
     if (container) container.classList.remove('hidden');

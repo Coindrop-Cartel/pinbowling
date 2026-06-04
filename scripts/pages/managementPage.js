@@ -1,7 +1,9 @@
 import { PB_API } from '@services/api.js';
-import { requireAdmin } from '@services/auth.js';
+import { requireAdmin, can, PERMISSIONS } from '@services/auth.js';
 import { setDebugEnabled } from '@services/state.js';
 import { showPrompt, showConfirm, showAlert, showAuthDialog } from '@ui/uiComponents.js';
+import { navigateTo } from '@scripts/utils.js';
+import { ROUTES } from '@scripts/routes.js';
 
 /**
  * Logic for the System Management page.
@@ -17,13 +19,18 @@ export async function initManagementPage() {
    * Verifies admin credentials before displaying management tools.
    */
   const initialize = async () => {
-    const [user] = await Promise.all([
-      PB_API.getCurrentUser()
+    const [user, isAuthorized] = await Promise.all([
+      PB_API.getCurrentUser(),
+      can(PERMISSIONS.RUN_CLEANUP) // Maintenance check
     ]);
 
-    const isAuthorized = user && (user.role === 'admin' || user.role === 'td');
-    if (isAuthorized) {
+    if (user && isAuthorized) {
       revealTools(user);
+    } else if (user) {
+      // Logged in but not an admin? Shoo!
+      showAlert('Administrator access is required for system maintenance.', 'Access Denied');
+      navigateTo(ROUTES.HOME());
+      return;
     }
     renderVersionInfo();
   };

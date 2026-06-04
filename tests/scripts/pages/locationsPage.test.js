@@ -21,8 +21,15 @@ vi.mock('@scripts/utils.js', () => ({
 }));
 
 vi.mock('@services/auth.js', () => ({
-  isManagementAuthorized: vi.fn(),
-  requireAdmin: vi.fn()
+  isManagementAuthorized: vi.fn(() => Promise.resolve(true)),
+  requireAdmin: vi.fn(() => Promise.resolve(true)),
+  can: vi.fn(() => Promise.resolve(true)),
+  PERMISSIONS: {
+    CREATE_SESSION: 'CREATE_SESSION',
+    JOIN_SESSION: 'JOIN_SESSION',
+    ADD_ANY_SCORE: 'ADD_ANY_SCORE',
+    MANAGE_LEAGUES: 'MANAGE_LEAGUES'
+  }
 }));
 
 vi.mock('@ui/uiComponents.js', () => ({
@@ -33,7 +40,7 @@ vi.mock('@ui/uiComponents.js', () => ({
 
 import { initLocationsPage } from '@scripts/pages/locationsPage.js';
 import { PB_API } from '@services/api.js';
-import { isManagementAuthorized } from '@services/auth.js';
+import { isManagementAuthorized, can } from '@services/auth.js';
 import { navigateTo } from '@scripts/utils.js';
 import { showAlert, showConfirm } from '@ui/uiComponents.js';
 
@@ -58,9 +65,14 @@ describe('Locations Page (locationsPage.js)', () => {
     vi.clearAllMocks();
     vi.stubGlobal('scrollTo', vi.fn());
     Element.prototype.scrollIntoView = vi.fn();
+    
+    // Reset mocks to authorized state by default
+    can.mockResolvedValue(true);
+    isManagementAuthorized.mockResolvedValue(true);
   });
 
   it('should redirect unauthorized users', async () => {
+    can.mockResolvedValue(false);
     isManagementAuthorized.mockResolvedValue(false);
     PB_API.getLocations.mockResolvedValue([]);
 

@@ -110,11 +110,18 @@ try {
 
     // POST: Create a new location (Protected by API Secret)
     if ($method === 'POST') {
+        $user = getCurrentUser();
+        $isPlayer = $user && in_array($user['role'], ['player', 'td', 'admin']);
+        $isTD = $user && in_array($user['role'], ['td', 'admin']);
+
         if (empty($input['name'])) {
             if ($task === 'units') {
                 if (empty($input['locationId']) || empty($input['machineId'])) {
                     sendJson(['error' => 'locationId and machineId are required'], 400);
                 }
+                // Players, TDs, and Admins can add machines to venues
+                if (!$isPlayer) validateTDAccess();
+
                 $sql = 'INSERT INTO location_machines (location_id, machine_id, value1, value2, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10, target_easy, target_med, target_hard) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON DUPLICATE KEY UPDATE 
@@ -136,6 +143,9 @@ try {
                 sendJson(['error' => 'name is required'], 400);
             }
         } else {
+            // Only TDs and Admins can create new locations
+            if (!$isTD) validateTDAccess();
+
             $stmt = $pdo->prepare('INSERT INTO locations (name, city, state) VALUES (?, ?, ?)');
             $stmt->execute([$input['name'], $input['city'] ?? null, $input['state'] ?? null]);
             $newId = $pdo->lastInsertId();
@@ -152,7 +162,7 @@ try {
 
     // PUT: Update an existing location (Protected by API Secret)
     if ($method === 'PUT') {
-        validateAdminAccess();
+        validateTDAccess(); // TDs and Admins can edit locations
         
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id || empty($input['name'])) {
@@ -173,15 +183,17 @@ try {
 
     // DELETE: Remove a location (Protected by API Secret)
     if ($method === 'DELETE') {
-        validateAdminAccess();
-        
         if ($task === 'units') {
+            validateTDAccess(); // Restricting removal to TD+ to prevent griefing
+            
             $location_id = isset($_GET['locationId']) ? (int)$_GET['locationId'] : 0;
             $machine_id = isset($_GET['machineId']) ? (int)$_GET['machineId'] : 0;
             $stmt = $pdo->prepare('DELETE FROM location_machines WHERE location_id = ? AND machine_id = ?');
             $stmt->execute([$location_id, $machine_id]);
             sendJson(['success' => true]);
         }
+
+        validateTDAccess(); // TDs and Admins can delete locations
 
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if (!$id) {

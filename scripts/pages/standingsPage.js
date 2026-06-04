@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js'; 
 import { getActiveEventId, getActiveLeagueId, setActiveEventId, formatNumber } from '@scripts/utils.js';
-import { fitTVModeToScreen, initTournamentSelector, renderActionSummary } from '@ui/uiComponents.js';
+import { fitTVModeToScreen, initTournamentSelector, renderActionSummary, applyPreferredTheme } from '@ui/uiComponents.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
 
 export async function initStandingsPage() {
@@ -34,6 +34,7 @@ export async function initStandingsPage() {
     if (standingsEmpty) standingsEmpty.classList.remove('hidden');
     if (tvBtn) tvBtn.classList.add('hidden');
     setActiveEventId(''); 
+    applyPreferredTheme(); // Reset to user's global preference
   };
 
   function toggleTvMode() {
@@ -194,6 +195,7 @@ export async function initStandingsPage() {
     
     const format = event?.scoringFormat || league?.scoringFormat || 'bowling';
     Engine = getScoringEngine(format);
+    applyPreferredTheme(format);
 
     if (tournamentSelectorUI && tournamentSummary) {
       const isSession = league?.type === 'session';
