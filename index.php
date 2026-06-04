@@ -102,5 +102,11 @@ if (file_exists($targetFile)) {
 $pageContent = ob_get_clean();
 
 // 5. Render Layout
-include __DIR__ . '/includes/layout.php';
+if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+    // For partial loads via AJAX, only return the page content
+    echo $pageContent;
+} else {
+    // Full page load
+    include __DIR__ . '/includes/layout.php';
+}
 ?>

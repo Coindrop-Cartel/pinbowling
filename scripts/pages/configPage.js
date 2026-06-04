@@ -250,19 +250,23 @@ export async function initConfigPage() {
         draggable: true,
         isExpanded,
         headerHtml: `
-          <div class="drag-handle" style="cursor: grab; color: var(--pb-primary); opacity: 0.5; padding: 0 4px; font-size: 1.2rem;">☰</div>
-          <span style="font-weight: bold; min-width: 30px; text-align: center;">${round.orderNumber}</span>
-          <span style="flex: 1; font-weight: bold;" class="machine-name-display">${round.machineName}</span>
-          <div style="display: flex; align-items: center; gap: 10px;" onclick="event.stopPropagation()">
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8;">${Engine.getHighScoreLabel()}:</label>
-              <input type="text" class="score10-input" value="${formatNumber(round.value1)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
+        <div style="display: flex; align-items: center; gap: 12px; width: 100%; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">
+            <div class="drag-handle" style="cursor: grab; color: var(--pb-primary); opacity: 0.5; padding: 0 4px; font-size: 1.2rem;">☰</div>
+            <span style="font-weight: bold; min-width: 30px; text-align: center;">${round.orderNumber}</span>
+            <span style="flex: 1; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" class="machine-name-display">${round.machineName}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto;" onclick="event.stopPropagation()">
+            <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
+              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${Engine.getHighScoreLabel()}:</label>
+              <input type="text" class="score10-input" value="${formatNumber(round.value1)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
             </div>
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8;">${Engine.getLowScoreLabel()}:</label>
-              <input type="text" class="score1-input" value="${formatNumber(round.value2)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
+            <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
+              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${Engine.getLowScoreLabel()}:</label>
+              <input type="text" class="score1-input" value="${formatNumber(round.value2)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
             </div>
           </div>
+        </div>
         `,
         contentHtml: `
           <div class="form-row">

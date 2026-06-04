@@ -95,6 +95,44 @@ export const navigateTo = (url) => {
 };
 
 /**
+ * Fetches and injects page content into the main container without a full reload.
+ * @param {string} url - The destination URL.
+ * @param {boolean} [pushState=true] - Whether to update the browser history.
+ */
+export async function loadPage(url, pushState = true) {
+  const main = document.querySelector('main.page-container');
+  if (!main) {
+    window.location.href = url;
+    return;
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    if (!response.ok) throw new Error('Partial load failed');
+    const html = await response.text();
+
+    // Parse the HTML to extract the inner content of the <main> tag if it exists.
+    // This avoids nested <main> elements.
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const newMain = doc.querySelector('main.page-container');
+
+    main.innerHTML = newMain ? newMain.innerHTML : html;
+    window.scrollTo(0, 0);
+
+    if (pushState) {
+      window.history.pushState({}, '', url);
+    }
+    document.dispatchEvent(new CustomEvent('pb:pageChanged', { detail: { url } }));
+  } catch (err) {
+    console.error('[SPA] Partial load failed, falling back to full reload:', err);
+    window.location.href = url;
+  }
+}
+
+/**
  * Dynamically generates the navigation menu from ROUTES and manages active states.
  * If the container already contains navigation links (from layout.php), it updates them.
  * @param {string} containerSelector CSS selector for the nav container.
@@ -141,6 +179,17 @@ export function initNavigation(containerSelector = '.nav-container') {
           }
         });
         link.setAttribute('href', ROUTES[routeName](params));
+
+        // Prevent redundant reloads if the user is already on the target page
+        link.onclick = (e) => {
+          e.preventDefault();
+          const targetUrl = new URL(link.href, window.location.origin);
+          const currentUrl = new URL(window.location.href, window.location.origin);
+          if (targetUrl.pathname === currentUrl.pathname && targetUrl.search === currentUrl.search) {
+            return;
+          }
+          self.loadPage(link.href);
+        };
       }
     });
 

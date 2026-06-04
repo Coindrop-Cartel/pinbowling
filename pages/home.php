@@ -3,7 +3,7 @@
   <header class="hero-section" style="position: relative;">
     <div class="hero-text">
       <div class="hero-brand-text" style="text-align: center; margin-bottom: 2rem;">
-        <h1 class="hero-brand-name" style="margin-bottom: 0.5rem;"><?php echo $siteBrand; ?></h1>
+        <h1 class="hero-brand-name" style="margin-bottom: 0.5rem; font-size: clamp(1.5rem, 8vw, 2.5rem); overflow-wrap: break-word;"><?php echo $siteBrand; ?></h1>
         <p class="hero-subtitle" style="opacity: 0.8;"><small><b><?php echo $siteSlogan; ?></b></small></p>
       </div>
       <div class="hero-brand-selector">

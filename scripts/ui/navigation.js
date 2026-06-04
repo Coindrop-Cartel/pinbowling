@@ -1,4 +1,5 @@
 import { ROUTES } from '@scripts/routes.js';
+import { loadPage } from '@scripts/utils.js';
 
 /**
  * Initializes all elements with data-route attributes by setting their href
@@ -22,6 +23,18 @@ export const initNavigation = (containerSelector = '.nav-container') => {
         }
       });
       link.href = ROUTES[routeName](params);
+
+      // Prevent redundant reloads if the user is already on the target page
+      link.onclick = (e) => {
+        e.preventDefault();
+        const targetUrl = new URL(link.href, window.location.origin);
+        const currentUrl = new URL(window.location.href, window.location.origin);
+        
+        if (targetUrl.pathname === currentUrl.pathname && targetUrl.search === currentUrl.search) {
+          return;
+        }
+        loadPage(link.href);
+      };
     }
   });
 

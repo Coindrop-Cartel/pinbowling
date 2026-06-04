@@ -1,6 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
-import { formatNumber, applyScoreFormatting, renderThresholdGrid, getCookie } from '@scripts/utils.js';
+import { formatNumber, applyScoreFormatting, renderThresholdGrid, getCookie, loadPage } from '@scripts/utils.js';
 import { 
   createSearchableSelect, 
   showPlayerSelectionDialog, 
@@ -116,13 +116,13 @@ export async function initPlayPage() {
         `,
         contentHtml: '', // Sessions do not expand
         onHeaderClick: () => {
-          window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}`;
+          loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}`);
         }
       });
 
       row.querySelector('.scoreboard-btn').onclick = (e) => {
         e.stopPropagation();
-        window.location.href = `standings?eventId=${event.id}&leagueId=${event.leagueId}`;
+        loadPage(`standings?eventId=${event.id}&leagueId=${event.leagueId}`);
       };
 
       row.querySelector('.join-btn').onclick = async (e) => {
@@ -136,7 +136,7 @@ export async function initPlayPage() {
         // Auto-join logic for logged-in users
         if (currentUser?.player_id) {
             if (joinedIds.has(currentUser.player_id)) {
-                window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${currentUser.player_id}`;
+                loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${currentUser.player_id}`);
                 return;
             }
             selectedId = currentUser.player_id;
@@ -152,7 +152,7 @@ export async function initPlayPage() {
 
         if (selectedId) {
           await PB_API.addLeaguePlayer(event.leagueId, Number(selectedId));
-          window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`;
+          loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`);
         }
       };
 
@@ -175,7 +175,7 @@ export async function initPlayPage() {
         }
 
         if (selectedId) {
-          window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`;
+          loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`);
         }
       };
     });
@@ -335,19 +335,23 @@ export async function initPlayPage() {
       const engine = getScoringEngine(currentSessionFormat);
 
       const headerHtml = `
-          <div class="drag-handle" style="cursor: grab; color: var(--pb-primary); opacity: 0.5; padding: 0 4px; font-size: 1.2rem;">☰</div>
-          <span style="font-weight: bold; min-width: 30px; text-align: center;">${frame.orderNumber}</span>
-          <span style="flex: 1; font-weight: bold;" class="machine-name-display">${frame.machineName}</span>
-          <div style="display: flex; align-items: center; gap: 10px;" onclick="event.stopPropagation()">
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8;">${engine.getHighScoreLabel()}:</label>
-              <input type="text" class="score10-input" value="${formatNumber(frame.value1)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
+        <div style="display: flex; align-items: center; gap: 12px; width: 100%; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">
+            <div class="drag-handle" style="cursor: grab; color: var(--pb-primary); opacity: 0.5; padding: 0 4px; font-size: 1.2rem;">☰</div>
+            <span style="font-weight: bold; min-width: 30px; text-align: center;">${frame.orderNumber}</span>
+            <span style="flex: 1; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" class="machine-name-display">${frame.machineName}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto;" onclick="event.stopPropagation()">
+            <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
+              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${engine.getHighScoreLabel()}:</label>
+              <input type="text" class="score10-input" value="${formatNumber(frame.value1)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
             </div>
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8;">${engine.getLowScoreLabel()}:</label>
-              <input type="text" class="score1-input" value="${formatNumber(frame.value2)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
+            <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
+              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${engine.getLowScoreLabel()}:</label>
+              <input type="text" class="score1-input" value="${formatNumber(frame.value2)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
             </div>
           </div>
+        </div>
       `;
 
       const contentHtml = `

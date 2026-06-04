@@ -19,6 +19,7 @@ import { getScoringEngine } from '@core/engine.js';
 import { getCookie } from '@scripts/utils.js';
 import { initAuthHeader } from '@services/auth.js';
 import { fitTVModeToScreen, applyPreferredTheme } from '@ui/uiComponents.js';
+import { loadPage } from '@scripts/utils.js';
 
 /**
  * Main entry point. Identifies which page is currently loaded 
@@ -28,7 +29,7 @@ import { fitTVModeToScreen, applyPreferredTheme } from '@ui/uiComponents.js';
  * PHP pages while ensuring only the necessary module logic is executed 
  * for the current view context.
  */
-async function ready() {
+export function initApp() {
   // Handle specific brand selection on the Home Page
   const heroLogoBtns = document.querySelectorAll('.hero-logo-btn');
   heroLogoBtns.forEach(btn => {
@@ -36,25 +37,13 @@ async function ready() {
     btn.onclick = () => {
       const format = btn.dataset.format; // bowling or golf
       document.cookie = `pb_preferred_format=${format}; path=/; max-age=31536000`;
-      window.location.reload();
+      applyPreferredTheme(format);
     };
   });
-
-  // Restore debug mode from local storage if previously toggled in Management UI
-  window.PB_DEBUG_MODE = getDebugEnabled();
-
-  if (window.PB_DEBUG_MODE) {
-    console.log('[Main] Application ready() triggered.');
-    console.log('[Main] Cache-Busting Version Active:', window.PB_UI_VERSION);
-    console.log('[Main] Global window.PB_DEBUG_MODE finalized to:', window.PB_DEBUG_MODE);
-  }
 
   initNavigation('.nav-container'); 
   applyPreferredTheme();
 
-  // Optimization: Do NOT await the auth header. It populates navigation elements 
-  // (like the username) but it should not block the main page logic from 
-  // loading leagues, machines, or scores.
   initAuthHeader();
 
   const pageInitializers = {
@@ -73,9 +62,26 @@ async function ready() {
   Object.entries(pageInitializers).forEach(([elementId, initialize]) => {
     if (document.getElementById(elementId)) initialize();
   });
+}
+
+async function ready() {
+  // Restore debug mode from local storage if previously toggled in Management UI
+  window.PB_DEBUG_MODE = getDebugEnabled();
+
+  initApp();
 
   // Handle scaling if window is resized while in TV Mode
   window.addEventListener('resize', fitTVModeToScreen);
+
+  // Handle back/forward browser buttons
+  window.addEventListener('popstate', () => {
+    loadPage(window.location.href, false);
+  });
+
+  // Re-run initialization when page content changes partially
+  document.addEventListener('pb:pageChanged', () => {
+    initApp();
+  });
 }
 
 document.addEventListener('DOMContentLoaded', ready);
