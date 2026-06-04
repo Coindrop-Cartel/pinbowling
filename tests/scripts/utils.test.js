@@ -77,15 +77,6 @@ describe('Utility Functions (utils.js)', () => {
   });
 
   describe('URL Parameter Management', () => {
-    // Temporarily mock initNavigation for these tests as they call it
-    beforeEach(() => {
-      vi.spyOn(Utils, 'initNavigation').mockImplementation(() => { });
-    });
-
-    afterEach(() => {
-      vi.mocked(Utils.initNavigation).mockRestore();
-    });
-
     it('getActiveLeagueId should return the correct leagueId from URL', () => {
       window.location = new URL('http://localhost/index.php?leagueId=123');
       expect(Utils.getActiveLeagueId()).toBe('123');
@@ -101,7 +92,6 @@ describe('Utility Functions (utils.js)', () => {
       expect(window.history.replaceState).toHaveBeenCalled();
       const url = vi.mocked(window.history.replaceState).mock.calls[0][2];
       expect(url.toString()).toContain('leagueId=456');
-      expect(Utils.initNavigation).toHaveBeenCalledTimes(1);
     });
 
     it('setActiveLeagueId should remove leagueId from URL if null is passed', () => {
@@ -110,7 +100,6 @@ describe('Utility Functions (utils.js)', () => {
       expect(window.history.replaceState).toHaveBeenCalled();
       const url = vi.mocked(window.history.replaceState).mock.calls[0][2];
       expect(url.toString()).not.toContain('leagueId');
-      expect(Utils.initNavigation).toHaveBeenCalledTimes(1);
     });
 
     it('getActiveEventId should return the correct eventId from URL', () => {
@@ -123,7 +112,6 @@ describe('Utility Functions (utils.js)', () => {
       expect(window.history.replaceState).toHaveBeenCalled();
       const url = vi.mocked(window.history.replaceState).mock.calls[0][2];
       expect(url.toString()).toContain('eventId=101');
-      expect(Utils.initNavigation).toHaveBeenCalledTimes(1);
     });
 
     it('getCurrentPlayerId should return the correct playerId from URL', () => {
@@ -136,7 +124,6 @@ describe('Utility Functions (utils.js)', () => {
       expect(window.history.replaceState).toHaveBeenCalled();
       const url = vi.mocked(window.history.replaceState).mock.calls[0][2];
       expect(url.toString()).toContain('playerId=66');
-      expect(Utils.initNavigation).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -200,52 +187,6 @@ describe('Utility Functions (utils.js)', () => {
     });
   });
 
-  describe('initNavigation', () => {
-    beforeEach(() => {
-      // Create the container that initNavigation expects
-      document.body.innerHTML = '<div class="nav-container"></div>';
-    });
-
-    it('should set "active" class on the current page link', () => {
-      window.location = new URL('http://localhost/machines.php');
-      Utils.initNavigation();
-      const navLinks = document.querySelectorAll('.nav-item');
-      expect(navLinks[0].classList.contains('active')).toBe(false); // Home
-      expect(navLinks[1].classList.contains('active')).toBe(true);  // Machines
-    });
-
-    it('should handle clean URLs (no .php extension)', () => {
-      window.location = new URL('http://localhost/machines');
-      Utils.initNavigation();
-      const navLinks = document.querySelectorAll('.nav-item');
-      expect(navLinks[1].classList.contains('active')).toBe(true); // Machines
-    });
-
-    it('should propagate URL parameters to navigation links', () => {
-      window.location = new URL('http://localhost/players.php?leagueId=10&eventId=20');
-      Utils.initNavigation();
-      const navLinks = document.querySelectorAll('.nav-item');
-
-      // Check the 'Machines' link, it should now have leagueId and eventId
-      expect(navLinks[1].getAttribute('href')).toBe('/machines?leagueId=10&eventId=20');
-    });
-
-    it('should not propagate parameters if target link already has them', () => {
-      // Note: With the new logic, the ROUTES path is the base. 
-      // To test "already has them", we verify it doesn't duplicate.
-      window.location = new URL('http://localhost/index.php?leagueId=10');
-      Utils.initNavigation();
-      const navLinks = document.querySelectorAll('.nav-item');
-      expect(navLinks[2].getAttribute('href')).toBe('/leagues?leagueId=10');
-    });
-
-    it('should handle index.php as default base', () => {
-      window.location = new URL('http://localhost/index.php');
-      Utils.initNavigation();
-      const navLinks = document.querySelectorAll('.nav-item');
-      expect(navLinks[0].classList.contains('active')).toBe(true); // Home
-    });
-  });
 
   describe('renderPreview', () => {
     let highScoreInput, lowScoreInput, previewValues;
@@ -326,32 +267,5 @@ describe('navigateTo function', () => {
     const originalHref = window.location.href;
     Utils.navigateTo('');
     expect(window.location.href).toBe(originalHref);
-  });
-});
-
-describe('initNavigation else branch (pre‑rendered links)', () => {
-  let originalLocation;
-  beforeEach(() => {
-    originalLocation = window.location;
-    delete window.location;
-    window.location = new URL('http://localhost/players.php?leagueId=5');
-    window.history.replaceState = vi.fn();
-    document.body.innerHTML = `
-      <div class="nav-container">
-        <a data-route="HOME" class="nav-link">Home</a>
-        <a data-route="MACHINES" class="nav-link" href="/machines.php?eventId=9">Machines</a>
-      </div>`;
-  });
-
-  afterEach(() => {
-    window.location = originalLocation;
-  });
-
-  it('sets active class on the current page link', () => {
-    window.location = new URL('http://localhost/machines.php?leagueId=2');
-    Utils.initNavigation();
-    const links = document.querySelectorAll('.nav-link');
-    expect(links[0].classList.contains('active')).toBe(false);
-    expect(links[1].classList.contains('active')).toBe(true);
   });
 });

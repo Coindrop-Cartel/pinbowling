@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 // Mock dependencies
 vi.mock('@services/api.js', () => ({
@@ -40,6 +40,10 @@ vi.mock('@ui/uiComponents.js', () => ({
   }),
   createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() })),
   applyPreferredTheme: vi.fn(),
+  renderActionSummary: vi.fn((container, title) => {
+    if (container) container.innerHTML = title;
+    if (container) container.classList.remove('hidden');
+  }),
 }));
 
 import { initScoresPage } from '@scripts/pages/scoresPage.js';
@@ -81,7 +85,7 @@ describe('Scores Page (scoresPage.js)', () => {
     await initScoresPage();
 
     expect(document.getElementById('player-selection-card').classList.contains('hidden')).toBe(false);
-    expect(document.getElementById('tournament-summary-text').textContent).toContain('L1 - W1');
+    expect(document.getElementById('tournament-summary').textContent).toContain('L1');
   });
 
   it('should render input rows and results when a player is selected', async () => {

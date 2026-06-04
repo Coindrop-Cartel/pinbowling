@@ -1,17 +1,17 @@
 /** @vitest-environment jsdom */
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 // Mock dependencies
 vi.mock('@services/api.js', () => ({
   PB_API: {
     getCurrentUser: vi.fn(),
-    logout: vi.fn()
+    logout: vi.fn(() => Promise.resolve())
   }
 }));
 
 vi.mock('@ui/uiComponents.js', () => ({
   showAlert: vi.fn(),
-  showAuthDialog: vi.fn()
+  showAuthDialog: vi.fn(() => Promise.resolve(true))
 }));
 
 import { requireAdmin, runAuthorizedLeagueAction, initAuthHeader, isManagementAuthorized } from '@scripts/services/auth.js';
@@ -121,32 +121,34 @@ describe('Auth Service (auth.js)', () => {
       expect(document.getElementById('header-login-btn')).not.toBeNull();
     });
 
-    it('should trigger logout API and reload on click', async () => {
+    it('should trigger logout API and refresh state on click', async () => {
       PB_API.getCurrentUser.mockResolvedValue({ role: 'player' });
-      const reloadMock = vi.fn();
-      vi.stubGlobal('location', { reload: reloadMock });
+      const dispatchSpy = vi.spyOn(document, 'dispatchEvent');
 
       await initAuthHeader();
       document.getElementById('header-logout-btn').click();
       
       await vi.waitFor(() => {
         expect(PB_API.logout).toHaveBeenCalled();
-        expect(reloadMock).toHaveBeenCalled();
+        expect(dispatchSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'pb:pageChanged' })
+        );
       });
     });
 
-    it('should trigger login dialog and reload on successful login', async () => {
+    it('should trigger login dialog and refresh state on successful login', async () => {
       PB_API.getCurrentUser.mockResolvedValue(null);
       showAuthDialog.mockResolvedValue(true);
-      const reloadMock = vi.fn();
-      vi.stubGlobal('location', { reload: reloadMock });
+      const dispatchSpy = vi.spyOn(document, 'dispatchEvent');
 
       await initAuthHeader();
       document.getElementById('header-login-btn').click();
       
       await vi.waitFor(() => {
         expect(showAuthDialog).toHaveBeenCalled();
-        expect(reloadMock).toHaveBeenCalled();
+        expect(dispatchSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'pb:pageChanged' })
+        );
       });
     });
   });

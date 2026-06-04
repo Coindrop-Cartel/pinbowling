@@ -88,10 +88,10 @@ describe('Printing Utilities (printing.js)', () => {
       expect(window.open).toHaveBeenCalledWith('', '_blank');
       expect(mockPrintWindow.document.write).toHaveBeenCalled();
       const html = mockPrintWindow.document.write.mock.calls[0][0];
-      expect(html).toContain('PinBowling Score Sheet');
-      expect(html).toContain('Round 1');
+      expect(html).toContain('Pinball Scoring Sheet');
+      expect(html).toContain('Frame 1');
       expect(html).toContain('Game: <strong>Machine A</strong>');
-      expect(html).toContain('Target: <strong>10,000</strong>');
+      expect(html).toContain('Strike: <strong>10,000</strong>');
       expect(html).toContain('Ball 1');
       expect(html).toContain('Ball 2');
       expect(html).toContain('Ball 3');

@@ -116,6 +116,11 @@ export async function initPlayersPage() {
               <strong>${p.playerName}</strong> 
               ${p.userRole ? `<span class="badge" style="background:var(--pb-primary); color:#fff; font-size:0.7rem; padding:2px 6px; border-radius:10px; font-weight: bold; text-transform: uppercase;">${p.userRole}</span>` : ''}
             </div>
+            <div style="font-size: 0.75rem; color: #666; margin-top: 2px;">
+              ${p.ifpaId ? `<span>IFPA: ${p.ifpaId}</span>` : ''}
+              ${p.ifpaId && p.matchplayId ? ' | ' : ''}
+              ${p.matchplayId ? `<span>MatchPlay: ${p.matchplayId}</span>` : ''}
+            </div>
             <div style="display: flex; gap: 8px; margin-top: 8px;">
               ${canEdit ? `<button type="button" class="edit-player-btn secondary" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.75rem;">Edit</button>` : ''}
               ${isAdmin ? `<button type="button" class="delete-player-btn-inline" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.75rem;">Delete</button>` : ''}

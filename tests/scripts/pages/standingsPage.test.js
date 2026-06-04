@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 // Mock dependencies
 vi.mock('@services/api.js', () => ({
@@ -26,6 +26,7 @@ vi.mock('@core/engine.js', () => ({
 vi.mock('@scripts/utils.js', () => ({
   getActiveEventId: vi.fn(),
   getActiveLeagueId: vi.fn(),
+  setActiveEventId: vi.fn(),
   formatNumber: vi.fn(n => n?.toLocaleString() || '0'),
 }));
 
@@ -33,12 +34,17 @@ vi.mock('@ui/uiComponents.js', () => ({
   fitTVModeToScreen: vi.fn(),
   initTournamentSelector: vi.fn(async (selector, options) => {
     if (options.onRefresh) await options.onRefresh();
-  })
+  }),
+  renderActionSummary: vi.fn((container, title) => {
+    if (container) container.innerHTML = title;
+    if (container) container.classList.remove('hidden');
+  }),
 }));
 
 import { initStandingsPage } from '@scripts/pages/standingsPage.js';
 import { PB_API } from '@services/api.js';
 import { getActiveEventId, getActiveLeagueId } from '@scripts/utils.js';
+import { renderActionSummary } from '@ui/uiComponents.js';
 
 describe('Standings Page (standingsPage.js)', () => {
   beforeEach(() => {
@@ -117,8 +123,12 @@ describe('Standings Page (standingsPage.js)', () => {
     
     await initStandingsPage();
 
-    const changeBtn = document.getElementById('change-tournament-btn');
-    changeBtn.click();
+    // Extract the handleTournamentChange callback from the renderActionSummary mock
+    const calls = vi.mocked(renderActionSummary).mock.calls;
+    const summaryCall = calls.find(c => c[1].includes('L1'));
+    const changeAction = summaryCall[2].find(a => a.text === 'Change');
+    
+    changeAction.onclick();
 
     expect(document.getElementById('tournament-selector-ui').classList.contains('hidden')).toBe(false);
     expect(document.getElementById('tournament-summary').classList.contains('hidden')).toBe(true);
