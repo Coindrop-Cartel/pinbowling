@@ -44,7 +44,9 @@ vi.mock('@ui/uiComponents.js', () => ({
     return div;
   }),
   setupSortableList: vi.fn(),
-  renderThresholdGrid: vi.fn(() => 'Grid')
+  renderThresholdGrid: vi.fn(() => 'Grid'),
+  getFormatBadgeHtml: vi.fn(() => 'Badge'),
+  applyPreferredTheme: vi.fn(),
 }));
 
 import { initPlayPage } from '@scripts/pages/playPage.js';

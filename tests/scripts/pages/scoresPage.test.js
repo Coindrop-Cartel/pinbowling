@@ -38,7 +38,8 @@ vi.mock('@ui/uiComponents.js', () => ({
   initTournamentSelector: vi.fn(async (selector, options) => {
     if (options.onRefresh) await options.onRefresh();
   }),
-  createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() }))
+  createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() })),
+  applyPreferredTheme: vi.fn(),
 }));
 
 import { initScoresPage } from '@scripts/pages/scoresPage.js';
