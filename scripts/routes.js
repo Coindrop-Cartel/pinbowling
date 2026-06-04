@@ -9,7 +9,9 @@ export const ROUTES = [
   { path: 'locations.php', label: 'Locations' },
   { path: 'standings.php', label: 'Standings' },
   { path: 'scores.php', label: 'Scores' },
-  { path: 'config.php', label: 'Setup' }
+  { path: 'config.php', label: 'Setup' },
+  { path: 'play.php', label: 'Play' },
+  { path: 'management.php', label: 'Maintenance' }
 ];
 
 const buildUrl = (path, params = {}) => {
@@ -37,3 +39,5 @@ ROUTES.STANDINGS = (params = {}) => buildUrl('/standings', params);
 ROUTES.PLAYERS = (params = {}) => buildUrl('/players', params);
 ROUTES.LOCATIONS = (params = {}) => buildUrl('/locations', params);
 ROUTES.MACHINES = (params = {}) => buildUrl('/machines', params);
+ROUTES.PLAY = (params = {}) => buildUrl('/play', params);
+ROUTES.MAINTENANCE = (params = {}) => buildUrl('/management', params);

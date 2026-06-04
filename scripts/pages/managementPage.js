@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { requireAdmin } from '@services/auth.js';
 import { setDebugEnabled } from '@services/state.js';
-import { showPrompt, showConfirm, showAlert } from '@ui/uiComponents.js';
+import { showPrompt, showConfirm, showAlert, showAuthDialog } from '@ui/uiComponents.js';
 
 /**
  * Logic for the System Management page.
@@ -76,7 +76,14 @@ export async function initManagementPage() {
   if (loginBtn) {
     // Use addEventListener for better reliability and wrap the call 
     // to ensure the MouseEvent isn't passed as the prompt message.
-    loginBtn.addEventListener('click', () => initialize());
+    loginBtn.addEventListener('click', async () => {
+      const user = await showAuthDialog();
+      if (user) {
+        await initialize();
+        // Notify the app that auth state changed to refresh the global header/nav
+        document.dispatchEvent(new CustomEvent('pb:pageChanged'));
+      }
+    });
   }
 
   // Perform an initial check on load. If no password is set or the user is already

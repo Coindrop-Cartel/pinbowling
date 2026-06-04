@@ -55,23 +55,6 @@ export async function initAuthHeader() {
         adminNav.classList.remove('hidden');
         const maintenanceLink = adminNav.querySelector('#nav-maintenance');
         if (maintenanceLink) maintenanceLink.classList.toggle('hidden', !isAdmin);
-
-        // Enhance dropdown for mobile: Use click to toggle instead of relying on hover
-        const dropBtn = adminNav.querySelector('.dropbtn');
-        if (dropBtn) {
-          dropBtn.onclick = (e) => {
-            if (window.innerWidth <= 768) {
-              e.stopPropagation();
-              const isOpen = adminNav.classList.toggle('is-open');
-              
-              // Prevent the scrolling nav container from clipping the vertical dropdown
-              const navLinks = adminNav.closest('.nav-links');
-              if (navLinks) {
-                navLinks.classList.toggle('dropdown-active', isOpen);
-              }
-            }
-          };
-        }
       }
 
       container.innerHTML = `
@@ -82,13 +65,15 @@ export async function initAuthHeader() {
       `;
       container.querySelector('#header-logout-btn').onclick = async () => {
         await PB_API.logout();
-        window.location.reload();
+        // Trigger partial refresh instead of full reload
+        document.dispatchEvent(new CustomEvent('pb:pageChanged'));
       };
     } else {
       container.innerHTML = `<button id="header-login-btn">Login</button>`;
       container.querySelector('#header-login-btn').onclick = async () => {
         const loggedIn = await showAuthDialog();
-        if (loggedIn) window.location.reload();
+        // Trigger partial refresh instead of full reload
+        if (loggedIn) document.dispatchEvent(new CustomEvent('pb:pageChanged'));
       };
     }
   };

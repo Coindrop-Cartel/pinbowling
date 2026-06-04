@@ -1,6 +1,7 @@
 import { getScoringEngine } from '@core/engine.js';
 import { ROUTES } from './routes.js';
 import * as self from '@scripts/utils.js';
+import { initNavigation } from '@ui/navigation.js';
 
 /**
  * Utility functions and state management helpers.
@@ -32,7 +33,10 @@ function setUrlParam(key, value) {
   if (value) url.searchParams.set(key, value);
   else url.searchParams.delete(key);
   window.history.replaceState({}, '', url);
-  self.initNavigation();
+  
+  // Re-run navigation logic to update header HREFs based on the new parameters.
+  // This ensures that "Scores" in the header points to the newly selected league.
+  initNavigation();
 }
 
 export const getActiveLeagueId = () => getUrlParam('leagueId');
@@ -129,91 +133,6 @@ export async function loadPage(url, pushState = true) {
   } catch (err) {
     console.error('[SPA] Partial load failed, falling back to full reload:', err);
     window.location.href = url;
-  }
-}
-
-/**
- * Dynamically generates the navigation menu from ROUTES and manages active states.
- * If the container already contains navigation links (from layout.php), it updates them.
- * @param {string} containerSelector CSS selector for the nav container.
- */
-export function initNavigation(containerSelector = '.nav-container') {
-  const navContainer = document.querySelector(containerSelector);
-  if (!navContainer) return;
-
-  const urlParams = new URLSearchParams(window.location.search);
-  const PERSISTENT_PARAMS = ['leagueId', 'eventId', 'playerId'];
-
-  // Normalize current path (e.g., "machines.php" or "machines" becomes "machines")
-  const rawPath = window.location.pathname.split('/').filter(Boolean).pop() || '';
-  const currentBase = rawPath.replace(/\.php$/, '') || 'index';
-
-  // If the container is completely empty (Vitest unit tests fallback), build links dynamically
-  if (navContainer.children.length === 0) {
-    navContainer.innerHTML = ROUTES.map(route => {
-      const url = new URL(route.path, window.location.origin);
-      
-      PERSISTENT_PARAMS.forEach(key => {
-        if (urlParams.has(key)) url.searchParams.set(key, urlParams.get(key));
-      });
-
-      const cleanPath = url.pathname.replace(/\.php$/, '');
-      const finalHref = cleanPath + url.search;
-      const pathWithSlash = finalHref.startsWith('/') ? finalHref : '/' + finalHref;
-      const hrefBase = cleanPath.split('/').pop() || 'index';
-      const isActive = hrefBase === currentBase;
-
-      return `<a href="${pathWithSlash}" class="nav-item ${isActive ? 'active' : ''}">${route.label}</a>`;
-    }).join('');
-  } else {
-    // If the navbar is already rendered (the real app), update the hrefs using data-route
-    const routeLinks = navContainer.querySelectorAll('[data-route]');
-    
-    routeLinks.forEach(link => {
-      const routeName = link.dataset.route;
-      if (ROUTES[routeName]) {
-        const params = {};
-        PERSISTENT_PARAMS.forEach(key => {
-          if (urlParams.has(key)) {
-            params[key] = urlParams.get(key);
-          }
-        });
-        link.setAttribute('href', ROUTES[routeName](params));
-
-        // Prevent redundant reloads if the user is already on the target page
-        link.onclick = (e) => {
-          e.preventDefault();
-          const targetUrl = new URL(link.href, window.location.origin);
-          const currentUrl = new URL(window.location.href, window.location.origin);
-          if (targetUrl.pathname === currentUrl.pathname && targetUrl.search === currentUrl.search) {
-            return;
-          }
-          self.loadPage(link.href);
-        };
-      }
-    });
-
-    // Clear active classes first
-    const allLinks = navContainer.querySelectorAll('.nav-link, .nav-item');
-    allLinks.forEach(link => link.classList.remove('active'));
-    navContainer.querySelectorAll('.dropbtn').forEach(btn => btn.classList.remove('active'));
-
-    // Update active class on links
-    allLinks.forEach(link => {
-      const href = link.getAttribute('href');
-      if (href && href !== 'javascript:void(0)') {
-        const rawHref = href.split('?')[0].split('/').filter(Boolean).pop() || '';
-        const hrefBase = rawHref.replace(/\.php$/, '') || 'index';
-        if (hrefBase === currentBase) {
-          link.classList.add('active');
-          const dropdown = link.closest('.dropdown');
-          if (dropdown) {
-            const dropbtn = dropdown.querySelector('.dropbtn');
-            if (dropbtn) dropbtn.classList.add('active');
-          }
-        }
-      }
-    });
   }
 }
 

@@ -105,7 +105,17 @@ body {
   z-index: 10000; /* Ensure menu items are above the navbar itself */
 }
 
-.dropdown:hover .dropdown-content,
+.dropdown.is-open .dropdown-content {
+  display: block;
+}
+
+/* Only trigger dropdown on hover for devices that support it (desktops) */
+@media (hover: hover) {
+  .dropdown:hover .dropdown-content {
+    display: block;
+  }
+}
+
 .dropdown.is-open .dropdown-content {
   display: block;
 }
