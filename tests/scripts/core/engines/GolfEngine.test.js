@@ -1,7 +1,18 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, beforeEach } from 'vitest';
 import { GolfEngine } from '@core/engines/GolfEngine.js';
 
 describe('GolfEngine', () => {
+  beforeEach(() => {
+    // Mock the global metadata object exported from config.php to satisfy base class getters
+    window.PB_ENGINE_META = {
+      golf: {
+        brand: 'PinGolf',
+        cta: "Let's Golf!",
+        logo: 'pingolf.png'
+      }
+    };
+  });
+
   const engine = new GolfEngine();
 
   const mockHole = (order) => ({

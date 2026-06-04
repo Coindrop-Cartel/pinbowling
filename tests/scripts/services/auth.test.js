@@ -125,32 +125,30 @@ describe('Auth Service (auth.js)', () => {
 
     it('should trigger logout API and refresh state on click', async () => {
       PB_API.getCurrentUser.mockResolvedValue({ role: 'player' });
-      const dispatchSpy = vi.spyOn(document, 'dispatchEvent');
+      const reloadSpy = vi.fn();
+      vi.stubGlobal('location', { ...window.location, reload: reloadSpy });
 
       await initAuthHeader();
       document.getElementById('header-logout-btn').click();
       
       await vi.waitFor(() => {
         expect(PB_API.logout).toHaveBeenCalled();
-        expect(dispatchSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ type: 'pb:pageChanged' })
-        );
+        expect(reloadSpy).toHaveBeenCalled();
       });
     });
 
     it('should trigger login dialog and refresh state on successful login', async () => {
       PB_API.getCurrentUser.mockResolvedValue(null);
       showAuthDialog.mockResolvedValue(true);
-      const dispatchSpy = vi.spyOn(document, 'dispatchEvent');
+      const reloadSpy = vi.fn();
+      vi.stubGlobal('location', { ...window.location, reload: reloadSpy });
 
       await initAuthHeader();
       document.getElementById('header-login-btn').click();
       
       await vi.waitFor(() => {
         expect(showAuthDialog).toHaveBeenCalled();
-        expect(dispatchSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ type: 'pb:pageChanged' })
-        );
+        expect(reloadSpy).toHaveBeenCalled();
       });
     });
   });

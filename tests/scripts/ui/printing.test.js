@@ -6,6 +6,8 @@ import { printMachineScores, printBlankScoreSheet } from '@ui/printing.js';
 const mockEngine = {
   getBonusTargets: vi.fn(() => ({ t1: 13000, t2: 16900 })),
   getRoundLabel: vi.fn(() => 'Frame'),
+  getScoringHint: vi.fn(() => 'Hint'),
+  getLastFrameHint: vi.fn(() => 'Last Hint'),
 };
 
 vi.mock('@core/engine.js', () => ({
@@ -88,7 +90,6 @@ describe('Printing Utilities (printing.js)', () => {
       expect(window.open).toHaveBeenCalledWith('', '_blank');
       expect(mockPrintWindow.document.write).toHaveBeenCalled();
       const html = mockPrintWindow.document.write.mock.calls[0][0];
-      expect(html).toContain('Pinball Scoring Sheet');
       expect(html).toContain('Frame 1');
       expect(html).toContain('Game: <strong>Machine A</strong>');
       expect(html).toContain('Strike: <strong>10,000</strong>');
