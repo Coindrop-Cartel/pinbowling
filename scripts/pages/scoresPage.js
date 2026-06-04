@@ -403,6 +403,7 @@ export async function initScoresPage() {
       playerSelectionCard.classList.add('hidden');
       scoringCard.classList.add('hidden');
       resultsCard.classList.add('hidden');
+      if (printSheetBtn) printSheetBtn.classList.add('hidden');
       return;
     }
     
@@ -422,6 +423,9 @@ export async function initScoresPage() {
     const leagueLabel = isSession ? '' : `${league?.name} - `;
     tournamentSummaryText.textContent = `${leagueLabel}${event?.eventName || 'Event'}`;
 
+    tournamentSelectorUI.classList.add('hidden');
+    tournamentSummary.classList.remove('hidden');
+
     currentUser = user;
     activeLeague = league;
     const format = event?.scoringFormat || league?.scoringFormat || 'bowling';
@@ -429,10 +433,12 @@ export async function initScoresPage() {
     applyPreferredTheme(format);
 
     machines = eventTargets;
+    if (printSheetBtn) printSheetBtn.classList.remove('hidden');
 
     if (machines.length === 0) {
       warning.textContent = 'No target scores have been configured for the selected event.';
       warning.classList.remove('hidden');
+      if (printSheetBtn) printSheetBtn.classList.add('hidden');
       roundsInput.innerHTML = '';
       return;
     }

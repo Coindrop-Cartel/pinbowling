@@ -4,7 +4,7 @@
     <div class="hero-text">
       <div class="hero-brand-text" style="text-align: center; margin-bottom: 2rem;">
         <h1 class="hero-brand-name" style="margin-bottom: 0.5rem;"><?php echo $siteBrand; ?></h1>
-        <p class="hero-subtitle" style="font-size: 1.2rem; opacity: 0.8;"><?php echo $siteSlogan; ?></p>
+        <p class="hero-subtitle" style="opacity: 0.8;"><small><b><?php echo $siteSlogan; ?></b></small></p>
       </div>
       <div class="hero-brand-selector">
         <img src="images/pinbowling.png" class="hero-logo-btn" data-format="bowling" alt="PinBowling">
