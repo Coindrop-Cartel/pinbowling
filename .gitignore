@@ -3,12 +3,13 @@ node_modules/
 
 # Security: Environment variables and secrets
 .env
-.env.local
-.env.*.local
+.env.*
 
 # Testing
+vendor/
 coverage/
 *.log
+.phpunit.result.cache
 
 # Editor/OS specific
 .vscode/
