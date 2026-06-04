@@ -279,6 +279,35 @@ export function applyPreferredTheme(overrideFormat) {
   if (logicText) logicText.textContent = engine.getScoringDescription();
 }
 
+/**
+ * Renders a standardized summary box with a title and action buttons.
+ * Optimized for mobile by using a stacked flex layout.
+ * 
+ * @param {HTMLElement} container The element to render into.
+ * @param {string} title The text/HTML to display as the title.
+ * @param {Array<{text: string, onclick: Function, hidden?: boolean}>} actions List of actions.
+ */
+export function renderActionSummary(container, title, actions = []) {
+  if (!container) return;
+  container.classList.remove('hidden');
+  container.innerHTML = `
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="font-weight: bold; font-size: 1.1rem; line-height: 1.2;">${title}</div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        ${actions.map((act, i) => `
+          <button type="button" class="secondary ${act.hidden ? 'hidden' : ''}" data-idx="${i}" style="padding: 4px 10px; font-size: 0.75rem; width: auto;">
+            ${act.text}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  container.querySelectorAll('button').forEach(btn => {
+    const action = actions[btn.dataset.idx];
+    if (action && action.onclick) btn.onclick = action.onclick;
+  });
+}
+
 export const showConfirm = (message, title = 'Confirm Action') => showDialog({ title, message, confirmText: 'Yes, Proceed', cancelText: 'Cancel' });
 export const showPrompt = (message, title = 'Admin Password', isPassword = true) => showDialog({ title, message, showInput: true, isPassword, confirmText: 'Submit' });
 export const showAlert = (message, title = 'Notice') => showDialog({ title, message, confirmText: 'OK', cancelText: null });

@@ -27,6 +27,7 @@ export async function initLeaguesPage() {
   const emptyNotice = document.getElementById('leagues-list-empty');
   const eventFormCard = document.getElementById('event-form-card');
   let allPlayersCache = []; // Cache all players for selection dialogs
+  let editingLeagueId = null;
 
   const preferredFormat = getCookie('pb_preferred_format') || 'bowling';
 
@@ -45,17 +46,37 @@ export async function initLeaguesPage() {
   const dateRow = document.getElementById('league-date-row');
   const formatRow = document.getElementById('league-format-row');
   const actionsRow = createBtn.closest('.form-actions');
+  
+  // Apply compact styling to the primary form button
+  if (createBtn) {
+    createBtn.style.padding = '4px 10px';
+    createBtn.style.fontSize = '0.75rem';
+  }
+
+  // Create a deletion button for the league form (only visible during edit)
+  const deleteLeagueMgmtBtn = document.createElement('button');
+  deleteLeagueMgmtBtn.type = 'button';
+  deleteLeagueMgmtBtn.className = 'danger hidden';
+  deleteLeagueMgmtBtn.textContent = 'Delete';
+  deleteLeagueMgmtBtn.style.padding = '4px 10px';
+  deleteLeagueMgmtBtn.style.fontSize = '0.75rem';
+  if (actionsRow) {
+    actionsRow.prepend(deleteLeagueMgmtBtn);
+  }
 
   let createToggle = null;
   if (isAuthorized) {
     createToggle = document.createElement('button');
     createToggle.type = 'button';
     createToggle.className = 'secondary';
-    createToggle.textContent = 'Create New League';
+    createToggle.textContent = 'Create';
     createToggle.style.marginTop = '10px';
+    createToggle.style.padding = '4px 10px';
+    createToggle.style.fontSize = '0.75rem';
     leagueNameInput.after(createToggle);
 
     createToggle.onclick = () => {
+      if (editingLeagueId) return resetForm();
       const isHidden = dateRow.classList.contains('hidden');
       dateRow.classList.toggle('hidden', !isHidden);
       if (formatRow) formatRow.classList.toggle('hidden', !isHidden);
@@ -65,7 +86,7 @@ export async function initLeaguesPage() {
         createToggle.style.marginTop = '0';
         actionsRow.appendChild(createToggle);
       } else {
-        createToggle.textContent = 'Create New League';
+        createToggle.textContent = 'Create';
         createToggle.style.marginTop = '10px';
         leagueNameInput.after(createToggle);
       }
@@ -97,13 +118,21 @@ export async function initLeaguesPage() {
         card.style.overflow = 'hidden';
 
         card.innerHTML = `
-          <div class="league-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 6px 12px; background: #f9f9f9;">
-            <div>
-              <h3 style="margin: 0; font-size: 1.05rem;">${league.name}</h3>
-              <small>Started: ${league.startDate || 'N/A'} | ${getFormatBadgeHtml(league.scoringFormat)} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
-            </div>
-            <div style="display: flex; gap: 8px;">
-              ${isAuthorized ? '<button class="delete-league-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>' : ''}
+          <div class="league-header" style="display: flex; align-items: flex-start; cursor: pointer; padding: 12px; background: #f9f9f9;">
+            <div style="flex: 1;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <h3 style="margin: 0; font-size: 1.1rem;">${league.name}</h3>
+                ${getFormatBadgeHtml(league.scoringFormat)}
+              </div>
+              <div style="font-size: 0.85rem; opacity: 0.8;">
+                Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0}
+              </div>
+              <div style="font-size: 0.85rem; opacity: 0.8;">
+                Players: ${league.players?.length || 0}
+              </div>
+              <div style="margin-top: 8px;">
+                ${isAuthorized ? '<button class="edit-league-btn secondary" style="padding: 4px 10px; font-size: 0.75rem;">Edit League</button>' : ''}
+              </div>
             </div>
           </div>
           <div class="league-details ${shouldExpand ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd; background: #fff;">
@@ -149,8 +178,11 @@ export async function initLeaguesPage() {
 
         // Action listeners
         if (isAuthorized) {
+          card.querySelector('.edit-league-btn').onclick = (e) => {
+            e.stopPropagation();
+            editLeague(league);
+          };
           card.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
-          card.querySelector('.delete-league-btn').onclick = () => deleteLeague(league.id, league.name);
           card.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
         }
 
@@ -195,6 +227,43 @@ export async function initLeaguesPage() {
 
   leagueDateInput.addEventListener('input', () => filterInstance.performFilter());
 
+  const editLeague = (league) => {
+    editingLeagueId = league.id;
+    leagueNameInput.value = league.name;
+    leagueDateInput.value = league.startDate || '';
+    leagueFormatInput.value = league.scoringFormat || 'bowling';
+    
+    // Expand the form
+    dateRow.classList.remove('hidden');
+    if (formatRow) formatRow.classList.remove('hidden');
+    actionsRow.classList.remove('hidden');
+    deleteLeagueMgmtBtn.classList.remove('hidden');
+    
+    createBtn.textContent = 'Update';
+    createToggle.textContent = 'Cancel';
+    createToggle.style.marginTop = '0';
+    actionsRow.appendChild(createToggle);
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const resetForm = () => {
+    editingLeagueId = null;
+    leagueNameInput.value = '';
+    leagueDateInput.value = '';
+    leagueFormatInput.value = preferredFormat;
+    
+    dateRow.classList.add('hidden');
+    if (formatRow) formatRow.classList.add('hidden');
+    actionsRow.classList.add('hidden');
+    deleteLeagueMgmtBtn.classList.add('hidden');
+    
+    createBtn.textContent = 'Create';
+    createToggle.textContent = 'Create';
+    createToggle.style.marginTop = '10px';
+    leagueNameInput.after(createToggle);
+  };
+
   const refresh = async (leagues = null, players = null) => {
     try {
       const [fetchedLeagues, fetchedPlayers] = (leagues && players) 
@@ -205,6 +274,7 @@ export async function initLeaguesPage() {
       allLeagues.push(...fetchedLeagues);
       allPlayersCache = fetchedPlayers;
 
+      resetForm();
       filterInstance.performFilter();
     } catch (err) {
       console.error('Failed to load leagues:', err);
@@ -220,22 +290,21 @@ export async function initLeaguesPage() {
     if (!isAuthorized) return;
 
     try {
-      await PB_API.createLeague({ name, startDate: date, scoringFormat });
-      leagueNameInput.value = '';
-      leagueDateInput.value = '';
-      // Collapse creation form back down
-      if (dateRow) dateRow.classList.add('hidden');
-      if (formatRow) formatRow.classList.add('hidden');
-      actionsRow.classList.add('hidden');
-      createToggle.textContent = 'Create New League';
-      createToggle.style.marginTop = '10px';
-      leagueNameInput.after(createToggle);
+      if (editingLeagueId) {
+        await PB_API.updateLeague(editingLeagueId, { name, startDate: date, scoringFormat });
+      } else {
+        await PB_API.createLeague({ name, startDate: date, scoringFormat });
+      }
       await refresh();
     } catch (err) {
       console.error('League creation failed:', err);
       alert(`Failed to create league: ${err.message}`);
     }
   });
+
+  deleteLeagueMgmtBtn.onclick = () => {
+    if (editingLeagueId) deleteLeague(editingLeagueId, leagueNameInput.value);
+  };
 
   function renderEventsForLeague(leagueId, leagueEvents, leagueName) {
     const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
@@ -244,15 +313,15 @@ export async function initLeaguesPage() {
     const eventsListEl = card.querySelector('.league-events-list');
 
     eventsListEl.innerHTML = (leagueEvents || []).map(e => `
-      <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span>${e.eventName} <small>(${e.eventDate || 'No Date'})</small></span>
+      <li style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; background: #f9f9f9; padding: 10px; border-radius: 4px; border: 1px solid #eee;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span style="font-weight: bold;">${e.eventName} <small style="font-weight: normal; opacity: 0.7;">(${e.eventDate || 'No Date'})</small></span>
           ${getFormatBadgeHtml(e.scoringFormat)}
         </div>
-        <div style="display: flex; gap: 4px;">
-          ${isAuthorized ? `<button class="setup-event-btn secondary" data-league-id="${leagueId}" data-event-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Setup</button>` : ''}
-          ${isAuthorized ? `<button class="edit-event-btn secondary" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>` : ''}
-          ${isAuthorized ? `<button class="delete-event-btn" data-id="${e.id}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>` : ''}
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          ${isAuthorized ? `<button class="setup-event-btn secondary" data-league-id="${leagueId}" data-event-id="${e.id}" style="padding: 4px 10px; font-size: 0.75rem;">Setup</button>` : ''}
+          ${isAuthorized ? `<button class="edit-event-btn secondary" data-id="${e.id}" style="padding: 4px 10px; font-size: 0.75rem;">Edit</button>` : ''}
+          ${isAuthorized ? `<button class="delete-event-btn" data-id="${e.id}" style="padding: 4px 10px; font-size: 0.75rem;">Delete</button>` : ''}
         </div>
       </li>
     `).join('') || '<li>No events scheduled.</li>';

@@ -55,31 +55,74 @@ export function printMachineScores(machines, format = 'bowling') {
 /**
  * Generates a printable PDF-like score sheet for manual tracking.
  */
-export function printBlankScoreSheet(machines) {
+export function printBlankScoreSheet(machines, leagueName, eventName, format = 'bowling') {
   const printWindow = window.open('', '_blank');
   if (!printWindow) return alert('Please allow popups to print.');
 
-  const framesHtml = machines.map((m) => `
+  const Engine = getScoringEngine(format);
+  const isBowling = format === 'bowling';
+  const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
+
+  const instructions = `
+    <p style="margin: 5px 0;"><strong>Do NOT Play Extra balls.</strong></p>
+    <p style="margin: 5px 0;">Enter your score after each ball until you hit the target score, or run out of balls.
+    ${isBowling ? ' Except on the last frame where you should keep playing until you hit the Target 2 score or run out of balls.' : ''}</p>
+  `;
+
+  const framesHtml = machines.map((m) => {
+    const isLast = m.orderNumber === maxOrder;
+    let targetsHtml = '';
+    if (isBowling) {
+      targetsHtml = `<span>Strike: <strong>${formatNumber(m.values[10])}</strong></span>`;
+      if (isLast) {
+        const { t1, t2 } = Engine.getBonusTargets(m);
+        targetsHtml += `
+          <span style="margin-left: 15px;">Target 1: <strong>${formatNumber(t1)}</strong></span>
+          <span style="margin-left: 15px;">Target 2: <strong>${formatNumber(t2)}</strong></span>
+        `;
+      }
+    } else {
+      // Golf
+      targetsHtml = `
+        <span>Target Score: <strong>${formatNumber(m.values[m.value2] || m.value1)}</strong></span>
+        <span style="margin-left: 15px;">Par: <strong>${m.value2}</strong></span>
+      `;
+    }
+
+    return `
     <div style="border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; page-break-inside: avoid;">
       <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px;">
-        <span style="font-weight: bold;">Round ${m.orderNumber}</span>
+        <span style="font-weight: bold;">${Engine.getRoundLabel()} ${m.orderNumber}</span>
         <span>Game: <strong>${m.machineName}</strong></span>
-        <span>Target: <strong>${formatNumber(m.values[10])}</strong></span>
+        ${targetsHtml}
       </div>
       <div style="display: flex; gap: 20px;">
         <div style="flex: 1;"><small>Ball 1</small><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
         <div style="flex: 1;"><small>Ball 2</small><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
         <div style="flex: 1;"><small>Ball 3</small><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   printWindow.document.write(`
     <html>
-      <head><style>body { font-family: sans-serif; padding: 20px; }</style></head>
+      <head><style>body { font-family: sans-serif; padding: 20px; line-height: 1.2; }</style></head>
       <body>
         <div style="border-bottom: 2px solid #000; margin-bottom: 12px; padding-bottom: 6px;">
-          <h1>PinBowling Score Sheet</h1>
-          <p>Player: __________________________ &nbsp;&nbsp; Date: ________</p>
+          <h1 style="margin: 0 0 10px 0;">Pinball Scoring Sheet</h1>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <div>
+              ${leagueName ? `<div><strong>League:</strong> ${leagueName}</div>` : ''}
+              <div><strong>Event:</strong> ${eventName}</div>
+            </div>
+            <div style="text-align: right;">
+              <div>Player: __________________________</div>
+              <div>Date: ________</div>
+            </div>
+          </div>
+          <div style="font-size: 0.9rem; line-height: 1.4;">
+            ${instructions}
+          </div>
         </div>
         ${framesHtml}
       </body>

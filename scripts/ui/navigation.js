@@ -9,6 +9,11 @@ export const initNavigation = (containerSelector = '.nav-container') => {
   const container = document.querySelector(containerSelector);
   if (!container) return;
 
+  // Normalize current path to detect self-links for reset behavior.
+  // Using filter(Boolean) ensures trailing slashes don't result in an empty string.
+  const rawPath = window.location.pathname.split('/').filter(Boolean).pop() || '';
+  const currentBase = rawPath.replace(/\.php$/, '') || 'index';
+
   // Centralized helper to forcefully collapse the mobile taskbar and all dropdowns.
   // This replicates the "clean slate" logic of a full page reload.
   const collapseAll = () => {
@@ -56,6 +61,16 @@ export const initNavigation = (containerSelector = '.nav-container') => {
         // Stop propagation immediately to prevent parent container listeners 
         // (like dropdown toggles) from firing and re-opening the menu.
         e.stopPropagation();
+
+        // SPECIAL CASE: Clicking 'Scores' or 'Scoreboard' (Standings) while already on 
+        // that page should clear the event selection. This acts as a "Reset" link 
+        // allowing users to navigate out of specific tournaments or sessions.
+        if ((currentBase === 'scores' && routeName === 'SCORES') || 
+            (currentBase === 'standings' && routeName === 'STANDINGS')) {
+          const resetUrl = new URL(link.href);
+          resetUrl.searchParams.delete('eventId');
+          link.href = resetUrl.toString();
+        }
 
         if (window.PB_DEBUG_MODE) {
           console.group(`[Navigation] Link Clicked: ${routeName}`);
@@ -134,11 +149,6 @@ export const initNavigation = (containerSelector = '.nav-container') => {
 
   // Force collapse on init to handle back/forward buttons and initial load state
   collapseAll();
-
-  // Normalize current path
-  // Using filter(Boolean) ensures trailing slashes don't result in an empty string
-  const rawPath = window.location.pathname.split('/').filter(Boolean).pop() || '';
-  const currentBase = rawPath.replace(/\.php$/, '') || 'index';
 
   routeLinks.forEach(link => {
     const href = link.getAttribute('href');

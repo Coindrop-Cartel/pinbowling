@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js';
-import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, setCurrentPlayerId, getCurrentPlayerId, renderThresholdGrid } from '@scripts/utils.js';
-import { initTournamentSelector, createSearchableSelect, applyPreferredTheme } from '@ui/uiComponents.js';
+import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, setActiveEventId, setCurrentPlayerId, getCurrentPlayerId, renderThresholdGrid } from '@scripts/utils.js';
+import { initTournamentSelector, createSearchableSelect, applyPreferredTheme, renderActionSummary } from '@ui/uiComponents.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
 
 /**
@@ -31,50 +31,34 @@ export async function initScoresPage() {
   let activeLeague = null;
   let allPlayersCache = [];
   let machines = [];
-  const printSheetBtn = document.getElementById('print-sheet-btn');
 
   // Selection UI Toggles
   const tournamentSelectorUI = document.getElementById('tournament-selector-ui');
   const tournamentSummary = document.getElementById('tournament-summary');
-  const tournamentSummaryText = document.getElementById('tournament-summary-text');
-  const changeTournamentBtn = document.getElementById('change-tournament-btn');
 
   const playerSelectorUI = document.getElementById('player-selector-ui');
   const playerSummary = document.getElementById('player-summary');
-  const playerSummaryText = document.getElementById('player-summary-text');
-  const changePlayerBtn = document.getElementById('change-player-btn');
 
-  changeTournamentBtn.onclick = () => {
+  const handleTournamentChange = () => {
     tournamentSelectorUI.classList.remove('hidden');
     tournamentSummary.classList.add('hidden');
-
-    // Clear dependent UI to prevent inconsistent states
     playerSelectionCard.classList.add('hidden');
     playerSummary.classList.add('hidden');
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
-
-    // Reset active player state
+    setActiveEventId(''); // Clear event selection from state/URL
     setCurrentPlayerId('');
   };
 
-  changePlayerBtn.onclick = () => {
+  const handlePlayerChange = () => {
     playerSelectorUI.classList.remove('hidden');
     playerSummary.classList.add('hidden');
-
-    // Hide scoring and results until a new player is confirmed
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
   };
 
   // Default engine
   let Engine = getScoringEngine('bowling');
-
-  if (printSheetBtn) {
-    printSheetBtn.addEventListener('click', () => {
-      printBlankScoreSheet(machines);
-    });
-  }
 
   warning.classList.add('hidden');
   playerSelect.disabled = false;
@@ -330,9 +314,11 @@ export async function initScoresPage() {
     }
 
     const player = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
-    playerSummaryText.textContent = player ? `Player: ${player.playerName}` : 'Player Selected';
     playerSelectorUI.classList.add('hidden');
-    playerSummary.classList.remove('hidden');
+
+    renderActionSummary(playerSummary, `Player: ${player?.playerName || 'Selected'}`, [
+      { text: 'Change', onclick: handlePlayerChange }
+    ]);
 
     warning.classList.add('hidden');
     scoringCard.classList.remove('hidden');
@@ -403,7 +389,6 @@ export async function initScoresPage() {
       playerSelectionCard.classList.add('hidden');
       scoringCard.classList.add('hidden');
       resultsCard.classList.add('hidden');
-      if (printSheetBtn) printSheetBtn.classList.add('hidden');
       return;
     }
     
@@ -418,13 +403,15 @@ export async function initScoresPage() {
     const event = league?.events?.find(e => String(e.id) === String(eventId));
 
     const isSession = league?.type === 'session';
-    if (changeTournamentBtn) changeTournamentBtn.classList.toggle('hidden', isSession);
-
-    const leagueLabel = isSession ? '' : `${league?.name} - `;
-    tournamentSummaryText.textContent = `${leagueLabel}${event?.eventName || 'Event'}`;
+    const leagueTitle = isSession ? '' : `<div style="font-weight: bold;">League: ${league?.name || 'Unknown'}</div>`;
+    const eventTitle = `<div style="font-size: 0.9rem; opacity: 0.8;">Event: ${event?.eventName || 'Event'}</div>`;
+    const summaryTitle = `${leagueTitle}${eventTitle}`;
 
     tournamentSelectorUI.classList.add('hidden');
-    tournamentSummary.classList.remove('hidden');
+    renderActionSummary(tournamentSummary, summaryTitle, [
+      { text: 'Change', onclick: handleTournamentChange },
+      { text: 'Print Blank Score Sheet', onclick: () => printBlankScoreSheet(machines, league?.name, event?.eventName, format), hidden: eventTargets.length === 0 }
+    ]);
 
     currentUser = user;
     activeLeague = league;
@@ -433,12 +420,10 @@ export async function initScoresPage() {
     applyPreferredTheme(format);
 
     machines = eventTargets;
-    if (printSheetBtn) printSheetBtn.classList.remove('hidden');
 
     if (machines.length === 0) {
       warning.textContent = 'No target scores have been configured for the selected event.';
       warning.classList.remove('hidden');
-      if (printSheetBtn) printSheetBtn.classList.add('hidden');
       roundsInput.innerHTML = '';
       return;
     }

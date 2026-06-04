@@ -1,7 +1,8 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js'; 
-import { getActiveEventId, getActiveLeagueId, formatNumber } from '@scripts/utils.js';
-import { fitTVModeToScreen, initTournamentSelector } from '@ui/uiComponents.js';
+import { getActiveEventId, getActiveLeagueId, setActiveEventId, formatNumber } from '@scripts/utils.js';
+import { fitTVModeToScreen, initTournamentSelector, renderActionSummary } from '@ui/uiComponents.js';
+import { printBlankScoreSheet } from '@ui/printing.js';
 
 export async function initStandingsPage() {
   const standingsHeader = document.getElementById('standings-header');
@@ -14,8 +15,6 @@ export async function initStandingsPage() {
   // Selection UI Toggles (matching the scores page behavior)
   const tournamentSelectorUI = document.getElementById('tournament-selector-ui');
   const tournamentSummary = document.getElementById('tournament-summary');
-  const tournamentSummaryText = document.getElementById('tournament-summary-text');
-  const changeBtn = document.getElementById('change-tournament-btn');
 
   let isTvMode = false;
   let refreshInterval = null;
@@ -27,17 +26,15 @@ export async function initStandingsPage() {
     tvBtn.addEventListener('click', toggleTvMode);
   }
 
-  if (changeBtn) {
-    changeBtn.onclick = () => {
-      tournamentSelectorUI.classList.remove('hidden');
-      tournamentSummary.classList.add('hidden');
+  const handleTournamentChange = () => {
+    tournamentSelectorUI.classList.remove('hidden');
+    tournamentSummary.classList.add('hidden');
 
-      // Clear dependent UI to prevent inconsistent states
-      if (standingsWrapper) standingsWrapper.classList.add('hidden');
-      if (standingsEmpty) standingsEmpty.classList.remove('hidden');
-      if (tvBtn) tvBtn.classList.add('hidden');
-    };
-  }
+    if (standingsWrapper) standingsWrapper.classList.add('hidden');
+    if (standingsEmpty) standingsEmpty.classList.remove('hidden');
+    if (tvBtn) tvBtn.classList.add('hidden');
+    setActiveEventId(''); 
+  };
 
   function toggleTvMode() {
     if (!getActiveEventId()) return; // Cannot enter TV Mode without a selection
@@ -195,16 +192,20 @@ export async function initStandingsPage() {
     const league = leagues.find(l => String(l.id) === String(leagueId));
     const event = eventId === 'summary' ? { eventName: 'Season Summary' } : league?.events?.find(e => String(e.id) === String(eventId));
     
-    Engine = getScoringEngine(event?.scoringFormat || league?.scoringFormat);
+    const format = event?.scoringFormat || league?.scoringFormat || 'bowling';
+    Engine = getScoringEngine(format);
 
     if (tournamentSelectorUI && tournamentSummary) {
-      if (league?.type === 'session') {
-        tournamentSummaryText.textContent = event?.eventName || 'Session Scoreboard';
-      } else {
-        tournamentSummaryText.textContent = `${league?.name || 'League'} - ${event?.eventName || 'Event'}`;
-      }
+      const isSession = league?.type === 'session';
+      const leagueTitle = isSession ? '' : `<div style="font-weight: bold;">League: ${league?.name || 'Unknown'}</div>`;
+      const eventTitle = `<div style="font-size: 0.9rem; opacity: 0.8;">Event: ${event?.eventName || 'Event'}</div>`;
+      const summaryTitle = `${leagueTitle}${eventTitle}`;
+
       tournamentSelectorUI.classList.add('hidden');
-      tournamentSummary.classList.remove('hidden');
+      renderActionSummary(tournamentSummary, summaryTitle, [
+        { text: 'Change', onclick: handleTournamentChange },
+        { text: 'Print Blank Score Sheet', onclick: () => printBlankScoreSheet(eventTargets, league?.name, event?.eventName, format), hidden: eventTargets.length === 0 || eventId === 'summary' }
+      ]);
     }
 
     if (eventId === 'summary') return renderLeagueSummary(leagueId, leagues);
