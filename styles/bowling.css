@@ -1,6 +1,7 @@
-/* bowling.css */
-:root {
-  --pb-primary: #1a1a1a;
+/* bowling.css - Scoped to Bowling theme and default fallback */
+.theme-bowling, 
+body:not(.theme-golf) {
+  --pb-primary: #b40202;
   --pb-primary-hover: #333333;
   --pb-accent: #1a1a1a;
   --pb-black: #1a1a1a;

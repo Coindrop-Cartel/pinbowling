@@ -1,199 +1,231 @@
 import { ScoringEngine } from '../ScoringEngine.js';
+import { formatNumber } from '../../utils.js';
 
 /**
- * Placeholder for future Golf scoring format.
+ * Implementation of Golf-style scoring logic (PinGolf).
+ * Scoring is based on strokes relative to par.
  */
 export class GolfEngine extends ScoringEngine {
-  getThemeClass() { return 'theme-golf'; }
-
-  calculateTurnResults(machines, scoreMap) {
-    const results = machines.map((round) => {
-      const entry = scoreMap[String(round.orderNumber)] || { ball1: 0, ball2: 0, ball3: 0 };
-      const target = Number(round.value1 || 0);
-      const par = Number(round.value2 || 3);
-      
-      let strokes = 10;
-
-      const b1 = Number(entry.ball1 || 0);
-      const b2 = Number(entry.ball2 || 0);
-      const b3 = Number(entry.ball3 || 0);
-
-      // 1, 2, or 3 strokes depends on which ball reached the Target Score
-      if (target > 0 && b1 >= target) {
-        strokes = 1;
-      } else if (target > 0 && b2 >= target) {
-        strokes = 2;
-      } else if (target > 0 && b3 >= target) {
-        strokes = 3;
-      } else {
-        // Fallback to threshold interpolation for 4-10 based on cumulative total
-        const finalTotal = Math.max(b1, b2, b3);
-        
-        // Sort thresholds to find the best (lowest) rank achieved
-        const thresholds = Object.entries(round.values || {})
-          .map(([rank, score]) => ({ rank: Number(rank), score: Number(score) }))
-          .filter(t => t.rank >= 4) // Ranks 1-3 are handled by ball sequence above
-          .sort((a, b) => a.rank - b.rank); // Sort 4, 5, 6...
-
-        for (const threshold of thresholds) {
-          if (finalTotal >= threshold.score) {
-            strokes = threshold.rank;
-            break;
-          }
-        }
-      }
-
-      return {
-        orderNumber: round.orderNumber,
-        machineName: round.machineName,
-        mark: this.formatMark({ score: strokes, par: par }),
-        score: strokes
-      };
-    });
-
-    const total = results.reduce((sum, res) => sum + res.score, 0);
-    return { turnResults: results, total };
-  }
-
-  getRoundCountOptions() {
-    return [3, 6, 9, 18];
-  }
-
   /**
-   * For Golf, value1 is the Target Score for Par, and value2 is the Par rank (default 3).
-   * @param {number} baseScore 
-   */
-  getInitialValues(baseScore) {
-    return { value1: baseScore, value2: 3 };
-  }
-
-  /**
-   * Filters the threshold list for display. 
-   * For Golf, we only show 3-10 as 1 and 2 are ball-dependent.
-   */
-  filterThresholds(values) {
-    const filtered = {};
-    Object.entries(values || {}).forEach(([rank, val]) => {
-      if (Number(rank) >= 3) filtered[rank] = val;
-    });
-    return filtered;
-  }
-
-  /**
-   * Maps a specific target score to the designated Par rank and interpolates the rest.
-   * @param {number} target The pinball score required to achieve Par.
-   * @param {number} par The rank (3-5) that represents Par.
-   * @param {string} scalingType 'flat' or 'curved'
+   * Overridden for Golf: Anchors the input 'target' at the 'par' rank.
+   * Scores for fewer strokes (ranks < par) are calculated above the target,
+   * while scores for more strokes (ranks > par) are calculated below.
+   * 
+   * @param {number} target The Target Score (Ball 1).
+   * @param {number|string} par The par value for the hole (usually 3).
+   * @param {string} scalingType 'flat' or 'curved'.
+   * @returns {Object|null}
    */
   buildRoundValues(target, par, scalingType) {
-    const values = {};
-    const t = Number(target) || 0;
-    const p = Number(par) || 3; // Default to Par 3 if not provided
+    const parRank = Number(par) || 3;
+    const floor = target / 10; // Default floor to 10% of the target
 
-    if (t > 0) {
-      const power = (scalingType === 'curved') ? 2 : 1;
-      
-      for (let rank = 1; rank <= 10; rank += 1) {
-        /**
-         * Calculation: Value = Target * ((11 - Rank) / (11 - Par))^power
-         * This ensures that at Rank = Par, Value = Target.
-         * Lower ranks (better strokes) require higher scores.
-         * Higher ranks (worse strokes) require lower scores.
-         */
-        values[rank] = Math.round(t * Math.pow((11 - rank) / (11 - p), power));
-      }
-      return values;
-    }
-    return null;
+    // Golf: target is the anchor at parRank, ascending order (1 is the high score requirement).
+    // Anchor at par means reaching the target score at the Par stroke (e.g. Stroke 3).
+    return this.calculateInterpolatedValues(target, floor, parRank, scalingType, 'asc');
   }
 
   /**
-   * For Golf, we sort thresholds Ascending (3 -> 10).
+   * Sort 1 to 10 for Golf (lowest strokes first).
    */
   getThresholdSort() {
     return (a, b) => Number(a[0]) - Number(b[0]);
   }
 
-  compareTotals(a, b) {
-    // Handle players with 0 strokes (didn't play) by moving them to the bottom
-    if (a === 0) return 1;
-    if (b === 0) return -1;
-    return a - b;
-  }
+  getThresholdPrefix() { return 'Strokes'; }
 
-  getTotalColumnLabel(anchorValue) {
-    return `Par: ${anchorValue}`;
-  }
-
-  formatTotalScore(total, anchorValue, formatFn) {
-    if (total === 0) return formatFn(0);
-    const diff = total - anchorValue;
-    if (diff === 0) return 'E';
-    if (diff > 0) return `+${diff}`;
-    return String(diff);
-  }
-
-  shouldShowRoundScore() {
-    return false;
-  }
-
-  getThresholdRowStyle(rank, value1, value2) {
-    const isParRank = Number(rank) === Number(value2);
-    if (isParRank) {
-      return 'border: 2px solid var(--pb-primary); padding: 2px 8px; border-radius: 4px; display: inline-block; background: rgba(0,0,0,0.05); font-weight: bold; margin: 2px 0;';
-    }
-    return 'margin: 2px 0;';
+  /**
+   * Overridden for Golf: Summarizes the target needed by Ball 3 to achieve a "3" or better.
+   * This helps players understand the primary goal of the hole.
+   * 
+   * @param {Object} round 
+   * @param {Function} formatFn 
+   * @returns {string}
+   */
+  getRowSummaryHtml(round, formatFn) {
+    const goal = round.values?.[3] || round.values?.['3'] || round.value1 || 0;
+    const par = round.value2 || 3;
+    return `<div class="strike-target" style="font-size: 0.8rem; color: var(--pb-primary); margin-top: 4px;"><b>Target Score:</b> ${formatFn(goal)} &nbsp;&nbsp; <b>Par:</b> ${par}</div>`;
   }
 
   /**
-   * Returns the stylized HTML for a golf score based on its relation to par.
+   * Highlighting for Golf thresholds (Target Stroke and Par Stroke).
    */
-  formatMark(turn) {
-    const strokes = Number(turn.score);
-    const par = Number(turn.par || 0);
-    if (!strokes || !par) return String(strokes || '−');
+  getThresholdRowStyle(rank, value1, value2) {
+    const r = Number(rank);
+    // Highlighting for the key thresholds: Start (3), End (10), and Par.
+    const isMajor = 
+      r === this.getThresholdStart() || 
+      r === this.getThresholdEnd() || 
+      r === Number(value2);
 
-    const diff = strokes - par;
-    // Shared container for symbols to ensure consistent alignment in tables
-    const baseStyle = "display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; margin: 0 auto; font-weight: bold; font-size: 0.85rem; box-sizing: border-box;";
-
-    // Par: No symbol
-    if (diff === 0) return `<span style="${baseStyle}">${strokes}</span>`;
-
-    // Birdie: Circle
-    if (diff === -1) return `<div style="${baseStyle} border: 1px solid var(--pb-primary); border-radius: 50%;">${strokes}</div>`;
-
-    // Eagle: Solid circle
-    if (diff === -2) return `<div style="${baseStyle} background: var(--pb-primary); color: var(--pb-white); border-radius: 50%;">${strokes}</div>`;
-
-    // Albatross or better: Solid circle with frame
-    if (diff <= -3) return `<div style="display: inline-flex; border: 1px solid var(--pb-primary); padding: 1px; border-radius: 50%; margin: 0 auto;"><div style="${baseStyle} background: var(--pb-primary); color: var(--pb-white); border-radius: 50%; width: 22px; height: 22px;">${strokes}</div></div>`;
-
-    // Bogey: Square
-    if (diff === 1) return `<div style="${baseStyle} border: 1px solid var(--pb-primary);">${strokes}</div>`;
-
-    // Double bogey: Solid square
-    if (diff === 2) return `<div style="${baseStyle} background: var(--pb-primary); color: var(--pb-white);">${strokes}</div>`;
-
-    // Triple bogey or worse: Solid square with frame
-    if (diff >= 3) return `<div style="display: inline-flex; border: 1px solid var(--pb-primary); padding: 1px; margin: 0 auto;"><div style="${baseStyle} background: var(--pb-primary); color: var(--pb-white); width: 22px; height: 22px;">${strokes}</div></div>`;
-
-    return String(strokes);
+    if (isMajor) {
+      return 'margin: 2px 0; font-weight: bold; color: var(--pb-primary);';
+    }
+    return 'margin: 2px 0; opacity: 0.8;';
   }
 
-  getRoundLabel() {
-    return 'Hole';
+  /**
+   * Returns a CSS class string for formatting a mark based on its value relative to par.
+   * @param {number} markValue The numeric value of the mark (stroke count).
+   * @param {number} parValue The par value for the current hole.
+   * @returns {string} CSS class string.
+   */
+  getMarkFormatting(markValue, parValue) {
+    const diff = markValue - parValue;
+    if (diff === 0) return ''; // Par
+    if (diff === -1) return 'golf-birdie';   // Circle
+    if (diff === -2) return 'golf-eagle';    // Solid Circle
+    if (diff <= -3) return 'golf-albatross'; // Solid Circle with Frame
+    if (diff === 1) return 'golf-bogey'; // Bogey (square)
+    if (diff === 2) return 'golf-double-bogey'; // Double Bogey (solid square)
+    if (diff >= 3) return 'golf-triple-bogey'; // Solid Square with Frame
+    return '';
   }
 
-  getTurnHeaderPrefix() {
-    return 'H';
+  /**
+   * Converts turn data into a visual mark string, applying Golf-specific formatting.
+   * @param {Object} turn The calculated turn result.
+   * @param {number} parValue The par value for the current hole.
+   * @returns {string}
+   */
+  formatMark(turn, parValue) {
+    const formattingClass = this.getMarkFormatting(turn.score, parValue);
+    return `<span class="${formattingClass}">${turn.mark}</span>`;
   }
 
-  getPrimaryTargetLabel() {
-    return 'Target Score';
+  /**
+   * Calculates the stroke result for a single hole based on cumulative ball scores.
+   * 
+   * @param {Object} machine The target definition for this hole.
+   * @property {number} machine.value1 - Target score.
+   * @property {number} machine.value2 - Par value.
+   * @property {Object<string, number>} machine.values - Interpolated thresholds.
+   * @property {number} raw1 Score after Ball 1.
+   * @property {number} raw2 Score after Ball 2.
+   * @param {number} raw1 Score after Ball 1.
+   * @param {number} raw2 Score after Ball 2.
+   * @param {number} raw3 Score after Ball 3.
+   * @returns {Object} Standardized turn data.
+   */
+  getTurnDataFromValues(machine, raw1, raw2, raw3) {
+    const values = machine.values || {};
+    let strokes = 10; // Default if target not hit
+
+    // For Golf, hitting the Rank 3 threshold on any of the first three balls
+    // determines the stroke count (1, 2, or 3).
+    const threshold3 = values[3] || 0;
+    if (raw1 >= threshold3) strokes = 1;
+    else if (raw2 >= threshold3) strokes = 2;
+    else if (raw3 >= threshold3) strokes = 3;
+    else {
+      // Step 2: Hitting target after 3 balls. 
+      // Strokes are calculated based on where the final score falls in the 4-10 thresholds.
+      const thresholds = Object.entries(values)
+        .filter(([rank]) => Number(rank) >= 4)
+        .map(([rank, score]) => ({ rank: Number(rank), score: Number(score) }))
+        .sort((a, b) => b.score - a.score);
+
+      const match = thresholds.find(t => raw3 >= t.score);
+      strokes = match ? match.rank : 10;
+    }
+
+    return {
+      orderNumber: machine.orderNumber,
+      machineName: machine.machineName,
+      mark: String(strokes),
+      score: strokes
+    };
   }
 
-  getHighScoreLabel() {
-    return 'Target Score';
+  /**
+   * Calculates the full game results for a PinGolf session.
+   * 
+   * @param {Array<Object>} machines Target definitions for the event.
+   * @param {Object} scoreMap Dictionary of ball scores keyed by orderNumber.
+   * @returns {{turnResults: Array, total: number}}
+   */
+  calculateTurnResults(machines, scoreMap) {
+    let runningTotal = 0;
+    const playedMachines = [];
+
+    const results = machines.map(machine => {
+      const entry = scoreMap[String(machine.orderNumber)];
+      const hasScores = entry && (Number(entry.ball1) > 0 || Number(entry.ball2) > 0 || Number(entry.ball3) > 0);
+      
+      const turn = this.getTurnDataFromValues(
+        machine,
+        Number(entry?.ball1 || 0),
+        Number(entry?.ball2 || 0),
+        Number(entry?.ball3 || 0)
+      );
+
+      if (hasScores) {
+        runningTotal += turn.score;
+        playedMachines.push(machine);
+        const par = Number(machine.value2) || 3;
+        const diff = turn.score - par;
+        const formattedMark = this.formatMark(turn, machine.value2);
+        return {
+          ...turn,
+          played: true,
+          mark: turn.mark, // Keep numeric mark for logic if needed
+          displayMark: formattedMark,
+          displayRoundTotal: diff === 0 ? 'E' : (diff > 0 ? `+${diff}` : String(diff)),
+          displayRunningTotal: this.formatTotalScore(runningTotal, playedMachines)
+        };
+      }
+
+      return { ...turn, played: false, displayMark: '−', displayRoundTotal: '', displayRunningTotal: '−' };
+    });
+
+    return { turnResults: results, total: runningTotal, totalDisplay: this.formatTotalScore(runningTotal, playedMachines) };
+  }
+
+  /**
+   * Comparator for player standings. Low score wins in Golf.
+   */
+  compareScores(a, b) { return a - b; } // Low score wins
+
+  /**
+   * Standardized round options for Golf.
+   * @returns {Array<number>} [9, 18]
+   */
+  getRoundCountOptions() { return [3, 6, 9, 18]; }
+
+  /** @returns {string} Label for a single round (e.g. "Hole"). */
+  getRoundLabel() { return this.config.roundLabel || 'Hole'; }
+
+  /** @returns {string} Prefix for turn headers. */
+  getTurnHeaderPrefix() { return this.config.turnHeaderPrefix || 'Hole'; }
+
+  /** @returns {string} Label for the main goal (e.g. "Par"). */
+  getPrimaryTargetLabel() { return this.config.primaryTargetLabel || 'Par'; }
+
+  /** @returns {string} Label for the value 1 (Target Score) requirement. */
+  getValue1Label() { return this.config.value1Label || 'Target Score'; }
+
+  /** @returns {string} Label for the value 2 (Par) baseline. */
+  getValue2Label() { return this.config.value2Label || 'Par'; }
+
+  /**
+   * Formats the total score, including relative-to-par display (e.g. "24 (+2)").
+   */
+  formatTotalScore(total, machines = []) {
+    // Ensure machines is always an array for reduce
+    const machinesArray = Array.isArray(machines) ? machines : [machines];
+
+    // Calculate cumulative par for the machines provided
+    const cumulativePar = machinesArray.reduce((sum, m) => sum + (Number(m.value2) || 3), 0);
+
+    if (cumulativePar === 0) return formatNumber(total);
+
+    const rel = (Number(total) || 0) - cumulativePar;
+    const relStr = rel === 0 ? 'E' : (rel > 0 ? `+${rel}` : rel);
+    return `${formatNumber(total)} (${relStr})`;
+  }
+  
+  getInitialValues(suggestedTarget = 5000000) {
+    return { value1: suggestedTarget, value2: 3 };
   }
 }

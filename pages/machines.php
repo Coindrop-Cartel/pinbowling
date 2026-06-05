@@ -15,7 +15,7 @@
         <div id="machine-metadata-row" class="form-row hidden" style="display: grid; grid-template-columns: 1fr 2fr; gap: 15px;">
           <div class="form-row">
             <label for="machine-year">Year</label>
-            <input id="machine-year" type="number" placeholder="e.g. 1992" />
+            <select id="machine-year"></select>
           </div>
           <div class="form-row">
             <label for="machine-manufacturer">Manufacturer</label>
@@ -23,7 +23,7 @@
           </div>
         </div>
         <div class="form-actions hidden">
-          <button type="submit" id="save-machine-button">Save Machine</button>
+          <button type="submit" id="save-machine-button" class="btn-mgmt">Save Machine</button>
         </div>
       </form>
     </section>

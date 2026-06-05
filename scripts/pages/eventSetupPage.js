@@ -1,20 +1,14 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js';
 import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormatting, formatNumber, renderThresholdGrid } from '@scripts/utils.js';
-import { 
-  createSearchableSelect, 
-  showPrompt, 
-  showAlert, 
-  initReadOnlyTournamentDisplay, 
-  createExpandableRow, 
-  setupSortableList,
-} from '@ui/uiComponents.js';
+import { createSearchableSelect, initReadOnlyTournamentDisplay, createExpandableRow, setupSortableList } from '@ui/selectors.js';
+import { showPrompt, showAlert } from '@ui/dialogs.js';
 import { printMachineScores } from '@ui/printing.js';
 import { requireAdmin, isManagementAuthorized } from '@services/auth.js';
 import {navigateTo} from '@scripts/utils.js';
 import { ROUTES } from '@scripts/routes.js';
 
-export async function initConfigPage() {
+export async function initEventSetupPage() {
   // Verify authorization before initializing the page logic
   const [authorized, initialLeagues] = await Promise.all([
     isManagementAuthorized(),
@@ -35,6 +29,14 @@ export async function initConfigPage() {
   const roundsList = document.getElementById('rounds-list');
   const reorderActions = document.getElementById('reorder-actions');
   const listEmpty = document.getElementById('list-empty');
+
+  // Apply standardized button sizes
+  if (submitBtn) submitBtn.classList.add('btn-mgmt');
+  document.getElementById('add-target-btn')?.classList.add('btn-mgmt');
+  document.getElementById('done-setup-btn')?.classList.add('btn-mgmt');
+  document.getElementById('save-order-btn')?.classList.add('btn-mgmt');
+  document.getElementById('cancel-order-btn')?.classList.add('btn-mgmt');
+
   let editingMachineId = null;
   let expandedTargetId = null;
   let isListDirty = false;
@@ -91,6 +93,7 @@ export async function initConfigPage() {
     const nextOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.orderNumber)) + 1 : 1;
     orderInput.value = nextOrder;
     displayOrder.textContent = nextOrder;
+    updatePreviewAndDirty();
     configCard.classList.remove('hidden');
     configCard.scrollIntoView({ behavior: 'smooth' });
   });
@@ -276,11 +279,11 @@ export async function initConfigPage() {
           </div>
           <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto;" onclick="event.stopPropagation()">
             <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${Engine.getHighScoreLabel()}:</label>
+              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${Engine.getValue1Label()}:</label>
               <input type="text" class="score10-input" value="${formatNumber(round.value1)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
             </div>
             <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${Engine.getLowScoreLabel()}:</label>
+              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${Engine.getValue2Label()}:</label>
               <input type="text" class="score1-input" value="${formatNumber(round.value2)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
             </div>
           </div>
@@ -294,13 +297,13 @@ export async function initConfigPage() {
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <div style="display: flex; gap: 6px;">
-               <button type="button" class="qfill secondary" data-type="easy" style="font-size: 0.75rem; padding: 2px 10px;">Easy</button>
-               <button type="button" class="qfill secondary" data-type="med" style="font-size: 0.75rem; padding: 2px 10px;">Med</button>
-               <button type="button" class="qfill secondary" data-type="hard" style="font-size: 0.75rem; padding: 2px 10px;">Hard</button>
+               <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
+               <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
+               <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
             </div>
             <div style="display: flex; gap: 4px;">
-               <button type="button" class="scaling-btn ${scaling === 'flat' ? 'btn-standard' : 'secondary'}" data-scale="flat" style="font-size: 0.7rem; padding: 2px 8px;">Flat</button>
-               <button type="button" class="scaling-btn ${scaling === 'curved' ? 'btn-standard' : 'secondary'}" data-scale="curved" style="font-size: 0.7rem; padding: 2px 8px;">Curved</button>
+               <button type="button" class="scaling-btn ${scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
+               <button type="button" class="scaling-btn ${scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
             </div>
           </div>
           <div class="preview-values-container">${renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2)}</div>
@@ -430,15 +433,12 @@ export async function initConfigPage() {
     Engine = getScoringEngine(format);
 
     // Update UI labels based on the scoring engine
-    if (labelHigh) labelHigh.textContent = Engine.getHighScoreLabel();
-    if (labelLow) labelLow.textContent = Engine.getLowScoreLabel();
+    if (labelHigh) labelHigh.textContent = Engine.getValue1Label();
+    if (labelLow) labelLow.textContent = Engine.getValue2Label();
 
-    if (format === 'golf') {
-      if (!score1Input.value) score1Input.value = '3';
-      score1Input.placeholder = 'e.g. 3';
-    } else {
-      score1Input.placeholder = 'e.g. 5,000,000';
-    }
+    const defaults = Engine.getInitialValues();
+    score10Input.placeholder = `e.g. ${formatNumber(defaults.value1)}`;
+    score1Input.placeholder = `e.g. ${formatNumber(defaults.value2)}`;
 
     const locationId = eventMatch?.locationId;
 
@@ -471,12 +471,11 @@ export async function initConfigPage() {
     machineSearch.updateOptions('');
     updateQuickFillState('');
 
-    if (Engine.getRoundLabel() === 'Hole') {
-      score1Input.value = '3';
-      score1Input.placeholder = 'e.g. 3';
-    } else {
-      score1Input.placeholder = 'e.g. 5,000,000';
-    }
+    const defaults = Engine.getInitialValues();
+    score10Input.value = formatNumber(defaults.value1);
+    score1Input.value = formatNumber(defaults.value2);
+    score10Input.placeholder = `e.g. ${formatNumber(defaults.value1)}`;
+    score1Input.placeholder = `e.g. ${formatNumber(defaults.value2)}`;
 
     currentScaling = 'curved';
     if (btnFlat && btnCurved) {
@@ -484,7 +483,7 @@ export async function initConfigPage() {
       btnCurved.classList.replace('secondary', 'btn-standard');
     }
 
-    renderPreview(score10Input, score1Input, previewValues, Engine, false, currentScaling);
+    renderPreview(score10Input, score1Input, previewValues, Engine, isCurrentTargetLast(), currentScaling);
   }
   document.getElementById('cancel-config-btn').onclick = resetForm;
 
@@ -497,6 +496,10 @@ export async function initConfigPage() {
     const eventId = getActiveEventId();
 
     if (!orderNumber || !machineName || (!score10 && !score1) || !eventId) return;
+
+    if (!await requireAdmin(`Enter Admin Password to save target for "${machineName}":`)) {
+      return;
+    }
 
     const values = Engine.buildRoundValues(score10, score1, currentScaling);
 

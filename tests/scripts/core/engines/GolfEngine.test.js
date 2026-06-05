@@ -13,25 +13,33 @@ describe('GolfEngine', () => {
     };
   });
 
-  const engine = new GolfEngine();
-
-  const mockHole = (order) => ({
-    orderNumber: order,
-    machineName: `Hole ${order}`,
-    value1: 10000,
-    value2: 3,
-    values: {
-      1: 20000, 2: 15000, 3: 10000, 4: 8000, 5: 6000,
-      6: 4000, 7: 3000, 8: 2000, 9: 1000, 10: 500
-    }
+  const engine = new GolfEngine({
+    brand: 'PinGolf',
+    cta: "Let's Golf!",
+    logo: 'pingolf.png',
+    roundLabel: 'Hole',
+    turnHeaderPrefix: 'Hole',
+    primaryTargetLabel: 'Par'
   });
+
+  const mockHole = (order) => {
+    const target = 10000;
+    const par = 3;
+    return {
+      orderNumber: order,
+      machineName: `Hole ${order}`,
+      value1: target,
+      value2: par,
+      values: engine.buildRoundValues(target, par, 'flat')
+    };
+  };
 
   test('calculateTurnResults - Ball Sequence Timing', () => {
     const holes = [mockHole(1), mockHole(2), mockHole(3)];
     const scoreMap = {
-      '1': { ball1: 12000 }, // Reached target on Ball 1 -> 1 Stroke
-      '2': { ball1: 5000, ball2: 10000 }, // Reached target on Ball 2 -> 2 Strokes
-      '3': { ball1: 2000, ball2: 5000, ball3: 11000 } // Reached target on Ball 3 -> 3 Strokes
+      '1': { ball1: 13000 }, // Threshold for Rank 1 is ~12571
+      '2': { ball1: 5000, ball2: 12000 }, // Threshold for Rank 2 is ~11285
+      '3': { ball1: 2000, ball2: 5000, ball3: 10000 } // Threshold for Rank 3 is exactly 10000
     };
 
     const { turnResults, total } = engine.calculateTurnResults(holes, scoreMap);
@@ -44,12 +52,12 @@ describe('GolfEngine', () => {
 
   test('calculateTurnResults - Fallback to 4-10 thresholds', () => {
     const hole = mockHole(1);
-    // Target 10,000 never reached. Max is 8,000.
-    const scoreMap = { '1': { ball1: 2000, ball2: 5000, ball3: 8000 } };
+    // Par (10,000) never reached. Max is 8,000.
+    const scoreMap = { '1': { ball1: 2000, ball2: 5000, ball3: 8714 } };
     
     const { turnResults } = engine.calculateTurnResults([hole], scoreMap);
     
-    // 8000 is the exact threshold for Rank 4 in mockHole
+    // ~8714 is the threshold for Rank 4 when anchored at Rank 3
     expect(turnResults[0].score).toBe(4);
   });
 
@@ -60,24 +68,22 @@ describe('GolfEngine', () => {
     // Rank 3 (Par) should be exactly the target
     expect(values[3]).toBe(1000);
     
-    // Rank 1 (better) should be higher: 1000 * (10/8) = 1250
-    expect(values[1]).toBe(1250);
-    // Rank 10 (worse) should be lower: 1000 * (1/8) = 125
-    expect(values[10]).toBe(125);
+    expect(values[1]).toBe(1257); // High requirement for 1 stroke
+    expect(values[10]).toBe(100); // Floor is 10% of target
   });
 
   test('buildRoundValues - Inverse Curved Interpolation', () => {
     const values = engine.buildRoundValues(1000, 3, 'curved');
 
     expect(values[3]).toBe(1000);
-    // Rank 1: 1000 * (10/8)^2 = 1000 * 1.5625 = 1563
-    expect(values[1]).toBe(1563);
+    expect(values[1]).toBe(1588); // Significantly higher requirement for 1 stroke
+    expect(values[10]).toBe(100);
   });
 
   test('Metadata Getters', () => {
     expect(engine.getRoundLabel()).toBe('Hole');
-    expect(engine.getTurnHeaderPrefix()).toBe('H');
-    expect(engine.getPrimaryTargetLabel()).toBe('Target Score');
+    expect(engine.getTurnHeaderPrefix()).toBe('Hole');
+    expect(engine.getPrimaryTargetLabel()).toBe('Par');
     expect(engine.getPlayActionLabel()).toBe("Let's Golf!");
     expect(engine.getBrandName()).toBe('PinGolf');
   });

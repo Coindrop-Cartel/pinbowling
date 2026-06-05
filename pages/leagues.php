@@ -19,7 +19,7 @@
           <select id="league-scoring-format" style="width: 100%; box-sizing: border-box;"></select>
         </div>
         <div class="form-actions hidden">
-          <button type="submit" id="create-league-btn" disabled>Create League</button>
+          <button type="submit" id="create-league-btn" class="btn-mgmt" disabled>Create League</button>
         </div>
       </form>
     </section>
@@ -58,8 +58,8 @@
           <select id="event-scoring-format" style="width: 100%; box-sizing: border-box;"></select>
         </div>
         <div class="form-actions">
-          <button type="submit">Save Event</button>
-          <button type="button" id="cancel-event-edit" class="secondary">Cancel</button>
+          <button type="submit" class="btn-mgmt">Save Event</button>
+          <button type="button" id="cancel-event-edit" class="secondary btn-mgmt">Cancel</button>
         </div>
       </form>
     </section>

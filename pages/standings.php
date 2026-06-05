@@ -10,6 +10,7 @@
 
     <div id="tournament-context-area" class="no-print">
       <div id="tournament-selector-ui" class="tournament-selector-container"></div>
+      <div id="player-filter-container" class="hidden" style="margin-bottom: 10px;"></div>
       <div id="tournament-summary" class="card hidden no-tv" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; margin-bottom: 5px;">
         <span id="tournament-summary-text" style="font-weight: bold; font-size: 1.1rem;"></span>
         <div style="display: flex; gap: 8px;">

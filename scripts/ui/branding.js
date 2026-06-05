@@ -1,0 +1,82 @@
+import { getScoringEngine } from '@core/engine.js';
+import { getCookie } from '@scripts/utils.js';
+
+/**
+ * Refreshes the site's CSS classes, logos, and terminology based on the 
+ * user's preferred scoring format (e.g., Bowling vs. Golf).
+ * 
+ * @param {string} [overrideFormat] - Force a specific format, ignoring cookies.
+ */
+export function applyPreferredTheme(overrideFormat) {
+  const preferred = overrideFormat || getCookie('pb_preferred_format') || 'bowling';
+  const engine = getScoringEngine(preferred);
+
+  // Clear any previous theme classes and apply the current engine's theme
+  document.body.classList.remove('theme-golf', 'theme-bowling');
+  const themeClass = engine.getThemeClass();
+  if (themeClass) document.body.classList.add(themeClass);
+  
+  // Update dynamic logos (header/nav)
+  const logoImgs = document.querySelectorAll('.nav-logo img, .header-logo img, .site-logo img, #site-logo');
+  logoImgs.forEach(img => {
+    const lastSlash = img.src.lastIndexOf('/');
+    const basePath = lastSlash !== -1 ? img.src.substring(0, lastSlash + 1) : '';
+    img.src = basePath + engine.getLogoImage();
+    img.alt = engine.getBrandName() + ' Logo';
+  });
+
+  // Update the navigation brand name label
+  document.querySelectorAll('.nav-logo span').forEach(el => {
+    el.textContent = engine.getBrandName();
+  });
+
+  // Update all play CTA links (nav and home button)
+  document.querySelectorAll('[data-route="PLAY"]').forEach(link => {
+    link.textContent = engine.getPlayActionLabel();
+  });
+
+  // Update homepage descriptive text
+  const logicText = document.getElementById('scoring-logic-text');
+  if (logicText) logicText.textContent = engine.getScoringDescription();
+}
+
+/**
+ * Generates a badge <span> for a scoring format.
+ * 
+ * @param {string} format - Format ID (e.g. 'golf').
+ * @returns {string} HTML string.
+ */
+export function getFormatBadgeHtml(format) {
+  if (!format) return '';
+  const engine = getScoringEngine(format);
+  const label = engine.getBrandName();
+  const themeClass = engine.getThemeClass();
+  return `<span class="badge ${themeClass}" style="background: var(--pb-primary); color: var(--pb-white); font-size:0.65rem; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle; font-weight: bold; text-transform: uppercase; border: none;">${label}</span>`;
+}
+
+/**
+ * Dynamically scales the TV Mode container to fit the viewport width.
+ */
+export function fitTVModeToScreen() {
+  const container = document.getElementById('tv-mode-content');
+  if (!container || !document.body.classList.contains('tv-mode-active')) {
+    if (container) {
+      container.style.transform = '';
+      container.style.width = '';
+    }
+    return;
+  }
+
+  container.style.transform = 'scale(1)';
+  container.style.width = 'auto';
+
+  const viewportWidth = window.innerWidth - 40;
+  const contentWidth = container.offsetWidth;
+
+  if (contentWidth > viewportWidth) {
+    const scaleFactor = viewportWidth / contentWidth;
+    container.style.transformOrigin = 'top center';
+    container.style.transform = `scale(${scaleFactor})`;
+    container.style.width = (100 / scaleFactor) + '%';
+  }
+}

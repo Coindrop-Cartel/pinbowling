@@ -2,14 +2,9 @@ import { PB_API } from '@services/api.js';
 import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
 import { formatNumber, applyScoreFormatting, renderThresholdGrid, getCookie, loadPage } from '@scripts/utils.js';
 import { can, PERMISSIONS } from '@services/auth.js';
-import { 
-  createSearchableSelect, 
-  showPlayerSelectionDialog, 
-  createExpandableRow, 
-  setupSortableList,
-  getFormatBadgeHtml,
-  applyPreferredTheme,
-} from '@ui/uiComponents.js';
+import { createSearchableSelect, createExpandableRow, setupSortableList } from '@ui/selectors.js';
+import { showPlayerSelectionDialog } from '@ui/dialogs.js';
+import { getFormatBadgeHtml, applyPreferredTheme } from '@ui/branding.js';
 
 export async function initPlayPage() {
   const form = document.getElementById('quick-play-form');
@@ -101,24 +96,24 @@ export async function initPlayPage() {
       const row = createExpandableRow(sessionsList, {
         id: event.id,
         className: 'session-item',
+        format: event.scoringFormat,
         headerHtml: `
           <div style="flex: 1; display: flex; flex-direction: column;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <strong>${event.eventName}</strong>
-              ${getFormatBadgeHtml(event.scoringFormat)}
             </div>
-            <small>${event.locationName || 'No Location'} | ${event.eventDate} | Players: ${event.roster?.length || 0}</small>
+            <div class="session-stats" style="font-size: 0.75rem; opacity: 0.7; margin-top: 2px;">
+              ${event.locationName || 'No Location'} | ${event.eventDate} | Players: ${event.roster?.length || 0}
+            </div>
             <div style="display: flex; gap: 6px; margin-top: 8px;">
-              <button class="join-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Join</button>
-              <button class="play-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Play</button>
-              <button class="scoreboard-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Scoreboard</button>
+              <button class="join-btn secondary btn-row">Join</button>
+              <button class="play-btn secondary btn-row">Play</button>
+              <button class="scoreboard-btn secondary btn-row">Scoreboard</button>
             </div>
           </div>
         `,
-        contentHtml: '', // Sessions do not expand
-        onHeaderClick: () => {
-          loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}`);
-        }
+        contentHtml: '',
+        onHeaderClick: () => loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}`)
       });
 
       row.querySelector('.scoreboard-btn').onclick = (e) => {
@@ -307,10 +302,23 @@ export async function initPlayPage() {
       selected.push(locMachines[Math.floor(Math.random() * locMachines.length)]);
     }
 
+    // Generate randomized pars for Golf (ensure at least one 3, 4, and 5)
+    const pars = [];
+    if (currentSessionFormat === 'golf') {
+      pars.push(3, 4, 5);
+      while (pars.length < frameCount) {
+        pars.push(Math.floor(Math.random() * 3) + 3); // Random 3, 4, or 5
+      }
+      // Shuffle the pars so the 3, 4, 5 aren't always the first three holes
+      pars.sort(() => Math.random() - 0.5);
+    }
+
       generatedFrames = selected.map((m, index) => {
         const difficultyKey = 'target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
         const baseScore = m[difficultyKey] || 1000000;
-        const { value1, value2 } = engine.getInitialValues(baseScore);
+        let { value1, value2 } = engine.getInitialValues(baseScore);
+
+        if (currentSessionFormat === 'golf') value2 = pars[index];
 
         return {
             machineId: Number(m.machineId),
@@ -350,11 +358,11 @@ export async function initPlayPage() {
           </div>
           <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto;" onclick="event.stopPropagation()">
             <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${engine.getHighScoreLabel()}:</label>
+              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${engine.getValue1Label()}:</label>
               <input type="text" class="score10-input" value="${formatNumber(frame.value1)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
             </div>
             <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${engine.getLowScoreLabel()}:</label>
+              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${engine.getValue2Label()}:</label>
               <input type="text" class="score1-input" value="${formatNumber(frame.value2)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
             </div>
           </div>
@@ -369,13 +377,13 @@ export async function initPlayPage() {
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <div style="display: flex; gap: 6px;">
-               <button type="button" class="qfill secondary" data-type="easy" style="font-size: 0.75rem; padding: 2px 10px;">Easy</button>
-               <button type="button" class="qfill secondary" data-type="med" style="font-size: 0.75rem; padding: 2px 10px;">Med</button>
-               <button type="button" class="qfill secondary" data-type="hard" style="font-size: 0.75rem; padding: 2px 10px;">Hard</button>
+               <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
+               <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
+               <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
             </div>
             <div style="display: flex; gap: 4px;">
-               <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'}" data-scale="flat" style="font-size: 0.7rem; padding: 2px 8px;">Flat</button>
-               <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'}" data-scale="curved" style="font-size: 0.7rem; padding: 2px 8px;">Curved</button>
+               <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
+               <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
             </div>
           </div>
           <div class="preview-values-container">${renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2)}</div>
@@ -554,21 +562,8 @@ export async function initPlayPage() {
         await PB_API.saveTargetScore(targetPayloads);
       }
 
-      // Instead of redirecting, refresh the data and show the updated list
-      await refreshSessionsData();
-      renderExistingSessions();
-      
-      // Reset UI to initial state
-      if (nameInput) nameInput.value = '';
-      if (previewSection) previewSection.classList.add('hidden');
-      if (setupFields) setupFields.classList.remove('hidden');
-      if (setupSummary) setupSummary.classList.add('hidden');
-      if (generatorOptions) generatorOptions.classList.add('hidden');
-      if (generateBtn) generateBtn.classList.add('hidden');
-      if (sessionsCard) sessionsCard.classList.remove('hidden');
-      if (createToggleBtn) createToggleBtn.textContent = 'Create New Session';
-      finalizeBtn.disabled = false;
-      finalizeBtn.textContent = 'Create Session';
+      // Direct redirect to the scoreboard for the new session
+      loadPage(`standings?eventId=${event.id}&leagueId=${qpLeague.id}`);
 
     } catch (err) {
       console.error(err);

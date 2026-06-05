@@ -1,100 +1,77 @@
 import { PB_API } from '@services/api.js';
 import { SCORING_FORMATS } from '@core/engine.js';
-import { setupLiveFilter, showConfirm, showPrompt, showPlayerSelectionDialog, showDialog, getFormatBadgeHtml, applyPreferredTheme } from '@ui/uiComponents.js';
-import { setActiveLeagueId, setActiveEventId, getActiveLeagueId, getCookie } from '@scripts/utils.js';
-import { requireAdmin, runAuthorizedLeagueAction, isManagementAuthorized } from '@services/auth.js';
-import { navigateTo } from '@scripts/utils.js';
+import { setupLiveFilter, createExpandableRow } from '@ui/selectors.js';
+import { showConfirm, showPrompt, showPlayerSelectionDialog } from '@ui/dialogs.js';
+import { runAuthorizedLeagueAction, isManagementAuthorized } from '@services/auth.js';
+import { navigateTo, getActiveLeagueId, setActiveLeagueId, setActiveEventId, getCookie } from '@scripts/utils.js';
+import { applyPreferredTheme } from '@ui/branding.js';
 import { ROUTES } from '@scripts/routes.js';
 
 /**
  * Logic for managing Leagues and Events.
  */
 export async function initLeaguesPage() {
-  // Batch initial data fetch and auth check to improve load performance
-  const [authorized, initialLeagues, initialPlayers] = await Promise.all([
-    isManagementAuthorized(),
-    PB_API.getLeagues({ type: 'standard' }),
-    PB_API.getPlayers()
-  ]);
-  const isAuthorized = authorized;
+  const isAuthorized = await isManagementAuthorized();
   const leagueForm = document.getElementById('league-form');
-
-  // Requirement: Hide the entire management card for non-TDs/Admins
-  if (!isAuthorized && leagueForm) {
-    leagueForm.closest('.card')?.classList.add('hidden');
-  }
-
   const leagueNameInput = document.getElementById('league-name');
   const leagueDateInput = document.getElementById('league-start-date');
-  const leagueFormatInput = document.getElementById('league-scoring-format');
   const createBtn = document.getElementById('create-league-btn');
-  const eventFormatInput = document.getElementById('event-scoring-format');
   const leaguesList = document.getElementById('leagues-list');
   const emptyNotice = document.getElementById('leagues-list-empty');
   const eventFormCard = document.getElementById('event-form-card');
   let allPlayersCache = []; // Cache all players for selection dialogs
-  let editingLeagueId = null;
-
-  const preferredFormat = getCookie('pb_preferred_format') || 'bowling';
-
-  // Populate scoring format dropdowns from centralized list
-  [leagueFormatInput, eventFormatInput].forEach(select => {
-    if (select) {
-      select.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
-      select.value = preferredFormat;
-    }
-  });
 
   let allLeagues = [];
   let filterInstance = null;
 
   // Setup "Create League" toggle behavior
-  const dateRow = document.getElementById('league-date-row');
+  const dateRow = leagueDateInput.closest('.form-row');
   const formatRow = document.getElementById('league-format-row');
-  const actionsRow = createBtn.closest('.form-actions');
-  
-  // Apply compact styling to the primary form button
-  if (createBtn) {
-    createBtn.style.padding = '4px 10px';
-    createBtn.style.fontSize = '0.75rem';
+  const leagueFormatInput = document.getElementById('league-scoring-format');
+
+  if (leagueFormatInput) {
+    const preferredFormat = getCookie('pb_preferred_format') || 'bowling';
+    leagueFormatInput.innerHTML = SCORING_FORMATS.map(f => 
+      `<option value="${f.value}" ${f.value === preferredFormat ? 'selected' : ''}>${f.label}</option>`
+    ).join('');
+    leagueFormatInput.addEventListener('change', () => applyPreferredTheme(leagueFormatInput.value));
   }
 
-  // Create a deletion button for the league form (only visible during edit)
-  const deleteLeagueMgmtBtn = document.createElement('button');
-  deleteLeagueMgmtBtn.type = 'button';
-  deleteLeagueMgmtBtn.className = 'danger hidden';
-  deleteLeagueMgmtBtn.textContent = 'Delete';
-  deleteLeagueMgmtBtn.style.padding = '4px 10px';
-  deleteLeagueMgmtBtn.style.fontSize = '0.75rem';
-  if (actionsRow) {
-    actionsRow.prepend(deleteLeagueMgmtBtn);
+  const eventFormatInput = document.getElementById('event-scoring-format');
+  if (eventFormatInput) {
+    eventFormatInput.addEventListener('change', () => applyPreferredTheme(eventFormatInput.value));
   }
+
+  const actionsRow = createBtn.closest('.form-actions');
+  
+  // Initially hide the creation fields
+  if (dateRow) dateRow.classList.add('hidden');
+  if (actionsRow) actionsRow.classList.add('hidden');
 
   let createToggle = null;
   if (isAuthorized) {
     createToggle = document.createElement('button');
     createToggle.type = 'button';
-    createToggle.className = 'secondary';
-    createToggle.textContent = 'Create';
+    createToggle.className = 'secondary btn-mgmt';
+    createToggle.textContent = 'Create New League';
     createToggle.style.marginTop = '10px';
-    createToggle.style.padding = '4px 10px';
-    createToggle.style.fontSize = '0.75rem';
-    leagueNameInput.after(createToggle);
+    if (leagueNameInput) leagueNameInput.after(createToggle);
 
     createToggle.onclick = () => {
-      if (editingLeagueId) return resetForm();
       const isHidden = dateRow.classList.contains('hidden');
       dateRow.classList.toggle('hidden', !isHidden);
-      if (formatRow) formatRow.classList.toggle('hidden', !isHidden);
+      formatRow.classList.toggle('hidden', !isHidden);
       actionsRow.classList.toggle('hidden', !isHidden);
       if (isHidden) {
         createToggle.textContent = 'Cancel';
         createToggle.style.marginTop = '0';
         actionsRow.appendChild(createToggle);
+        if (leagueFormatInput) applyPreferredTheme(leagueFormatInput.value);
       } else {
-        createToggle.textContent = 'Create';
+        createToggle.textContent = 'Create New League';
         createToggle.style.marginTop = '10px';
         leagueNameInput.after(createToggle);
+        applyPreferredTheme(getCookie('pb_preferred_format') || 'bowling');
       }
     };
   }
@@ -115,93 +92,63 @@ export async function initLeaguesPage() {
       filtered.forEach(league => {
         const shouldExpand = activeLeagueId && String(league.id) === String(activeLeagueId);
 
-        const card = document.createElement('div');
-        card.className = 'league-registry-item';
-        card.dataset.leagueId = league.id;
-        card.style.marginBottom = '5px';
-        card.style.border = '1px solid #ddd';
-        card.style.borderRadius = '4px';
-        card.style.overflow = 'hidden';
-
-        card.innerHTML = `
-          <div class="league-header" style="display: flex; align-items: flex-start; cursor: pointer; padding: 12px; background: #f9f9f9;">
-            <div style="flex: 1;">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                <h3 style="margin: 0; font-size: 1.1rem;">${league.name}</h3>
-                ${getFormatBadgeHtml(league.scoringFormat)}
-              </div>
-              <div style="font-size: 0.85rem; opacity: 0.8;">
-                Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0}
-              </div>
-              <div style="font-size: 0.85rem; opacity: 0.8;">
-                Players: ${league.players?.length || 0}
-              </div>
-              <div style="margin-top: 8px;">
-                ${isAuthorized ? '<button class="edit-league-btn secondary" style="padding: 4px 10px; font-size: 0.75rem;">Edit League</button>' : ''}
-              </div>
-            </div>
+        const headerHtml = `
+          <div>
+            <h3 style="margin: 0; font-size: 1.05rem;">${league.name}</h3>
+            <small>Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
           </div>
-          <div class="league-details ${shouldExpand ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd; background: #fff;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <h4 style="margin: 0;">Events</h4>
-              ${isAuthorized ? `<button class="add-event-btn secondary" data-league-id="${league.id}" data-league-name="${league.name}" style="padding: 4px 12px; font-size: 0.85rem;">Add Event</button>` : ''}
-            </div>
-            <ul class="league-events-list" style="list-style: none; padding: 0;">
-              <!-- Events will be rendered here -->
-            </ul>
-
-            <div class="league-players-section" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h4 style="margin: 0;">Roster</h4>
-                ${isAuthorized ? `<button class="add-player-btn secondary" data-league-id="${league.id}" data-league-name="${league.name}" style="padding: 4px 12px; font-size: 0.85rem;">Add Player</button>` : ''}
-              </div>
-              <ul class="league-players-list" style="list-style: none; padding: 0;">
-                <!-- Players will be rendered here -->
-              </ul>
-              <div class="notice league-players-empty hidden">No players assigned to this league.</div>
-            </div>
+          <div style="display: flex; gap: 8px;">
+            ${isAuthorized ? '<button class="delete-league-btn btn-row">Delete</button>' : ''}
           </div>
         `;
 
-        // Toggle expansion
-        card.querySelector('.league-header').onclick = (e) => {
-          if (e.target.closest('button')) return;
-          const details = card.querySelector('.league-details');
-          const wasHidden = details.classList.contains('hidden');
+        const contentHtml = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h4 style="margin: 0;">Events</h4>
+            ${isAuthorized ? `<button class="add-event-btn secondary btn-row" data-league-id="${league.id}" data-league-name="${league.name}">Add Event</button>` : ''}
+          </div>
+          <ul class="league-events-list" style="list-style: none; padding: 0;"></ul>
 
-          // Accordion behavior: Collapse all other league cards first
-          leaguesList.querySelectorAll('.league-details').forEach(d => d.classList.add('hidden'));
+          <div class="league-players-section" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <h4 style="margin: 0;">Roster</h4>
+              ${isAuthorized ? `<button class="add-player-btn secondary btn-row" data-league-id="${league.id}" data-league-name="${league.name}">Add Player</button>` : ''}
+            </div>
+            <ul class="league-players-list" style="list-style: none; padding: 0;"></ul>
+            <div class="notice league-players-empty hidden">No players assigned to this league.</div>
+          </div>
+        `;
 
-          if (wasHidden) {
-            details.classList.remove('hidden');
-            renderPlayersForLeague(league.id, league.players, allPlayersCache);
-            setActiveLeagueId(league.id);
-            applyPreferredTheme(league.scoringFormat);
-          } else {
-            setActiveLeagueId(null);
+        const row = createExpandableRow(leaguesList, {
+          id: league.id,
+          className: 'league-registry-item',
+          headerHtml,
+          contentHtml,
+          isExpanded: shouldExpand,
+          onHeaderClick: (e) => {
+            if (e.target.closest('button')) return;
+            const currentActive = getActiveLeagueId();
+            setActiveLeagueId(String(currentActive) === String(league.id) ? null : league.id);
+            onFilterUpdate(filtered, query);
           }
-        };
+        });
+
+        // Ensure compatibility with existing component renderers
+        row.dataset.leagueId = league.id;
 
         // Action listeners
         if (isAuthorized) {
-          card.querySelector('.edit-league-btn').onclick = (e) => {
-            e.stopPropagation();
-            editLeague(league);
-          };
-          card.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
-          card.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
+          row.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
+          row.querySelector('.delete-league-btn').onclick = () => deleteLeague(league.id, league.name);
+          row.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
         }
 
-        leaguesList.appendChild(card);
-
-        // Initial render of components
         renderEventsForLeague(league.id, league.events, league.name);
-        const details = card.querySelector('.league-details');
-        if (!details.classList.contains('hidden')) renderPlayersForLeague(league.id, league.players, allPlayersCache);
+        if (shouldExpand) renderPlayersForLeague(league.id, league.players, allPlayersCache);
 
         // Smooth scroll to the expanded league if we just came from setup
         if (shouldExpand && !query) {
-          setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+          setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
         }
       });
     }
@@ -211,13 +158,11 @@ export async function initLeaguesPage() {
 
     // Hide the "Create" toggle if an exact match exists, unless the creation 
     // form is already open (in which case the button serves as "Cancel").
-    const isFormOpen = dateRow && !dateRow.classList.contains('hidden');
-    if (createToggle) {
-      createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
-    }
-    
-    const dateVal = leagueDateInput?.value;
-    if (createBtn) createBtn.disabled = !query || !dateVal || !!exactMatch;
+    const isFormOpen = !dateRow.classList.contains('hidden');
+    if (createToggle) createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
+
+    const dateVal = leagueDateInput.value;
+    createBtn.disabled = !query || !dateVal || !!exactMatch;
     
     if (exactMatch) {
       createBtn.title = "A league with this name already exists.";
@@ -235,56 +180,14 @@ export async function initLeaguesPage() {
 
   leagueDateInput.addEventListener('input', () => filterInstance.performFilter());
 
-  const editLeague = (league) => {
-    editingLeagueId = league.id;
-    leagueNameInput.value = league.name;
-    leagueDateInput.value = league.startDate || '';
-    leagueFormatInput.value = league.scoringFormat || 'bowling';
-    
-    // Expand the form
-    dateRow.classList.remove('hidden');
-    if (formatRow) formatRow.classList.remove('hidden');
-    actionsRow.classList.remove('hidden');
-    deleteLeagueMgmtBtn.classList.remove('hidden');
-    
-    createBtn.textContent = 'Update';
-    createToggle.textContent = 'Cancel';
-    createToggle.style.marginTop = '0';
-    actionsRow.appendChild(createToggle);
-    
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const resetForm = () => {
-    editingLeagueId = null;
-    leagueNameInput.value = '';
-    leagueDateInput.value = '';
-    leagueFormatInput.value = preferredFormat;
-    
-    dateRow.classList.add('hidden');
-    if (formatRow) formatRow.classList.add('hidden');
-    actionsRow.classList.add('hidden');
-    deleteLeagueMgmtBtn.classList.add('hidden');
-    
-    if (createBtn) createBtn.textContent = 'Create';
-    if (createToggle) {
-      createToggle.textContent = 'Create';
-      createToggle.style.marginTop = '10px';
-      leagueNameInput.after(createToggle);
-    }
-  };
-
-  const refresh = async (leagues = null, players = null) => {
+  const refresh = async () => {
     try {
-      const [fetchedLeagues, fetchedPlayers] = (leagues && players) 
-        ? [leagues, players] 
-        : await Promise.all([PB_API.getLeagues({ type: 'standard' }), PB_API.getPlayers()]);
-
+      // Fetch standard leagues only for management (one-off sessions are handled by cleanup)
+      const data = await PB_API.getLeagues({ type: 'standard' });
       allLeagues.length = 0;
-      allLeagues.push(...fetchedLeagues);
-      allPlayersCache = fetchedPlayers;
-
-      resetForm();
+      allLeagues.push(...data);
+      // Also refresh the global player cache for selection dialogs
+      allPlayersCache = await PB_API.getPlayers();
       filterInstance.performFilter();
     } catch (err) {
       console.error('Failed to load leagues:', err);
@@ -299,22 +202,26 @@ export async function initLeaguesPage() {
 
     if (!isAuthorized) return;
 
+    const leaguePass = await showPrompt(`Set a League Password for "${name}". This will be required for scoring and setup by non-admins. (Optional)`, 'League Password', false);
+
     try {
-      if (editingLeagueId) {
-        await PB_API.updateLeague(editingLeagueId, { name, startDate: date, scoringFormat });
-      } else {
-        await PB_API.createLeague({ name, startDate: date, scoringFormat });
-      }
+      await PB_API.createLeague({ name, startDate: date, password: leaguePass, scoringFormat });
+      leagueNameInput.value = '';
+      leagueDateInput.value = '';
+      // Collapse creation form back down
+      dateRow.classList.add('hidden');
+      formatRow.classList.add('hidden');
+      actionsRow.classList.add('hidden');
+      createToggle.textContent = 'Create New League';
+      createToggle.style.marginTop = '10px';
+      leagueNameInput.after(createToggle);
+      applyPreferredTheme(getCookie('pb_preferred_format') || 'bowling');
       await refresh();
     } catch (err) {
       console.error('League creation failed:', err);
       alert(`Failed to create league: ${err.message}`);
     }
   });
-
-  deleteLeagueMgmtBtn.onclick = () => {
-    if (editingLeagueId) deleteLeague(editingLeagueId, leagueNameInput.value);
-  };
 
   function renderEventsForLeague(leagueId, leagueEvents, leagueName) {
     const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
@@ -323,15 +230,12 @@ export async function initLeaguesPage() {
     const eventsListEl = card.querySelector('.league-events-list');
 
     eventsListEl.innerHTML = (leagueEvents || []).map(e => `
-      <li style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; background: #f9f9f9; padding: 10px; border-radius: 4px; border: 1px solid #eee;">
-        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-          <span style="font-weight: bold;">${e.eventName} <small style="font-weight: normal; opacity: 0.7;">(${e.eventDate || 'No Date'})</small></span>
-          ${getFormatBadgeHtml(e.scoringFormat)}
-        </div>
-        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-          ${isAuthorized ? `<button class="setup-event-btn secondary" data-league-id="${leagueId}" data-event-id="${e.id}" style="padding: 4px 10px; font-size: 0.75rem;">Setup</button>` : ''}
-          ${isAuthorized ? `<button class="edit-event-btn secondary" data-id="${e.id}" style="padding: 4px 10px; font-size: 0.75rem;">Edit</button>` : ''}
-          ${isAuthorized ? `<button class="delete-event-btn" data-id="${e.id}" style="padding: 4px 10px; font-size: 0.75rem;">Delete</button>` : ''}
+      <li style="display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
+        <span>${e.eventName} <small>(${e.eventDate || 'No Date'})</small></span>
+        <div style="display: flex; gap: 4px;">
+          ${isAuthorized ? `<button class="setup-event-btn secondary btn-row" data-league-id="${leagueId}" data-event-id="${e.id}">Setup</button>` : ''}
+          ${isAuthorized ? `<button class="edit-event-btn secondary btn-row" data-id="${e.id}">Edit</button>` : ''}
+          ${isAuthorized ? `<button class="delete-event-btn btn-row" data-id="${e.id}">Delete</button>` : ''}
         </div>
       </li>
     `).join('') || '<li>No events scheduled.</li>';
@@ -371,7 +275,7 @@ export async function initLeaguesPage() {
                 li.style = "display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;";
                 li.innerHTML = `
                     <span>${lp.playerName}</span>
-                    ${isAuthorized ? `<button class="remove-player-btn" data-league-id="${leagueId}" data-player-id="${lp.id}" data-player-name="${lp.playerName}" style="padding: 2px 8px; font-size: 0.8rem;">Delete</button>` : ''}
+                    ${isAuthorized ? `<button class="remove-player-btn btn-row" data-league-id="${leagueId}" data-player-id="${lp.id}" data-player-name="${lp.playerName}">Delete</button>` : ''}
                 `;
                 playersListEl.appendChild(li);
             }
@@ -396,7 +300,7 @@ export async function initLeaguesPage() {
 
     const statsEl = card.querySelector('.league-header small');
     if (statsEl) {
-      statsEl.textContent = `Started: ${league.startDate || 'N/A'} | Format: ${league.scoringFormat || 'bowling'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}`;
+      statsEl.textContent = `Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}`;
     }
   }
 
@@ -485,6 +389,15 @@ export async function initLeaguesPage() {
     document.getElementById('event-name').value = event ? event.eventName : '';
     document.getElementById('event-date').value = event ? (event.eventDate || '') : '';
 
+    // Populate and default the scoring format dropdown
+    const formatSelect = document.getElementById('event-scoring-format');
+    if (formatSelect) {
+      formatSelect.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
+      const format = event?.scoringFormat || getCookie('pb_preferred_format') || 'bowling';
+      formatSelect.value = format;
+      applyPreferredTheme(format);
+    }
+
     // Populate location dropdown
     const locationSelect = document.getElementById('event-location');
     const locations = await PB_API.getLocations();
@@ -497,19 +410,13 @@ export async function initLeaguesPage() {
       locationSelect.appendChild(opt);
     });
 
-    // Populate scoring format
-    const formatSelect = document.getElementById('event-scoring-format');
-    if (event) {
-      formatSelect.value = event.scoringFormat || 'bowling';
-    } else {
-      const league = allLeagues.find(l => String(l.id) === String(leagueId));
-      formatSelect.value = league?.scoringFormat || 'bowling';
-    }
-
     eventFormCard.scrollIntoView({ behavior: 'smooth' });
   }
 
-  document.getElementById('cancel-event-edit').onclick = () => eventFormCard.classList.add('hidden');
+  document.getElementById('cancel-event-edit').onclick = () => {
+    eventFormCard.classList.add('hidden');
+    applyPreferredTheme(getCookie('pb_preferred_format') || 'bowling');
+  };
 
   document.getElementById('event-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -518,16 +425,16 @@ export async function initLeaguesPage() {
     const name = document.getElementById('event-name').value.trim();
     const date = document.getElementById('event-date').value;
     const locationValue = document.getElementById('event-location').value;
-    const scoringFormat = document.getElementById('event-scoring-format').value;
+    const formatValue = document.getElementById('event-scoring-format')?.value;
 
     if (!isAuthorized) return;
 
     const payload = { 
       leagueId: leagueId, 
       eventName: name, 
-      eventDate: date, 
-      locationId: locationValue ? Number(locationValue) : null,
-      scoringFormat
+      eventDate: date,
+      scoringFormat: formatValue || 'bowling',
+      locationId: locationValue ? Number(locationValue) : null
     };
 
     try {
@@ -555,12 +462,12 @@ export async function initLeaguesPage() {
           renderEventsForLeague(Number(leagueId), league.events, league.name);
           updateLeagueHeaderStats(Number(leagueId), league);
       }
+      applyPreferredTheme(getCookie('pb_preferred_format') || 'bowling');
     } catch (err) {
       console.error('Event save failed:', err);
       alert(`Failed to save event: ${err.message}`);
     }
   };
 
-  // Initialize UI with pre-fetched data
-  await refresh(initialLeagues, initialPlayers);
+  await refresh();
 }

@@ -14,11 +14,13 @@ vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
     getTurnHeaderPrefix: vi.fn(() => 'F'),
     calculateTurnResults: vi.fn(() => ({ turnResults: [], total: 100 })),
-    getRoundLabel: vi.fn(() => 'Frame'),
+    getRoundLabel: vi.fn(() => 'Frame'), // Ensure this is consistent
     getThresholdSort: vi.fn(() => (a, b) => b[0] - a[0]),
-    compareTotals: vi.fn((a, b) => b - a),
+    compareScores: vi.fn((a, b) => b - a),
     getTotalColumnLabel: vi.fn(() => 'Total'),
-    formatTotalScore: vi.fn((total, anchor, formatFn) => formatFn(total)),
+    formatTotalScore: vi.fn((total) => String(total)),
+    getMarkFormatting: vi.fn(() => ''),
+    formatMark: vi.fn((turn) => turn.mark),
     shouldShowRoundScore: vi.fn(() => true),
   }))
 }));
@@ -30,25 +32,32 @@ vi.mock('@scripts/utils.js', () => ({
   formatNumber: vi.fn(n => n?.toLocaleString() || '0'),
 }));
 
-vi.mock('@ui/uiComponents.js', () => ({
+const uiMocks = vi.hoisted(() => ({
   fitTVModeToScreen: vi.fn(),
   initTournamentSelector: vi.fn(async (selector, options) => {
     if (options.onRefresh) await options.onRefresh();
   }),
   applyPreferredTheme: vi.fn(),
-  renderActionSummary: vi.fn((container, title) => {
+  renderActionSummary: vi.fn((container, title, actions = []) => {
     if (container) container.innerHTML = title;
+    if (container) container._actions = actions; // Store for test access
     if (container) container.classList.remove('hidden');
   }),
+  showDialog: vi.fn(),
 }));
+
+vi.mock('@ui/selectors.js', () => uiMocks);
+vi.mock('@ui/branding.js', () => uiMocks);
+vi.mock('@ui/dialogs.js', () => uiMocks);
 
 import { initStandingsPage } from '@scripts/pages/standingsPage.js';
 import { PB_API } from '@services/api.js';
 import { getActiveEventId, getActiveLeagueId } from '@scripts/utils.js';
-import { renderActionSummary } from '@ui/uiComponents.js';
+import { renderActionSummary } from '@ui/selectors.js';
 
 describe('Standings Page (standingsPage.js)', () => {
   beforeEach(() => {
+    vi.stubGlobal('alert', vi.fn());
     document.body.innerHTML = `
       <div id="tournament-selector-ui"></div>
       <div id="tournament-summary" class="hidden"><span id="tournament-summary-text"></span><button id="change-tournament-btn"></button></div>
@@ -71,7 +80,7 @@ describe('Standings Page (standingsPage.js)', () => {
     getActiveLeagueId.mockReturnValue('1');
     getActiveEventId.mockReturnValue('101');
     PB_API.getLeagues.mockResolvedValue([{ 
-      id: 1, name: 'L1', players: [{ id: 7, playerName: 'Kyle' }], events: [{ id: 101, eventName: 'W1' }] 
+      id: '1', name: 'L1', players: [{ id: '7', playerName: 'Kyle' }], events: [{ id: '101', eventName: 'W1' }] 
     }]);
     PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineName: 'M1' }]);
     PB_API.getScores.mockResolvedValue([]);
@@ -87,10 +96,10 @@ describe('Standings Page (standingsPage.js)', () => {
     getActiveLeagueId.mockReturnValue('1');
     getActiveEventId.mockReturnValue('summary');
     PB_API.getLeagues.mockResolvedValue([{ 
-      id: 1, name: 'L1', players: [{ id: 7, playerName: 'Kyle' }], events: [{ id: 101, eventName: 'W1' }] 
+      id: '1', name: 'L1', players: [{ id: '7', playerName: 'Kyle' }], events: [{ id: '101', eventName: 'W1' }] // Ensure eventName is present
     }]);
-    PB_API.getTargetScores.mockResolvedValue([{ eventId: 101, orderNumber: 1, machineName: 'M1' }]);
-    PB_API.getScores.mockResolvedValue([{ eventId: 101, playerId: 7, orderNumber: 1, ball1: 1000 }]);
+    PB_API.getTargetScores.mockResolvedValue([{ eventId: '101', orderNumber: 1, machineName: 'M1' }]);
+    PB_API.getScores.mockResolvedValue([{ eventId: '101', playerId: '7', orderNumber: 1, ball1: 1000 }]);
 
     await initStandingsPage();
 
@@ -114,20 +123,21 @@ describe('Standings Page (standingsPage.js)', () => {
     
     // Advance time and check if refresh is triggered
     vi.advanceTimersByTime(16000); 
-    expect(PB_API.getLeagues).toHaveBeenCalledTimes(2); // Initial + 1 refresh
+    // 1 (init) + 1 (initial refresh) + 1 (timer refresh) = 3
+    expect(PB_API.getLeagues).toHaveBeenCalledTimes(3); 
   });
 
   it('should show selector and hide standings when Change button is clicked', async () => {
     getActiveLeagueId.mockReturnValue('1');
     getActiveEventId.mockReturnValue('101');
-    PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'L1', events: [{ id: 101 }] }]);
+    PB_API.getLeagues.mockResolvedValue([{ id: '1', name: 'L1', events: [{ id: '101' }] }]);
     
     await initStandingsPage();
 
     // Extract the handleTournamentChange callback from the renderActionSummary mock
     const calls = vi.mocked(renderActionSummary).mock.calls;
     const summaryCall = calls.find(c => c[1].includes('L1'));
-    const changeAction = summaryCall[2].find(a => a.text === 'Change');
+    const changeAction = summaryCall[2].find(a => a.text === 'Change' || a.text === 'Change Tournament');
     
     changeAction.onclick();
 

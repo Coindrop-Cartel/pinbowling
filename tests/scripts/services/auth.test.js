@@ -9,14 +9,14 @@ vi.mock('@services/api.js', () => ({
   }
 }));
 
-vi.mock('@ui/uiComponents.js', () => ({
+vi.mock('@ui/dialogs.js', () => ({
   showAlert: vi.fn(),
   showAuthDialog: vi.fn(() => Promise.resolve(true))
 }));
 
 import { requireAdmin, runAuthorizedLeagueAction, initAuthHeader, isManagementAuthorized, resetAuthCache } from '@scripts/services/auth.js';
 import { PB_API } from '@services/api.js';
-import { showAlert, showAuthDialog } from '@ui/uiComponents.js';
+import { showAlert, showAuthDialog } from '@ui/dialogs.js';
 
 describe('Auth Service (auth.js)', () => {
   beforeEach(() => {

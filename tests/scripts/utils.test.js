@@ -15,6 +15,14 @@ const mockEngine = {
   }),
   getThresholdRowStyle: vi.fn(() => 'margin: 2px 0;'),
   getThresholdSort: vi.fn(() => (a, b) => Number(b[0]) - Number(a[0])),
+  getInitialValues: vi.fn(() => ({ value1: 5000000, value2: 500000 })),
+  formatTotalScore: vi.fn((total) => String(total)),
+  getThresholdPrefix: vi.fn(() => 'Pins'),
+  getValue1Label: vi.fn(() => 'Target Score'),
+  getValue2Label: vi.fn(() => 'Base Score'),
+  getThresholdStart: vi.fn(() => 10), // Default for Bowling
+  getThresholdEnd: vi.fn(() => 1), // Default for Bowling
+  getThresholdRange: vi.fn(() => Array.from({ length: 10 }, (_, i) => 10 - i)), // Default descending
 };
 
 // Mock getScoringEngine for renderPreview and print functions

@@ -120,9 +120,17 @@ $engineMeta = [
         'brand' => 'PinBowling',
         'logo'  => 'pinbowling.png',
         'cta'   => "Let's Bowl!",
+        'themeClass' => 'theme-bowling',
+        'roundLabel' => 'Frame',
+        'turnHeaderPrefix' => 'Frame',
+        'primaryTargetLabel' => 'Strike',
+        'value1Label' => 'Strike',
+        'value2Label' => '1',
         'hint'  => "Enter the cumulative score after each ball. If you reach the target score for that round, you can stop entering scores and move on to the next frame. 
                     DO NOT PLAY EXTRA BALLS",
         'lastFrameHint' => "In the last frame, you can get up to 3 strikes.  Keep playing until you hit the additional target scores or you run out of balls.",
+        'thresholdStart' => 10, // Display ranks from 10 down to 1
+        'thresholdEnd' => 1,
         'logic' => "Each machine has target scores corresponding to pin counts. Reaching the target on ball 1 is a strike (X). Reaching it on ball 2 is a 9-count spare (9/). 
         Reaching it on ball 3 is a spare based on your cumulative progress from balls 1 & 2 (capped at 8/). Total scores are calculated following standard bowling rules, 
         if you don't know how Bowling Score works I'm not gonna explain it to you, but I will say higher is better."
@@ -131,8 +139,17 @@ $engineMeta = [
         'brand' => 'PinGolf',
         'logo'  => 'pingolf.png',
         'cta'   => "Let's Golf!",
+        'themeClass' => 'theme-golf',
+        'roundLabel' => 'Hole',
+        'turnHeaderPrefix' => 'Hole',
+        'primaryTargetLabel' => 'Par',
+        'value1Label' => 'Target Score',
+        'value2Label' => 'Par',
         'hint'  => "Enter the cumulative score after each ball. When you hit the target score you can stop entering scores for that round and move on to the next hole.
                     DO NOT PLAY EXTRA BALLS",
+        'lastFrameHint' => "",
+        'thresholdStart' => 3, // Display ranks from 3 up to 10
+        'thresholdEnd' => 10,
         'logic' => "Strokes 1, 2, or 3 are awarded based on which ball reached the Target Score. If the target is not met within three balls, 
         a score of 4-10 is assigned based on the final cumulative score relative the target scores for that hole and then scored relative to the par value (-1, +2, etc).  
         If you don't know how Golf scoring works, I don't really know what to tell you, but I will say lower is better."
@@ -140,6 +157,7 @@ $engineMeta = [
 ];
 
 $active = $engineMeta[$preferredFormat] ?? $engineMeta['bowling'];
+$bodyClass = $active['themeClass'];
 
 $dbDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset={$dbCharset}";
 
@@ -346,6 +364,8 @@ function initializeDatabaseSchema($pdo) {
         }
     }
 
+    /// Ensure 'machines' table has year and manufacturer
+    $checkLeagues = $pdo->query("SHOW TABLES LIKE 'leagues'")->fetch();
     // Ensure 'leagues' table has the 'type' column for standard vs session distinction
     if ($checkLeagues) {
         $checkType = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'type'")->fetch();
@@ -633,8 +653,6 @@ function getJsonInput() {
  */
 function versionedAsset($path) {
     global $uiVersion, $baseUrl;
-    // Extract the part of the path after the base URL
-    $relativePath = str_replace($baseUrl, '', $path);
-    // Prepend the version segment: /baseUrl/v1.1.1/relativePath
-    return $baseUrl . '/v' . $uiVersion . '/' . ltrim($relativePath, '/');
+    $relativePath = ltrim(str_replace($baseUrl, '', $path), '/');
+    return $baseUrl . '/v' . $uiVersion . '/' . $relativePath;
 }

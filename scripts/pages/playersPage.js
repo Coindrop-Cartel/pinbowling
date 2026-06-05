@@ -1,5 +1,6 @@
 import { PB_API } from '@services/api.js';
-import { setupLiveFilter, showConfirm, showPrompt, showChoiceDialog, showAlert } from '@ui/uiComponents.js';
+import { setupLiveFilter, createExpandableRow } from '@ui/selectors.js';
+import { showConfirm, showPrompt, showChoiceDialog, showAlert } from '@ui/dialogs.js';
 import { requireAdmin } from '@services/auth.js';
 
 /**
@@ -38,17 +39,13 @@ export async function initPlayersPage() {
   // Create management buttons for the form (only visible during edit)
   const resetPassBtn = document.createElement('button');
   resetPassBtn.type = 'button';
-  resetPassBtn.className = 'secondary hidden';
+  resetPassBtn.className = 'secondary btn-mgmt hidden';
   resetPassBtn.textContent = 'Reset Password';
-  resetPassBtn.style.fontSize = '0.75rem';
-  resetPassBtn.style.padding = '8px 12px';
 
   const changeRoleBtn = document.createElement('button');
   changeRoleBtn.type = 'button';
-  changeRoleBtn.className = 'secondary hidden';
+  changeRoleBtn.className = 'secondary btn-mgmt hidden';
   changeRoleBtn.textContent = 'Change Role';
-  changeRoleBtn.style.fontSize = '0.75rem';
-  changeRoleBtn.style.padding = '8px 12px';
 
   if (actionsRow) {
     actionsRow.prepend(changeRoleBtn);
@@ -57,10 +54,12 @@ export async function initPlayersPage() {
 
   const createToggle = document.createElement('button');
   createToggle.type = 'button';
-  createToggle.className = 'secondary';
+  createToggle.className = 'secondary btn-mgmt';
   createToggle.textContent = 'Create New Player';
   createToggle.style.marginTop = '10px';
   playerNameInput.after(createToggle);
+
+  if (savePlayerButton) savePlayerButton.classList.add('btn-mgmt');
 
   if (!hasElevatedPrivileges) {
     createToggle.classList.add('hidden');
@@ -94,36 +93,41 @@ export async function initPlayersPage() {
         const isSelf = currentUser && String(p.id) === String(currentUser.player_id);
         const canEdit = hasElevatedPrivileges || isSelf;
 
-        const li = document.createElement('li');
-        li.style.padding = '6px 12px';
-        li.style.marginBottom = '5px';
-        li.style.background = '#f9f9f9';
-        li.style.borderRadius = '4px';
-        li.innerHTML = `
-          <div style="flex: 1;">
-            <div style="display: flex; align-items: center; gap: 8px;">
+        const headerHtml = `
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
               <strong>${p.playerName}</strong> 
-              ${p.userRole ? `<span class="badge" style="background:var(--pb-primary); color:#fff; font-size:0.7rem; padding:2px 6px; border-radius:10px; font-weight: bold; text-transform: uppercase;">${p.userRole}</span>` : ''}
+              ${p.userRole ? `<span class="badge" style="background:var(--pb-primary); color:var(--pb-white); font-size:0.7rem; padding:2px 6px; border-radius:10px; font-weight: bold; text-transform: uppercase;">${p.userRole}</span>` : ''}
             </div>
-            <div style="font-size: 0.75rem; color: #666; margin-top: 2px;">
-              ${p.ifpaId ? `<span>IFPA: ${p.ifpaId}</span>` : ''}
-              ${p.ifpaId && p.matchplayId ? ' | ' : ''}
-              ${p.matchplayId ? `<span>MatchPlay: ${p.matchplayId}</span>` : ''}
-            </div>
-            <div style="display: flex; gap: 8px; margin-top: 8px;">
-              ${canEdit ? `<button type="button" class="edit-player-btn secondary" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.75rem;">Edit</button>` : ''}
-              ${isAdmin ? `<button type="button" class="delete-player-btn-inline" data-player-id="${p.id}" style="padding: 4px 10px; font-size: 0.75rem;">Delete</button>` : ''}
+            <div style="display: flex; gap: 8px;">
+              ${canEdit ? `<button type="button" class="edit-player-btn secondary btn-row">Edit</button>` : ''}
+              ${isAdmin ? `<button type="button" class="delete-player-btn-inline btn-row">Delete</button>` : ''}
             </div>
           </div>
         `;
-        playerList.appendChild(li);
-      });
-      
-      playerList.querySelectorAll('.edit-player-btn').forEach(btn => {
-        btn.onclick = () => editPlayer(Number(btn.dataset.playerId));
-      });
-      playerList.querySelectorAll('.delete-player-btn-inline').forEach(btn => {
-        btn.onclick = () => deletePlayer(Number(btn.dataset.playerId));
+
+        const contentHtml = `
+          <div style="font-size: 0.85rem; color: #666; display: flex; flex-direction: column; gap: 4px;">
+            ${p.ifpaId ? `<div><strong>IFPA ID:</strong> ${p.ifpaId}</div>` : ''}
+            ${p.matchplayId ? `<div><strong>MatchPlay ID:</strong> ${p.matchplayId}</div>` : ''}
+            ${!p.ifpaId && !p.matchplayId ? '<div style="opacity: 0.6; font-style: italic;">No external IDs linked.</div>' : ''}
+          </div>
+        `;
+
+        const row = createExpandableRow(playerList, {
+          id: p.id,
+          tag: 'li',
+          className: 'player-item-row',
+          headerHtml,
+          contentHtml,
+          isExpanded: false
+        });
+
+        const editBtn = row.querySelector('.edit-player-btn');
+        if (editBtn) editBtn.onclick = (e) => { e.stopPropagation(); editPlayer(Number(p.id)); };
+
+        const delBtn = row.querySelector('.delete-player-btn-inline');
+        if (delBtn) delBtn.onclick = (e) => { e.stopPropagation(); deletePlayer(Number(p.id)); };
       });
     }
 

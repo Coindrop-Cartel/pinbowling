@@ -1,4 +1,5 @@
 import { ScoringEngine } from '../ScoringEngine.js';
+import { formatNumber } from '../../utils.js';
 
 /**
  * Implementation of the Bowling-style scoring logic.
@@ -7,29 +8,29 @@ import { ScoringEngine } from '../ScoringEngine.js';
 export class BowlingEngine extends ScoringEngine {
   /**
    * Converts a raw pinball score into a 0-10 pin count based on machine-specific thresholds.
-   * @param {Object} round - The round/machine configuration containing threshold values.
-   * @param {number} rawScore - The cumulative pinball score achieved.
+   * Uses a descending search to find the highest threshold reached.
+   * 
+   * @param {Object} round The round configuration containing .values map.
+   * @param {number} rawScore The cumulative pinball score for the current frame.
    * @returns {number} Pin count (0-10).
    */
   getPinCount(round, rawScore) {
     if (!round || typeof rawScore !== 'number' || rawScore <= 0) return 0;
     const thresholds = Object.entries(round.values)
       .map(([rank, score]) => ({ rank: Number(rank), score: Number(score) }))
-      .sort((a, b) => a.score - b.score);
-    let pins = 0;
-    for (const threshold of thresholds) {
-      if (rawScore >= threshold.score) {
-        pins = Math.max(pins, threshold.rank);
-      }
-    }
-    return pins;
+      .sort((a, b) => b.score - a.score);
+
+    const match = thresholds.find(t => rawScore >= t.score);
+    return match ? match.rank : 0;
   }
 
   /**
    * Calculates Target 1 (1.3x strike) and Target 2 (1.3x Target 1) for the last round.
-   * @param {Object} round The round object containing scoring values.
-   * @param {string} [scalingType] Optional explicit scaling type ('flat' or 'curved').
-   * @returns {{t1: number, t2: number}} An object with calculated Target 1 and Target 2 scores.
+   * Bonus targets are used in the 10th frame to allow for multiple strikes.
+   * 
+   * @param {Object} round The round definition.
+   * @param {string} [scalingType] Scaling preference ('flat'|'curved').
+   * @returns {{t1: number, t2: number}} Calculated bonus threshold values.
    */
   getBonusTargets(round, scalingType) {
     const s1 = round.values?.[1];
@@ -60,21 +61,35 @@ export class BowlingEngine extends ScoringEngine {
   }
 
   /**
-   * Generates format-specific HTML for bonus targets (e.g., Round 10 Targets).
+   * Generates format-specific HTML for bonus targets.
+   * Specifically used in Bowling to show the extra point thresholds for the 10th frame.
+   * 
+   * @param {Object} round The round definition.
+   * @param {boolean} isLastRound Whether this is the final frame.
+   * @param {Function} formatFn Numeric formatting helper.
+   * @param {string} scalingType Scaling preference ('flat'|'curved').
+   * @returns {string} HTML string.
    */
   getBonusTargetHtml(round, isLastRound, formatFn, scalingType) {
     if (!isLastRound || !round.values || !round.values[10]) return '';
     const { t1, t2 } = this.getBonusTargets(round, scalingType);
     return `
-      <div style="margin-top: 8px; border-top: 1px dashed var(--pb-primary); padding-top: 4px; font-size: 0.8rem; color: var(--pb-primary);">
-        <div><b>Target 1:</b> ${formatFn(t1)}</div>
-        <div><b>Target 2:</b> ${formatFn(t2)}</div>
+      <div style="margin-top: 8px; border-top: 1px dashed #bbb; padding-top: 4px; font-size: 0.8rem; color: var(--pb-primary);">
+        <div><b>XX:</b> ${formatFn(t1)}</div>
+        <div><b>XXX:</b> ${formatFn(t2)}</div>
       </div>
     `;
   }
 
   /**
-   * Complex logic for Round 10.
+   * Orchestrates the branching paths for the 10th frame (Final Round).
+   * Handles "Instant Perfect Finish", multiple strikes, and early/late spares.
+   * 
+   * @param {Object} round Machine configuration.
+   * @param {number} raw1 Score after Ball 1.
+   * @param {number} raw2 Score after Ball 2.
+   * @param {number} raw3 Score after Ball 3.
+   * @returns {Object} Turn data containing mark and cumulative frame score.
    */
   getRound10Data(round, raw1, raw2, raw3) {
     const { t1, t2 } = this.getBonusTargets(round);
@@ -99,7 +114,17 @@ export class BowlingEngine extends ScoringEngine {
   }
 
   /**
-   * Handles the strike path for the 10th frame.
+   * Handles the "Strike Path" for the 10th frame.
+   * If ball 1 is a strike, the player gets two more balls. This method
+   * determines if those balls result in more strikes or spares.
+   * 
+   * @param {Object} round Machine configuration.
+   * @param {number} raw2 Score after Ball 2.
+   * @param {number} raw3 Score after Ball 3.
+   * @param {number} target The base strike target.
+   * @param {number} t1 Bonus Target 1.
+   * @param {number} t2 Bonus Target 2.
+   * @returns {Object} Calculated turn data.
    */
   _processTenthStrike(round, raw2, raw3, target, t1, t2) {
     if (raw2 >= t1) {
@@ -121,7 +146,14 @@ export class BowlingEngine extends ScoringEngine {
   }
 
   /**
-   * Handles the spare path for the 10th frame.
+   * Handles the "Spare Path" for the 10th frame.
+   * If the strike target is reached on ball 2, the player gets one more bonus ball.
+   * 
+   * @param {Object} round Machine configuration.
+   * @param {number} raw3 Score after Ball 3.
+   * @param {number} target The base strike target.
+   * @param {number} t1 Bonus Target 1.
+   * @returns {Object} Calculated turn data.
    */
   _processTenthSpare(round, raw3, target, t1) {
     if (raw3 >= t1) {
@@ -135,7 +167,12 @@ export class BowlingEngine extends ScoringEngine {
   }
 
   /**
-   * Handles the ball 3 spare (late spare) path for the 10th frame.
+   * Processes the "Late Spare" path. This occurs when the player fails to hit 
+   * the strike target on balls 1 and 2, but reaches it cumulatively on ball 3.
+   * 
+   * @param {Object} round Machine configuration.
+   * @param {number} raw2 Score after Ball 2.
+   * @returns {Object} Turn data with a spare mark (e.g. "8/").
    */
   _processTenthLateSpare(round, raw2) {
     const p2 = this.getPinCount(round, raw2);
@@ -144,14 +181,30 @@ export class BowlingEngine extends ScoringEngine {
   }
 
   /**
-   * Helper to calculate pin counts relative to a specific raw score offset.
+   * Helper to calculate pin counts relative to a specific raw score offset. 
+   * Used during the 10th frame to calculate pins after a strike or spare has occurred.
+   * 
+   * @param {Object} round Machine configuration.
+   * @param {number} rawScore The achievement to evaluate.
+   * @param {number} offset The amount of score "consumed" by previous marks.
+   * @returns {number} Pin count (0-10).
    */
   _getRelativePins(round, rawScore, offset) {
     return this.getPinCount(round, Math.max(0, rawScore - offset));
   }
 
   /**
-   * Standardized factory for turn data objects.
+   * Internal factory for turn data objects.
+   * Ensures a consistent structure for return values across all branching paths.
+   * 
+   * @param {Object} round Machine configuration.
+   * @param {string} type The logic path (strike, spare2, open, etc).
+   * @param {string} mark The visual representation (X, 9/, etc).
+   * @param {number} first Pin count of first ball.
+   * @param {number} second Pin count of second ball.
+   * @param {number} third Pin count of third ball.
+   * @param {number} score Frame total for current pins (excluding bonuses).
+   * @returns {Object} Standardized turn result.
    */
   _createTurnData(round, type, mark, first, second, third = 0, score) {
     return {
@@ -166,6 +219,16 @@ export class BowlingEngine extends ScoringEngine {
     };
   }
 
+  /**
+   * Calculates the pin results for a standard (1-9) frame.
+   * 
+   * @param {Object} round Machine configuration.
+   * @param {number} raw1 Score after Ball 1.
+   * @param {number} raw2 Score after Ball 2.
+   * @param {number} raw3 Score after Ball 3.
+   * @param {boolean} [isLastRound=false] Toggle for 10th frame logic.
+   * @returns {Object} Raw turn result including pin counts for bowling math.
+   */
   getTurnDataFromValues(round, raw1, raw2, raw3, isLastRound = false) {
     if (isLastRound) return this.getRound10Data(round, raw1, raw2, raw3);
 
@@ -187,6 +250,14 @@ export class BowlingEngine extends ScoringEngine {
     return this._createTurnData(round, 'open', String(p3), p2, Math.max(0, p3 - p2), 0, p3);
   }
 
+  /**
+   * Look-ahead helper for standard bowling math.
+   * 
+   * @param {number} roundIndex The current frame index.
+   * @param {number} count Number of balls to look ahead (1 for spare, 2 for strike).
+   * @param {Array} turnData The full list of calculated frame results.
+   * @returns {Array<number>} The pin counts of the next N balls.
+   */
   getNextBallValues(roundIndex, count, turnData) {
     const values = [];
     for (let current = roundIndex + 1; current < turnData.length && values.length < count; current += 1) {
@@ -198,13 +269,48 @@ export class BowlingEngine extends ScoringEngine {
     return values.slice(0, count);
   }
 
-  formatMark(turn) {
-    if (turn.type === 'tenth') return turn.mark;
+  /** @returns {string} Label for a single round (e.g. "Frame"). */
+  getRoundLabel() { return this.config.roundLabel || 'Frame'; }
+
+  /** @returns {string} Prefix for turn headers. */
+  getTurnHeaderPrefix() { return this.config.turnHeaderPrefix || 'Frame'; }
+
+  /** @returns {string} Label for the main goal (e.g. "Strike"). */
+  getPrimaryTargetLabel() { return this.config.primaryTargetLabel || 'Strike'; }
+
+  /** @returns {string} Label for the value 1 (Strike) requirement. */
+  getValue1Label() { return this.config.value1Label || 'Target Score'; }
+
+  /** @returns {string} Label for the value 2 (1-Pin) baseline. */
+  getValue2Label() { return this.config.value2Label || 'Base Score'; }
+
+  getThresholdPrefix() { return 'Pins'; }
+
+  // Explicitly define for Bowling, even if they match the base defaults
+  getThresholdStart() { return this.config.thresholdStart ?? 10; }
+  getThresholdEnd() { return this.config.thresholdEnd ?? 1; }
+
+  /**
+   * Converts turn data into a visual mark string.
+   * 
+   * @param {Object} turn The calculated turn result.
+   * @returns {string} e.g. "X", "7/", "4 3".
+   */
+  formatMark(turn, _parValue = 0) { // Bowling doesn't use parValue for mark formatting
+    if (turn.type === 'tenth') return turn.mark || '';
     if (turn.type === 'strike') return 'X';
     if (turn.type === 'spare2' || turn.type === 'spare3') return `${turn.first}/`;
-    return `${turn.first} ${turn.second}`;
+    if (typeof turn.first === 'number' && typeof turn.second === 'number') return `${turn.first} ${turn.second}`;
+    return turn.mark || '';
   }
 
+  /**
+   * Calculates the full game results for a Bowling session.
+   * 
+   * @param {Array<Object>} machines Target definitions for the event.
+   * @param {Object} scoreMap Dictionary of ball scores keyed by orderNumber.
+   * @returns {{turnResults: Array, total: number}}
+   */
   calculateTurnResults(machines, scoreMap) {
     const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
@@ -224,35 +330,54 @@ export class BowlingEngine extends ScoringEngine {
         turnScore = 10 + next1;
       }
       total += turnScore;
-      return { orderNumber: turn.orderNumber, machineName: turn.machineName, mark: this.formatMark(turn), score: turnScore };
+      const formattedMark = this.formatMark(turn);
+      return { 
+        ...turn, 
+        score: turnScore, 
+        played: true,
+        mark: formattedMark, // Update mark property to satisfy unit tests
+        displayMark: formattedMark,
+        displayRoundTotal: this.formatTotalScore(total),
+        displayRunningTotal: this.formatTotalScore(total)
+      };
     });
-    return { turnResults: results, total };
+    return { turnResults: results, total, totalDisplay: this.formatTotalScore(total) };
   }
 
+  /**
+   * Generates a 1-to-10 pin mapping based on a Target (10) and Base (1) score.
+   * 
+   * @param {number} score10 The strike target.
+   * @param {number} score1 The 1-pin baseline.
+   * @param {string} scalingType 'flat' for linear, 'curved' for exponential.
+   * @returns {Object|null} Map of rank -> raw score.
+   */
   buildRoundValues(score10, score1, scalingType) {
-    const values = {};
-    if (score10 > 0 && score1 > 0) {
-      const range = score10 - score1;
-      for (let rank = 10; rank >= 1; rank -= 1) {
-        const fraction = (rank - 1) / 9;
-        const multiplier = (scalingType === 'curved') ? Math.pow(fraction, 2) : fraction;
-        values[rank] = Math.round(score1 + range * multiplier);
-      }
-      return values;
-    }
-    return null;
+    // Bowling: score10 is the anchor at rank 10, descending order (10 is the high score requirement).
+    return this.calculateInterpolatedValues(score10, score1, 10, scalingType, 'desc');
   }
 
-  getThresholdLabel(rank) {
-    const r = Number(rank);
-    if (r === 10) return 'High';
-    if (r === 1) return 'Low';
-    return rank;
-  }
+  /**
+   * Standardized round options for Bowling.
+   * @returns {Array<number>} [10]
+   */
+  getRoundCountOptions() { return [3, 6, 10]; }
 
-  getRoundLabel() { return 'Frame'; }
-  getTurnHeaderPrefix() { return 'Frame'; }
-  getPrimaryTargetLabel() { return 'Strike'; }
-  getHighScoreLabel() { return 'Strike'; }
-  getLowScoreLabel() { return '1 Pin'; }
+  /**
+   * Formats the total score for the leaderboard.
+   * @param {number} total Final cumulative points.
+   * @returns {string} Formatted number.
+   */
+  formatTotalScore(total) { return formatNumber(total); }
+
+  /**
+   * Returns default values for a new Bowling machine configuration.
+   * Calculates a suggested baseline of 10% of the target.
+   * 
+   * @param {number} [suggestedTarget=5000000] The strike goal.
+   * @returns {{value1: number, value2: number}}
+   */
+  getInitialValues(suggestedTarget = 5000000) {
+    return { value1: suggestedTarget, value2: Math.floor(suggestedTarget / 10) };
+  }
 }

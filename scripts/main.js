@@ -7,7 +7,7 @@
 import { initNavigation } from '@ui/navigation.js';
 import { initMachinesPage } from '@pages/machinesPage.js';
 import { initLocationsPage } from '@pages/locationsPage.js';
-import { initConfigPage } from '@pages/configPage.js';
+import { initEventSetupPage } from '@scripts/pages/eventSetupPage.js';
 import { initPlayersPage } from '@pages/playersPage.js';
 import { initScoresPage } from '@pages/scoresPage.js';
 import { initStandingsPage } from '@pages/standingsPage.js';
@@ -18,7 +18,7 @@ import { getDebugEnabled } from '@services/state.js';
 import { getScoringEngine } from '@core/engine.js';
 import { getCookie } from '@scripts/utils.js';
 import { initAuthHeader } from '@services/auth.js';
-import { fitTVModeToScreen, applyPreferredTheme } from '@ui/uiComponents.js';
+import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { loadPage } from '@scripts/utils.js';
 
 /**
@@ -49,7 +49,7 @@ export function initApp() {
   const pageInitializers = {
     'machine-form': initMachinesPage,
     'location-form': initLocationsPage,
-    'round-form': initConfigPage,
+    'round-form': initEventSetupPage,
     'player-list': initPlayersPage,
     'rounds-input': initScoresPage,
     'standings-body': initStandingsPage,

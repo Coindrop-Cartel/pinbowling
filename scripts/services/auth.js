@@ -1,4 +1,4 @@
-import { showAlert, showAuthDialog } from '@ui/uiComponents.js';
+import { showAlert, showAuthDialog } from '@ui/dialogs.js';
 import { PB_API } from '@services/api.js';
 
 let _cachedUser = null;

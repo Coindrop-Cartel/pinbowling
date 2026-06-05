@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 // Mock dependencies
 vi.mock('@services/api.js', () => ({
@@ -17,6 +17,10 @@ vi.mock('@services/api.js', () => ({
   }
 }));
 
+const { mockLeagueState } = vi.hoisted(() => ({
+  mockLeagueState: { activeId: null }
+}));
+
 vi.mock('@services/auth.js', () => ({
   isManagementAuthorized: vi.fn(),
   runAuthorizedLeagueAction: vi.fn((id, cb) => cb())
@@ -26,9 +30,9 @@ vi.mock('@scripts/utils.js', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
-    setActiveLeagueId: vi.fn(),
+    setActiveLeagueId: vi.fn((id) => { mockLeagueState.activeId = id; }),
     setActiveEventId: vi.fn(),
-    getActiveLeagueId: vi.fn(),
+    getActiveLeagueId: vi.fn(() => mockLeagueState.activeId),
     navigateTo: vi.fn(),
     getCookie: vi.fn(() => 'bowling'), // Mock getCookie to return a default value for tests
     ROUTES: {
@@ -38,7 +42,7 @@ vi.mock('@scripts/utils.js', async (importOriginal) => {
   };
 });
 
-vi.mock('@ui/uiComponents.js', () => ({
+const uiMocks = vi.hoisted(() => ({
   setupLiveFilter: vi.fn((input, data, options) => ({
     performFilter: () => options.onFilter(data, input.value.toLowerCase())
   })),
@@ -49,19 +53,42 @@ vi.mock('@ui/uiComponents.js', () => ({
   showDialog: vi.fn(),
   getFormatBadgeHtml: vi.fn((f) => `<span>${f || 'bowling'}</span>`),
   applyPreferredTheme: vi.fn(),
+  createExpandableRow: vi.fn((container, options) => {
+    const row = document.createElement('div');
+    row.className = options.className || '';
+    row.innerHTML = `
+      <div class="league-header">${options.headerHtml}</div>
+      <div class="league-details ${options.isExpanded ? '' : 'hidden'}">${options.contentHtml}</div>
+    `;
+    container.appendChild(row);
+    if (options.onHeaderClick) {
+      row.querySelector('.league-header').addEventListener('click', options.onHeaderClick);
+    }
+    return row;
+  }),
 }));
+
+vi.mock('@ui/selectors.js', () => uiMocks);
+vi.mock('@ui/dialogs.js', () => uiMocks);
+vi.mock('@ui/branding.js', () => uiMocks);
 
 import { initLeaguesPage } from '@scripts/pages/leaguesPage.js';
 import { PB_API } from '@services/api.js';
 import { isManagementAuthorized } from '@services/auth.js';
-import { showConfirm, showPlayerSelectionDialog } from '@ui/uiComponents.js';
+import { showConfirm, showPlayerSelectionDialog } from '@ui/dialogs.js';
 
 describe('Leagues Page (leaguesPage.js)', () => {
   beforeEach(() => {
+    // Mock layout methods not implemented in JSDOM
+    vi.stubGlobal('alert', vi.fn());
+    vi.stubGlobal('scrollTo', vi.fn());
+    Element.prototype.scrollIntoView = vi.fn();
+    vi.useFakeTimers();
+
     document.body.innerHTML = `
       <form id="league-form">
         <input id="league-name" />
-        <div id="league-date-row" class="hidden">
+        <div id="league-date-row" class="form-row hidden">
            <input id="league-start-date" />
         </div>
         <div id="league-format-row" class="hidden">
@@ -87,6 +114,11 @@ describe('Leagues Page (leaguesPage.js)', () => {
       </div>
     `;
     vi.clearAllMocks();
+    mockLeagueState.activeId = null;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('should render the league list and toggle expansion', async () => {
@@ -103,7 +135,8 @@ describe('Leagues Page (leaguesPage.js)', () => {
     const header = item.querySelector('.league-header');
     header.click();
 
-    expect(item.querySelector('.league-details').classList.contains('hidden')).toBe(false);
+    const updatedItem = document.querySelector('.league-registry-item');
+    expect(updatedItem.querySelector('.league-details').classList.contains('hidden')).toBe(false);
   });
 
   it('should prompt for player selection when adding a player', async () => {

@@ -1,5 +1,6 @@
 import { PB_API } from '@services/api.js';
-import { setupLiveFilter, showConfirm, showAlert } from '@ui/uiComponents.js';
+import { setupLiveFilter, createExpandableRow } from '@ui/selectors.js';
+import { showConfirm, showAlert } from '@ui/dialogs.js';
 import { requireAdmin } from '@services/auth.js';
 import { navigateTo } from '@scripts/utils.js';
 import { ROUTES } from '@scripts/routes.js';
@@ -32,6 +33,16 @@ export async function initMachinesPage() {
   const machineList = document.getElementById('machines-list');
   const emptyNotice = document.getElementById('machines-list-empty');
 
+  // Populate Year dropdown from 1947 (Humpty Dumpty / Flipper Era) to current year
+  if (yearInput) {
+    const currentYear = new Date().getFullYear();
+    let yearHtml = '<option value="">Year (Optional)</option>';
+    for (let y = currentYear; y >= 1947; y--) {
+      yearHtml += `<option value="${y}">${y}</option>`;
+    }
+    yearInput.innerHTML = yearHtml;
+  }
+
   let allMachines = [];
   let filterInstance = null;
 
@@ -39,9 +50,11 @@ export async function initMachinesPage() {
   const metadataRow = document.getElementById('machine-metadata-row');
   const actionsRow = saveMachineButton.closest('.form-actions');
 
+  if (saveMachineButton) saveMachineButton.classList.add('btn-mgmt');
+
   const createToggle = document.createElement('button');
   createToggle.type = 'button';
-  createToggle.className = 'secondary';
+  createToggle.className = 'secondary btn-mgmt';
   createToggle.textContent = 'Create New Machine';
   createToggle.style.marginTop = '10px';
   machineNameInput.after(createToggle);
@@ -83,36 +96,38 @@ export async function initMachinesPage() {
     } else {
       emptyNotice.classList.add('hidden');
       filtered.forEach(m => {
-        const item = document.createElement('div');
-        item.className = 'machine-registry-item';
-        item.style.display = 'flex';
-        item.style.justifyContent = 'space-between';
-        item.style.alignItems = 'center';
-        item.style.padding = '6px 12px';
-        item.style.marginBottom = '5px';
-        item.style.background = '#f9f9f9';
-        item.style.borderRadius = '4px';
-        
         const info = [m.manufacturer, m.year].filter(Boolean).join(', ');
-        item.innerHTML = `
-          <div style="display: flex; flex-direction: column;">
-            <span style="font-weight: bold;">${m.machineName}</span>
-            ${info ? `<small style="color: #666;">${info}</small>` : ''}
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <button type="button" class="edit-mach-btn secondary" style="padding: 4px 10px; font-size: 0.85rem;">Edit</button>
-            ${isAdmin ? `<button type="button" class="delete-mach-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>` : ''}
+        const headerHtml = `
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div style="flex: 1;">
+              <span style="font-weight: bold;">${m.machineName}</span>
+              ${info ? `<br><small style="opacity: 0.7; font-size: 0.8rem;">${info}</small>` : ''}
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="edit-mach-btn secondary btn-row">Edit</button>
+              ${isAdmin ? `<button type="button" class="delete-mach-btn btn-row">Delete</button>` : ''}
+            </div>
           </div>
         `;
 
-        item.querySelector('.edit-mach-btn').onclick = () => editMachine(m);
-        const deleteBtn = item.querySelector('.delete-mach-btn');
-        if (deleteBtn) deleteBtn.onclick = async () => {
+        const contentHtml = '<div style="font-size: 0.85rem; color: #666; font-style: italic;">Select Edit to update machine metadata.</div>';
+
+        const row = createExpandableRow(machineList, {
+          id: m.id,
+          className: 'machine-registry-item',
+          headerHtml,
+          contentHtml,
+          isExpanded: false
+        });
+
+        row.querySelector('.edit-mach-btn').onclick = (e) => { e.stopPropagation(); editMachine(m); };
+        const deleteBtn = row.querySelector('.delete-mach-btn');
+        if (deleteBtn) deleteBtn.onclick = async (e) => {
+          e.stopPropagation();
           if (await showConfirm(`Are you sure you want to remove "${m.machineName}"? This will remove it from all locations and events.`, 'Delete Machine')) {
             await deleteMachine(m.id);
           }
         };
-        machineList.appendChild(item);
       });
     }
 
@@ -182,7 +197,7 @@ export async function initMachinesPage() {
   });
 
   // Ensure validation and button states are updated when metadata fields change
-  yearInput.addEventListener('input', () => filterInstance.performFilter());
+  yearInput.addEventListener('change', () => filterInstance.performFilter());
   mfgInput.addEventListener('input', () => filterInstance.performFilter());
 
   async function refresh(data = null) {

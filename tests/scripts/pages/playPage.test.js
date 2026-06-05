@@ -26,9 +26,19 @@ vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
     buildRoundValues: vi.fn(() => ({ 1: 100, 10: 1000 })),
     getInitialValues: vi.fn((score) => ({ value1: score, value2: score / 10 })),
-    getHighScoreLabel: vi.fn(() => 'Strike'),
-    getLowScoreLabel: vi.fn(() => '1 Pin'),
+    getValue1Label: vi.fn(() => 'Strike'),
+    getValue2Label: vi.fn(() => '1 Pin'),
+    getThresholdPrefix: vi.fn(() => 'Pins'),
+    getThresholdRange: vi.fn(() => [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]),
+    getRowSummaryHtml: vi.fn(() => '<div>Summary</div>'),
+    getMarkFormatting: vi.fn(() => ''),
+    formatMark: vi.fn((turn) => turn.mark),
+    getThresholdLabel: vi.fn(rank => rank),
+    getThresholdRowStyle: vi.fn(() => ''),
+    getThresholdSort: vi.fn(() => (a, b) => b[0] - a[0]),
     getRoundLabel: vi.fn(() => 'Frame'),
+    getBrandName: vi.fn(() => 'PinBowling'),
+    getThemeClass: vi.fn(() => 'theme-bowling'),
     filterThresholds: vi.fn((v) => v),
     getRoundCountOptions: vi.fn(() => [3, 5, 10]),
   }))
@@ -39,9 +49,10 @@ vi.mock('@scripts/utils.js', () => ({
   applyScoreFormatting: vi.fn(),
   renderThresholdGrid: vi.fn(() => 'Grid'),
   getCookie: vi.fn(() => 'bowling'),
+  loadPage: vi.fn(),
 }));
 
-vi.mock('@ui/uiComponents.js', () => ({
+const uiMocks = vi.hoisted(() => ({
   createSearchableSelect: vi.fn(),
   showPlayerSelectionDialog: vi.fn(),
   createExpandableRow: vi.fn((container, options) => {
@@ -58,11 +69,16 @@ vi.mock('@ui/uiComponents.js', () => ({
   applyPreferredTheme: vi.fn(),
 }));
 
+vi.mock('@ui/selectors.js', () => uiMocks);
+vi.mock('@ui/dialogs.js', () => uiMocks);
+vi.mock('@ui/branding.js', () => uiMocks);
+
 import { initPlayPage } from '@scripts/pages/playPage.js';
 import { PB_API } from '@services/api.js';
 
 describe('Play Page (playPage.js)', () => {
   beforeEach(() => {
+    vi.stubGlobal('alert', vi.fn());
     document.body.innerHTML = `
       <form id="quick-play-form">
         <select id="qp-location"></select>

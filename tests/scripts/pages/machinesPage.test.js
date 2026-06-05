@@ -20,7 +20,7 @@ vi.mock('@scripts/utils.js', () => ({
   navigateTo: vi.fn(),
 }));
 
-vi.mock('@ui/uiComponents.js', () => ({
+const uiMocks = vi.hoisted(() => ({
   setupLiveFilter: vi.fn((input, data, options) => ({
     performFilter: () => {
       const query = input.value.toLowerCase();
@@ -29,8 +29,17 @@ vi.mock('@ui/uiComponents.js', () => ({
     }
   })),
   showConfirm: vi.fn(),
-  showAlert: vi.fn()
+  showAlert: vi.fn(),
+  createExpandableRow: vi.fn((container, options) => {
+    const row = document.createElement(options.tag || 'div');
+    row.innerHTML = options.headerHtml + (options.contentHtml || '');
+    container.appendChild(row);
+    return row;
+  }),
 }));
+
+vi.mock('@ui/selectors.js', () => uiMocks);
+vi.mock('@ui/dialogs.js', () => uiMocks);
 
 import { initMachinesPage } from '@scripts/pages/machinesPage.js';
 import { PB_API } from '@services/api.js';
@@ -70,8 +79,11 @@ describe('Machines Page (machinesPage.js)', () => {
   });
 
   it('should render the list and allow editing for admins', async () => {
-    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
-    PB_API.getMachines.mockResolvedValue([{ id: 1, machineName: 'Medieval Madness', year: 1997 }]);
+    // Ensure auth is resolved before init
+    vi.mocked(PB_API.getCurrentUser).mockResolvedValue({ role: 'admin' });
+    vi.mocked(PB_API.getMachines).mockResolvedValue([
+      { id: 1, machineName: 'Medieval Madness', year: 1997 }
+    ]);
 
     await initMachinesPage();
 

@@ -1,7 +1,8 @@
 import { PB_API } from '@services/api.js';
 import { getScoringEngine } from '@core/engine.js';
 import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, setActiveEventId, setActiveLeagueId, setCurrentPlayerId, getCurrentPlayerId, renderThresholdGrid } from '@scripts/utils.js';
-import { initTournamentSelector, createSearchableSelect, applyPreferredTheme, renderActionSummary } from '@ui/uiComponents.js';
+import { initTournamentSelector, createSearchableSelect, renderActionSummary } from '@ui/selectors.js';
+import { applyPreferredTheme } from '@ui/branding.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
 import { can, PERMISSIONS } from '@services/auth.js';
 
@@ -71,8 +72,13 @@ export async function initScoresPage() {
     playerSummary.classList.add('hidden');
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
-    setActiveEventId(''); // Clear event selection from state/URL
     setCurrentPlayerId('');
+
+    const search = document.getElementById('league-search-global');
+    if (search) {
+      search.value = '';
+      search.dispatchEvent(new Event('input'));
+    }
   };
 
   const handlePlayerChange = () => {
@@ -156,7 +162,7 @@ export async function initScoresPage() {
     row.innerHTML = `
       <div class="round-info" style="cursor: pointer; flex: 1; min-width: 200px;">
         <div class="round-label"><b>${Engine.getRoundLabel()} ${round.orderNumber}:</b> ${round.machineName}</div>
-        <div class="strike-target" style="font-size: 0.8rem; color: var(--pb-primary); margin-top: 4px;"><b>${Engine.getPrimaryTargetLabel()}:</b> ${formatNumber(round.value1)}</div>
+        ${Engine.getRowSummaryHtml(round, formatNumber)}
         ${bonusHtml}
         <div class="target-details hidden" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--pb-primary); opacity: 0.8;">
           <div style="font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; color: var(--pb-primary);">Scoring Thresholds</div>
@@ -173,6 +179,7 @@ export async function initScoresPage() {
 
     const inputsContainer = row.querySelector('.round-inputs-container');
     const saveBtn = row.querySelector('.save-round-button');
+    saveBtn.classList.add('btn-mgmt'); // Apply standardized button style
 
     row.querySelector('.round-info').addEventListener('click', () => {
       row.querySelector('.target-details').classList.toggle('hidden');
@@ -406,24 +413,20 @@ export async function initScoresPage() {
    */
   function renderCurrentResults() {
     const scoreMap = getScoreMapFromInputs();
-    const { turnResults, total: finalTotal } = Engine.calculateTurnResults(machines, scoreMap);
-    let runningTotal = 0;
+    const { turnResults, totalDisplay } = Engine.calculateTurnResults(machines, scoreMap);
+
     resultsBody.innerHTML = turnResults
-      .map(
-        (result) => {
-          runningTotal += result.score;
-          return `
-        <tr>
-          <td>${result.orderNumber}</td>
-          <td>${result.machineName}</td>
-          <td>${result.mark}</td>
-          <td>${formatNumber(runningTotal)}</td>
-        </tr>
-          `;
-        })
+      .map(result => `
+          <tr>
+            <td>${result.orderNumber}</td>
+            <td>${result.machineName}</td>
+            <td>${result.displayMark}</td>
+            <td>${result.displayRunningTotal}</td>
+          </tr>
+      `)
       .join('');
 
-    totalScore.textContent = formatNumber(finalTotal);
+    totalScore.textContent = totalDisplay;
     resultsEmpty.classList.add('hidden');
     resultsPanel.classList.remove('hidden');
   }
@@ -479,7 +482,7 @@ export async function initScoresPage() {
     // Update the general hint text based on the active engine
     const scoringHint = document.getElementById('scoring-hint');
     if (scoringHint) {
-      scoringHint.textContent = Engine.getScoringHint?.() || '';
+      scoringHint.textContent = Engine.getScoringHint();
     }
 
     machines = eventTargets;
