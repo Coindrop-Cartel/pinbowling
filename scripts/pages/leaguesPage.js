@@ -202,10 +202,8 @@ export async function initLeaguesPage() {
 
     if (!isAuthorized) return;
 
-    const leaguePass = await showPrompt(`Set a League Password for "${name}". This will be required for scoring and setup by non-admins. (Optional)`, 'League Password', false);
-
     try {
-      await PB_API.createLeague({ name, startDate: date, password: leaguePass, scoringFormat });
+      await PB_API.createLeague({ name, startDate: date, scoringFormat });
       leagueNameInput.value = '';
       leagueDateInput.value = '';
       // Collapse creation form back down
