@@ -12,6 +12,7 @@ vi.mock('@services/api.js', () => ({
     deleteLocation: vi.fn(),
     addLocationMachine: vi.fn(),
     removeLocationMachine: vi.fn(),
+    getCurrentUser: vi.fn().mockResolvedValue({ role: 'admin' }),
   },
 }));
 
@@ -19,10 +20,19 @@ vi.mock('@services/auth.js', () => ({
   requireAdmin: vi.fn(() => Promise.resolve(true)),
 }));
 
-vi.mock('@ui/uiComponents.js', () => ({
+const uiMocks = vi.hoisted(() => ({
   showConfirm: vi.fn(() => Promise.resolve(true)),
   showPrompt: vi.fn(),
+  createExpandableRow: vi.fn((container, options) => {
+    const row = document.createElement(options.tag || 'div');
+    row.innerHTML = options.headerHtml + (options.contentHtml || '');
+    container.appendChild(row);
+    return row;
+  }),
 }));
+
+vi.mock('@ui/selectors.js', () => uiMocks);
+vi.mock('@ui/dialogs.js', () => uiMocks);
 
 describe('Locations Management Page (locationsPage.js)', () => {
   beforeEach(() => {

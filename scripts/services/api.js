@@ -1,10 +1,8 @@
 /**
  * API Client and State Management
  */
-import { getLeaguePassword } from './state.js';
 
 const API_SECRET = window.PB_API_SECRET || "";
-export const ADMIN_PASSWORD = window.PB_ADMIN_PASSWORD || "";
 
 // Calculate the base application path once to ensure relative API calls resolve correctly
 // regardless of clean URL routing (e.g., /leagues vs /leagues.php)
@@ -35,10 +33,6 @@ export async function fetchJSON(url, options = {}) {
 
   if (window.PB_DEBUG_MODE) console.log(`[API] Constructing ${method} request to: ${url}`, { params: options.params, finalUrl });
 
-  const urlObj = new URL(finalUrl.startsWith('http') ? finalUrl : `http://localhost/${finalUrl}`);
-  const leagueId = urlObj.searchParams.get('leagueId') || (options.body ? JSON.parse(options.body).leagueId : null);
-  const leaguePass = leagueId ? getLeaguePassword(leagueId) : null;
-
   // Tunnel DELETE and PUT via POST to bypass potential server-level method blocking.
   // This ensures the project setup is synchronized and robust across different hosts.
   const headers = { ...options.headers };
@@ -51,7 +45,6 @@ export async function fetchJSON(url, options = {}) {
   const finalHeaders = {
     'Content-Type': 'application/json',
     'X-PB-SECRET': API_SECRET,
-    ...(leaguePass && { 'X-LEAGUE-PASSWORD': leaguePass }),
     ...headers
   };
 
@@ -112,11 +105,11 @@ export const PB_API = {
   },
   saveScore: (score) => fetchJSON('service/scoreService.php', { method: 'POST', body: JSON.stringify(score) }), // score object should contain eventId
   deletePlayer: (id) => fetchJSON(`service/playerService.php?id=${id}`, { method: 'DELETE' }),
-  createMachine: (machineName) => fetchJSON('service/machineService.php', { method: 'POST', body: JSON.stringify({ machineName }) }), // Create master machine
+  createMachine: (machine) => fetchJSON('service/machineService.php', { method: 'POST', body: JSON.stringify(machine) }), // Create master machine
   updatePlayer: (id, player) => fetchJSON(`service/playerService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(player) }),
   updateUserPassword: (userId, password) => fetchJSON(`service/authService.php?task=reset&id=${userId}`, { method: 'POST', body: JSON.stringify({ password }) }),
   updateUserRole: (userId, role) => fetchJSON(`service/playerService.php?task=role&id=${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
-  updateMachine: (id, machineName) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'PUT', body: JSON.stringify({ machineName }) }), // Update master machine
+  updateMachine: (id, machine) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(machine) }), // Update master machine
   deleteMachine: (id) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'DELETE' }),
   createPlayer: (player) => fetchJSON('service/playerService.php', { method: 'POST', body: JSON.stringify(player) }),
   clearScores: (playerId) => fetchJSON(`service/scoreService.php?playerId=${playerId}`, { method: 'DELETE' }),

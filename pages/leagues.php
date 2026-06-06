@@ -1,6 +1,6 @@
 <?php $pageTitle = 'Leagues & Events'; ?>
   <main class="page-container">
-    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <header>
       <h1>Leagues & Events Management</h1>
     </header>
 
@@ -10,12 +10,16 @@
           <label for="league-name">League Name</label>
           <input id="league-name" type="text" placeholder="e.g., Summer 2024 League" required style="width: 100%; box-sizing: border-box;" />
         </div>
-        <div class="form-row">
+        <div id="league-date-row" class="form-row hidden">
           <label for="league-start-date">Start Date</label>
           <input id="league-start-date" type="date" required style="width: 100%; box-sizing: border-box;" />
         </div>
-        <div class="form-actions">
-          <button type="submit" id="create-league-btn" disabled>Create League</button>
+        <div id="league-format-row" class="form-row hidden">
+          <label for="league-scoring-format">Default Scoring Format</label>
+          <select id="league-scoring-format" style="width: 100%; box-sizing: border-box;"></select>
+        </div>
+        <div class="form-actions hidden">
+          <button type="submit" id="create-league-btn" class="btn-mgmt" disabled>Create League</button>
         </div>
       </form>
     </section>
@@ -49,9 +53,13 @@
             <!-- Locations will be loaded here -->
           </select>
         </div>
+        <div class="form-row">
+          <label for="event-scoring-format">Scoring Format</label>
+          <select id="event-scoring-format" style="width: 100%; box-sizing: border-box;"></select>
+        </div>
         <div class="form-actions">
-          <button type="submit">Save Event</button>
-          <button type="button" id="cancel-event-edit" class="secondary">Cancel</button>
+          <button type="submit" class="btn-mgmt">Save Event</button>
+          <button type="button" id="cancel-event-edit" class="secondary btn-mgmt">Cancel</button>
         </div>
       </form>
     </section>

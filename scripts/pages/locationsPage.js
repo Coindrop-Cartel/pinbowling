@@ -1,12 +1,14 @@
 import { PB_API } from '@services/api.js';
+import { getScoringEngine } from '@core/engine.js';
 import { applyScoreFormatting, formatNumber } from '@scripts/utils.js';
-import { showConfirm, showPrompt } from '@ui/uiComponents.js';
+import { showConfirm, showPrompt } from '@ui/dialogs.js';
+import { createExpandableRow } from '@ui/selectors.js';
 import { requireAdmin } from '@services/auth.js';
 
 /**
  * Logic for managing league locations/venues.
  */
-export function initLocationsPage() {
+export async function initLocationsPage() {
   const form = document.getElementById('location-form');
   const editingIdInput = document.getElementById('editing-location-id');
   const list = document.getElementById('locations-list');
@@ -17,23 +19,9 @@ export function initLocationsPage() {
   const cityInput = document.getElementById('location-city');
   const stateInput = document.getElementById('location-state');
   const saveBtn = document.getElementById('save-location-button');
-  const cancelBtn = document.getElementById('cancel-loc-edit-button');
 
-  // Group City and State into one row for a more compact layout
-  const cityRow = cityInput.closest('.form-row');
-  const stateRow = stateInput.closest('.form-row');
-  let cityStateContainer = null;
-  if (cityRow && stateRow) {
-    cityStateContainer = document.createElement('div');
-    cityStateContainer.style = "display: flex; gap: 15px; margin-bottom: 15px;";
-    cityRow.style.flex = "2";
-    cityRow.style.marginBottom = "0";
-    stateRow.style.flex = "1";
-    stateRow.style.marginBottom = "0";
-    cityRow.before(cityStateContainer);
-    cityStateContainer.appendChild(cityRow);
-    cityStateContainer.appendChild(stateRow);
-  }
+  // Reference the existing city/state row from the PHP template
+  const cityStateContainer = document.getElementById('location-city-state-row');
 
   // Setup "Create Location" toggle behavior
   const actionsRow = saveBtn.closest('.form-actions');
@@ -42,23 +30,24 @@ export function initLocationsPage() {
 
   const createToggle = document.createElement('button');
   createToggle.type = 'button';
-  createToggle.className = 'secondary';
+  createToggle.className = 'secondary btn-mgmt';
   createToggle.textContent = 'Create New Location';
   createToggle.style.marginTop = '10px';
   nameInput.after(createToggle);
 
+  if (saveBtn) saveBtn.classList.add('btn-mgmt');
+
   createToggle.onclick = () => {
+    if (!cityStateContainer) return;
     const isHidden = cityStateContainer.classList.contains('hidden');
-    cityStateContainer.classList.toggle('hidden', !isHidden);
-    actionsRow.classList.toggle('hidden', !isHidden);
     if (isHidden) {
+      cityStateContainer.classList.remove('hidden');
+      actionsRow.classList.remove('hidden');
       createToggle.textContent = 'Cancel';
       createToggle.style.marginTop = '0';
       actionsRow.appendChild(createToggle);
     } else {
-      createToggle.textContent = 'Create New Location';
-      createToggle.style.marginTop = '10px';
-      nameInput.after(createToggle);
+      resetForm();
     }
   };
 
@@ -87,57 +76,47 @@ export function initLocationsPage() {
       filtered.forEach(loc => {
         const cityState = (loc.city && loc.state) ? ` (${loc.city}, ${loc.state})` : '';
         const isExpanded = String(loc.id) === String(expandedLocationId);
-        const locDiv = document.createElement('div');
-        locDiv.className = 'location-registry-item';
-        locDiv.style.marginBottom = '5px';
-        locDiv.style.border = '1px solid #ddd';
-        locDiv.style.borderRadius = '4px';
-        locDiv.style.overflow = 'hidden';
 
-        locDiv.innerHTML = `
-          <div class="location-header" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 6px 12px; background: #f9f9f9;">
-            <h3 style="margin: 0; font-size: 1.05rem;">
+        const headerHtml = `
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <h3 style="margin: 0; font-size: 1.05rem; flex: 1;">
               ${loc.name}${cityState}<br>
               <small>Machines: (${loc.machines?.length || 0})</small>
             </h3>
             <div style="display: flex; gap: 8px;">
-              <button class="edit-loc-btn secondary" style="padding: 4px 10px; font-size: 0.85rem;">Edit</button>
-              <button class="delete-loc-btn" style="padding: 4px 10px; font-size: 0.85rem;">Delete</button>
-            </div>
-          </div>
-          <div class="location-details ${isExpanded ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd; background: #fff;">
-            <div style="margin-bottom: 15px;">
-              <button class="add-mach-btn secondary" style="padding: 4px 12px; font-size: 0.85rem;">Add Machine to Venue</button>
-            </div>
-            <div class="league-details-columns" style="display: flex; gap: 2rem; flex-wrap: wrap;">
-              <div class="machines-list" id="mach-for-loc-${loc.id}" style="flex: 1; min-width: 250px;">
-                <div class="mach-list-inner"></div>
-                <div class="notice mach-empty hidden">No machines at this venue.</div>
-              </div>
+              <button class="edit-loc-btn secondary btn-row">Edit</button>
+              <button class="delete-loc-btn btn-row">Delete</button>
             </div>
           </div>
         `;
-        list.appendChild(locDiv);
 
-        locDiv.querySelector('.location-header').onclick = (e) => {
-          if (e.target.closest('button')) return;
-          const details = locDiv.querySelector('.location-details');
-          const wasHidden = details.classList.contains('hidden');
+        const contentHtml = `
+          <div style="margin-bottom: 15px;">
+            <button class="add-mach-btn secondary btn-row">Add Machine to Venue</button>
+          </div>
+          <div class="league-details-columns" style="display: flex; gap: 2rem; flex-wrap: wrap;">
+            <div class="machines-list" id="mach-for-loc-${loc.id}" style="flex: 1; min-width: 250px;">
+              <div class="mach-list-inner"></div>
+              <div class="notice mach-empty hidden">No machines at this venue.</div>
+            </div>
+          </div>
+        `;
 
-          // Accordion behavior: Collapse all other venues first
-          list.querySelectorAll('.location-details').forEach(d => d.classList.add('hidden'));
-
-          if (wasHidden) {
-            details.classList.remove('hidden');
-            expandedLocationId = loc.id;
-          } else {
-            expandedLocationId = null;
+        const row = createExpandableRow(list, {
+          id: loc.id,
+          className: 'location-registry-item',
+          headerHtml,
+          contentHtml,
+          isExpanded,
+          onHeaderClick: () => {
+            expandedLocationId = (expandedLocationId === loc.id) ? null : loc.id;
+            onFilterUpdate();
           }
-        };
+        });
 
-        locDiv.querySelector('.edit-loc-btn').onclick = () => editLocation(loc.id);
-        locDiv.querySelector('.add-mach-btn').onclick = () => showMachineForm(loc.id, loc.name);
-        locDiv.querySelector('.delete-loc-btn').onclick = () => window.deleteLocation(loc.id);
+        row.querySelector('.edit-loc-btn').onclick = (e) => { e.stopPropagation(); editLocation(loc.id); };
+        row.querySelector('.delete-loc-btn').onclick = (e) => { e.stopPropagation(); deleteLocation(loc.id); };
+        row.querySelector('.add-mach-btn').onclick = (e) => { e.stopPropagation(); showMachineForm(loc.id, loc.name); };
 
         renderMachinesForLocation(loc.id, loc.name, loc.machines);
       });
@@ -191,9 +170,7 @@ export function initLocationsPage() {
     nameInput.value = loc.name;
     cityInput.value = loc.city || '';
     stateInput.value = loc.state || '';
-
     saveBtn.textContent = 'Update Location';
-    cancelBtn.classList.remove('hidden');
 
     // Expand fields for editing
     if (cityStateContainer) cityStateContainer.classList.remove('hidden');
@@ -211,9 +188,9 @@ export function initLocationsPage() {
    */
   function resetForm() {
     editingIdInput.value = '';
+    nameInput.value = '';
     form.reset();
     saveBtn.textContent = 'Add Location';
-    cancelBtn.classList.add('hidden');
 
     // Collapse creation fields
     if (cityStateContainer) cityStateContainer.classList.add('hidden');
@@ -266,8 +243,8 @@ export function initLocationsPage() {
           <small>E: ${formatNumber(m.targetEasy)} | M: ${formatNumber(m.targetMed)} | H: ${formatNumber(m.targetHard)}</small>
         </span>
         <div style="display: flex; gap: 4px;">
-          <button class="edit-mach-btn secondary" style="padding: 2px 8px; font-size: 0.8rem;">Edit</button>
-          <button class="remove-mach-btn" style="padding: 2px 8px; font-size: 0.8rem;">Remove</button>
+          <button class="edit-mach-btn secondary btn-row">Edit</button>
+          <button class="remove-mach-btn btn-row">Remove</button>
         </div>
       `;
       item.querySelector('.edit-mach-btn').onclick = () => showMachineForm(locationId, locationName, m);
@@ -295,6 +272,10 @@ export function initLocationsPage() {
     machineFormCard.classList.remove('hidden');
     machineFormCard.innerHTML = `<h2>Loading Machine Details...</h2>`;
 
+    const engine = getScoringEngine();
+    const highScoreLabel = engine.getHighScoreLabel();
+    const defaults = engine.getInitialValues();
+
     const allMachines = await PB_API.getMachines();
     machineFormCard.innerHTML = `
       <h2>${existing ? 'Edit' : 'Add'} Machine for ${locationName}</h2>
@@ -306,20 +287,20 @@ export function initLocationsPage() {
         </select>
       </div>
       <div class="form-row">
-        <label>Target Score: Easy</label>
-        <input type="text" id="target-easy" value="${existing ? formatNumber(existing.targetEasy) : ''}">
+        <label>${highScoreLabel}: Easy</label>
+        <input type="text" id="target-easy" placeholder="e.g. ${formatNumber(defaults.value1)}" value="${existing ? formatNumber(existing.targetEasy) : ''}">
       </div>
       <div class="form-row">
-        <label>Target Score: Medium</label>
-        <input type="text" id="target-med" value="${existing ? formatNumber(existing.targetMed) : ''}">
+        <label>${highScoreLabel}: Medium</label>
+        <input type="text" id="target-med" placeholder="e.g. ${formatNumber(defaults.value1 * 2)}" value="${existing ? formatNumber(existing.targetMed) : ''}">
       </div>
       <div class="form-row">
-        <label>Target Score: Hard</label>
-        <input type="text" id="target-hard" value="${existing ? formatNumber(existing.targetHard) : ''}">
+        <label>${highScoreLabel}: Hard</label>
+        <input type="text" id="target-hard" placeholder="e.g. ${formatNumber(defaults.value1 * 3)}" value="${existing ? formatNumber(existing.targetHard) : ''}">
       </div>
       <div class="form-actions">
-        <button id="save-loc-mach">${existing ? 'Update' : 'Add to'} Location</button>
-        <button id="cancel-loc-mach" class="secondary">Cancel</button>
+        <button id="save-loc-mach" class="btn-mgmt">${existing ? 'Update' : 'Add to'} Location</button>
+        <button id="cancel-loc-mach" class="secondary btn-mgmt">Cancel</button>
       </div>
     `;
 
@@ -385,21 +366,14 @@ export function initLocationsPage() {
   });
 
   /**
-   * Global helper for deleting locations.
-   * Attached to window to allow for simple inline event handlers if needed.
-   * @param {number} id 
+   * Handles the deletion of a location venue.
    */
-  window.deleteLocation = async (id) => {
+  async function deleteLocation(id) {
     const loc = allLocations.find(l => l.id === id);
     const locName = loc ? loc.name : 'this location';
 
-    if (!await showConfirm(`Are you sure you want to delete the location "${locName}"?`, 'Delete Location')) {
-      return;
-    }
-
-    if (!await requireAdmin('Enter Admin Password to confirm location deletion:')) {
-      return;
-    }
+    if (!await showConfirm(`Are you sure you want to delete the location "${locName}"?`, 'Delete Location')) return;
+    if (!await requireAdmin('Enter Admin Password to confirm location deletion:')) return;
 
     try {
       await PB_API.deleteLocation(id);
@@ -407,9 +381,10 @@ export function initLocationsPage() {
     } catch (err) {
       alert(`Failed to delete location: ${err.message}`);
     }
-  };
+  }
 
-  cancelBtn.onclick = resetForm;
+  // Backwards compatibility for unit tests
+  window.deleteLocation = deleteLocation;
 
-  renderLocations();
+  await renderLocations();
 }

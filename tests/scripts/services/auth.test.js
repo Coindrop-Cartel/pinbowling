@@ -1,119 +1,155 @@
 /** @vitest-environment jsdom */
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { requireAdmin, runAuthorizedLeagueAction } from '@scripts/services/auth.js';
-import * as State from '@services/state.js';
-import * as UI from '@ui/uiComponents.js';
 
-vi.mock('@services/state.js', () => ({
-  getAdminSessionPassword: vi.fn(),
-  setAdminSessionPassword: vi.fn(),
-  getLeaguePassword: vi.fn(),
-  setLeaguePassword: vi.fn(),
+// Mock dependencies
+vi.mock('@services/api.js', () => ({
+  PB_API: {
+    getCurrentUser: vi.fn(),
+    logout: vi.fn(() => Promise.resolve())
+  }
 }));
 
-vi.mock('@ui/uiComponents.js', () => ({
-  showPrompt: vi.fn(),
-  showAlert: vi.fn(), // Add showAlert to the mock
+vi.mock('@ui/dialogs.js', () => ({
+  showAlert: vi.fn(),
+  showAuthDialog: vi.fn(() => Promise.resolve(true))
 }));
 
-describe('Authorization Helpers (auth.js)', () => {
+import { requireAdmin, runAuthorizedLeagueAction, initAuthHeader, isManagementAuthorized, resetAuthCache } from '@scripts/services/auth.js';
+import { PB_API } from '@services/api.js';
+import { showAlert, showAuthDialog } from '@ui/dialogs.js';
+
+describe('Auth Service (auth.js)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.PB_ADMIN_PASSWORD = 'admin-secret';
-    vi.spyOn(window, 'alert').mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    resetAuthCache();
+    // Setup DOM for auth header tests
+    document.body.innerHTML = `
+      <div id="auth-header-container"></div>
+      <div id="admin-nav-item" class="hidden">
+        <a id="nav-leagues" class="hidden">Leagues</a>
+        <a id="nav-maintenance" class="hidden">Maintenance</a>
+      </div>
+    `;
+    window.PB_DEBUG_MODE = false;
   });
 
   describe('requireAdmin', () => {
-    it('should return true immediately if global admin password is not set', async () => {
-      window.PB_ADMIN_PASSWORD = "";
+    it('should return true if user is admin', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
       const result = await requireAdmin();
       expect(result).toBe(true);
+      expect(showAlert).not.toHaveBeenCalled();
     });
 
-    it('should return true if password is already in session', async () => {
-      State.getAdminSessionPassword.mockReturnValue('admin-secret');
-      const result = await requireAdmin();
-      expect(result).toBe(true);
-      expect(UI.showPrompt).not.toHaveBeenCalled();
-    });
-
-    it('should prompt user if password is not in session', async () => {
-      State.getAdminSessionPassword.mockReturnValue(null);
-      UI.showPrompt.mockResolvedValue('admin-secret');
-      
-      const result = await requireAdmin('Msg');
-      expect(result).toBe(true);
-      expect(State.setAdminSessionPassword).toHaveBeenCalledWith('admin-secret');
-    });
-
-    it('should return false and alert on incorrect password', async () => {
-      State.getAdminSessionPassword.mockReturnValue(null);
-      UI.showPrompt.mockResolvedValue('wrong');
-      
+    it('should show alert and return false if user is not admin', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'player' });
       const result = await requireAdmin();
       expect(result).toBe(false);
-      expect(UI.showAlert).toHaveBeenCalledWith('Invalid Admin Password.', 'Authentication Error');
+      expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Administrator privileges'), 'Access Denied');
     });
 
-    it('should return false if prompt is cancelled', async () => {
-      UI.showPrompt.mockResolvedValue(null);
-      expect(await requireAdmin()).toBe(false);
+    it('should return false if no user session is found', async () => {
+      PB_API.getCurrentUser.mockResolvedValue(null);
+      const result = await requireAdmin();
+      expect(result).toBe(false);
+      expect(showAlert).toHaveBeenCalled();
+    });
+  });
+
+  describe('isManagementAuthorized', () => {
+    it('should return true for admin role', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+      expect(await isManagementAuthorized()).toBe(true);
+    });
+
+    it('should return true for td role', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'td' });
+      expect(await isManagementAuthorized()).toBe(true);
+    });
+
+    it('should return false for player role', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'player' });
+      expect(await isManagementAuthorized()).toBe(false);
     });
   });
 
   describe('runAuthorizedLeagueAction', () => {
-    it('should execute action if admin password is in session', async () => {
-      State.getAdminSessionPassword.mockReturnValue('admin-secret');
-      const action = vi.fn();
-      const result = await runAuthorizedLeagueAction(1, action);
+    it('should execute the callback if authorized', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'td' });
+      const callback = vi.fn();
+      const result = await runAuthorizedLeagueAction(1, callback);
       expect(result).toBe(true);
-      expect(action).toHaveBeenCalled();
+      expect(callback).toHaveBeenCalled();
     });
 
-    it('should prompt for password if none found', async () => {
-      State.getAdminSessionPassword.mockReturnValue(null);
-      State.getLeaguePassword.mockReturnValue(null);
-      UI.showPrompt.mockResolvedValue('league-pass');
-      
-      const action = vi.fn();
-      const result = await runAuthorizedLeagueAction(5, action);
-      
-      expect(result).toBe(true);
-      expect(UI.showPrompt).toHaveBeenCalled();
-      expect(State.setLeaguePassword).toHaveBeenCalledWith(5, 'league-pass');
-      expect(action).toHaveBeenCalled();
-    });
-
-    it('should allow admin password in the league prompt', async () => {
-        State.getAdminSessionPassword.mockReturnValue(null);
-        UI.showPrompt.mockResolvedValue('admin-secret');
-        
-        const result = await runAuthorizedLeagueAction(5, vi.fn());
-        expect(result).toBe(true);
-        expect(State.setAdminSessionPassword).toHaveBeenCalledWith('admin-secret');
-    });
-
-    it('should clear passwords and alert if action returns 401 Unauthorized', async () => {
-      State.getLeaguePassword.mockReturnValue('stored-pass');
-      const action = vi.fn().mockRejectedValue(new Error('Unauthorized access'));
-      
-      const result = await runAuthorizedLeagueAction(1, action);
-      
+    it('should skip callback and alert user if unauthorized', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'player' });
+      const callback = vi.fn();
+      const result = await runAuthorizedLeagueAction(1, callback);
       expect(result).toBe(false);
-      expect(State.setLeaguePassword).toHaveBeenCalledWith(1, null);
-      expect(State.setAdminSessionPassword).toHaveBeenCalledWith(null);
-      expect(UI.showAlert).toHaveBeenCalledWith('The password provided was invalid for both this league and the global administrator.', 'Unauthorized');
+      expect(callback).not.toHaveBeenCalled();
+      expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('permission'), 'Unauthorized');
+    });
+  });
+
+  describe('initAuthHeader', () => {
+    it('should display hi message and logout button for authenticated users', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'player', player_name: 'Kyle' });
+      await initAuthHeader();
+      const container = document.getElementById('auth-header-container');
+      expect(container.innerHTML).toContain('Hi, Kyle');
+      expect(document.getElementById('header-logout-btn')).not.toBeNull();
     });
 
-    it('should re-throw non-authorization errors', async () => {
-      State.getAdminSessionPassword.mockReturnValue('admin-secret');
-      const action = vi.fn().mockRejectedValue(new Error('Database error'));
+    it('should reveal admin navigation and maintenance tools for admins', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+      await initAuthHeader();
+      const adminNav = document.getElementById('admin-nav-item');
+      expect(adminNav.classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('nav-maintenance').classList.contains('hidden')).toBe(false);
+    });
+
+    it('should reveal admin navigation but hide maintenance for TDs', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'td', player_name: 'TD User' });
+      await initAuthHeader();
+      const adminNav = document.getElementById('admin-nav-item');
+      expect(adminNav.classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('nav-maintenance').classList.contains('hidden')).toBe(true);
+    });
+
+    it('should display a login button when no user is logged in', async () => {
+      PB_API.getCurrentUser.mockResolvedValue(null);
+      await initAuthHeader();
+      expect(document.getElementById('header-login-btn')).not.toBeNull();
+    });
+
+    it('should trigger logout API and refresh state on click', async () => {
+      PB_API.getCurrentUser.mockResolvedValue({ role: 'player' });
+      const reloadSpy = vi.fn();
+      vi.stubGlobal('location', { ...window.location, reload: reloadSpy });
+
+      await initAuthHeader();
+      document.getElementById('header-logout-btn').click();
       
-      await expect(runAuthorizedLeagueAction(1, action)).rejects.toThrow('Database error');
+      await vi.waitFor(() => {
+        expect(PB_API.logout).toHaveBeenCalled();
+        expect(reloadSpy).toHaveBeenCalled();
+      });
+    });
+
+    it('should trigger login dialog and refresh state on successful login', async () => {
+      PB_API.getCurrentUser.mockResolvedValue(null);
+      showAuthDialog.mockResolvedValue(true);
+      const reloadSpy = vi.fn();
+      vi.stubGlobal('location', { ...window.location, reload: reloadSpy });
+
+      await initAuthHeader();
+      document.getElementById('header-login-btn').click();
+      
+      await vi.waitFor(() => {
+        expect(showAuthDialog).toHaveBeenCalled();
+        expect(reloadSpy).toHaveBeenCalled();
+      });
     });
   });
 });

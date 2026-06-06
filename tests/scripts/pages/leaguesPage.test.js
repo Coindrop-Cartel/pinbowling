@@ -1,155 +1,157 @@
 /** @vitest-environment jsdom */
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { initLeaguesPage } from '@pages/leaguesPage.js';
-import { PB_API } from '@services/api.js';
-import * as Auth from '@services/auth.js';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+// Mock dependencies
 vi.mock('@services/api.js', () => ({
   PB_API: {
     getLeagues: vi.fn(),
     getPlayers: vi.fn(),
+    getLocations: vi.fn(),
     createLeague: vi.fn(),
     deleteLeague: vi.fn(),
+    addLeaguePlayer: vi.fn(),
+    removeLeaguePlayer: vi.fn(),
     createEvent: vi.fn(),
-  },
+    updateEvent: vi.fn(),
+    deleteEvent: vi.fn()
+  }
 }));
 
-vi.mock('@services/auth.js', () => {
-  const requireAdmin = vi.fn();
+const { mockLeagueState } = vi.hoisted(() => ({
+  mockLeagueState: { activeId: null }
+}));
+
+vi.mock('@services/auth.js', () => ({
+  isManagementAuthorized: vi.fn(),
+  runAuthorizedLeagueAction: vi.fn((id, cb) => cb())
+}));
+
+vi.mock('@scripts/utils.js', async (importOriginal) => {
+  const actual = await importOriginal();
   return {
-    requireAdmin,
-    isManagementAuthorized: vi.fn(() => Promise.resolve(true)),
-    // Ensure the wrapper mock actually calls the requireAdmin mock to reflect real behavior
-    runAuthorizedLeagueAction: vi.fn(async (id, action) => (await requireAdmin()) ? action() : null),
+    ...actual,
+    setActiveLeagueId: vi.fn((id) => { mockLeagueState.activeId = id; }),
+    setActiveEventId: vi.fn(),
+    getActiveLeagueId: vi.fn(() => mockLeagueState.activeId),
+    navigateTo: vi.fn(),
+    getCookie: vi.fn(() => 'bowling'), // Mock getCookie to return a default value for tests
+    ROUTES: {
+      HOME: '/',
+      LEAGUE_SETUP: (o) => `/setup?l=${o.leagueId}&e=${o.eventId}`
+    }
   };
 });
 
-vi.mock('@ui/uiComponents.js', () => ({
+const uiMocks = vi.hoisted(() => ({
   setupLiveFilter: vi.fn((input, data, options) => ({
-    performFilter: () => {
-      const query = input.value.toLowerCase();
-      const filtered = data.filter(item => item.name.toLowerCase().includes(query));
-      options.onFilter(filtered, query);
-    }
+    performFilter: () => options.onFilter(data, input.value.toLowerCase())
   })),
-  showConfirm: vi.fn(() => Promise.resolve(true)),
+  showConfirm: vi.fn(),
   showPrompt: vi.fn(),
   showPlayerSelectionDialog: vi.fn(),
+  showAlert: vi.fn(),
   showDialog: vi.fn(),
-  initTournamentSelector: vi.fn(),
+  getFormatBadgeHtml: vi.fn((f) => `<span>${f || 'bowling'}</span>`),
+  applyPreferredTheme: vi.fn(),
+  createExpandableRow: vi.fn((container, options) => {
+    const row = document.createElement('div');
+    row.className = options.className || '';
+    row.innerHTML = `
+      <div class="league-header">${options.headerHtml}</div>
+      <div class="league-details ${options.isExpanded ? '' : 'hidden'}">${options.contentHtml}</div>
+    `;
+    container.appendChild(row);
+    if (options.onHeaderClick) {
+      row.querySelector('.league-header').addEventListener('click', options.onHeaderClick);
+    }
+    return row;
+  }),
 }));
 
-describe('Leagues Management Page (leaguesPage.js)', () => {
-  const mockLeagues = [
-    { id: 1, name: 'Monday Pinball', startDate: '2024-01-01', events: [], players: [] }
-  ];
+vi.mock('@ui/selectors.js', () => uiMocks);
+vi.mock('@ui/dialogs.js', () => uiMocks);
+vi.mock('@ui/branding.js', () => uiMocks);
 
+import { initLeaguesPage } from '@scripts/pages/leaguesPage.js';
+import { PB_API } from '@services/api.js';
+import { isManagementAuthorized } from '@services/auth.js';
+import { showConfirm, showPlayerSelectionDialog } from '@ui/dialogs.js';
+
+describe('Leagues Page (leaguesPage.js)', () => {
   beforeEach(() => {
     // Mock layout methods not implemented in JSDOM
+    vi.stubGlobal('alert', vi.fn());
     vi.stubGlobal('scrollTo', vi.fn());
     Element.prototype.scrollIntoView = vi.fn();
+    vi.useFakeTimers();
 
     document.body.innerHTML = `
       <form id="league-form">
         <input id="league-name" />
-        <div class="form-row"><input id="league-start-date" /></div>
-        <div class="form-actions"><button id="create-league-btn">Save</button></div>
+        <div id="league-date-row" class="form-row hidden">
+           <input id="league-start-date" />
+        </div>
+        <div id="league-format-row" class="hidden">
+           <select id="league-scoring-format"></select>
+        </div>
+        <div class="form-actions hidden">
+           <button id="create-league-btn"></button>
+        </div>
       </form>
       <div id="leagues-list"></div>
-      <div id="leagues-list-empty" class="hidden"></div>
+      <div id="leagues-list-empty"></div>
       <div id="event-form-card" class="hidden">
-         <h2 id="event-form-title"></h2>
-         <form id="event-form">
-            <input id="event-league-id" />
-            <input id="event-id" />
-            <input id="event-name" />
-            <input id="event-date" />
-            <select id="event-location"></select>
-            <button id="cancel-event-edit">Cancel</button>
-         </form>
+        <h2 id="event-form-title"></h2>
+        <form id="event-form">
+          <input id="event-league-id" />
+          <input id="event-id" />
+          <input id="event-name" />
+          <input id="event-date" />
+          <select id="event-location"></select>
+          <select id="event-scoring-format"></select>
+          <button id="cancel-event-edit"></button>
+        </form>
       </div>
     `;
-
     vi.clearAllMocks();
+    mockLeagueState.activeId = null;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should render the league list and toggle expansion', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const mockLeagues = [{ id: 1, name: 'L1', players: [], events: [] }];
     PB_API.getLeagues.mockResolvedValue(mockLeagues);
     PB_API.getPlayers.mockResolvedValue([]);
+
+    await initLeaguesPage();
+
+    const item = document.querySelector('.league-registry-item');
+    expect(item.innerHTML).toContain('L1');
+
+    const header = item.querySelector('.league-header');
+    header.click();
+
+    const updatedItem = document.querySelector('.league-registry-item');
+    expect(updatedItem.querySelector('.league-details').classList.contains('hidden')).toBe(false);
   });
 
-  it('should fetch and display leagues on init', async () => {
-    await initLeaguesPage();
-    expect(PB_API.getLeagues).toHaveBeenCalled();
-    
-    // Check if the list rendered the league
-    const list = document.getElementById('leagues-list');
-    expect(list.innerHTML).toContain('Monday Pinball');
-  });
+  it('should prompt for player selection when adding a player', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'L1', players: [] }]);
+    PB_API.getPlayers.mockResolvedValue([{ id: 10, playerName: 'Kyle' }]);
+    showPlayerSelectionDialog.mockResolvedValue('10');
 
-  it('should toggle the creation form when "Create New League" is clicked', async () => {
     await initLeaguesPage();
-    const toggle = document.querySelector('button.secondary'); // The dynamic toggle
-    const dateRow = document.getElementById('league-start-date').closest('.form-row');
-    
-    toggle.click();
-    expect(dateRow.classList.contains('hidden')).toBe(false);
-    expect(toggle.textContent).toBe('Cancel');
-  });
+    document.querySelector('.league-header').click();
+    document.querySelector('.add-player-btn').click();
 
-  it('should prompt for league password and create a league on form submission', async () => {
-    await initLeaguesPage();
-    const UI = await import('@ui/uiComponents.js');
-    
-    // Mock the optional league password prompt
-    UI.showPrompt.mockResolvedValue('test-league-pass');
-    PB_API.createLeague.mockResolvedValue({ id: 2, name: 'New League', password: 'test-league-pass' });
-    
-    document.getElementById('league-name').value = 'New League';
-    document.getElementById('league-name').dispatchEvent(new Event('input'));
-    document.getElementById('league-start-date').value = '2024-05-01';
-    document.getElementById('league-start-date').dispatchEvent(new Event('input'));
-
-    document.getElementById('create-league-btn').click();
-    
+    expect(showPlayerSelectionDialog).toHaveBeenCalled();
     await vi.waitFor(() => {
-      expect(UI.showPrompt).toHaveBeenCalledWith(expect.stringContaining('League Password'), expect.any(String), false);
-      expect(PB_API.createLeague).toHaveBeenCalledWith(expect.objectContaining({
-        name: 'New League',
-        password: 'test-league-pass'
-      }));
-    });
-  });
-
-  it('should create a league without a password if the prompt is cancelled', async () => {
-    await initLeaguesPage();
-    const UI = await import('@ui/uiComponents.js');
-    
-    UI.showPrompt.mockResolvedValue(null); // Simulate "Cancel" on the password prompt
-    
-    document.getElementById('league-name').value = 'Open League';
-    document.getElementById('league-name').dispatchEvent(new Event('input'));
-    document.getElementById('league-start-date').value = '2024-06-01';
-    document.getElementById('league-start-date').dispatchEvent(new Event('input'));
-
-    document.getElementById('create-league-btn').click();
-    
-    await vi.waitFor(() => {
-      expect(PB_API.createLeague).toHaveBeenCalledWith(expect.objectContaining({
-        name: 'Open League',
-        password: null
-      }));
-    });
-  });
-
-  it('should delete a league after confirmation and admin check', async () => {
-    await initLeaguesPage();
-    const UI = await import('@ui/uiComponents.js');
-    UI.showConfirm.mockResolvedValue(true);
-    Auth.requireAdmin.mockResolvedValue(true);
-
-    const deleteBtn = document.querySelector('.delete-league-btn');
-    deleteBtn.click();
-
-    await vi.waitFor(() => {
-      expect(PB_API.deleteLeague).toHaveBeenCalledWith(1);
+      expect(PB_API.addLeaguePlayer).toHaveBeenCalledWith(1, 10);
     });
   });
 });

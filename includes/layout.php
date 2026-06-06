@@ -4,11 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><?php echo isset($pageTitle) ? "PinBowling - $pageTitle" : 'PinBowling'; ?></title>
-  <link rel="stylesheet" href="<?php echo versionedAsset($baseUrl . '/styles.css'); ?>" />
+  <link rel="stylesheet" id="theme-stylesheet" href="<?php echo versionedAsset($baseUrl . '/' . ($stylesDir ? $stylesDir . '/' : '') . 'styles.css'); ?>" />
   <link rel="icon" type="image/png" href="<?php echo versionedAsset($baseUrl . '/images/logo.png'); ?>" />
   <script>
     // Bridge PHP calculated base path to JavaScript
     window.APP_BASE = "<?php echo $baseUrl; ?>";
+    // Bridge Engine metadata from config.php to JavaScript
+    window.PB_SETTINGS = <?php echo json_encode($engineMeta, JSON_UNESCAPED_UNICODE); ?>;
   </script>
   <script type="importmap">
   {

@@ -7,15 +7,19 @@
 import { initNavigation } from '@ui/navigation.js';
 import { initMachinesPage } from '@pages/machinesPage.js';
 import { initLocationsPage } from '@pages/locationsPage.js';
-import { initConfigPage } from '@pages/configPage.js';
+import { initEventSetupPage } from '@scripts/pages/eventSetupPage.js';
 import { initPlayersPage } from '@pages/playersPage.js';
 import { initScoresPage } from '@pages/scoresPage.js';
 import { initStandingsPage } from '@pages/standingsPage.js';
 import { initLeaguesPage } from '@pages/leaguesPage.js';
 import { initPlayPage } from '@pages/playPage.js';
 import { initManagementPage } from '@pages/managementPage.js';
+import { getDebugEnabled } from '@services/state.js';
+import { getScoringEngine } from '@core/engine.js';
+import { getCookie } from '@scripts/utils.js';
 import { initAuthHeader } from '@services/auth.js';
-import { fitTVModeToScreen } from '@ui/uiComponents.js';
+import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
+import { loadPage } from '@scripts/utils.js';
 
 /**
  * Main entry point. Identifies which page is currently loaded 
@@ -25,27 +29,27 @@ import { fitTVModeToScreen } from '@ui/uiComponents.js';
  * PHP pages while ensuring only the necessary module logic is executed 
  * for the current view context.
  */
-async function ready() {
-  // Restore debug mode from local storage if previously toggled in Management UI
-  const storedDebug = localStorage.getItem('pb_debug_enabled');
-  if (storedDebug !== null) {
-    window.PB_DEBUG_MODE = (storedDebug === 'true');
-  }
-
-  if (window.PB_DEBUG_MODE) {
-    console.log('[Main] Application ready() triggered.');
-    console.log('[Main] localStorage lookup (pb_debug_enabled):', storedDebug);
-    console.log('[Main] Cache-Busting Version Active:', window.PB_UI_VERSION);
-    console.log('[Main] Global window.PB_DEBUG_MODE finalized to:', window.PB_DEBUG_MODE);
-  }
+export function initApp() {
+  // Handle specific brand selection on the Home Page
+  const heroLogoBtns = document.querySelectorAll('.hero-logo-btn');
+  heroLogoBtns.forEach(btn => {
+    btn.style.cursor = 'pointer';
+    btn.onclick = () => {
+      const format = btn.dataset.format; // bowling or golf
+      document.cookie = `pb_preferred_format=${format}; path=/; max-age=31536000`;
+      applyPreferredTheme(format);
+    };
+  });
 
   initNavigation('.nav-container'); 
-  await initAuthHeader();
+  applyPreferredTheme();
+
+  initAuthHeader();
 
   const pageInitializers = {
     'machine-form': initMachinesPage,
     'location-form': initLocationsPage,
-    'round-form': initConfigPage,
+    'round-form': initEventSetupPage,
     'player-list': initPlayersPage,
     'rounds-input': initScoresPage,
     'standings-body': initStandingsPage,
@@ -58,9 +62,26 @@ async function ready() {
   Object.entries(pageInitializers).forEach(([elementId, initialize]) => {
     if (document.getElementById(elementId)) initialize();
   });
+}
+
+async function ready() {
+  // Restore debug mode from local storage if previously toggled in Management UI
+  window.PB_DEBUG_MODE = getDebugEnabled();
+
+  initApp();
 
   // Handle scaling if window is resized while in TV Mode
   window.addEventListener('resize', fitTVModeToScreen);
+
+  // Handle back/forward browser buttons
+  window.addEventListener('popstate', () => {
+    loadPage(window.location.href, false);
+  });
+
+  // Re-run initialization when page content changes partially
+  document.addEventListener('pb:pageChanged', () => {
+    initApp();
+  });
 }
 
 document.addEventListener('DOMContentLoaded', ready);

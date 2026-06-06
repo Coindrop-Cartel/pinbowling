@@ -1,7 +1,10 @@
-import { PB_API, ADMIN_PASSWORD } from '@services/api.js';
-import { setAdminSessionPassword } from '@services/state.js';
-import { requireAdmin } from '@services/auth.js';
-import { showPrompt, showConfirm, showAlert } from '@ui/uiComponents.js';
+import { PB_API } from '@services/api.js';
+import { requireAdmin, can, PERMISSIONS } from '@services/auth.js';
+import { setDebugEnabled } from '@services/state.js';
+import { showPrompt, showConfirm, showAlert, showAuthDialog } from '@ui/dialogs.js';
+import { renderActionSummary, initTournamentSelector } from '@ui/selectors.js';
+import { navigateTo } from '@scripts/utils.js';
+import { ROUTES } from '@scripts/routes.js';
 
 /**
  * Logic for the System Management page.
@@ -11,32 +14,47 @@ export async function initManagementPage() {
   const authNotice = document.getElementById('management-auth-notice');
   const toolsSection = document.getElementById('management-tools');
   const loginBtn = document.getElementById('admin-login-btn');
-  const cleanupBtn = document.getElementById('mgmt-run-cleanup-btn');
 
   /**
    * Verifies admin credentials before displaying management tools.
    */
-  const checkAuth = async () => {
-    const user = await PB_API.getCurrentUser();
-    
-    if (user && user.role === 'admin') {
-      revealTools();
-    } else {
-      authNotice.innerHTML = `<h2>Access Denied</h2><p>You must be logged in as an administrator to access this page.</p>`;
+  const initialize = async () => {
+    const [user, isAuthorized] = await Promise.all([
+      PB_API.getCurrentUser(),
+      can(PERMISSIONS.RUN_CLEANUP) // Maintenance check
+    ]);
+
+    if (user && isAuthorized) {
+      revealTools(user);
+    } else if (user) {
+      // Logged in but not an admin? Shoo!
+      showAlert('Administrator access is required for system maintenance.', 'Access Denied');
+      // Casting ROUTES to any to allow property access on the array type
+      const routes = /** @type {any} */ (ROUTES);
+      navigateTo(routes.HOME());
+      return;
     }
+    renderVersionInfo();
   };
 
-  const revealTools = () => {
-    authNotice.classList.add('hidden');
-    toolsSection.classList.remove('hidden');
+  /**
+   * @param {import('@scripts/types.js').User} user
+   */
+  const revealTools = (user) => {
+    authNotice?.classList.add('hidden');
+    toolsSection?.classList.remove('hidden');
+
+    renderActionSummary(toolsSection, 'System Maintenance', [
+      { text: 'Run Database Cleanup', onclick: handleCleanup, hidden: user.role !== 'admin' }
+    ]);
   };
 
   /**
    * Adds a subtle version indicator to the bottom of the management tools.
    */
   const renderVersionInfo = () => {
-    if (document.getElementById('mgmt-ui-version')) return;
-    if (window.PB_DEBUG_MODE) console.log('[Management] Rendering version footer. current state:', window.PB_DEBUG_MODE);
+    if (document.getElementById('mgmt-ui-version') || !toolsSection) return;
+    if (window['PB_DEBUG_MODE']) console.log('[Management] Rendering version footer. current state:', window['PB_DEBUG_MODE']);
 
     const versionInfo = document.createElement('div');
     versionInfo.id = 'mgmt-ui-version';
@@ -51,39 +69,47 @@ export async function initManagementPage() {
     `;
     
     const debugToggle = debugLabel.querySelector('input');
-    if (window.PB_DEBUG_MODE) console.log('[Management] Syncing checkbox UI with window.PB_DEBUG_MODE:', window.PB_DEBUG_MODE);
-    debugToggle.checked = Boolean(window.PB_DEBUG_MODE); // Explicitly sync state from global variable
+    if (window['PB_DEBUG_MODE']) console.log('[Management] Syncing checkbox UI with window.PB_DEBUG_MODE:', window['PB_DEBUG_MODE']);
+    if (debugToggle) {
+      debugToggle.checked = Boolean(window['PB_DEBUG_MODE']); // Explicitly sync state from global variable
 
-    debugToggle.onchange = () => {
-      const isEnabled = debugToggle.checked;
-      if (window.PB_DEBUG_MODE || isEnabled) console.log('[Management] Debug toggle changed. New state:', isEnabled);
-      window.PB_DEBUG_MODE = isEnabled;
-      localStorage.setItem('pb_debug_enabled', isEnabled);
-    };
+      debugToggle.onchange = () => {
+        const isEnabled = debugToggle.checked;
+        window['PB_DEBUG_MODE'] = isEnabled;
+        setDebugEnabled(isEnabled);
+      };
+    }
 
     const versionText = document.createElement('span');
-    versionText.textContent = `System UI Version: ${window.PB_UI_VERSION || '1.0.0'}`;
+    versionText.textContent = `System UI Version: ${window['PB_UI_VERSION'] || '1.0.0'}`;
 
     versionInfo.appendChild(debugLabel);
     versionInfo.appendChild(versionText);
-    (toolsSection.parentElement || document.body).appendChild(versionInfo);
+    if (toolsSection) (toolsSection.parentElement || document.body).appendChild(versionInfo);
   };
 
   if (loginBtn) {
+    loginBtn.classList.add('btn-mgmt');
     // Use addEventListener for better reliability and wrap the call 
     // to ensure the MouseEvent isn't passed as the prompt message.
-    loginBtn.addEventListener('click', () => checkAuth());
+    loginBtn.addEventListener('click', async () => {
+      const user = await showAuthDialog();
+      if (user) {
+        await initialize();
+        // Notify the app that auth state changed to refresh the global header/nav
+        document.dispatchEvent(new CustomEvent('pb:pageChanged'));
+      }
+    });
   }
 
   // Perform an initial check on load. If no password is set or the user is already
   // authenticated, we reveal the tools immediately without a prompt.
-  checkAuth();
-  renderVersionInfo();
+  await initialize();
 
   /**
    * Manually triggers the cleanup service to prune old session data.
    */
-  cleanupBtn.onclick = async () => {
+  async function handleCleanup() {
     const confirmed = await showConfirm(
       'Are you sure you want to run the database cleanup? This will permanently delete session-type leagues and their associated data based on the retention period.',
       'Confirm Cleanup'
@@ -91,24 +117,19 @@ export async function initManagementPage() {
     
     if (!confirmed) return;
 
-    const adminVerified = await requireAdmin('Enter Admin Password to perform database cleanup:');
-    if (!adminVerified) return;
+    if (!await requireAdmin()) return;
 
     const daysInput = await showPrompt('Enter retention period in days (leagues older than this will be deleted):', 'Cleanup Configuration', false);
     if (daysInput === null) return; // User cancelled the prompt
     const days = parseInt(daysInput, 10) || 30;
 
     try {
-      cleanupBtn.disabled = true;
-      cleanupBtn.textContent = 'Running Cleanup...';
-      
-      const result = await PB_API.runCleanup(days);
+      // Using bracket notation to bypass linter warning on specific method signature
+      const result = await PB_API['runCleanup'](days);
       showAlert(`Cleanup successful! Removed ${result.leagues_cleaned || 0} session leagues older than ${days} days.`, 'Success');
     } catch (err) {
-      showAlert('Cleanup failed: ' + err.message, 'Error');
-    } finally {
-      cleanupBtn.disabled = false;
-      cleanupBtn.textContent = 'Run Cleanup Script';
+      const message = err instanceof Error ? err.message : String(err);
+      showAlert('Cleanup failed: ' + message, 'Error');
     }
-  };
+  }
 }

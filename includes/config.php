@@ -77,6 +77,10 @@ $dbName = envValue($loadedEnv, ['DB_NAME', 'MYSQL_DATABASE'], 'pinbowling');
 $dbUser = envValue($loadedEnv, ['DB_USER', 'MYSQL_USER'], 'username');
 $dbPass = envValue($loadedEnv, ['DB_PASS', 'MYSQL_PASSWORD'], 'password');
 $dbCharset = 'utf8mb4';
+
+// Asset Configuration
+$stylesDir = 'styles'; // Folder name for CSS files. Set to '' if files are in the root.
+
 $apiSecret = envValue($loadedEnv, ['API_SECRET'], 'bowl-2024-secret');
 // UI_VERSION is used for asset cache-busting. 
 // It is read from version.txt to allow cache-busting updates without touching environment secrets.
@@ -88,15 +92,86 @@ $uiVersionSource = $isReadable ? 'version.txt' : 'Hardcoded Fallback';
 $adminPassword = envValue($loadedEnv, ['ADMIN_PASSWORD'], 'admin123');
 $debugMode = false; // Initial state; toggled via Management UI and persisted in localStorage.
 
+// --- Shared Branding Metadata ---
+// Retrieve site-wide preference from cookie (shared with JS)
+$preferredFormat = $_COOKIE['pb_preferred_format'] ?? 'bowling';
+$themeClass = ($preferredFormat === 'golf') ? 'theme-golf' : '';
+
+// Global project text (Format Agnostic)
+$siteBrand   = 'Pinball And Stuff';
+$siteSlogan  = "Don't say \"and stuff\", just say \"There is pinball here\".";
+$aboutProject = "Like Pinball, but wish it was scored like Bowling?  Like Pinball, but wish it was scored more like Golf? Like Pinball, but wish it was scored more like Basketball?  
+                Well if it's the first two, we've got a site for you (if it's the 3rd one, find an NBA Fastbreak machine, perferablely linked.  I know a guy). 
+                <br><br> 
+                This project is a free and open-source web application to let folks manage leagues or create one off sessions to kill time at a bar.  
+                At some point the links to the source code on github will be on some other page, but I haven't gotten to that.";
+$aiDisclosure = "I don't feel like AI \"generated\" this site, but at this point it's pretty hard to code without it being involved in some part of your workflow.  
+                I don't consider that \"generating\" code because the design, structure, layout and logos were all designed and reviewed by a human (one human to be specific), 
+                but I also don't want to be misleading about the fact that it was used to help generate the backend, stardized pages and track down issues and syntax.  
+                <br><br>
+                Unfortunately this means that some text in some locations may have been overriden and I didn't notice (but I'm working tracking that down).  
+                AI has a tendancy left unchecked to overstep bounds and include dumb corporate speak when I just want it track down some syntax issue or find out why a dropdown won't go away.  
+                If you have questions about how it was used, feel free to ask.  I have a complicated relationship with AI so be prepared for a long rambling answer. 
+                <br><br>
+                <b>If given all this you feel like it was and that makes it a hard pass for you, I totally undersatnd.</b>";
+
+$engineMeta = [
+    'bowling' => [
+        'brand' => 'PinBowling',
+        'logo'  => 'pinbowling.png',
+        'cta'   => "Let's Bowl!",
+        'themeClass' => 'theme-bowling',
+        'roundLabel' => 'Frame',
+        'turnHeaderPrefix' => 'Frame',
+        'primaryTargetLabel' => 'Strike',
+        'value1Label' => 'Strike',
+        'value2Label' => '1',
+        'hint'  => "Enter the cumulative score after each ball. If you reach the target score for that round, you can stop entering scores and move on to the next frame. 
+                    DO NOT PLAY EXTRA BALLS",
+        'lastFrameHint' => "In the last frame, you can get up to 3 strikes.  Keep playing until you hit the additional target scores or you run out of balls.",
+        'thresholdStart' => 10, // Display ranks from 10 down to 1
+        'thresholdEnd' => 1,
+        'logic' => "Each machine has target scores corresponding to pin counts. Reaching the target on ball 1 is a strike (X). Reaching it on ball 2 is a 9-count spare (9/). 
+        Reaching it on ball 3 is a spare based on your cumulative progress from balls 1 & 2 (capped at 8/). Total scores are calculated following standard bowling rules, 
+        if you don't know how Bowling Score works I'm not gonna explain it to you, but I will say higher is better."
+    ],
+    'golf' => [
+        'brand' => 'PinGolf',
+        'logo'  => 'pingolf.png',
+        'cta'   => "Let's Golf!",
+        'themeClass' => 'theme-golf',
+        'roundLabel' => 'Hole',
+        'turnHeaderPrefix' => 'Hole',
+        'primaryTargetLabel' => 'Par',
+        'value1Label' => 'Target Score',
+        'value2Label' => 'Par',
+        'hint'  => "Enter the cumulative score after each ball. When you hit the target score you can stop entering scores for that round and move on to the next hole.
+                    DO NOT PLAY EXTRA BALLS",
+        'lastFrameHint' => "",
+        'thresholdStart' => 3, // Display ranks from 3 up to 10
+        'thresholdEnd' => 10,
+        'logic' => "Strokes 1, 2, or 3 are awarded based on which ball reached the Target Score. If the target is not met within three balls, 
+        a score of 4-10 is assigned based on the final cumulative score relative the target scores for that hole and then scored relative to the par value (-1, +2, etc).  
+        If you don't know how Golf scoring works, I don't really know what to tell you, but I will say lower is better."
+    ]
+];
+
+$active = $engineMeta[$preferredFormat] ?? $engineMeta['bowling'];
+$bodyClass = $active['themeClass'];
+
 $dbDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset={$dbCharset}";
 
 /**
  * Established a singleton PDO connection to the MySQL database.
  * @return PDO
  */
-function getDbConnection() {
+function getDbConnection($mockPdo = null) {
     global $dbDsn, $dbUser, $dbPass;
     static $pdo = null;
+    if ($mockPdo !== null) {
+        $pdo = $mockPdo;
+        return $pdo;
+    }
     if ($pdo === null) {
         $pdo = new PDO($dbDsn, $dbUser, $dbPass, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -114,10 +189,41 @@ function getDbConnection() {
  * @param PDO $pdo
  */
 function initializeDatabaseSchema($pdo) {
+    global $adminPassword;
     // --- Base Table Creation ---
     // We use CREATE TABLE IF NOT EXISTS to ensure the database can be rebuilt 
     // automatically if tables are dropped or if starting a fresh installation.
     
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `locations` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `name` VARCHAR(255) NOT NULL,
+        `city` VARCHAR(255) DEFAULT NULL,
+        `state` VARCHAR(255) DEFAULT NULL,
+        UNIQUE KEY `unique_location` (`name`, `city`, `state`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `machines` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `machine_name` VARCHAR(255) NOT NULL UNIQUE,
+        `year` INT DEFAULT NULL,
+        `manufacturer` VARCHAR(255) DEFAULT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `players` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `player_name` VARCHAR(255) NOT NULL UNIQUE,
+        `ifpa_id` VARCHAR(50) DEFAULT NULL,
+        `matchplay_id` VARCHAR(50) DEFAULT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `leagues` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `name` VARCHAR(255) NOT NULL,
+        `type` ENUM('standard', 'session') DEFAULT 'standard',
+        `start_date` DATE DEFAULT NULL,
+        `scoring_format` VARCHAR(50) DEFAULT 'bowling'
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS `users` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `player_id` INT UNIQUE,
@@ -136,40 +242,13 @@ function initializeDatabaseSchema($pdo) {
         CONSTRAINT `fk_staff_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `leagues` (
-        `id` INT AUTO_INCREMENT PRIMARY KEY,
-        `name` VARCHAR(255) NOT NULL,
-        `type` ENUM('standard', 'session') DEFAULT 'standard',
-        `start_date` DATE DEFAULT NULL,
-        `password` VARCHAR(255) DEFAULT NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `locations` (
-        `id` INT AUTO_INCREMENT PRIMARY KEY,
-        `name` VARCHAR(255) NOT NULL,
-        `city` VARCHAR(255) DEFAULT NULL,
-        `state` VARCHAR(255) DEFAULT NULL,
-        UNIQUE KEY `unique_location` (`name`, `city`, `state`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `machines` (
-        `id` INT AUTO_INCREMENT PRIMARY KEY,
-        `machine_name` VARCHAR(255) NOT NULL UNIQUE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `players` (
-        `id` INT AUTO_INCREMENT PRIMARY KEY,
-        `player_name` VARCHAR(255) NOT NULL UNIQUE,
-        `ifpa_id` VARCHAR(50) DEFAULT NULL,
-        `matchplay_id` VARCHAR(50) DEFAULT NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
     $pdo->exec("CREATE TABLE IF NOT EXISTS `events` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `league_id` INT NOT NULL,
         `location_id` INT DEFAULT NULL,
         `event_name` VARCHAR(255) NOT NULL,
         `event_date` DATE DEFAULT NULL,
+        `scoring_format` VARCHAR(50) DEFAULT 'bowling',
         CONSTRAINT `fk_events_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_events_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
@@ -217,6 +296,8 @@ function initializeDatabaseSchema($pdo) {
         `event_id` INT NOT NULL,
         `machine_id` INT NOT NULL,
         `order_number` INT NOT NULL,
+        `value1` BIGINT DEFAULT 0,
+        `value2` BIGINT DEFAULT 0,
         `score1` BIGINT DEFAULT 0, `score2` BIGINT DEFAULT 0, `score3` BIGINT DEFAULT 0, `score4` BIGINT DEFAULT 0, `score5` BIGINT DEFAULT 0,
         `score6` BIGINT DEFAULT 0, `score7` BIGINT DEFAULT 0, `score8` BIGINT DEFAULT 0, `score9` BIGINT DEFAULT 0, `score10` BIGINT DEFAULT 0,
         UNIQUE KEY `unique_event_round` (`event_id`, `order_number`),
@@ -229,6 +310,8 @@ function initializeDatabaseSchema($pdo) {
         `location_id` INT NOT NULL,
         `machine_id` INT NOT NULL,
         `note` TEXT DEFAULT NULL,
+        `value1` BIGINT DEFAULT 0,
+        `value2` BIGINT DEFAULT 0,
         `score1` BIGINT DEFAULT 0, `score2` BIGINT DEFAULT 0, `score3` BIGINT DEFAULT 0, `score4` BIGINT DEFAULT 0, `score5` BIGINT DEFAULT 0,
         `score6` BIGINT DEFAULT 0, `score7` BIGINT DEFAULT 0, `score8` BIGINT DEFAULT 0, `score9` BIGINT DEFAULT 0, `score10` BIGINT DEFAULT 0,
         `target_easy` BIGINT DEFAULT 0,
@@ -262,12 +345,12 @@ function initializeDatabaseSchema($pdo) {
         }
     }
 
-    // Ensure 'leagues' table has the 'password' column (added for protected leagues)
-    $checkLeagues = $pdo->query("SHOW TABLES LIKE 'leagues'")->fetch();
-    if ($checkLeagues) {
-        $checkPassword = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'password'")->fetch();
-        if (!$checkPassword) {
-            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `password` VARCHAR(255) DEFAULT NULL AFTER `start_date` ");
+    // Ensure 'machines' table has year and manufacturer
+    $checkMachines = $pdo->query("SHOW TABLES LIKE 'machines'")->fetch();
+    if ($checkMachines) {
+        $checkYear = $pdo->query("SHOW COLUMNS FROM `machines` LIKE 'year'")->fetch();
+        if (!$checkYear) {
+            $pdo->exec("ALTER TABLE `machines` ADD COLUMN `year` INT DEFAULT NULL AFTER `machine_name`, ADD COLUMN `manufacturer` VARCHAR(255) DEFAULT NULL AFTER `year` ");
         }
     }
 
@@ -281,11 +364,30 @@ function initializeDatabaseSchema($pdo) {
         }
     }
 
+    /// Ensure 'machines' table has year and manufacturer
+    $checkLeagues = $pdo->query("SHOW TABLES LIKE 'leagues'")->fetch();
     // Ensure 'leagues' table has the 'type' column for standard vs session distinction
     if ($checkLeagues) {
         $checkType = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'type'")->fetch();
         if (!$checkType) {
             $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `type` ENUM('standard', 'session') DEFAULT 'standard' AFTER `name` ");
+        }
+    }
+
+    // Ensure 'leagues' table has the 'scoring_format' column for default scoring engine
+    if ($checkLeagues) {
+        $checkLeagueScoring = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'scoring_format'")->fetch();
+        if (!$checkLeagueScoring) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `scoring_format` VARCHAR(50) DEFAULT 'bowling' AFTER `start_date` ");
+        }
+    }
+
+    // Ensure 'events' table has the 'scoring_format' column
+    $checkEvents = $pdo->query("SHOW TABLES LIKE 'events'")->fetch();
+    if ($checkEvents) {
+        $checkScoring = $pdo->query("SHOW COLUMNS FROM `events` LIKE 'scoring_format'")->fetch();
+        if (!$checkScoring) {
+            $pdo->exec("ALTER TABLE `events` ADD COLUMN `scoring_format` VARCHAR(50) DEFAULT 'bowling' AFTER `event_date` ");
         }
     }
 
@@ -300,6 +402,17 @@ function initializeDatabaseSchema($pdo) {
                 ADD COLUMN `target_easy` BIGINT DEFAULT 0, ADD COLUMN `target_med` BIGINT DEFAULT 0, ADD COLUMN `target_hard` BIGINT DEFAULT 0,
                 ADD UNIQUE KEY `unique_location_machine` (`location_id`, `machine_id`) ");
         }
+    }
+
+    // Ensure 'target_scores' and 'location_machines' have value1 and value2 source columns
+    $checkTSValue1 = $pdo->query("SHOW COLUMNS FROM `target_scores` LIKE 'value1'")->fetch();
+    if (!$checkTSValue1) {
+        $pdo->exec("ALTER TABLE `target_scores` ADD COLUMN `value1` BIGINT DEFAULT 0 AFTER `order_number`, ADD COLUMN `value2` BIGINT DEFAULT 0 AFTER `value1` ");
+    }
+
+    $checkLMValue1 = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'value1'")->fetch();
+    if (!$checkLMValue1) {
+        $pdo->exec("ALTER TABLE `location_machines` ADD COLUMN `value1` BIGINT DEFAULT 0 AFTER `note`, ADD COLUMN `value2` BIGINT DEFAULT 0 AFTER `value1` ");
     }
 
     // Ensure 'locations' table has city and state columns
@@ -328,6 +441,15 @@ function initializeDatabaseSchema($pdo) {
         if (!$checkIndex) {
             $pdo->exec("ALTER TABLE `target_scores` ADD UNIQUE KEY `unique_event_round` (event_id, order_number)");
         }
+    }
+
+    // --- Seed Default Admin User ---
+    // If no admin user exists, create one using the ADMIN_PASSWORD from .env
+    $checkAdmin = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
+    if ($checkAdmin == 0) {
+        $hashed = password_hash($adminPassword, PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)");
+        $stmt->execute(['admin', $hashed, 'admin']);
     }
 
     // Ensure 'scores' table has the unique constraint for upsert logic
@@ -367,7 +489,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $methodOverride) {
 // Set global CORS headers to prevent NetworkErrors during preflighted requests (DELETE, PUT, etc.)
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-PB-SECRET, X-LEAGUE-PASSWORD, X-HTTP-Method-Override');
+header('Access-Control-Allow-Headers: Content-Type, X-PB-SECRET, X-HTTP-Method-Override');
 
 // Handle CORS preflight requests globally. This is required because custom 
 // headers like X-PB-SECRET trigger an OPTIONS request for ALL method types.
@@ -425,34 +547,21 @@ function getHeader($name) {
  * provided league-specific password matches.
  */
 function validateLeagueAccess($pdo, $leagueId) {
-    global $adminPassword, $apiSecret;
-    
-    $providedPass = getHeader('X-League-Password');
+    global $apiSecret;
+
     $providedSecret = getHeader('X-PB-Secret');
 
-    // 1. Master Overrides: Session Role, Admin Password or API Secret
+    // 1. Master Overrides: Session Role or API Secret
     $user = getCurrentUser();
     if ($user && ($user['role'] === 'admin' || $user['role'] === 'td')) {
         return;
     }
 
-    // 1. Master Overrides: Admin Password or API Secret
-    if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+    if ($providedSecret && $providedSecret === $apiSecret) {
         return;
     }
-  
-    // 2. League Specific Password Check
-    if (!$leagueId) sendJson(['error' => 'League ID required for validation'], 400);
 
-    $stmt = $pdo->prepare('SELECT password FROM leagues WHERE id = ?');
-    $stmt->execute([(int)$leagueId]);
-    $hash = $stmt->fetchColumn();
-
-    if (!$hash) return; // Open if no password set
-
-    if (!$providedPass || !password_verify($providedPass, $hash)) {
-        sendJson(['error' => 'Unauthorized: Invalid League Password'], 401);
-    }
+    // If we reach here and it's a restricted action, we'll rely on the specific service logic
 }
 
 /**
@@ -460,12 +569,11 @@ function validateLeagueAccess($pdo, $leagueId) {
  * Used for system-wide modifications like master machine/player editing.
  */
 function validateAdminAccess() {
-    global $adminPassword, $apiSecret;
-    
-    $providedPass = getHeader('X-League-Password');
+    global $apiSecret;
+
     $providedSecret = getHeader('X-PB-Secret');
 
-    if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+    if ($providedSecret && $providedSecret === $apiSecret) {
         return;
     }
     
@@ -481,12 +589,11 @@ function validateAdminAccess() {
  * Verifies that the user is at least a TD or has master credentials.
  */
 function validateTDAccess() {
-    global $adminPassword, $apiSecret;
-    
-    $providedPass = getHeader('X-League-Password');
+    global $apiSecret;
+
     $providedSecret = getHeader('X-PB-Secret');
 
-    if (($providedPass && $providedPass === $adminPassword) || ($providedSecret && $providedSecret === $apiSecret)) {
+    if ($providedSecret && $providedSecret === $apiSecret) {
         return;
     }
     
@@ -503,12 +610,11 @@ function validateTDAccess() {
  * the server-side API_SECRET. Rejects unauthorized write requests.
  */
 function validateApiSecret() {
-    global $apiSecret, $adminPassword;
-    $providedSecret = getHeader('X-PB-Secret');
-    $providedPass = getHeader('X-League-Password');
+    global $apiSecret;
 
-    // Allow either the secret or the admin password to satisfy API secret checks
-    if ($providedSecret === $apiSecret || ($providedPass && $providedPass === $adminPassword)) {
+    $providedSecret = getHeader('X-PB-Secret');
+
+    if ($providedSecret === $apiSecret) {
         return;
     }
 
@@ -547,8 +653,6 @@ function getJsonInput() {
  */
 function versionedAsset($path) {
     global $uiVersion, $baseUrl;
-    // Extract the part of the path after the base URL
-    $relativePath = str_replace($baseUrl, '', $path);
-    // Prepend the version segment: /baseUrl/v1.1.1/relativePath
-    return $baseUrl . '/v' . $uiVersion . '/' . ltrim($relativePath, '/');
+    $relativePath = ltrim(str_replace($baseUrl, '', $path), '/');
+    return $baseUrl . '/v' . $uiVersion . '/' . $relativePath;
 }

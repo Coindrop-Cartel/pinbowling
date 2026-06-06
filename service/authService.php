@@ -62,32 +62,54 @@ switch ($task) {
         $username = $input['username'] ?? '';
         $password = $input['password'] ?? '';
         $playerName = $input['playerName'] ?? '';
+        $confirmClaim = $input['confirmClaim'] ?? false;
 
         if (!$username || !$password || !$playerName) {
             sendJson(['error' => 'Username, password, and player name are required.'], 400);
         }
 
+        $pdo->beginTransaction();
         try {
-            $pdo->beginTransaction();
-
-            // Try to find an existing player by name to link the account to
+            // 1. Check if a player with this name already exists
             $stmt = $pdo->prepare("SELECT id FROM players WHERE player_name = ?");
             $stmt->execute([$playerName]);
-            $playerId = $stmt->fetchColumn();
+            $existingPlayer = $stmt->fetch();
 
-            if (!$playerId) {
+            if ($existingPlayer) {
+                $playerId = (int)$existingPlayer['id'];
+                
+                // Check if this player is already tied to a user account
+                $stmtUserCheck = $pdo->prepare("SELECT id FROM users WHERE player_id = ?");
+                $stmtUserCheck->execute([$playerId]);
+                if ($stmtUserCheck->fetch()) {
+                    if ($pdo->inTransaction()) $pdo->rollBack();
+                    sendJson(['error' => 'This player name is already associated with an account.'], 409);
+                }
+
+                // If not linked and user hasn't confirmed the claim yet, send a prompt requirement
+                if (!$confirmClaim) {
+                    if ($pdo->inTransaction()) $pdo->rollBack();
+                    sendJson([
+                        'claimRequired' => true,
+                        'message' => "A player record for '$playerName' already exists. Is this you? Click confirm to link your new account to your existing history."
+                    ]);
+                }
+            } else {
+                // No player exists, create a new one
                 $stmt = $pdo->prepare("INSERT INTO players (player_name) VALUES (?)");
                 $stmt->execute([$playerName]);
                 $playerId = $pdo->lastInsertId();
             }
 
+            // 2. Create user
             $hash = password_hash($password, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("INSERT INTO users (player_id, username, password_hash, role) VALUES (?, ?, ?, 'player')");
             $stmt->execute([$playerId, $username, $hash]);
+            $userId = $pdo->lastInsertId();
 
             $pdo->commit();
-            sendJson(['success' => true]);
-        } catch (PDOException $e) {
+            sendJson(['success' => true, 'userId' => $userId]);
+        } catch (Exception $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }

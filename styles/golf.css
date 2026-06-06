@@ -1,0 +1,12 @@
+/* golf.css - Scoped to Golf theme */
+.theme-golf {
+  --pb-primary: #004d00;
+  --pb-primary-hover: #006400;
+  --pb-accent: #004d00;
+  --pb-black: #000000;
+  --pb-white: #ffffff;
+  --pb-gray: #dcedc8;
+  --pb-border: 3px solid var(--pb-primary);
+  --pb-shadow: 6px 6px 0px var(--pb-primary);
+  --pb-background: #ffffff;
+}

@@ -117,13 +117,12 @@ try {
 
         // Security Rule: If updating an existing score in a protected 'standard' league,
         // verify League or Admin credentials.
-        $stmtL = $pdo->prepare('SELECT l.id, l.password, l.type FROM events e JOIN leagues l ON e.league_id = l.id WHERE e.id = ?');
+        $stmtL = $pdo->prepare('SELECT l.id, l.type FROM events e JOIN leagues l ON e.league_id = l.id WHERE e.id = ?');
         $stmtL->execute([$event_id]);
         $leagueInfo = $stmtL->fetch();
 
         if ($leagueInfo) {
             $league_id = (int)$leagueInfo['id'];
-            $hasPassword = !empty($leagueInfo['password']);
             $isStandard = ($leagueInfo['type'] === 'standard');
 
             // Check if a score record already exists for this slot
@@ -131,7 +130,7 @@ try {
             $stmtCheck->execute([$event_id, $player_id, $order_number]);
             $existingScoreId = $stmtCheck->fetchColumn();
 
-            if ($existingScoreId && $hasPassword && $isStandard) {
+            if ($existingScoreId && $isStandard) {
                 validateLeagueAccess($pdo, $league_id);
             }
         }

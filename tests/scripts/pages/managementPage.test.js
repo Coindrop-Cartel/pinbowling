@@ -5,6 +5,8 @@ import { PB_API } from '@services/api.js';
 import * as Auth from '@services/auth.js';
 import * as State from '@services/state.js';
 
+import { showAuthDialog } from '@ui/dialogs.js';
+
 vi.mock('@services/api.js', () => ({
   PB_API: {
     getLeagues: vi.fn(),
@@ -17,18 +19,29 @@ vi.mock('@services/api.js', () => ({
 vi.mock('@services/auth.js', () => ({
   requireAdmin: vi.fn(),
   initAuthHeader: vi.fn(),
+  can: vi.fn(), // Add this
+  PERMISSIONS: { RUN_CLEANUP: 'run_cleanup' }, // Add this, or mock specific permissions as needed
 }));
 
 vi.mock('@services/state.js', () => ({
   setAdminSessionPassword: vi.fn(),
 }));
 
-vi.mock('@ui/uiComponents.js', () => ({
+const uiMocks = vi.hoisted(() => ({
   showPrompt: vi.fn(),
   showConfirm: vi.fn(),
   showAlert: vi.fn(),
   initTournamentSelector: vi.fn(),
+  showAuthDialog: vi.fn(),
+  renderActionSummary: vi.fn((container, title, actions = []) => {
+    if (container) container.innerHTML = title;
+    if (container) container._actions = actions;
+    if (container) container.classList.remove('hidden');
+  }),
 }));
+
+vi.mock('@ui/dialogs.js', () => uiMocks);
+vi.mock('@ui/selectors.js', () => uiMocks);
 
 describe('Management Page (managementPage.js)', () => {
   beforeEach(() => {
@@ -49,6 +62,7 @@ describe('Management Page (managementPage.js)', () => {
 
   it('should reveal tools and render version info when authenticated', async () => {
     PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+    Auth.can.mockResolvedValue(true);
     
     await initManagementPage();
 
@@ -61,6 +75,7 @@ describe('Management Page (managementPage.js)', () => {
 
   it('should stay hidden if authentication fails', async () => {
     PB_API.getCurrentUser.mockResolvedValue(null);
+    Auth.can.mockResolvedValue(false);
     
     await initManagementPage();
 
@@ -69,14 +84,14 @@ describe('Management Page (managementPage.js)', () => {
   });
 
   it('should re-trigger auth check when login button is clicked', async () => {
-    PB_API.getCurrentUser.mockResolvedValue(null);
+    Auth.can.mockResolvedValue(false);
     await initManagementPage();
     
     vi.clearAllMocks();
-    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+    vi.mocked(showAuthDialog).mockResolvedValue({ role: 'admin' });
+    Auth.can.mockResolvedValue(true);
     
     document.getElementById('admin-login-btn').click();
-    
-    expect(PB_API.getCurrentUser).toHaveBeenCalled();
+    await vi.waitFor(() => expect(Auth.can).toHaveBeenCalled());
   });
 });

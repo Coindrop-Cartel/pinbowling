@@ -13,7 +13,7 @@ vi.mock('@services/api.js', () => ({
   },
 }));
 
-vi.mock('@ui/uiComponents.js', () => ({
+const uiMocks = vi.hoisted(() => ({
   setupLiveFilter: vi.fn((input, data, options) => ({
     performFilter: () => {
       const query = input.value.toLowerCase();
@@ -25,7 +25,17 @@ vi.mock('@ui/uiComponents.js', () => ({
   showPrompt: vi.fn(),
   showChoiceDialog: vi.fn(),
   showAlert: vi.fn(),
+  createExpandableRow: vi.fn((container, options) => {
+    const row = document.createElement(options.tag || 'div');
+    row.innerHTML = options.headerHtml + (options.contentHtml || '');
+    if (options.className) row.className = options.className;
+    container.appendChild(row);
+    return row;
+  }),
 }));
+
+vi.mock('@ui/selectors.js', () => uiMocks);
+vi.mock('@ui/dialogs.js', () => uiMocks);
 
 vi.mock('@services/auth.js', () => ({
   requireAdmin: vi.fn(() => Promise.resolve(true)),
@@ -43,9 +53,9 @@ describe('Player Management Page (playersPage.js)', () => {
         <form id="player-form">
           <input id="editing-player-id" />
           <input id="player-name" />
-          <div class="form-row"><input id="ifpa-id" /></div>
-          <div class="form-row"><input id="matchplay-id" /></div>
-          <div class="form-actions">
+          <div id="player-ifpa-row" class="form-row"><input id="ifpa-id" /></div>
+          <div id="player-matchplay-row" class="form-row"><input id="matchplay-id" /></div>
+          <div id="player-form-actions" class="form-actions">
             <button id="save-player-button">Save</button>
             <button id="cancel-edit-button">Cancel</button>
           </div>
@@ -66,7 +76,7 @@ describe('Player Management Page (playersPage.js)', () => {
     await initPlayersPage();
     const list = document.getElementById('player-list');
     expect(list.innerHTML).toContain('Alice');
-    expect(list.innerHTML).toContain('IFPA: 123');
+    expect(list.innerHTML).toContain('IFPA ID:</strong> 123');
   });
 
   it('should switch to edit mode when Edit is clicked', async () => {

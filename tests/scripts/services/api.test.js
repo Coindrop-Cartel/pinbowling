@@ -26,11 +26,7 @@ import {
 
 import {
   getCurrentPlayerId, 
-  setCurrentPlayerId, 
-  getLeaguePassword, 
-  setLeaguePassword,
-  getAdminSessionPassword,
-  setAdminSessionPassword
+  setCurrentPlayerId
 } from '@services/state.js';
 
 /**
@@ -59,20 +55,6 @@ describe('API Client (api.js)', () => {
       expect(getCurrentPlayerId()).toBe('42');
       setCurrentPlayerId(null);
       expect(getCurrentPlayerId()).toBeNull();
-    });
-
-    it('should manage league passwords in sessionStorage', () => {
-      setLeaguePassword(10, 'secret-pass');
-      expect(getLeaguePassword(10)).toBe('secret-pass');
-      setLeaguePassword(10, null);
-      expect(getLeaguePassword(10)).toBeNull();
-    });
-
-    it('should manage admin session password in sessionStorage', () => {
-      setAdminSessionPassword('admin-token');
-      expect(getAdminSessionPassword()).toBe('admin-token');
-      setAdminSessionPassword(null);
-      expect(getAdminSessionPassword()).toBeNull();
     });
   });
 
@@ -172,29 +154,6 @@ describe('API Client (api.js)', () => {
       
       const callArgs = fetch.mock.calls[0][1];
       expect(callArgs.body).toBe(JSON.stringify({}));
-    });
-
-    it('should include X-LEAGUE-PASSWORD if leagueId is in query params', async () => {
-      setLeaguePassword(5, 'league-access-code');
-      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-
-      await fetchJSON('service/scoreService.php?leagueId=5');
-
-      const headers = fetch.mock.calls[0][1].headers;
-      expect(headers['X-LEAGUE-PASSWORD']).toBe('league-access-code');
-    });
-
-    it('should include X-LEAGUE-PASSWORD if league_id is in request body', async () => {
-      setLeaguePassword(7, 'body-secret');
-      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-
-      await fetchJSON('service/scoreService.php', { 
-        method: 'POST', 
-        body: JSON.stringify({ leagueId: 7, other: 'data' }) 
-      });
-
-      const headers = fetch.mock.calls[0][1].headers;
-      expect(headers['X-LEAGUE-PASSWORD']).toBe('body-secret');
     });
   });
 

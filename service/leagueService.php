@@ -26,7 +26,8 @@ function serializeEvent($row) {
         'locationId' => isset($row['location_id']) ? (int)$row['location_id'] : null,
         'eventName' => $row['event_name'],
         'eventDate' => $row['event_date'],
-        'locationName' => $row['location_name'] ?? null
+        'locationName' => $row['location_name'] ?? null,
+        'scoringFormat' => $row['scoring_format'] ?? 'bowling'
     ];
 }
 
@@ -38,7 +39,8 @@ function serializePlayer($row) {
         'id' => (int)$row['id'],
         'playerName' => $row['player_name'],
         'ifpaId' => $row['ifpa_id'] ?? null,
-        'matchplayId' => $row['matchplay_id'] ?? null
+        'matchplayId' => $row['matchplay_id'] ?? null,
+        'userId' => isset($row['user_id']) ? (int)$row['user_id'] : (isset($row['userId']) ? (int)$row['userId'] : null)
     ];
 }
 
@@ -51,10 +53,16 @@ function serializeLeague($row) {
         'name' => $row['name'],
         'type' => $row['type'] ?? 'standard',
         'startDate' => $row['start_date'],
+        'scoringFormat' => $row['scoring_format'] ?? 'bowling',
         'events' => isset($row['events']) ? array_map('serializeEvent', $row['events']) : [],
         // Players are already standardized in playerService, keeping key consistent
         'players' => isset($row['players']) ? array_map('serializePlayer', $row['players']) : []
     ];
+}
+
+// Prevent immediate execution during unit testing
+if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING === true) {
+    return;
 }
 
 try {
@@ -87,11 +95,16 @@ try {
                     $stmt->execute([$id]);
                     $league['events'] = $stmt->fetchAll();
 
-                    $stmt = $pdo->prepare('SELECT p.* FROM players p JOIN league_players lp ON p.id = lp.player_id WHERE lp.league_id = ? ORDER BY p.player_name ASC');
+                    $stmt = $pdo->prepare('
+                        SELECT p.*, u.id as user_id 
+                        FROM players p 
+                        JOIN league_players lp ON p.id = lp.player_id 
+                        LEFT JOIN users u ON p.id = u.player_id 
+                        WHERE lp.league_id = ? 
+                        ORDER BY p.player_name ASC');
                     $stmt->execute([$id]);
                     $league['players'] = $stmt->fetchAll();
 
-                    unset($league['password']); // Never return hashes
                     sendJson(serializeLeague($league));
                 }
                 sendJson(['error' => 'League not found'], 404);
@@ -104,7 +117,7 @@ try {
             
             // Fetch leagues (optionally filtered by type)
             $typeFilter = $_GET['type'] ?? null;
-            $sql = 'SELECT id, name, start_date, type FROM leagues';
+            $sql = 'SELECT id, name, start_date, type, scoring_format FROM leagues';
             if ($typeFilter) $sql .= ' WHERE type = ?';
             $sql .= ' ORDER BY start_date DESC';
             
@@ -117,7 +130,12 @@ try {
             $allEvents = $eventsStmt->fetchAll();
 
             // Fetch all league players
-            $lpStmt = $pdo->query('SELECT lp.league_id, p.* FROM players p JOIN league_players lp ON p.id = lp.player_id ORDER BY p.player_name ASC');
+            $lpStmt = $pdo->query('
+                SELECT lp.league_id, p.*, u.id as user_id 
+                FROM players p 
+                JOIN league_players lp ON p.id = lp.player_id 
+                LEFT JOIN users u ON p.id = u.player_id 
+                ORDER BY p.player_name ASC');
             $allLeaguePlayers = $lpStmt->fetchAll();
 
             // Group events by their league_id
@@ -161,12 +179,22 @@ try {
             if (empty($input['leagueId']) || empty($input['eventName'])) {
                 sendJson(['error' => 'leagueId and eventName are required'], 400);
             }
-            $sql = 'INSERT INTO events (league_id, location_id, event_name, event_date) VALUES (?, ?, ?, ?)';
+
+            // If no scoring format is provided for the event, inherit it from the league
+            $format = $input['scoringFormat'] ?? null;
+            if (!$format) {
+                $stmtL = $pdo->prepare('SELECT scoring_format FROM leagues WHERE id = ?');
+                $stmtL->execute([(int)$input['leagueId']]);
+                $format = $stmtL->fetchColumn() ?: 'bowling';
+            }
+
+            $sql = 'INSERT INTO events (league_id, location_id, event_name, event_date, scoring_format) VALUES (?, ?, ?, ?, ?)';
             $params = [
                 (int)$input['leagueId'], 
                 !empty($input['locationId']) ? (int)$input['locationId'] : null, 
                 $input['eventName'], 
-                $input['eventDate'] ?? null
+                $input['eventDate'] ?? null,
+                $format
             ];
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
@@ -182,13 +210,17 @@ try {
         } else {
             if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
             
-            $password = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
-            $sql = 'INSERT INTO leagues (name, start_date, password, type) VALUES (?, ?, ?, ?)';
+            $sql = 'INSERT INTO leagues (name, start_date, type, scoring_format) VALUES (?, ?, ?, ?)';
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$input['name'], $input['startDate'] ?? null, $password, $input['type'] ?? 'standard']);
+            $stmt->execute([
+                $input['name'], 
+                $input['startDate'] ?? null, 
+                $input['type'] ?? 'standard',
+                $input['scoringFormat'] ?? 'bowling'
+            ]);
             $newId = $pdo->lastInsertId();
 
-            $stmt = $pdo->prepare('SELECT id, name, start_date, type FROM leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT id, name, start_date, type, scoring_format FROM leagues WHERE id = ?');
             $stmt->execute([$newId]);
             $row = $stmt->fetch();
             if (!$row) {
@@ -207,28 +239,17 @@ try {
         if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
 
         if ($task === 'fixture') {
-            $sql = 'UPDATE events SET league_id = ?, location_id = ?, event_name = ?, event_date = ? WHERE id = ?';
-            $params = [
-                (int)$input['leagueId'], 
-                !empty($input['locationId']) ? (int)$input['locationId'] : null, 
-                $input['eventName'], 
-                $input['eventDate'] ?? null, 
-                $id
-            ];
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id WHERE e.id = ?');
         } else {
-            // Handle password reset separately (Requires Global Admin)
-            if (isset($input['resetPassword'])) {
-                // Resetting a league password is a system-wide administrative task
-                validateAdminAccess();
-                $newPass = !empty($input['password']) ? password_hash($input['password'], PASSWORD_DEFAULT) : null;
-                $pdo->prepare('UPDATE leagues SET password = ? WHERE id = ?')->execute([$newPass, $id]);
-                sendJson(['success' => true]);
-            }
-            $sql = 'UPDATE leagues SET name = ?, start_date = ? WHERE id = ?';
-            $params = [$input['name'], $input['startDate'] ?? null, $id];
+            $sql = 'UPDATE leagues SET name = ?, start_date = ?, scoring_format = ? WHERE id = ?';
+            $params = [
+                $input['name'], 
+                $input['startDate'] ?? null, 
+                $input['scoringFormat'] ?? 'bowling',
+                $id
+            ];
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
             $stmt = $pdo->prepare('SELECT * FROM leagues WHERE id = ?');

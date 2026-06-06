@@ -1,11 +1,11 @@
 <nav class="navbar">
   <div class="nav-container">
-    <a href="<?php echo rtrim($baseUrl, '/') . '/'; ?>" class="nav-logo">
-      <img src="<?php echo $baseUrl; ?>/images/logo.png" alt="PinBowling Logo">
-      <span>PinBowling</span>
+    <a href="<?php echo rtrim($baseUrl, '/') . '/'; ?>" class="nav-logo" data-route="HOME">
+      <img src="<?php echo $baseUrl; ?>/images/<?php echo $active['logo']; ?>" alt="<?php echo $active['brand']; ?> Logo">
+      <span><?php echo $active['brand']; ?></span>
     </a>
     <ul class="nav-links">
-      <li class="nav-item"><a href="<?php echo $baseUrl; ?>/play" class="nav-link" data-route="PLAY">Let's Bowl!</a></li>
+      <li class="nav-item"><a href="<?php echo $baseUrl; ?>/play" class="nav-link" data-route="PLAY"><?php echo $active['cta']; ?></a></li>
       <li class="nav-item dropdown">
         <a href="javascript:void(0)" class="nav-link dropbtn">Leagues</a>
         <div class="dropdown-content">

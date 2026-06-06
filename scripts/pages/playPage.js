@@ -1,11 +1,15 @@
 import { PB_API } from '@services/api.js';
-import { getScoringEngine } from '@core/engine.js';
-import { formatNumber, applyScoreFormatting } from '@scripts/utils.js';
-import { createSearchableSelect, showPlayerSelectionDialog } from '@ui/uiComponents.js';
+import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
+import { formatNumber, applyScoreFormatting, renderThresholdGrid, getCookie, loadPage } from '@scripts/utils.js';
+import { can, PERMISSIONS } from '@services/auth.js';
+import { createSearchableSelect, createExpandableRow, setupSortableList } from '@ui/selectors.js';
+import { showPlayerSelectionDialog } from '@ui/dialogs.js';
+import { getFormatBadgeHtml, applyPreferredTheme } from '@ui/branding.js';
 
 export async function initPlayPage() {
   const form = document.getElementById('quick-play-form');
   const locSelect = document.getElementById('qp-location');
+  const formatSelect = document.getElementById('qp-format');
   const nameInput = document.getElementById('qp-event-name');
   const generateBtn = document.getElementById('generate-qp-btn');
   const createToggleBtn = document.getElementById('create-new-toggle');
@@ -24,6 +28,34 @@ export async function initPlayPage() {
   const sessionsCard = document.getElementById('qp-sessions-card');
   let allPlayersCache = [];
   let todayEvents = [];
+  let currentSessionFormat = getCookie('pb_preferred_format') || 'bowling';
+
+  // Populate session format dropdown from central list
+  if (formatSelect) {
+    formatSelect.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
+    formatSelect.value = getCookie('pb_preferred_format') || 'bowling';
+  }
+
+  const updateRoundOptions = () => {
+    currentSessionFormat = formatSelect?.value || 'bowling';
+    const engine = getScoringEngine(currentSessionFormat);
+    const roundLabel = engine.getRoundLabel();
+    applyPreferredTheme(currentSessionFormat);
+
+    const counts = engine.getRoundCountOptions();
+
+    renderExistingSessions();
+    const label = document.querySelector('label[for="qp-frames"]');
+    if (label) label.textContent = `Number of ${roundLabel}s`;
+
+    const framesSelect = document.getElementById('qp-frames');
+    if (framesSelect) {
+      const currentVal = framesSelect.value;
+      framesSelect.innerHTML = counts.map(c => 
+        `<option value="${c}" ${String(c) === currentVal ? 'selected' : (c === 10 || c === 18 ? 'selected' : '')}>${c} ${roundLabel}s</option>`
+      ).join('');
+    }
+  };
 
   async function refreshSessionsData() {
     // Fetch only session-type leagues directly from the server
@@ -34,7 +66,8 @@ export async function initPlayPage() {
     sessionLeagues.forEach(league => {
       const matches = (league.events || []).filter(e => e.eventDate === today);
       matches.forEach(event => {
-        todayEvents.push({ ...event, leagueId: league.id, roster: league.players || [] });
+        const format = event.scoringFormat || league.scoringFormat || 'bowling';
+        todayEvents.push({ ...event, leagueId: league.id, roster: league.players || [], scoringFormat: format });
       });
     });
 
@@ -43,15 +76,15 @@ export async function initPlayPage() {
 
   function renderExistingSessions() {
     if (!sessionsList) return;
-    sessionsList.innerHTML = '';
-    
+    sessionsList.innerHTML = ''; // Clear previous results before re-rendering
     const nameQuery = nameInput.value.toLowerCase().trim();
     const locQuery = Number(locSelect.value);
 
     const filtered = todayEvents.filter(e => {
       const matchesName = !nameQuery || e.eventName.toLowerCase().includes(nameQuery);
       const matchesLoc = !locQuery || Number(e.locationId) === locQuery;
-      return matchesName && matchesLoc;
+      const matchesFormat = e.scoringFormat === currentSessionFormat;
+      return matchesName && matchesLoc && matchesFormat;
     });
 
     if (filtered.length === 0) {
@@ -59,64 +92,88 @@ export async function initPlayPage() {
       return;
     }
 
-    sessionsList.innerHTML = '';
     filtered.forEach(event => {
-      const div = document.createElement('div');
-      div.className = 'session-item';
-      div.style = "padding: 12px; cursor: pointer; margin-bottom: 8px; background: #fff; border: 1px solid #ddd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;";
-      div.innerHTML = `
-        <div><strong>${event.eventName}</strong><br><small>${event.locationName || 'No Location'} | ${event.eventDate}</small></div>
-        <div style="display: flex; gap: 6px;">
-          <button class="scoreboard-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Scoreboard</button>
-          <button class="join-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Join</button>
-          <button class="play-btn secondary" style="padding: 4px 8px; font-size: 0.75rem;">Play</button>
-        </div>
-      `;
+      const row = createExpandableRow(sessionsList, {
+        id: event.id,
+        className: 'session-item',
+        format: event.scoringFormat,
+        headerHtml: `
+          <div style="flex: 1; display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <strong>${event.eventName}</strong>
+            </div>
+            <div class="session-stats" style="font-size: 0.75rem; opacity: 0.7; margin-top: 2px;">
+              ${event.locationName || 'No Location'} | ${event.eventDate} | Players: ${event.roster?.length || 0}
+            </div>
+            <div style="display: flex; gap: 6px; margin-top: 8px;">
+              <button class="join-btn secondary btn-row">Join</button>
+              <button class="play-btn secondary btn-row">Play</button>
+              <button class="scoreboard-btn secondary btn-row">Scoreboard</button>
+            </div>
+          </div>
+        `,
+        contentHtml: '',
+        onHeaderClick: () => loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}`)
+      });
 
-      div.querySelector('.scoreboard-btn').onclick = (e) => {
+      row.querySelector('.scoreboard-btn').onclick = (e) => {
         e.stopPropagation();
-        window.location.href = `standings?eventId=${event.id}&leagueId=${event.leagueId}`;
+        loadPage(`standings?eventId=${event.id}&leagueId=${event.leagueId}`);
       };
 
-      div.querySelector('.join-btn').onclick = async (e) => {
+      row.querySelector('.join-btn').onclick = async (e) => {
         e.stopPropagation();
-        const joinedIds = new Set(event.roster.map(p => p.id));
-        const available = allPlayersCache.filter(p => !joinedIds.has(p.id));
+        
+        const currentUser = await PB_API.getCurrentUser();
+        let selectedId = null;
 
-        if (available.length === 0) {
-          alert('All registered players have already joined this session.');
-          return;
+        const joinedIds = new Set(event.roster.map(p => p.id));
+        
+        // Auto-join logic for logged-in users
+        if (currentUser?.player_id) {
+            if (joinedIds.has(currentUser.player_id)) {
+                loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${currentUser.player_id}`);
+                return;
+            }
+            selectedId = currentUser.player_id;
+        } else {
+            const available = allPlayersCache.filter(p => !joinedIds.has(p.id));
+            if (available.length === 0) {
+              alert('All registered players have already joined this session.');
+              return;
+            }
+            const options = available.map(p => ({ value: p.id, label: p.playerName }));
+            selectedId = await showPlayerSelectionDialog('Play Session', 'Select your name to start playing:', options, 'Play');
         }
 
-        const options = available.map(p => ({ value: p.id, label: p.playerName }));
-        const selectedId = await showPlayerSelectionDialog('Play Session', 'Select your name to start playing:', options, 'Play');
         if (selectedId) {
           await PB_API.addLeaguePlayer(event.leagueId, Number(selectedId));
-          window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`;
+          loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`);
         }
       };
 
-      div.querySelector('.play-btn').onclick = async (e) => {
+      row.querySelector('.play-btn').onclick = async (e) => {
         e.stopPropagation();
-        const roster = event.roster || [];
         
-        if (roster.length === 0) {
-          alert('No players are assigned to this session yet. Use "Join" to add yourself.');
-          return;
+        const currentUser = await PB_API.getCurrentUser();
+        let selectedId = null;
+
+        if (currentUser?.player_id) {
+            selectedId = currentUser.player_id;
+        } else {
+            const roster = event.roster || [];
+            if (roster.length === 0) {
+              alert('No players are assigned to this session yet. Use "Join" to add yourself.');
+              return;
+            }
+            const options = roster.map(p => ({ value: p.id, label: p.playerName }));
+            selectedId = await showPlayerSelectionDialog('Play Session', 'Who is playing?', options, 'Play');
         }
 
-        const options = roster.map(p => ({ value: p.id, label: p.playerName }));
-        const selectedId = await showPlayerSelectionDialog('Play Session', 'Who is bowling?', options, 'Play');
         if (selectedId) {
-          window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`;
+          loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`);
         }
       };
-
-      div.onclick = (e) => {
-        if (e.target.closest('button')) return;
-        window.location.href = `scores?eventId=${event.id}&leagueId=${event.leagueId}`;
-      };
-      sessionsList.appendChild(div);
     });
   }
 
@@ -125,9 +182,14 @@ export async function initPlayPage() {
   let currentLocMachines = [];
   let expandedTempId = null; // Tracks which row is expanded for machine selection
 
-  const locations = await PB_API.getLocations();
+  // Batch initial data fetches for smoother loading
+  const [locations] = await Promise.all([
+    PB_API.getLocations(),
+    refreshSessionsData()
+  ]);
+
   locationsCache = locations;
-  locations.forEach(loc => {
+  locationsCache.forEach(loc => {
     const opt = document.createElement('option');
     opt.value = loc.id;
     opt.textContent = `${loc.name}${loc.city ? ` (${loc.city})` : ''}`;
@@ -140,6 +202,17 @@ export async function initPlayPage() {
   });
 
   if (nameInput) nameInput.oninput = () => renderExistingSessions();
+
+  if (formatSelect) {
+    formatSelect.addEventListener('change', updateRoundOptions);
+    updateRoundOptions(); // Initial sync
+  }
+
+  // Hide session generator for unregistered users
+  const canCreate = await can(PERMISSIONS.CREATE_SESSION);
+  if (!canCreate && createToggleBtn) {
+    createToggleBtn.classList.add('hidden');
+  }
 
   if (createToggleBtn && generatorOptions && generateBtn) {
     createToggleBtn.onclick = () => {
@@ -170,14 +243,21 @@ export async function initPlayPage() {
   }
 
   // Initialize dragging listeners on the container once
-  setupDragging(framesList);
+  setupSortableList(framesList, {
+    itemSelector: '.frame-preview-item',
+    onReorder: (tidOrder) => {
+      const newArray = tidOrder.map(tid => generatedFrames.find(f => f.tempId === String(tid)));
+      generatedFrames = newArray.map((f, i) => ({ ...f, order: i + 1 }));
+      
+      renderPreview();
+    }
+  });
 
   form.onsubmit = (e) => {
     e.preventDefault();
     generatePreview();
   };
 
-  await refreshSessionsData();
   renderExistingSessions();
 
   function generatePreview() {
@@ -204,7 +284,8 @@ export async function initPlayPage() {
     const frameCount = Number(document.getElementById('qp-frames').value);
     const difficulty = document.getElementById('qp-difficulty').value;
     const globalScaling = document.getElementById('qp-scaling').value;
-    const engine = getScoringEngine('bowling');
+    currentSessionFormat = formatSelect?.value || 'bowling';
+    const engine = getScoringEngine(currentSessionFormat);
 
     const locMachines = location?.machines || [];
     currentLocMachines = locMachines;
@@ -221,9 +302,24 @@ export async function initPlayPage() {
       selected.push(locMachines[Math.floor(Math.random() * locMachines.length)]);
     }
 
+    // Generate randomized pars for Golf (ensure at least one 3, 4, and 5)
+    const pars = [];
+    if (currentSessionFormat === 'golf') {
+      pars.push(3, 4, 5);
+      while (pars.length < frameCount) {
+        pars.push(Math.floor(Math.random() * 3) + 3); // Random 3, 4, or 5
+      }
+      // Shuffle the pars so the 3, 4, 5 aren't always the first three holes
+      pars.sort(() => Math.random() - 0.5);
+    }
+
       generatedFrames = selected.map((m, index) => {
-        const score10 = m['target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1)] || 1000000;
-        const score1 = Math.floor(score10 / 10);
+        const difficultyKey = 'target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+        const baseScore = m[difficultyKey] || 1000000;
+        let { value1, value2 } = engine.getInitialValues(baseScore);
+
+        if (currentSessionFormat === 'golf') value2 = pars[index];
+
         return {
             machineId: Number(m.machineId),
             machineName: m.machineName,
@@ -232,10 +328,10 @@ export async function initPlayPage() {
                 med: m.targetMed || 2000000,
                 hard: m.targetHard || 3000000
             },
-            score10,
-            score1,
+            value1,
+            value2,
             scaling: globalScaling,
-            values: engine.buildRoundValues(score10, score1, globalScaling),
+            values: engine.buildRoundValues(value1, value2, globalScaling),
             orderNumber: index + 1,
             tempId: Math.random().toString(36).substr(2, 9)
         };
@@ -250,31 +346,30 @@ export async function initPlayPage() {
   function renderPreview() {
     framesList.innerHTML = '';
     generatedFrames.forEach((frame, index) => {
-      const row = document.createElement('div');
-      row.className = 'frame-preview-item';
-      row.draggable = true;
-      row.dataset.tempId = frame.tempId;
       const isExpanded = expandedTempId === frame.tempId;
-      const engine = getScoringEngine('bowling');
+      const engine = getScoringEngine(currentSessionFormat);
 
-      row.style = "margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff;";
-      row.innerHTML = `
-        <div class="frame-row-header" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #f9f9f9; cursor: pointer;">
-          <div class="drag-handle" style="cursor: grab; color: #888; padding: 0 4px; font-size: 1.2rem;">☰</div>
-          <span style="font-weight: bold; min-width: 30px; text-align: center;">${frame.orderNumber}</span>
-          <span style="flex: 1; font-weight: bold;" class="machine-name-display">${frame.machineName}</span>
-          <div style="display: flex; align-items: center; gap: 10px;" onclick="event.stopPropagation()">
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <label style="font-size: 0.7rem; color: #666;">10:</label>
-              <input type="text" class="score10-input" value="${formatNumber(frame.score10)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
+      const headerHtml = `
+        <div style="display: flex; align-items: center; gap: 12px; width: 100%; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">
+            <div class="drag-handle" style="cursor: grab; color: var(--pb-primary); opacity: 0.5; padding: 0 4px; font-size: 1.2rem;">☰</div>
+            <span style="font-weight: bold; min-width: 30px; text-align: center;">${frame.orderNumber}</span>
+            <span style="flex: 1; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" class="machine-name-display">${frame.machineName}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto;" onclick="event.stopPropagation()">
+            <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
+              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${engine.getValue1Label()}:</label>
+              <input type="text" class="score10-input" value="${formatNumber(frame.value1)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
             </div>
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <label style="font-size: 0.7rem; color: #666;">1:</label>
-              <input type="text" class="score1-input" value="${formatNumber(frame.score1)}" style="width: 85px; padding: 3px; font-size: 0.85rem;">
+            <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
+              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${engine.getValue2Label()}:</label>
+              <input type="text" class="score1-input" value="${formatNumber(frame.value2)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
             </div>
           </div>
         </div>
-        <div class="frame-expansion ${isExpanded ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd;">
+      `;
+
+      const contentHtml = `
           <div class="form-row">
             <label style="font-size: 0.85rem;">Change Machine</label>
             <input type="text" class="row-machine-search" placeholder="Filter machines..." style="width: 100%; box-sizing: border-box; margin-bottom: 5px;">
@@ -282,25 +377,46 @@ export async function initPlayPage() {
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <div style="display: flex; gap: 6px;">
-               <button type="button" class="qfill secondary" data-type="easy" style="font-size: 0.75rem; padding: 2px 10px;">Easy</button>
-               <button type="button" class="qfill secondary" data-type="med" style="font-size: 0.75rem; padding: 2px 10px;">Med</button>
-               <button type="button" class="qfill secondary" data-type="hard" style="font-size: 0.75rem; padding: 2px 10px;">Hard</button>
+               <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
+               <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
+               <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
             </div>
             <div style="display: flex; gap: 4px;">
-               <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'}" data-scale="flat" style="font-size: 0.7rem; padding: 2px 8px;">Flat</button>
-               <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'}" data-scale="curved" style="font-size: 0.7rem; padding: 2px 8px;">Curved</button>
+               <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
+               <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
             </div>
           </div>
-          <div class="preview-values-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; font-size: 0.75rem; background: #f0f0f0; padding: 8px; border-radius: 4px;">
-            ${Object.entries(frame.values || {})
-              .sort((a, b) => Number(b[0]) - Number(a[0]))
-              .map(([rank, val]) => `<div><strong>${rank}:</strong> ${formatNumber(val)}</div>`)
-              .join('')
-            }
-          </div>
-        </div>
+          <div class="preview-values-container">${renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2)}</div>
       `;
 
+      const row = createExpandableRow(framesList, {
+        id: frame.tempId,
+        className: 'frame-preview-item',
+        draggable: true,
+        headerHtml,
+        contentHtml,
+        isExpanded,
+        onMoveUp: frame.orderNumber > 1 ? () => {
+          const idx = generatedFrames.indexOf(frame);
+          if (idx > 0) {
+            [generatedFrames[idx], generatedFrames[idx - 1]] = [generatedFrames[idx - 1], generatedFrames[idx]];
+            generatedFrames.forEach((f, i) => f.orderNumber = i + 1);
+            renderPreview();
+          }
+        } : null,
+        onMoveDown: frame.orderNumber < generatedFrames.length ? () => {
+          const idx = generatedFrames.indexOf(frame);
+          if (idx < generatedFrames.length - 1) {
+            [generatedFrames[idx], generatedFrames[idx + 1]] = [generatedFrames[idx + 1], generatedFrames[idx]];
+            generatedFrames.forEach((f, i) => f.orderNumber = i + 1);
+            renderPreview();
+          }
+        } : null,
+        onHeaderClick: () => {
+          expandedTempId = (expandedTempId === frame.tempId) ? null : frame.tempId;
+          renderPreview();
+        }
+      });
       const s10 = row.querySelector('.score10-input');
       const s1 = row.querySelector('.score1-input');
       applyScoreFormatting(s10);
@@ -308,28 +424,19 @@ export async function initPlayPage() {
 
       // Immediate data updates as user types
       const updateValues = () => {
-        frame.score10 = Number(s10.value.replace(/\D/g, '')) || 0;
-        frame.score1 = Number(s1.value.replace(/\D/g, '')) || 0;
-        frame.values = engine.buildRoundValues(frame.score10, frame.score1, frame.scaling);
+        frame.value1 = Number(s10.value.replace(/\D/g, '')) || 0;
+        frame.value2 = Number(s1.value.replace(/\D/g, '')) || 0;
+        frame.values = engine.buildRoundValues(frame.value1, frame.value2, frame.scaling);
 
         // Update the visual grid without re-rendering the whole row to maintain input focus
-        const grid = row.querySelector('.preview-values-grid');
-        if (grid) {
-            grid.innerHTML = Object.entries(frame.values || {})
-                .sort((a, b) => Number(b[0]) - Number(a[0]))
-                .map(([rank, val]) => `<div><strong>${rank}:</strong> ${formatNumber(val)}</div>`)
-                .join('');
+        const container = row.querySelector('.preview-values-container');
+        if (container) {
+            container.innerHTML = renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2);
         }
       };
 
       s10.oninput = updateValues;
       s1.oninput = updateValues;
-
-      // Expand on click
-      row.querySelector('.frame-row-header').onclick = () => {
-        expandedTempId = (expandedTempId === frame.tempId) ? null : frame.tempId;
-        renderPreview();
-      };
 
       // Searchable Select initialization (only if expanded)
       if (isExpanded) {
@@ -365,10 +472,11 @@ export async function initPlayPage() {
             const type = btn.dataset.type;
             const val = frame.targets?.[type];
             if (val) {
-              frame.score10 = val;
-              frame.score1 = Math.floor(val / 10);
-              s10.value = formatNumber(frame.score10);
-              s1.value = formatNumber(frame.score1);
+              const { value1, value2 } = engine.getInitialValues(val);
+              frame.value1 = value1;
+              frame.value2 = value2;
+              s10.value = formatNumber(frame.value1);
+              s1.value = formatNumber(frame.value2);
               updateValues();
               renderPreview();
             }
@@ -386,45 +494,6 @@ export async function initPlayPage() {
             }
           }
         });
-      }
-
-      framesList.appendChild(row);
-    });
-  }
-
-  /**
-   * Implements drag-and-drop reordering for frames.
-   * Matches the behavior found in configPage.js for tournament setup.
-   */
-  function setupDragging(container) {
-    let draggedItem = null;
-
-    container.addEventListener('dragstart', (e) => {
-      draggedItem = e.target.closest('.frame-preview-item');
-      if (draggedItem) draggedItem.style.opacity = '0.5';
-    });
-
-    container.addEventListener('dragend', (e) => {
-      if (draggedItem) draggedItem.style.opacity = '';
-      
-      // Update the data array to match the new DOM order
-      const tidOrder = Array.from(container.querySelectorAll('.frame-preview-item'))
-        .map(el => el.dataset.tempId);
-      
-      const newArray = tidOrder.map(tid => generatedFrames.find(f => f.tempId === tid));
-      generatedFrames = newArray.map((f, i) => ({ ...f, order: i + 1 }));
-      
-      renderPreview();
-    });
-
-    container.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      const overItem = e.target.closest('.frame-preview-item');
-      if (overItem && overItem !== draggedItem) {
-        const rect = overItem.getBoundingClientRect();
-        const midpoint = rect.top + rect.height / 2;
-        if (e.clientY < midpoint) container.insertBefore(draggedItem, overItem);
-        else container.insertBefore(draggedItem, overItem.nextSibling);
       }
     });
   }
@@ -450,7 +519,8 @@ export async function initPlayPage() {
       const newLeague = await PB_API.createLeague({ 
         name: eventName, 
         startDate: now.toISOString().split('T')[0],
-        type: 'session'
+        type: 'session',
+        scoringFormat: currentSessionFormat
       });
 
       if (!newLeague || !newLeague.id) {
@@ -463,7 +533,8 @@ export async function initPlayPage() {
         leagueId: qpLeague.id,
         eventName: eventName,
         eventDate: now.toISOString().split('T')[0],
-        locationId: locId
+        locationId: locId,
+        scoringFormat: currentSessionFormat
       });
 
       if (!newEvent || !newEvent.id) {
@@ -479,6 +550,8 @@ export async function initPlayPage() {
             eventId: Number(event.id),
             machineId: Number(frame.machineId),
             orderNumber: frame.orderNumber,
+            value1: frame.value1,
+            value2: frame.value2,
             values: frame.values
           };
         });
@@ -489,21 +562,8 @@ export async function initPlayPage() {
         await PB_API.saveTargetScore(targetPayloads);
       }
 
-      // Instead of redirecting, refresh the data and show the updated list
-      await refreshSessionsData();
-      renderExistingSessions();
-      
-      // Reset UI to initial state
-      if (nameInput) nameInput.value = '';
-      if (previewSection) previewSection.classList.add('hidden');
-      if (setupFields) setupFields.classList.remove('hidden');
-      if (setupSummary) setupSummary.classList.add('hidden');
-      if (generatorOptions) generatorOptions.classList.add('hidden');
-      if (generateBtn) generateBtn.classList.add('hidden');
-      if (sessionsCard) sessionsCard.classList.remove('hidden');
-      if (createToggleBtn) createToggleBtn.textContent = 'Create New Session';
-      finalizeBtn.disabled = false;
-      finalizeBtn.textContent = 'Create Session';
+      // Direct redirect to the scoreboard for the new session
+      loadPage(`standings?eventId=${event.id}&leagueId=${qpLeague.id}`);
 
     } catch (err) {
       console.error(err);

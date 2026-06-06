@@ -1,6 +1,5 @@
 <?php $pageTitle = 'System Maintenance'; ?>
 <main class="page-container">
-  <div id="auth-header-container" style="display: flex; justify-content: flex-end; padding: 10px 0; margin-bottom: 10px;"></div>
   <header style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
     <div>
       <h1>System Maintenance</h1>

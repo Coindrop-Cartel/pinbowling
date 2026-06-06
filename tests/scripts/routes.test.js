@@ -21,7 +21,7 @@ describe('Route Configuration (routes.js)', () => {
 
     it('should handle object parameters correctly', () => {
       const url = ROUTES.LEAGUE_SETUP({ leagueId: 10, eventId: 20 });
-      expect(url).toBe('/pinball/event-setup?leagueId=10&eventId=20');
+      expect(url).toBe('/pinball/eventSetup?leagueId=10&eventId=20');
     });
 
     it('should filter out undefined or null parameters', () => {

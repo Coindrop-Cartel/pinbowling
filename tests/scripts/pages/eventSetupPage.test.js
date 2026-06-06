@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { initConfigPage } from '@pages/configPage.js';
+import { initEventSetupPage } from '@pages/eventSetupPage.js';
 import { PB_API } from '@services/api.js';
 import * as Utils from '@scripts/utils.js';
 import * as Auth from '@services/auth.js';
@@ -21,9 +21,42 @@ vi.mock('@scripts/utils.js', () => ({
   getActiveEventId: vi.fn(),
   getActiveLeagueId: vi.fn(),
   renderPreview: vi.fn(),
+  renderThresholdGrid: vi.fn(() => '<div>Grid</div>'),
   applyScoreFormatting: vi.fn(),
   formatNumber: (n) => String(n),
   navigateTo: vi.fn(),
+}));
+
+const uiMocks = vi.hoisted(() => ({
+  createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() })),
+  showPrompt: vi.fn(),
+  showAlert: vi.fn(),
+  initReadOnlyTournamentDisplay: vi.fn((container, refresh) => Promise.resolve(refresh())),
+  initTournamentSelector: vi.fn(),
+  createExpandableRow: vi.fn((container) => {
+    const div = document.createElement('div');
+    container.appendChild(div);
+    return div;
+  }),
+  setupSortableList: vi.fn(),
+}));
+
+vi.mock('@ui/selectors.js', () => uiMocks);
+vi.mock('@ui/dialogs.js', () => uiMocks);
+
+vi.mock('@core/engine.js', () => ({
+  getScoringEngine: vi.fn(() => ({
+    getInitialValues: vi.fn(() => ({ value1: 5000000, value2: 500000 })),
+    getValue1Label: vi.fn(() => 'Target Score'),
+    getValue2Label: vi.fn(() => 'Base Score'),
+    getRowSummaryHtml: vi.fn(() => '<div>Summary</div>'),
+    getMarkFormatting: vi.fn(() => ''),
+    formatMark: vi.fn((turn) => turn.mark),
+    getRoundLabel: vi.fn(() => 'Frame'),
+    getBonusTargetHtml: vi.fn(() => ''),
+    filterThresholds: vi.fn(v => v),
+    buildRoundValues: vi.fn(() => ({ 10: 1000000, 1: 100000 })),
+  }))
 }));
 
 vi.mock('@services/auth.js', () => ({
@@ -31,22 +64,17 @@ vi.mock('@services/auth.js', () => ({
   isManagementAuthorized: vi.fn(() => Promise.resolve(true)),
 }));
 
-vi.mock('@ui/uiComponents.js', () => ({
-  createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() })),
-  showPrompt: vi.fn(),
-  initReadOnlyTournamentDisplay: vi.fn((container, refresh) => refresh()),
-  initTournamentSelector: vi.fn(),
-}));
-
-describe('Event Config Page (configPage.js)', () => {
+describe('Event Setup Page (eventSetupPage.js)', () => {
   beforeEach(() => {
     // Mock layout methods not implemented in JSDOM
+    vi.stubGlobal('alert', vi.fn());
     vi.stubGlobal('scrollTo', vi.fn());
     Element.prototype.scrollIntoView = vi.fn();
     vi.spyOn(console, 'log').mockImplementation(() => {});
 
     document.body.innerHTML = `
       <div class="tournament-selector-container"></div>
+      <div id="tournament-selector-ui" class="hidden"></div>
       <div id="config-card" class="hidden">
         <div id="display-order"></div>
         <input id="order-number" />
@@ -62,8 +90,11 @@ describe('Event Config Page (configPage.js)', () => {
           <button id="cancel-config-btn" type="button">Cancel</button>
         </form>
       </div>
-      <div id="reorder-actions" class="hidden"><button id="save-order-btn">Save Order</button></div>
-      <table id="rounds-table" class="hidden"><tbody></tbody></table>
+      <div id="reorder-actions" class="hidden">
+        <button id="save-order-btn">Save Order</button>
+        <button id="cancel-order-btn">Cancel Order</button>
+      </div>
+      <table id="rounds-table" class="hidden"><tbody id="rounds-list"></tbody></table>
       <div id="list-empty"></div>
       <button id="add-target-btn">Add</button>
       <button id="done-setup-btn">Done</button>
@@ -79,13 +110,13 @@ describe('Event Config Page (configPage.js)', () => {
   });
 
   it('should load machine suggestions and targets on init', async () => {
-    await initConfigPage();
+    await initEventSetupPage();
     expect(PB_API.getMachines).toHaveBeenCalled();
     expect(PB_API.getTargetScores).toHaveBeenCalledWith('101');
   });
 
   it('should show the config form when "Add Target" is clicked', async () => {
-    await initConfigPage();
+    await initEventSetupPage();
     const btn = document.getElementById('add-target-btn');
     const card = document.getElementById('config-card');
     
@@ -98,17 +129,22 @@ describe('Event Config Page (configPage.js)', () => {
     Auth.requireAdmin.mockResolvedValue(true);
     PB_API.saveTargetScore.mockResolvedValue({ success: true });
     
-    await initConfigPage();
+    await initEventSetupPage();
     
     // Populate fields
     document.getElementById('order-number').value = '1';
     document.getElementById('machine-name').value = 'Iron Maiden';
     document.getElementById('value-10').value = '1,000,000';
     document.getElementById('value-1').value = '100,000';
+    
+    // Trigger events to ensure internal state is updated
+    document.getElementById('machine-name').dispatchEvent(new Event('change'));
+    document.getElementById('save-round-btn').disabled = false;
 
     const form = document.getElementById('round-form');
-    await form.dispatchEvent(new Event('submit'));
+    form.dispatchEvent(new Event('submit'));
 
+    await vi.waitFor(() => expect(Auth.requireAdmin).toHaveBeenCalled());
     expect(Auth.requireAdmin).toHaveBeenCalled();
     expect(PB_API.saveTargetScore).toHaveBeenCalledWith(expect.objectContaining({
         orderNumber: 1,
@@ -117,7 +153,7 @@ describe('Event Config Page (configPage.js)', () => {
   });
 
   it('should navigate back to leagues when "Done" is clicked', async () => {
-    await initConfigPage();
+    await initEventSetupPage();
     document.getElementById('done-setup-btn').click();
     expect(Utils.navigateTo).toHaveBeenCalled();
   });

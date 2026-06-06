@@ -159,8 +159,8 @@ describe('BowlingEngine', () => {
     
     // Last round
     const html = engine.getBonusTargetHtml(round, true, formatFn);
-    expect(html).toContain('Target 1:</b> val:13000');
-    expect(html).toContain('Target 2:</b> val:16900');
+    expect(html).toContain('XX:</b> val:13000');
+    expect(html).toContain('XXX:</b> val:16900');
 
     // Missing values
     expect(engine.getBonusTargetHtml({ values: {} }, true, formatFn)).toBe('');
@@ -177,7 +177,7 @@ describe('BowlingEngine', () => {
 
   test('buildRoundValues - Invalid Inputs', () => {
     expect(engine.buildRoundValues(0, 1000)).toBeNull();
-    expect(engine.buildRoundValues(10000, 0)).toBeNull();
+    expect(engine.buildRoundValues(10000, 0)).not.toBeNull(); // 0 is now a valid input for bottomScore
   });
 
   test('Metadata Getters', () => {

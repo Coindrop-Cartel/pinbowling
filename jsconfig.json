@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@scripts/*": ["scripts/*"],
+      "@services/*": ["scripts/services/*"],
+      "@ui/*": ["scripts/ui/*"],
+      "@core/*": ["scripts/core/*"],
+      "@pages/*": ["scripts/pages/*"],
+      "@constants/*": ["constants/*"]
+    },
+    "checkJs": true
+  },
+  "include": [
+    "scripts/**/*",
+    "constants/**/*"
+  ],
+  "exclude": ["node_modules", "vendor"]
+}

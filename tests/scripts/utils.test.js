@@ -6,6 +6,23 @@ const mockEngine = {
   buildRoundValues: vi.fn(),
   getBonusTargets: vi.fn(),
   getRoundLabel: vi.fn(),
+  getBonusTargetHtml: vi.fn(),
+  filterThresholds: vi.fn((v) => v),
+  getThresholdLabel: vi.fn((r) => {
+    if (Number(r) === 10) return 'High';
+    if (Number(r) === 1) return 'Low';
+    return r;
+  }),
+  getThresholdRowStyle: vi.fn(() => 'margin: 2px 0;'),
+  getThresholdSort: vi.fn(() => (a, b) => Number(b[0]) - Number(a[0])),
+  getInitialValues: vi.fn(() => ({ value1: 5000000, value2: 500000 })),
+  formatTotalScore: vi.fn((total) => String(total)),
+  getThresholdPrefix: vi.fn(() => 'Pins'),
+  getValue1Label: vi.fn(() => 'Target Score'),
+  getValue2Label: vi.fn(() => 'Base Score'),
+  getThresholdStart: vi.fn(() => 10), // Default for Bowling
+  getThresholdEnd: vi.fn(() => 1), // Default for Bowling
+  getThresholdRange: vi.fn(() => Array.from({ length: 10 }, (_, i) => 10 - i)), // Default descending
 };
 
 // Mock getScoringEngine for renderPreview and print functions
@@ -57,6 +74,7 @@ describe('Utility Functions (utils.js)', () => {
     });
     mockEngine.getBonusTargets.mockReturnValue({ t1: 13000, t2: 16900 });
     mockEngine.getRoundLabel.mockReturnValue('Frame');
+    mockEngine.getBonusTargetHtml.mockReturnValue('');
 
     vi.clearAllMocks();
   });
@@ -67,15 +85,6 @@ describe('Utility Functions (utils.js)', () => {
   });
 
   describe('URL Parameter Management', () => {
-    // Temporarily mock initNavigation for these tests as they call it
-    beforeEach(() => {
-      vi.spyOn(Utils, 'initNavigation').mockImplementation(() => { });
-    });
-
-    afterEach(() => {
-      vi.mocked(Utils.initNavigation).mockRestore();
-    });
-
     it('getActiveLeagueId should return the correct leagueId from URL', () => {
       window.location = new URL('http://localhost/index.php?leagueId=123');
       expect(Utils.getActiveLeagueId()).toBe('123');
@@ -91,7 +100,6 @@ describe('Utility Functions (utils.js)', () => {
       expect(window.history.replaceState).toHaveBeenCalled();
       const url = vi.mocked(window.history.replaceState).mock.calls[0][2];
       expect(url.toString()).toContain('leagueId=456');
-      expect(Utils.initNavigation).toHaveBeenCalledTimes(1);
     });
 
     it('setActiveLeagueId should remove leagueId from URL if null is passed', () => {
@@ -100,7 +108,6 @@ describe('Utility Functions (utils.js)', () => {
       expect(window.history.replaceState).toHaveBeenCalled();
       const url = vi.mocked(window.history.replaceState).mock.calls[0][2];
       expect(url.toString()).not.toContain('leagueId');
-      expect(Utils.initNavigation).toHaveBeenCalledTimes(1);
     });
 
     it('getActiveEventId should return the correct eventId from URL', () => {
@@ -113,7 +120,6 @@ describe('Utility Functions (utils.js)', () => {
       expect(window.history.replaceState).toHaveBeenCalled();
       const url = vi.mocked(window.history.replaceState).mock.calls[0][2];
       expect(url.toString()).toContain('eventId=101');
-      expect(Utils.initNavigation).toHaveBeenCalledTimes(1);
     });
 
     it('getCurrentPlayerId should return the correct playerId from URL', () => {
@@ -126,7 +132,6 @@ describe('Utility Functions (utils.js)', () => {
       expect(window.history.replaceState).toHaveBeenCalled();
       const url = vi.mocked(window.history.replaceState).mock.calls[0][2];
       expect(url.toString()).toContain('playerId=66');
-      expect(Utils.initNavigation).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -190,65 +195,19 @@ describe('Utility Functions (utils.js)', () => {
     });
   });
 
-  describe('initNavigation', () => {
-    beforeEach(() => {
-      // Create the container that initNavigation expects
-      document.body.innerHTML = '<div class="nav-container"></div>';
-    });
-
-    it('should set "active" class on the current page link', () => {
-      window.location = new URL('http://localhost/machines.php');
-      Utils.initNavigation();
-      const navLinks = document.querySelectorAll('.nav-item');
-      expect(navLinks[0].classList.contains('active')).toBe(false); // Home
-      expect(navLinks[1].classList.contains('active')).toBe(true);  // Machines
-    });
-
-    it('should handle clean URLs (no .php extension)', () => {
-      window.location = new URL('http://localhost/machines');
-      Utils.initNavigation();
-      const navLinks = document.querySelectorAll('.nav-item');
-      expect(navLinks[1].classList.contains('active')).toBe(true); // Machines
-    });
-
-    it('should propagate URL parameters to navigation links', () => {
-      window.location = new URL('http://localhost/players.php?leagueId=10&eventId=20');
-      Utils.initNavigation();
-      const navLinks = document.querySelectorAll('.nav-item');
-
-      // Check the 'Machines' link, it should now have leagueId and eventId
-      expect(navLinks[1].getAttribute('href')).toBe('/machines?leagueId=10&eventId=20');
-    });
-
-    it('should not propagate parameters if target link already has them', () => {
-      // Note: With the new logic, the ROUTES path is the base. 
-      // To test "already has them", we verify it doesn't duplicate.
-      window.location = new URL('http://localhost/index.php?leagueId=10');
-      Utils.initNavigation();
-      const navLinks = document.querySelectorAll('.nav-item');
-      expect(navLinks[2].getAttribute('href')).toBe('/leagues?leagueId=10');
-    });
-
-    it('should handle index.php as default base', () => {
-      window.location = new URL('http://localhost/index.php');
-      Utils.initNavigation();
-      const navLinks = document.querySelectorAll('.nav-item');
-      expect(navLinks[0].classList.contains('active')).toBe(true); // Home
-    });
-  });
 
   describe('renderPreview', () => {
-    let score10Input, score1Input, previewValues;
+    let highScoreInput, lowScoreInput, previewValues;
     let mockEngineBuildRoundValues;
 
     beforeEach(() => {
       document.body.innerHTML = `
-        <input id="score10" value="10000" />
-        <input id="score1" value="1000" />
+        <input id="highScore" value="10000" />
+        <input id="lowScore" value="1000" />
         <div id="preview"></div>
       `;
-      score10Input = document.getElementById('score10');
-      score1Input = document.getElementById('score1');
+      highScoreInput = document.getElementById('highScore');
+      lowScoreInput = document.getElementById('lowScore');
       previewValues = document.getElementById('preview');
 
       // Get the mocked engine's methods
@@ -268,36 +227,36 @@ describe('Utility Functions (utils.js)', () => {
       });
     });
 
-    it('should display "Enter a 10 score or a 1 score" if buildRoundValues returns null', () => {
+    it('should display "Enter a High Score and a Low Score" if buildRoundValues returns null', () => {
       mockEngineBuildRoundValues.mockImplementation(() => null);
-      Utils.renderPreview(score10Input, score1Input, previewValues, getScoringEngine());
-      expect(previewValues.innerHTML).toContain('Enter a 10 score or a 1 score');
+      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine());
+      expect(previewValues.innerHTML).toContain('Enter a High Score and a Low Score');
     });
 
     it('should render score values correctly', () => {
       mockEngineBuildRoundValues.mockImplementation(() => ({ 10: 10000, 5: 5000, 1: 1000 }));
-      Utils.renderPreview(score10Input, score1Input, previewValues, getScoringEngine());
-      expect(previewValues.innerHTML).toContain('<strong>10:</strong> 10,000');
+      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine());
+      expect(previewValues.innerHTML).toContain('<strong>High:</strong> 10,000');
       expect(previewValues.innerHTML).toContain('<strong>5:</strong> 5,000');
-      expect(previewValues.innerHTML).toContain('<strong>1:</strong> 1,000');
+      expect(previewValues.innerHTML).toContain('<strong>Low:</strong> 1,000');
     });
 
     it('should include bonus targets if isLastRound is true and values[10] exists', () => {
-      Utils.renderPreview(score10Input, score1Input, previewValues, getScoringEngine(), true);
+      mockEngine.getBonusTargetHtml.mockImplementation((round, isLast, formatFn) => {
+        return isLast ? `<div><strong>Target 1:</strong> ${formatFn(13000)}</div>` : '';
+      });
+
+      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine(), true);
       expect(previewValues.innerHTML).toContain('<strong>Target 1:</strong>');
       expect(previewValues.innerHTML).toContain('13,000');
     });
 
     it('should not include bonus targets if isLastRound is false', () => {
-      Utils.renderPreview(score10Input, score1Input, previewValues, getScoringEngine(), false);
+      mockEngine.getBonusTargetHtml.mockReturnValue('');
+      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine(), false);
       expect(previewValues.innerHTML).not.toContain('<strong>Target 1:</strong>');
     });
 
-    it('should not include bonus targets if values[10] is missing', () => {
-      mockEngineBuildRoundValues.mockImplementation(() => ({ 9: 9000, 1: 1000 }));
-      Utils.renderPreview(score10Input, score1Input, previewValues, getScoringEngine(), true);
-      expect(previewValues.innerHTML).not.toContain('Target 1:');
-    });
   });
 });
 
@@ -316,32 +275,5 @@ describe('navigateTo function', () => {
     const originalHref = window.location.href;
     Utils.navigateTo('');
     expect(window.location.href).toBe(originalHref);
-  });
-});
-
-describe('initNavigation else branch (pre‑rendered links)', () => {
-  let originalLocation;
-  beforeEach(() => {
-    originalLocation = window.location;
-    delete window.location;
-    window.location = new URL('http://localhost/players.php?leagueId=5');
-    window.history.replaceState = vi.fn();
-    document.body.innerHTML = `
-      <div class="nav-container">
-        <a data-route="HOME" class="nav-link">Home</a>
-        <a data-route="MACHINES" class="nav-link" href="/machines.php?eventId=9">Machines</a>
-      </div>`;
-  });
-
-  afterEach(() => {
-    window.location = originalLocation;
-  });
-
-  it('sets active class on the current page link', () => {
-    window.location = new URL('http://localhost/machines.php?leagueId=2');
-    Utils.initNavigation();
-    const links = document.querySelectorAll('.nav-link');
-    expect(links[0].classList.contains('active')).toBe(false);
-    expect(links[1].classList.contains('active')).toBe(true);
   });
 });

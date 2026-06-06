@@ -23,6 +23,7 @@ vi.mock('@scripts/utils.js', () => ({
   setCurrentPlayerId: vi.fn(),
   formatNumber: (n) => String(n),
   applyScoreFormatting: vi.fn(),
+  renderThresholdGrid: vi.fn(() => 'Grid'),
 }));
 
 vi.mock('@core/engine.js', () => ({
@@ -31,17 +32,27 @@ vi.mock('@core/engine.js', () => ({
     getRoundLabel: () => 'Frame',
     getPrimaryTargetLabel: () => 'Strike',
     getBonusTargetHtml: () => '',
+    getRowSummaryHtml: vi.fn(() => '<div>Summary</div>'),
+    getMarkFormatting: vi.fn((mark, par) => (mark === 10 ? 'golf-eagle' : '')), // Mock some formatting
+    formatMark: vi.fn((turn) => turn.mark),
+    filterThresholds: vi.fn(v => v),
+    formatTotalScore: vi.fn((t) => String(t)),
   })),
 }));
 
-vi.mock('@ui/tournamentSelector.js', () => ({
-  initTournamentSelector: vi.fn((container, options) => options?.onRefresh?.()),
+const uiMocks = vi.hoisted(() => ({
+  createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() })),
+  initTournamentSelector: vi.fn((container, options) => Promise.resolve(options?.onRefresh?.())),
+  applyPreferredTheme: vi.fn(),
+  renderActionSummary: vi.fn((container, title, actions = []) => {
+    if (container) container.innerHTML = title;
+    if (container) container._actions = actions;
+    if (container) container.classList.remove('hidden');
+  }),
 }));
 
-vi.mock('@ui/uiComponents.js', () => ({
-  createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() })),
-  initTournamentSelector: vi.fn((container, options) => options?.onRefresh?.()),
-}));
+vi.mock('@ui/selectors.js', () => uiMocks);
+vi.mock('@ui/branding.js', () => uiMocks);
 
 describe('Scoring Entry Page (scoresPage.js)', () => {
   beforeEach(() => {
@@ -69,8 +80,8 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
     vi.clearAllMocks();
     Utils.getActiveLeagueId.mockReturnValue('1');
     Utils.getActiveEventId.mockReturnValue('101');
-    PB_API.getLeagues.mockResolvedValue([{ id: 1, events: [{ id: 101, eventName: 'Week 1' }] }]);
-    PB_API.getLeague.mockResolvedValue({ id: 1, players: [] });
+    PB_API.getLeagues.mockResolvedValue([{ id: '1', events: [{ id: '101', eventName: 'Week 1' }] }]);
+    PB_API.getLeague.mockResolvedValue({ id: '1', players: [] });
     PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineName: 'M1', machineId: 5, values: { 10: 100 } }]);
     PB_API.getScores.mockResolvedValue([]);
     PB_API.getCurrentUser.mockResolvedValue(null);
@@ -79,7 +90,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
   it('should hide selector and show summary when event is active', async () => {
     await initScoresPage();
     expect(document.getElementById('tournament-summary').classList.contains('hidden')).toBe(false);
-    expect(document.getElementById('tournament-summary-text').textContent).toContain('Week 1');
+    expect(document.getElementById('tournament-summary').textContent).toContain('Week 1');
   });
 
   it('should load inputs and results when a player is selected', async () => {

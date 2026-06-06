@@ -2,18 +2,22 @@
 <main class="page-container">
   <header class="hero-section" style="position: relative;">
     <div class="hero-text">
-      <h1>Welcome to PinBowling</h1>
-      <p>A quick attempt to put together a basic way to track pinball scores in a bowling format. </p> 
-      <p>This site is in ACTIVE DEVELOPMENT. Use at your own risk.</p>
+      <div class="hero-brand-text" style="text-align: center; margin-bottom: 2rem;">
+        <h1 class="hero-brand-name" style="margin-bottom: 0.5rem; font-size: clamp(1.5rem, 8vw, 2.5rem); overflow-wrap: break-word;"><?php echo $siteBrand; ?></h1>
+        <p class="hero-subtitle" style="opacity: 0.8;"><small><b><?php echo $siteSlogan; ?></b></small></p>
+      </div>
+      <div class="hero-brand-selector">
+        <img src="images/pinbowling.png" class="hero-logo-btn" data-format="bowling" alt="PinBowling">
+        <img src="images/pingolf.png" class="hero-logo-btn" data-format="golf" alt="PinGolf">
+      </div>
     </div>
-    <img src="<?php echo $baseUrl; ?>/images/logo.png" alt="PinBowling Logo" class="hero-logo-img">
   </header>
 
   <section class="card">
     <h2>About the Project</h2>
-    <p>The system attempts to map pinball scoring to bowling scoring. It calculates strikes, spares, and total scores following standard bowling rules based the target scores for each machine.</p>
+    <p><?php echo $aboutProject; ?></p>
     <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
-      <a href="<?php echo $baseUrl; ?>/play" class="btn-standard">Let's Bowl</a>
+      <a href="<?php echo $baseUrl; ?>/play" class="btn-standard" data-route="PLAY"><?php echo $active['cta']; ?></a>
       <a href="<?php echo $baseUrl; ?>/leagues" class="btn-standard">Manage Leagues</a>
       <a href="<?php echo $baseUrl; ?>/scores" class="btn-standard">Enter Scores</a>
     </div>
@@ -21,7 +25,11 @@
 
   <section class="card">
     <h2>Scoring Logic</h2>
-    <p>Each machine has target scores corresponding to pin counts. Reaching the target on ball 1 is a strike (X). Reaching it on ball 2 is a 9-count spare (9/). Reaching it on ball 3 is a spare based on your cumulative progress from balls 1 & 2 (capped at 8/).</p>
-    <p>Total scores are calculated following standard bowling rules, including strike and spare bonuses from subsequent frames.</p>
+    <p id="scoring-logic-text"><?php echo $active['logic']; ?></p>
+  </section>
+
+  <section class="card">
+    <h2>AI Disclosure</h2>
+    <p><?php echo $aiDisclosure; ?></p>
   </section>
 </main>
