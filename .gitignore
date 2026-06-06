@@ -9,6 +9,7 @@ vendor/
 .env.*.local
 
 # Testing
+vendor/
 coverage/
 *.log
 .phpunit.result.cache
