@@ -174,19 +174,42 @@ export async function initStandingsPage() {
    * Uses bulk-fetching for all scores and target definitions to ensure fast rendering.
    */
   const renderLeagueSummary = async (leagueId) => {
-    // Fetch all leagues to ensure we can resolve metadata regardless of type
-    const leagues = await PB_API.getLeagues();
+    // Fetch leagues and teams in parallel to support team-based grouping
+    const [leagues, allTeamsData] = await Promise.all([
+      PB_API.getLeagues(),
+      PB_API.getTeams()
+    ]);
     const league = leagues.find(l => String(l.id) === String(leagueId));
     const format = league?.scoringFormat || 'bowling';
     const engine = getScoringEngine(format);
+    const isTeamLeague = league?.participants === 'team';
+
     applyPreferredTheme(format);
-    const players = league?.players || [];
+    
+    let players = league?.players || [];
+    if (league?.participants === 'team') {
+      const memberMap = new Map();
+      (league.teams || []).forEach(t => {
+        (t.members || []).forEach(m => memberMap.set(String(m.id), { ...m, id: Number(m.id) }));
+      });
+      players = Array.from(memberMap.values());
+    }
+
     const events = league?.events || [];
 
-    const [allLeagueScores, allLeagueTargets] = await Promise.all([
+    const [rawScores, allLeagueTargets] = await Promise.all([
       PB_API.getScores(null, null, leagueId),
       PB_API.getTargetScores(null, leagueId)
     ]);
+
+    // Normalize raw database columns for scores
+    const allLeagueScores = rawScores.map(s => ({
+      ...s,
+      playerId: s.playerId || s.player_id,
+      eventId: s.eventId || s.event_id,
+      orderNumber: s.orderNumber || s.order_number,
+      machineId: s.machineId || s.machine_id
+    }));
 
     // Map raw database columns to camelCase and grouped 'values'
     const normalizedLeagueTargets = allLeagueTargets.map(t => ({
@@ -217,38 +240,60 @@ export async function initStandingsPage() {
       return acc;
     }, {});
 
-    // Pre-calculate weekly points if the league uses points-based scoring
-    const eventPointsMap = {}; // eventId -> playerId -> points
+    // Pre-calculate weekly points if the league uses points-based scoring.
+    // If it's a team league, points are assigned based on the entire Team's placement each week.
+    const eventPointsMap = {}; // eventId -> (playerId OR teamId) -> points
     if (league?.seasonScoring === 'weekly') {
       events.forEach(event => {
         const eventTargets = targetsByEvent[event.id] || [];
-        const eventPlayerScores = [];
+        const scoreEntities = []; // Will hold { id, total }
         
-        players.forEach(p => {
-          const scores = scoresByEventAndPlayer[event.id]?.[p.id] || [];
-          if (scores.length > 0) {
-            const scoreMap = scores.reduce((map, row) => {
-              map[String(row.orderNumber)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
-              return map;
-            }, {});
-            const { total } = engine.calculateTurnResults(eventTargets, scoreMap);
-            eventPlayerScores.push({ id: p.id, total });
-          }
-        });
+        if (isTeamLeague) {
+          (league.teams || []).forEach(team => {
+            let teamEventTotal = 0;
+            let hasData = false;
+            (team.members || []).forEach(m => {
+              const scores = scoresByEventAndPlayer[event.id]?.[m.id] || [];
+              if (scores.length > 0) {
+                hasData = true;
+                const scoreMap = scores.reduce((map, row) => {
+                  map[String(row.orderNumber)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
+                  return map;
+                }, {});
+                const { total } = engine.calculateTurnResults(eventTargets, scoreMap);
+                teamEventTotal += total;
+              }
+            });
+            if (hasData) scoreEntities.push({ id: team.id, total: teamEventTotal });
+          });
+        } else {
+          players.forEach(p => {
+            const scores = scoresByEventAndPlayer[event.id]?.[p.id] || [];
+            if (scores.length > 0) {
+              const scoreMap = scores.reduce((map, row) => {
+                map[String(row.orderNumber)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
+                return map;
+              }, {});
+              const { total } = engine.calculateTurnResults(eventTargets, scoreMap);
+              scoreEntities.push({ id: p.id, total });
+            }
+          });
+        }
 
         // Sort using the format-specific engine (e.g., Bowling high-to-low, Golf low-to-high)
-        eventPlayerScores.sort((a, b) => engine.compareScores(a.total, b.total));
+        scoreEntities.sort((a, b) => engine.compareScores(a.total, b.total));
         eventPointsMap[event.id] = {};
-        eventPlayerScores.forEach((ps, idx) => {
+        scoreEntities.forEach((entity, idx) => {
           // Inverse rank points: 1st place gets most points (equal to number of participants)
-          eventPointsMap[event.id][ps.id] = eventPlayerScores.length - idx;
+          eventPointsMap[event.id][entity.id] = scoreEntities.length - idx;
         });
       });
     }
 
-    const filteredPlayers = selectedPlayerIds.length > 0 ? players.filter(p => selectedPlayerIds.includes(String(p.id))) : players;
+    // For Season Summary, if it's a team league, we operate on teams rather than individuals.
+    const entitiesToMap = isTeamLeague ? (league.teams || []) : (selectedPlayerIds.length > 0 ? players.filter(p => selectedPlayerIds.includes(String(p.id))) : players);
 
-    // Pre-calculate which targets a player has actually touched across the whole league
+    // Pre-calculate which targets a player has actually touched across the league
     // to ensure par-relativity is accurate for the season total.
     const getPlayedTargets = (playerId) => {
       return normalizedLeagueTargets.filter(target => {
@@ -257,34 +302,55 @@ export async function initStandingsPage() {
       });
     };
 
-    const rows = filteredPlayers.map(player => {
+    const rows = entitiesToMap.map(entity => {
       let totalSeasonPoints = 0;
       const eventTotals = {};
       const individualScores = []; // Array of { eventId, value }
 
       events.forEach(event => {
         const eventTargets = targetsByEvent[event.id] || [];
-        const playerEventScores = scoresByEventAndPlayer[event.id]?.[player.id] || [];
+        let scoreValue = 0;
+        let hasData = false;
 
-        if (playerEventScores.length > 0 && eventTargets.length > 0) {
-          let scoreValue = 0;
-          if (league?.seasonScoring === 'weekly') {
-            const pts = eventPointsMap[event.id]?.[player.id] || 0;
-            eventTotals[event.id] = pts > 0 ? `${pts} pts` : '0 pts';
-            scoreValue = pts;
+        if (league?.seasonScoring === 'weekly') {
+          const pts = eventPointsMap[event.id]?.[entity.id] || 0;
+          scoreValue = pts;
+          hasData = pts > 0;
+        } else {
+          // Cumulative Total
+          if (isTeamLeague) {
+            (entity.members || []).forEach(m => {
+              const scores = scoresByEventAndPlayer[event.id]?.[m.id] || [];
+              if (scores.length > 0) {
+                hasData = true;
+                const scoreMap = scores.reduce((map, row) => {
+                  map[String(row.orderNumber)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
+                  return map;
+                }, {});
+                const { total } = engine.calculateTurnResults(eventTargets, scoreMap);
+                scoreValue += total;
+              }
+            });
           } else {
-            const scoreMap = playerEventScores.reduce((map, row) => {
-              map[String(row.orderNumber)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
-              return map;
-            }, {});
-
-            // Pass eventTargets to calculateTurnResults for correct par calculation in Golf
-            const { total, totalDisplay } = engine.calculateTurnResults(eventTargets, scoreMap); 
-            eventTotals[event.id] = totalDisplay;
-            scoreValue = total;
+            const playerEventScores = scoresByEventAndPlayer[event.id]?.[entity.id] || [];
+            if (playerEventScores.length > 0 && eventTargets.length > 0) {
+              hasData = true;
+              const scoreMap = playerEventScores.reduce((map, row) => {
+                map[String(row.orderNumber)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
+                return map;
+              }, {});
+              const { total } = engine.calculateTurnResults(eventTargets, scoreMap);
+              scoreValue = total;
+            }
           }
+        }
+
+        if (hasData) {
+          eventTotals[event.id] = league?.seasonScoring === 'weekly' ? `${scoreValue} pts` : engine.formatTotalScore(scoreValue);
           individualScores.push({ eventId: event.id, value: scoreValue });
-        } else { eventTotals[event.id] = null; }
+        } else {
+          eventTotals[event.id] = null;
+        }
       });
 
       // Drop lowest scores logic
@@ -311,7 +377,7 @@ export async function initStandingsPage() {
       }
 
       totalSeasonPoints = scoresToSum.reduce((sum, s) => sum + s.value, 0);
-      return { player, eventTotals, totalSeasonPoints, playedTargets: getPlayedTargets(player.id) };
+      return { entity, eventTotals, totalSeasonPoints, playedTargets: isTeamLeague ? [] : getPlayedTargets(entity.id) };
     });
 
     // Sorting: If weekly points, always sort descending (most points win). 
@@ -321,27 +387,27 @@ export async function initStandingsPage() {
       return engine.compareScores(a.totalSeasonPoints, b.totalSeasonPoints);
     });
 
-    renderFilterUI(players);
+    if (!isTeamLeague) renderFilterUI(players);
 
     if (tvTitle) {
       const league = leagues.find(l => String(l.id) === String(leagueId));
       tvTitle.textContent = `${league?.name || 'League'} - Season Summary`;
     }
 
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th style="text-align: center;">#</th><th style="text-align: center;">Player</th>${events.map((e, idx) => `<th style="text-align: center;">${idx + 1}</th>`).join('')}<th style="text-align: center;">Total</th></tr>`;
-    if (standingsBody) standingsBody.innerHTML = rows.map((row, idx) => {
-      return `
-      <tr>
-        <td style="text-align: center;">${idx + 1}</td>
-        <td class="player-name-cell"></td>
-        ${events.map(e => `<td>${row.eventTotals[e.id] !== null ? row.eventTotals[e.id] : '−'}</td>`).join('')}
-        <td class="standings-total">${league?.seasonScoring === 'weekly' ? `${row.totalSeasonPoints} pts` : engine.formatTotalScore(row.totalSeasonPoints, row.playedTargets)}</td>
-      </tr>
-    `;}).join('');
+    const playerLabel = isTeamLeague ? 'Team' : 'Player';
 
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th style="text-align: center;">#</th><th style="text-align: center;">${playerLabel}</th>${events.map((e, idx) => `<th style="text-align: center;">${idx + 1}</th>`).join('')}<th style="text-align: center;">Total</th></tr>`;
+    
     if (standingsBody) {
-      standingsBody.querySelectorAll('.player-name-cell').forEach((cell, i) => { cell.textContent = rows[i].player.playerName; });
+      standingsBody.innerHTML = rows.map((row, idx) => `
+        <tr>
+          <td style="text-align: center;">${idx + 1}</td>
+          <td class="player-name-cell">${isTeamLeague ? row.entity.name : row.entity.playerName}</td>
+          ${events.map(e => `<td>${row.eventTotals[e.id] !== null ? row.eventTotals[e.id] : '−'}</td>`).join('')}
+          <td class="standings-total">${league?.seasonScoring === 'weekly' ? `${row.totalSeasonPoints} pts` : engine.formatTotalScore(row.totalSeasonPoints, row.playedTargets)}</td>
+        </tr>`).join('');
     }
+
     if (standingsEmpty) standingsEmpty.classList.add('hidden');
     if (standingsWrapper) standingsWrapper.classList.remove('hidden');
   };
@@ -408,9 +474,30 @@ export async function initStandingsPage() {
 
     if (eventId === 'summary') return renderLeagueSummary(leagueId);
 
-    const players = league?.players || [];
+    let players = league?.players || [];
+    if (league?.participants === 'team') {
+      const memberMap = new Map();
+      (league.teams || []).forEach(t => {
+        (t.members || []).forEach(m => memberMap.set(String(m.id), { ...m, id: Number(m.id) }));
+      });
+      players = Array.from(memberMap.values());
+    }
+
     const rawMachines = await PB_API.getTargetScores(eventId);
+    const [rawScores, allTeamsData] = await Promise.all([
+      PB_API.getScores(null, Number(eventId)),
+      PB_API.getTeams()
+    ]);
     
+    // Normalize raw database columns for scores
+    const allEventScores = rawScores.map(s => ({
+      ...s,
+      playerId: s.playerId || s.player_id,
+      eventId: s.eventId || s.event_id,
+      orderNumber: s.orderNumber || s.order_number,
+      machineId: s.machineId || s.machine_id
+    }));
+
     const machines = rawMachines.map(t => ({
       ...t,
       machineId: t.machineId || t.machine_id,
@@ -425,8 +512,6 @@ export async function initStandingsPage() {
       }
     }));
 
-    const allEventScores = await PB_API.getScores(null, Number(eventId));
-    
     const scoresByPlayer = allEventScores.reduce((acc, s) => {
       if (!acc[s.playerId]) acc[s.playerId] = [];
       acc[s.playerId].push(s);
@@ -466,37 +551,63 @@ export async function initStandingsPage() {
       const { turnResults, total, totalDisplay } = Engine.calculateTurnResults(machines, scoreMap);
 
       return { player, turnResults, total, totalDisplay, ordersWithScores };
-    }).sort((a, b) => Engine.compareScores(a.total, b.total));
+    });
 
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th style="text-align: center;">#</th><th style="text-align: center;">Player</th>${machines.map(m => `<th style="text-align: center;">${m.orderNumber}</th>`).join('')}<th style="text-align: center;">Total</th></tr>`;
-    if (standingsBody) standingsBody.innerHTML = rows.map((res, idx) => {
-      let rowHasUpdate = false;
-      const turnsHtml = res.turnResults.map(t => {
-          const scoreKey = `${res.player.id}-${t.orderNumber}`;
-          const isNew = lastScoreState.has(scoreKey) && lastScoreState.get(scoreKey) !== currentScoreState.get(scoreKey);
-          if (isNew) rowHasUpdate = true;
+    const isTeamLeague = league?.participants === 'team';
+    const playerLabel = isTeamLeague ? 'Team' : 'Player';
+
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th style="text-align: center;">#</th><th style="text-align: center;">${playerLabel}</th>${machines.map(m => `<th style="text-align: center;">${m.orderNumber}</th>`).join('')}<th style="text-align: center;">Total</th></tr>`;
+    
+    if (standingsBody) {
+      if (isTeamLeague) {
+        const leagueTeamIds = new Set((league.teams || []).map(t => t.id));
+        const teams = allTeamsData.filter(t => leagueTeamIds.has(t.id));
+
+        const teamResults = teams.map(team => {
+          const memberIds = new Set(team.members.map(m => m.id));
+          const teamMembers = rows.filter(r => memberIds.has(r.player.id));
+          const teamTotal = teamMembers.reduce((sum, m) => sum + m.total, 0);
+          return { team, teamMembers, teamTotal };
+        }).sort((a, b) => Engine.compareScores(a.teamTotal, b.teamTotal));
+
+        standingsBody.innerHTML = teamResults.map((tr, idx) => {
+          const teamHeader = `<tr style="background-color: var(--pb-gray); font-weight: bold;"><td style="text-align: center;">${idx + 1}</td><td colspan="${machines.length + 1}">${tr.team.name}</td><td class="standings-total">${Engine.formatTotalScore(tr.teamTotal)}</td></tr>`;
+          const memberRows = tr.teamMembers.map(res => {
+            let rowHasUpdate = false;
+            const turnsHtml = res.turnResults.map(t => {
+              const scoreKey = `${res.player.id}-${t.orderNumber}`;
+              const isNew = lastScoreState.has(scoreKey) && lastScoreState.get(scoreKey) !== currentScoreState.get(scoreKey);
+              if (isNew) rowHasUpdate = true;
+              return `<td class="standings-round ${t.played ? 'has-score' : 'no-score'} ${(isTvMode && isNew) ? 'score-just-updated' : ''}" style="text-align: center;"><div class="standings-mark">${t.displayMark}</div><div class="standings-round-score">${t.displayRoundTotal}</div></td>`;
+            }).join('');
+            return `<tr><td></td><td class="player-name-cell" style="padding-left: 20px;">${res.player.playerName}</td>${turnsHtml}<td class="standings-total ${rowHasUpdate ? 'score-just-updated' : ''}">${res.totalDisplay}</td></tr>`;
+          }).join('');
+          return teamHeader + memberRows;
+        }).join('');
+      } else {
+        const sortedRows = rows.sort((a, b) => Engine.compareScores(a.total, b.total));
+        standingsBody.innerHTML = sortedRows.map((res, idx) => {
+          let rowHasUpdate = false;
+          const turnsHtml = res.turnResults.map(t => {
+              const scoreKey = `${res.player.id}-${t.orderNumber}`;
+              const isNew = lastScoreState.has(scoreKey) && lastScoreState.get(scoreKey) !== currentScoreState.get(scoreKey);
+              if (isNew) rowHasUpdate = true;
+              return `<td class="standings-round ${t.played ? 'has-score' : 'no-score'} ${(isTvMode && isNew) ? 'score-just-updated' : ''}" style="text-align: center;"><div class="standings-mark">${t.displayMark}</div><div class="standings-round-score">${t.displayRoundTotal}</div></td>`;
+          }).join('');
 
           return `
-          <td class="standings-round ${t.played ? 'has-score' : 'no-score'} ${(isTvMode && isNew) ? 'score-just-updated' : ''}" style="text-align: center;">
-            <div class="standings-mark">${t.displayMark}</div>
-            <div class="standings-round-score">${t.displayRoundTotal}</div>
-          </td>`;
-      }).join('');
-
-      return `
-      <tr>
-        <td>${idx + 1}</td>
-        <td class="player-name-cell"></td>
-        ${turnsHtml}
-        <td class="standings-total ${rowHasUpdate ? 'score-just-updated' : ''}">${res.totalDisplay}</td>
-      </tr>`;
-    }).join('');
+          <tr>
+            <td>${idx + 1}</td>
+            <td class="player-name-cell">${res.player.playerName}</td>
+            ${turnsHtml}
+            <td class="standings-total ${rowHasUpdate ? 'score-just-updated' : ''}">${res.totalDisplay}</td>
+          </tr>`;
+        }).join('');
+      }
+    }
 
     lastScoreState = currentScoreState;
 
-    if (standingsBody) {
-      standingsBody.querySelectorAll('.player-name-cell').forEach((cell, i) => { cell.textContent = rows[i].player.playerName; });
-    }
     if (standingsEmpty) standingsEmpty.classList.add('hidden');
     if (standingsWrapper) standingsWrapper.classList.remove('hidden');
   };

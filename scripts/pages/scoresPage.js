@@ -43,7 +43,15 @@ export async function initScoresPage() {
   // we clear it so the selector resets and refreshes to show standard leagues.
   // EXCEPTION: If we have both leagueId and eventId, we are deep-linking from "Let's Bowl".
   const initialLeagueId = getActiveLeagueId();
-  const initialEventId = getActiveEventId();
+  let initialEventId = getActiveEventId();
+
+  // The "summary" eventId is a virtual ID used for the Season Summary scoreboard.
+  // Scores must be entered for specific events, so we clear it if it persists from navigation.
+  if (initialEventId === 'summary') {
+    setActiveEventId('');
+    initialEventId = '';
+  }
+
   if (initialLeagueId && !initialEventId) {
     const active = initialLeagues.find(l => String(l.id) === String(initialLeagueId));
     if (active && active.type !== 'standard') {
@@ -251,7 +259,17 @@ export async function initScoresPage() {
       if (leagueId) {
         // Fetch the specific league to get the assigned roster
         const league = await PB_API.getLeague(leagueId);
-        selectablePlayers = league?.players || [];
+        
+        if (league?.participants === 'team') {
+          // In a team league, the selectable players are the members of the assigned teams
+          const memberMap = new Map();
+          (league.teams || []).forEach(team => {
+            (team.members || []).forEach(m => memberMap.set(String(m.id), m));
+          });
+          selectablePlayers = Array.from(memberMap.values());
+        } else {
+          selectablePlayers = league?.players || [];
+        }
       } else {
         selectablePlayers = allPlayers;
       }

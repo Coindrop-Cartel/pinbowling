@@ -57,19 +57,22 @@ function serializeLeague($row) {
         'scoringFormat' => $row['scoring_format'] ?? 'bowling',
         'seasonScoring' => $row['season_scoring'] ?? 'weekly',
         'dropLowestWeeks' => (int)($row['drop_lowest_weeks'] ?? 0),
-        'teams' => isset($row['teams']) ? array_map('serializeTeamInfo', $row['teams']) : [],
+        'teams' => isset($row['teams']) ? array_map('serializeTeamWithMembers', $row['teams']) : [],
         'events' => isset($row['events']) ? array_map('serializeEvent', $row['events']) : [],
         // Players are already standardized in playerService, keeping key consistent
         'players' => isset($row['players']) ? array_map('serializePlayer', $row['players']) : []
     ];
 }
 
-function serializeTeamInfo($row) {
+function serializeTeamWithMembers($row) {
     return [
         'id' => (int)$row['id'],
         'name' => $row['name'],
         'city' => $row['city'] ?? null,
-        'state' => $row['state'] ?? null
+        'state' => $row['state'] ?? null,
+        'members' => isset($row['members']) ? array_map(function($m) {
+            return ['id' => (int)$m['id'], 'playerName' => $m['player_name']];
+        }, $row['members']) : []
     ];
 }
 
@@ -119,12 +122,23 @@ try {
                     $league['players'] = $stmt->fetchAll();
 
                     $stmt = $pdo->prepare('
-                        SELECT t.* 
-                        FROM teams t 
-                        JOIN league_teams lt ON t.id = lt.team_id 
-                        WHERE lt.league_id = ?');
+                        SELECT t.*, 
+                               GROUP_CONCAT(p.id, ":", p.player_name SEPARATOR "|") as member_data
+                        FROM teams t
+                        JOIN league_teams lt ON t.id = lt.team_id
+                        LEFT JOIN team_members tm ON t.id = tm.team_id
+                        LEFT JOIN players p ON tm.player_id = p.id
+                        WHERE lt.league_id = ?
+                        GROUP BY t.id');
                     $stmt->execute([$id]);
-                    $league['teams'] = $stmt->fetchAll();
+                    $teams = $stmt->fetchAll();
+                    foreach ($teams as &$t) {
+                        $t['members'] = array_filter(array_map(function($m) {
+                            $parts = explode(":", $m);
+                            return count($parts) === 2 ? ['id' => $parts[0], 'player_name' => $parts[1]] : null;
+                        }, explode("|", $t['member_data'] ?? '')));
+                    }
+                    $league['teams'] = $teams;
 
                     sendJson(serializeLeague($league));
                 }
@@ -161,9 +175,13 @@ try {
 
             // Fetch all league teams
             $ltStmt = $pdo->query('
-                SELECT lt.league_id, t.* 
+                SELECT lt.league_id, t.*, 
+                       GROUP_CONCAT(p.id, ":", p.player_name SEPARATOR "|") as member_data
                 FROM teams t 
                 JOIN league_teams lt ON t.id = lt.team_id 
+                LEFT JOIN team_members tm ON t.id = tm.team_id
+                LEFT JOIN players p ON tm.player_id = p.id
+                GROUP BY lt.league_id, t.id
                 ORDER BY t.name ASC');
             $allLeagueTeams = $ltStmt->fetchAll();
 
@@ -185,7 +203,14 @@ try {
             // Group teams by league_id
             $teamsByLeague = [];
             foreach ($allLeagueTeams as $lt) {
-                $lId = $lt['league_id'];
+                $lId = (int)$lt['league_id'];
+
+                // Parse the GROUP_CONCAT member data into an array of objects for the serializer
+                $lt['members'] = array_filter(array_map(function($m) {
+                    $parts = explode(":", $m);
+                    return count($parts) === 2 ? ['id' => $parts[0], 'player_name' => $parts[1]] : null;
+                }, explode("|", $lt['member_data'] ?? '')));
+
                 $teamsByLeague[$lId][] = $lt;
             }
 

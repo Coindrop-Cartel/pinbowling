@@ -5,7 +5,7 @@
         <h1>Standings</h1>
         <button id="tv-mode-btn" class="btn-standard secondary no-print">TV Mode</button>
       </div>
-      <p class="no-print">See the current player rankings and frame-by-frame scores.</p>
+      <p class="no-print">See the current rankings and frame-by-frame scores.</p>
     </header>
 
     <div id="tournament-context-area" class="no-print">
