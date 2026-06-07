@@ -220,10 +220,36 @@ function initializeDatabaseSchema($pdo) {
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(255) NOT NULL,
         `type` ENUM('standard', 'session') DEFAULT 'standard',
+        `participants` ENUM('individual', 'team') DEFAULT 'individual',
         `start_date` DATE DEFAULT NULL,
         `scoring_format` VARCHAR(50) DEFAULT 'bowling',
         `season_scoring` ENUM('cumulative', 'weekly') DEFAULT 'weekly',
         `drop_lowest_weeks` INT DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `teams` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY,
+        `name` VARCHAR(255) NOT NULL,
+        `city` VARCHAR(255) DEFAULT NULL,
+        `state` VARCHAR(255) DEFAULT NULL,
+        UNIQUE KEY `unique_team_location` (`name`, `city`, `state`),
+        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `team_members` (
+        `team_id` INT NOT NULL,
+        `player_id` INT NOT NULL,
+        PRIMARY KEY (`team_id`, `player_id`),
+        CONSTRAINT `fk_tm_team` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_tm_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `league_teams` (
+        `league_id` INT NOT NULL,
+        `team_id` INT NOT NULL,
+        PRIMARY KEY (`league_id`, `team_id`),
+        CONSTRAINT `fk_lt_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_lt_team` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `users` (
@@ -373,6 +399,24 @@ function initializeDatabaseSchema($pdo) {
         $checkType = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'type'")->fetch();
         if (!$checkType) {
             $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `type` ENUM('standard', 'session') DEFAULT 'standard' AFTER `name` ");
+        }
+    }
+
+    // Ensure 'teams' table has city and state
+    $checkTeamsTable = $pdo->query("SHOW TABLES LIKE 'teams'")->fetch();
+    if ($checkTeamsTable) {
+        $checkCity = $pdo->query("SHOW COLUMNS FROM `teams` LIKE 'city'")->fetch();
+        if (!$checkCity) {
+            $pdo->exec("ALTER TABLE `teams` ADD COLUMN `city` VARCHAR(255) DEFAULT NULL AFTER `name`, ADD COLUMN `state` VARCHAR(255) DEFAULT NULL AFTER `city` ");
+            $pdo->exec("ALTER TABLE `teams` ADD UNIQUE KEY `unique_team_location` (`name`, `city`, `state`) ");
+        }
+    }
+
+    // Ensure 'leagues' table has the 'participants' column for individual vs team distinction
+    if ($checkLeagues) {
+        $checkParticipants = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'participants'")->fetch();
+        if (!$checkParticipants) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `participants` ENUM('individual', 'team') DEFAULT 'individual' AFTER `type` ");
         }
     }
 

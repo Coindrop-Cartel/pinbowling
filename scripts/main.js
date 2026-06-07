@@ -10,6 +10,7 @@ import { initLocationsPage } from '@pages/locationsPage.js';
 import { initEventSetupPage } from '@scripts/pages/eventSetupPage.js';
 import { initPlayersPage } from '@pages/playersPage.js';
 import { initScoresPage } from '@pages/scoresPage.js';
+import { initTeamsPage } from '@pages/teamsPage.js';
 import { initStandingsPage } from '@pages/standingsPage.js';
 import { initLeaguesPage } from '@pages/leaguesPage.js';
 import { initPlayPage } from '@pages/playPage.js';
@@ -51,6 +52,7 @@ export function initApp() {
     'location-form': initLocationsPage,
     'round-form': initEventSetupPage,
     'player-list': initPlayersPage,
+    'team-form': initTeamsPage,
     'rounds-input': initScoresPage,
     'standings-body': initStandingsPage,
     'leagues-list': initLeaguesPage,

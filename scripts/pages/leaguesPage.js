@@ -32,6 +32,8 @@ export async function initLeaguesPage() {
   const leagueFormatInput = document.getElementById('league-scoring-format');
   const leagueSeasonScoringInput = document.getElementById('league-season-scoring');
   const seasonScoringRow = document.getElementById('league-season-scoring-row');
+  const leagueParticipantsInput = document.getElementById('league-participants');
+  const participantsRow = document.getElementById('league-participants-row');
   const leagueDropLowestInput = document.getElementById('league-drop-weeks');
   const dropLowestRow = document.getElementById('league-drop-weeks-row');
 
@@ -60,6 +62,7 @@ export async function initLeaguesPage() {
   // Initially hide the creation fields
   if (dateRow) dateRow.classList.add('hidden');
   if (formatRow) formatRow.classList.add('hidden');
+  if (participantsRow) participantsRow.classList.add('hidden');
   if (seasonScoringRow) seasonScoringRow.classList.add('hidden');
   if (dropLowestRow) dropLowestRow.classList.add('hidden');
   if (actionsRow) actionsRow.classList.add('hidden');
@@ -80,6 +83,7 @@ export async function initLeaguesPage() {
       } else {
         dateRow.classList.remove('hidden');
         formatRow.classList.remove('hidden');
+        if (participantsRow) participantsRow.classList.remove('hidden');
         if (seasonScoringRow) seasonScoringRow.classList.remove('hidden');
         if (dropLowestRow) dropLowestRow.classList.remove('hidden');
         actionsRow.classList.remove('hidden');
@@ -99,6 +103,7 @@ export async function initLeaguesPage() {
 
     dateRow.classList.add('hidden');
     formatRow.classList.add('hidden');
+    if (participantsRow) participantsRow.classList.add('hidden');
     if (seasonScoringRow) seasonScoringRow.classList.add('hidden');
     if (dropLowestRow) dropLowestRow.classList.add('hidden');
     actionsRow.classList.add('hidden');
@@ -116,6 +121,7 @@ export async function initLeaguesPage() {
     leagueNameInput.value = league.name;
     leagueDateInput.value = league.startDate || '';
     leagueFormatInput.value = league.scoringFormat || 'bowling';
+    if (leagueParticipantsInput) leagueParticipantsInput.value = league.participants || 'individual';
     if (leagueSeasonScoringInput) leagueSeasonScoringInput.value = league.seasonScoring || 'weekly';
     if (leagueDropLowestInput) leagueDropLowestInput.value = league.dropLowestWeeks || 0;
 
@@ -124,6 +130,7 @@ export async function initLeaguesPage() {
 
     dateRow.classList.remove('hidden');
     formatRow.classList.remove('hidden');
+    if (participantsRow) participantsRow.classList.remove('hidden');
     if (seasonScoringRow) seasonScoringRow.classList.remove('hidden');
     if (dropLowestRow) dropLowestRow.classList.remove('hidden');
     actionsRow.classList.remove('hidden');
@@ -153,11 +160,14 @@ export async function initLeaguesPage() {
       emptyNotice.classList.add('hidden');
       filtered.forEach(league => {
         const shouldExpand = activeLeagueId && String(league.id) === String(activeLeagueId);
+        
+        const participantCount = league.participants === 'team' ? (league.teams?.length || 0) : (league.players?.length || 0);
+        const participantLabel = league.participants === 'team' ? 'Teams' : 'Players';
 
         const headerHtml = `
           <div>
             <h3 style="margin: 0; font-size: 1.05rem;">${league.name}</h3>
-            <small>Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}</small>
+            <small>Started: ${league.startDate || 'N/A'} | ${league.participants === 'team' ? 'Team' : 'Individual'} | Events: ${league.events?.length || 0} | ${participantLabel}: ${participantCount} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}</small>
           </div>
         `;
 
@@ -170,11 +180,11 @@ export async function initLeaguesPage() {
 
           <div class="league-players-section" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <h4 style="margin: 0;">Roster</h4>
-              ${isAuthorized ? `<button class="add-player-btn secondary btn-row" data-league-id="${league.id}" data-league-name="${league.name}">Add Player</button>` : ''}
+              <h4 style="margin: 0;">${league.participants === 'team' ? 'Teams' : 'Roster'}</h4>
+              ${isAuthorized ? `<button class="${league.participants === 'team' ? 'add-team-btn' : 'add-player-btn'} secondary btn-row" data-league-id="${league.id}" data-league-name="${league.name}">Add ${league.participants === 'team' ? 'Team' : 'Player'}</button>` : ''}
             </div>
-            <ul class="league-players-list" style="list-style: none; padding: 0;"></ul>
-            <div class="notice league-players-empty hidden">No players assigned to this league.</div>
+            <ul class="league-participants-list" style="list-style: none; padding: 0;"></ul>
+            <div class="notice league-participants-empty hidden">No ${league.participants === 'team' ? 'teams' : 'players'} assigned to this league.</div>
           </div>
           <div style="display: flex; gap: 8px;">
             ${isAuthorized ? '<button class="edit-league-btn secondary btn-row">Edit League</button>' : ''}
@@ -204,11 +214,15 @@ export async function initLeaguesPage() {
           row.querySelector('.edit-league-btn').onclick = () => editLeague(league);
           row.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
           row.querySelector('.delete-league-btn').onclick = () => deleteLeague(league.id, league.name);
-          row.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
+          if (row.querySelector('.add-player-btn')) row.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
+          if (row.querySelector('.add-team-btn')) row.querySelector('.add-team-btn').onclick = () => addTeamToLeague(league.id, league.name);
         }
 
         renderEventsForLeague(league.id, league.events, league.name);
-        if (shouldExpand) renderPlayersForLeague(league.id, league.players, allPlayersCache);
+        if (shouldExpand) {
+          if (league.participants === 'team') renderTeamsForLeague(league.id, league.teams);
+          else renderPlayersForLeague(league.id, league.players, allPlayersCache);
+        }
 
         // Smooth scroll to the expanded league if we just came from setup
         if (shouldExpand && !query) {
@@ -264,13 +278,14 @@ export async function initLeaguesPage() {
     const name = leagueNameInput.value.trim();
     const date = leagueDateInput.value;
     const scoringFormat = leagueFormatInput.value;
+    const participants = leagueParticipantsInput?.value || 'individual';
     const seasonScoring = leagueSeasonScoringInput?.value || 'weekly';
     const dropLowestWeeks = parseInt(leagueDropLowestInput?.value || '0', 10);
 
     if (!isAuthorized) return;
 
     try {
-      const payload = { name, startDate: date, scoringFormat, seasonScoring, dropLowestWeeks };
+      const payload = { name, startDate: date, scoringFormat, participants, seasonScoring, dropLowestWeeks };
       if (editingLeagueId) {
         await PB_API.updateLeague(editingLeagueId, payload);
       } else {
@@ -318,14 +333,92 @@ export async function initLeaguesPage() {
     });
   }
 
+  async function renderTeamsForLeague(leagueId, leagueTeams) {
+    const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
+    if (!card) return;
+
+    const section = card.querySelector('.league-players-section');
+    const teamsListEl = section.querySelector('.league-participants-list');
+    const emptyNoticeEl = section.querySelector('.league-participants-empty');
+
+    teamsListEl.innerHTML = '';
+    if (leagueTeams && leagueTeams.length > 0) {
+        emptyNoticeEl.classList.add('hidden');
+        leagueTeams.forEach(team => {
+            const li = document.createElement('li');
+            li.style = "display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;";
+            li.innerHTML = `
+                <span>${team.name} <small>(${team.city || 'No City'})</small></span>
+                ${isAuthorized ? `<button class="remove-team-btn btn-row" data-league-id="${leagueId}" data-team-id="${team.id}" data-team-name="${team.name}">Delete</button>` : ''}
+            `;
+            teamsListEl.appendChild(li);
+        });
+    } else {
+        emptyNoticeEl.classList.remove('hidden');
+    }
+
+    teamsListEl.querySelectorAll('.remove-team-btn').forEach(btn => {
+        btn.onclick = (e) => removeTeamFromLeague(
+            Number(e.target.dataset.leagueId),
+            Number(e.target.dataset.teamId),
+            e.target.dataset.teamName
+        );
+    });
+  }
+
+  async function addTeamToLeague(leagueId, leagueName) {
+    const league = allLeagues.find(l => l.id === leagueId);
+    if (!league) return;
+    
+    const teamsInLeague = new Set((league.teams || []).map(t => t.id));
+    const allTeams = await PB_API.getTeams();
+    const availableTeams = allTeams.filter(t => !teamsInLeague.has(t.id));
+
+    if (availableTeams.length === 0) {
+        alert('All available teams are already in this league.');
+        return;
+    }
+
+    const teamOptions = availableTeams.map(t => ({ value: t.id, label: `${t.name} (${t.city || 'No City'})` }));
+    const selectedTeamId = await showPlayerSelectionDialog(
+        `Add Team to ${leagueName}`,
+        'Select a team to add:',
+        teamOptions
+    );
+
+    if (selectedTeamId) {
+        await PB_API.addLeagueTeam(leagueId, Number(selectedTeamId));
+        const team = allTeams.find(t => t.id === Number(selectedTeamId));
+        if (team) {
+            if (!league.teams) league.teams = [];
+            league.teams.push(team);
+            renderTeamsForLeague(leagueId, league.teams);
+            updateLeagueHeaderStats(leagueId, league);
+        }
+    }
+  }
+
+  async function removeTeamFromLeague(leagueId, teamId, teamName) {
+    if (!await showConfirm(`Remove "${teamName}" from this league?`, 'Remove Team')) return;
+    await runAuthorizedLeagueAction(leagueId, async () => {
+      await PB_API.removeLeagueTeam(leagueId, teamId);
+      const league = allLeagues.find(l => l.id === leagueId);
+      if (league && league.teams) {
+          league.teams = league.teams.filter(t => t.id !== teamId);
+          renderTeamsForLeague(leagueId, league.teams);
+          updateLeagueHeaderStats(leagueId, league);
+      }
+    });
+  }
+
   async function renderPlayersForLeague(leagueId, leaguePlayers, allPlayers) {
     // Find the roster list specifically for this league card
     const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
     if (!card) return;
 
     const section = card.querySelector('.league-players-section');
-    const playersListEl = section.querySelector('.league-players-list');
-    const emptyNoticeEl = section.querySelector('.league-players-empty');
+    const playersListEl = section.querySelector('.league-participants-list');
+    const emptyNoticeEl = section.querySelector('.league-participants-empty');
 
     playersListEl.innerHTML = '';
     if (leaguePlayers && leaguePlayers.length > 0) {
@@ -361,7 +454,10 @@ export async function initLeaguesPage() {
 
     const statsEl = card.querySelector('.league-header small');
     if (statsEl) {
-      statsEl.textContent = `Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}`;
+      const participantCount = league.participants === 'team' ? (league.teams?.length || 0) : (league.players?.length || 0);
+      const participantLabel = league.participants === 'team' ? 'Teams' : 'Players';
+
+      statsEl.textContent = `Started: ${league.startDate || 'N/A'} | ${league.participants === 'team' ? 'Team' : 'Individual'} | Events: ${league.events?.length || 0} | ${participantLabel}: ${participantCount} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}`;
     }
   }
 

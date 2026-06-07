@@ -127,6 +127,16 @@ export const PB_API = {
   addLeaguePlayer: (leagueId, playerId) => fetchJSON('service/leagueService.php?task=member', { method: 'POST', body: JSON.stringify({ leagueId, playerId }) }),
   removeLeaguePlayer: (leagueId, playerId) => fetchJSON(`service/leagueService.php?task=member&leagueId=${leagueId}&playerId=${playerId}`, { method: 'DELETE' }),
 
+  // Teams
+  getTeams: () => fetchJSON('service/teamService.php'),
+  createTeam: (data) => fetchJSON('service/teamService.php', { method: 'POST', body: JSON.stringify(data) }),
+  updateTeam: (id, data) => fetchJSON(`service/teamService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteTeam: (id) => fetchJSON(`service/teamService.php?id=${id}`, { method: 'DELETE' }),
+  addTeamMember: (teamId, playerId) => fetchJSON('service/teamService.php?task=member', { method: 'POST', body: JSON.stringify({ teamId, playerId }) }),
+  removeTeamMember: (teamId, playerId) => fetchJSON(`service/teamService.php?task=member&teamId=${teamId}&playerId=${playerId}`, { method: 'DELETE' }),
+  addLeagueTeam: (leagueId, teamId) => fetchJSON('service/teamService.php?task=league', { method: 'POST', body: JSON.stringify({ leagueId, teamId }) }),
+  removeLeagueTeam: (leagueId, teamId) => fetchJSON(`service/teamService.php?task=league&leagueId=${leagueId}&teamId=${teamId}`, { method: 'DELETE' }),
+
   // Locations and Target Scores
   getLocations: (params) => fetchJSON('service/locationService.php', { params }),
   createLocation: (loc) => fetchJSON('service/locationService.php', { method: 'POST', body: JSON.stringify(loc) }),

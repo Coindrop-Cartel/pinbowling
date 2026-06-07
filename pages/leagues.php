@@ -14,6 +14,13 @@
           <label for="league-start-date">Start Date</label>
           <input id="league-start-date" type="date" required style="width: 100%; box-sizing: border-box;" />
         </div>
+        <div id="league-participants-row" class="form-row hidden">
+          <label for="league-participants">League Type</label>
+          <select id="league-participants" style="width: 100%; box-sizing: border-box;">
+            <option value="individual" selected>Individual</option>
+            <option value="team">Team</option>
+          </select>
+        </div>
         <div id="league-format-row" class="form-row hidden">
           <label for="league-scoring-format">Default Scoring Format</label>
           <select id="league-scoring-format" style="width: 100%; box-sizing: border-box;"></select>

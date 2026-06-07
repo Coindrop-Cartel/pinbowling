@@ -52,13 +52,24 @@ function serializeLeague($row) {
         'id' => (int)$row['id'],
         'name' => $row['name'],
         'type' => $row['type'] ?? 'standard',
+        'participants' => $row['participants'] ?? 'individual',
         'startDate' => $row['start_date'],
         'scoringFormat' => $row['scoring_format'] ?? 'bowling',
         'seasonScoring' => $row['season_scoring'] ?? 'weekly',
         'dropLowestWeeks' => (int)($row['drop_lowest_weeks'] ?? 0),
+        'teams' => isset($row['teams']) ? array_map('serializeTeamInfo', $row['teams']) : [],
         'events' => isset($row['events']) ? array_map('serializeEvent', $row['events']) : [],
         // Players are already standardized in playerService, keeping key consistent
         'players' => isset($row['players']) ? array_map('serializePlayer', $row['players']) : []
+    ];
+}
+
+function serializeTeamInfo($row) {
+    return [
+        'id' => (int)$row['id'],
+        'name' => $row['name'],
+        'city' => $row['city'] ?? null,
+        'state' => $row['state'] ?? null
     ];
 }
 
@@ -107,6 +118,14 @@ try {
                     $stmt->execute([$id]);
                     $league['players'] = $stmt->fetchAll();
 
+                    $stmt = $pdo->prepare('
+                        SELECT t.* 
+                        FROM teams t 
+                        JOIN league_teams lt ON t.id = lt.team_id 
+                        WHERE lt.league_id = ?');
+                    $stmt->execute([$id]);
+                    $league['teams'] = $stmt->fetchAll();
+
                     sendJson(serializeLeague($league));
                 }
                 sendJson(['error' => 'League not found'], 404);
@@ -140,6 +159,14 @@ try {
                 ORDER BY p.player_name ASC');
             $allLeaguePlayers = $lpStmt->fetchAll();
 
+            // Fetch all league teams
+            $ltStmt = $pdo->query('
+                SELECT lt.league_id, t.* 
+                FROM teams t 
+                JOIN league_teams lt ON t.id = lt.team_id 
+                ORDER BY t.name ASC');
+            $allLeagueTeams = $ltStmt->fetchAll();
+
             // Group events by their league_id
             $eventsByLeague = [];
             foreach ($allEvents as $event) {
@@ -155,10 +182,18 @@ try {
                 $playersByLeague[$lId][] = $lp;
             }
 
+            // Group teams by league_id
+            $teamsByLeague = [];
+            foreach ($allLeagueTeams as $lt) {
+                $lId = $lt['league_id'];
+                $teamsByLeague[$lId][] = $lt;
+            }
+
             // Attach events to their corresponding leagues
             foreach ($leagues as &$league) {
                 $league['events'] = $eventsByLeague[(int)$league['id']] ?? [];
                 $league['players'] = $playersByLeague[(int)$league['id']] ?? [];
+                $league['teams'] = $teamsByLeague[(int)$league['id']] ?? [];
             }
 
             sendJson(array_map('serializeLeague', $leagues));
@@ -212,12 +247,13 @@ try {
         } else {
             if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
             
-            $sql = 'INSERT INTO leagues (name, start_date, type, scoring_format, season_scoring, drop_lowest_weeks) VALUES (?, ?, ?, ?, ?, ?)';
+            $sql = 'INSERT INTO leagues (name, start_date, type, participants, scoring_format, season_scoring, drop_lowest_weeks) VALUES (?, ?, ?, ?, ?, ?, ?)';
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 $input['name'], 
                 $input['startDate'] ?? null, 
                 $input['type'] ?? 'standard',
+                $input['participants'] ?? 'individual',
                 $input['scoringFormat'] ?? 'bowling',
                 $input['seasonScoring'] ?? 'weekly',
                 (int)($input['dropLowestWeeks'] ?? 0)

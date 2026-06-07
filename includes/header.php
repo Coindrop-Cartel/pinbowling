@@ -20,6 +20,7 @@
           <a href="<?php echo $baseUrl; ?>/machines" class="nav-link" data-route="MACHINES">Machines</a>
           <a href="<?php echo $baseUrl; ?>/locations" class="nav-link" data-route="LOCATIONS">Locations</a>
           <a href="<?php echo $baseUrl; ?>/players" class="nav-link" data-route="PLAYERS">Players</a>
+          <a id="nav-teams" href="<?php echo $baseUrl; ?>/teams" class="nav-link" data-route="TEAMS">Teams</a>
           <a id="nav-maintenance" href="<?php echo $baseUrl; ?>/management" class="nav-link" data-route="MAINTENANCE">Maintenance</a>
         </div>
       </li>
