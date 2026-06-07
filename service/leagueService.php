@@ -54,6 +54,8 @@ function serializeLeague($row) {
         'type' => $row['type'] ?? 'standard',
         'startDate' => $row['start_date'],
         'scoringFormat' => $row['scoring_format'] ?? 'bowling',
+        'seasonScoring' => $row['season_scoring'] ?? 'weekly',
+        'dropLowestWeeks' => (int)($row['drop_lowest_weeks'] ?? 0),
         'events' => isset($row['events']) ? array_map('serializeEvent', $row['events']) : [],
         // Players are already standardized in playerService, keeping key consistent
         'players' => isset($row['players']) ? array_map('serializePlayer', $row['players']) : []
@@ -117,7 +119,7 @@ try {
             
             // Fetch leagues (optionally filtered by type)
             $typeFilter = $_GET['type'] ?? null;
-            $sql = 'SELECT id, name, start_date, type, scoring_format FROM leagues';
+            $sql = 'SELECT * FROM leagues';
             if ($typeFilter) $sql .= ' WHERE type = ?';
             $sql .= ' ORDER BY start_date DESC';
             
@@ -210,17 +212,19 @@ try {
         } else {
             if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
             
-            $sql = 'INSERT INTO leagues (name, start_date, type, scoring_format) VALUES (?, ?, ?, ?)';
+            $sql = 'INSERT INTO leagues (name, start_date, type, scoring_format, season_scoring, drop_lowest_weeks) VALUES (?, ?, ?, ?, ?, ?)';
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 $input['name'], 
                 $input['startDate'] ?? null, 
                 $input['type'] ?? 'standard',
-                $input['scoringFormat'] ?? 'bowling'
+                $input['scoringFormat'] ?? 'bowling',
+                $input['seasonScoring'] ?? 'weekly',
+                (int)($input['dropLowestWeeks'] ?? 0)
             ]);
             $newId = $pdo->lastInsertId();
 
-            $stmt = $pdo->prepare('SELECT id, name, start_date, type, scoring_format FROM leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT * FROM leagues WHERE id = ?');
             $stmt->execute([$newId]);
             $row = $stmt->fetch();
             if (!$row) {
@@ -243,11 +247,13 @@ try {
             $stmt->execute($params);
             $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id WHERE e.id = ?');
         } else {
-            $sql = 'UPDATE leagues SET name = ?, start_date = ?, scoring_format = ? WHERE id = ?';
+            $sql = 'UPDATE leagues SET name = ?, start_date = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ? WHERE id = ?';
             $params = [
                 $input['name'], 
                 $input['startDate'] ?? null, 
                 $input['scoringFormat'] ?? 'bowling',
+                $input['seasonScoring'] ?? 'weekly',
+                (int)($input['dropLowestWeeks'] ?? 0),
                 $id
             ];
             $stmt = $pdo->prepare($sql);

@@ -18,6 +18,14 @@
           <label for="league-scoring-format">Default Scoring Format</label>
           <select id="league-scoring-format" style="width: 100%; box-sizing: border-box;"></select>
         </div>
+        <div id="league-season-scoring-row" class="form-row hidden">
+          <label for="league-season-scoring">Season Scoring</label>
+          <select id="league-season-scoring" style="width: 100%; box-sizing: border-box;"></select>
+        </div>
+        <div id="league-drop-weeks-row" class="form-row hidden">
+          <label for="league-drop-weeks">Drop Lowest Weeks</label>
+          <input id="league-drop-weeks" type="number" min="0" value="0" style="width: 100%; box-sizing: border-box;" />
+        </div>
         <div class="form-actions hidden">
           <button type="submit" id="create-league-btn" class="btn-mgmt" disabled>Create League</button>
         </div>

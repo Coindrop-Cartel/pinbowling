@@ -188,7 +188,23 @@ export async function initStandingsPage() {
       PB_API.getTargetScores(null, leagueId)
     ]);
 
-    const targetsByEvent = allLeagueTargets.reduce((acc, t) => {
+    // Map raw database columns to camelCase and grouped 'values'
+    const normalizedLeagueTargets = allLeagueTargets.map(t => ({
+      ...t,
+      eventId: t.eventId || t.event_id,
+      machineId: t.machineId || t.machine_id,
+      machineName: t.machineName || t.machine_name,
+      orderNumber: t.orderNumber || t.order_number,
+      value1: Number(t.value1 || 0),
+      value2: Number(t.value2 || 0),
+      values: t.values || {
+        1: Number(t.score1 || 0), 2: Number(t.score2 || 0), 3: Number(t.score3 || 0), 
+        4: Number(t.score4 || 0), 5: Number(t.score5 || 0), 6: Number(t.score6 || 0), 
+        7: Number(t.score7 || 0), 8: Number(t.score8 || 0), 9: Number(t.score9 || 0), 10: Number(t.score10 || 0)
+      }
+    }));
+
+    const targetsByEvent = normalizedLeagueTargets.reduce((acc, t) => {
       if (!acc[t.eventId]) acc[t.eventId] = [];
       acc[t.eventId].push(t);
       return acc;
@@ -201,12 +217,41 @@ export async function initStandingsPage() {
       return acc;
     }, {});
 
+    // Pre-calculate weekly points if the league uses points-based scoring
+    const eventPointsMap = {}; // eventId -> playerId -> points
+    if (league?.seasonScoring === 'weekly') {
+      events.forEach(event => {
+        const eventTargets = targetsByEvent[event.id] || [];
+        const eventPlayerScores = [];
+        
+        players.forEach(p => {
+          const scores = scoresByEventAndPlayer[event.id]?.[p.id] || [];
+          if (scores.length > 0) {
+            const scoreMap = scores.reduce((map, row) => {
+              map[String(row.orderNumber)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
+              return map;
+            }, {});
+            const { total } = engine.calculateTurnResults(eventTargets, scoreMap);
+            eventPlayerScores.push({ id: p.id, total });
+          }
+        });
+
+        // Sort using the format-specific engine (e.g., Bowling high-to-low, Golf low-to-high)
+        eventPlayerScores.sort((a, b) => engine.compareScores(a.total, b.total));
+        eventPointsMap[event.id] = {};
+        eventPlayerScores.forEach((ps, idx) => {
+          // Inverse rank points: 1st place gets most points (equal to number of participants)
+          eventPointsMap[event.id][ps.id] = eventPlayerScores.length - idx;
+        });
+      });
+    }
+
     const filteredPlayers = selectedPlayerIds.length > 0 ? players.filter(p => selectedPlayerIds.includes(String(p.id))) : players;
 
     // Pre-calculate which targets a player has actually touched across the whole league
     // to ensure par-relativity is accurate for the season total.
     const getPlayedTargets = (playerId) => {
-      return allLeagueTargets.filter(target => {
+      return normalizedLeagueTargets.filter(target => {
         const playerScores = scoresByEventAndPlayer[target.eventId]?.[playerId] || [];
         return playerScores.some(s => Number(s.orderNumber) === Number(target.orderNumber));
       });
@@ -215,25 +260,66 @@ export async function initStandingsPage() {
     const rows = filteredPlayers.map(player => {
       let totalSeasonPoints = 0;
       const eventTotals = {};
+      const individualScores = []; // Array of { eventId, value }
+
       events.forEach(event => {
         const eventTargets = targetsByEvent[event.id] || [];
         const playerEventScores = scoresByEventAndPlayer[event.id]?.[player.id] || [];
 
         if (playerEventScores.length > 0 && eventTargets.length > 0) {
-          const scoreMap = playerEventScores.reduce((map, row) => {
-            map[String(row.orderNumber)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
-            return map;
-          }, {});
+          let scoreValue = 0;
+          if (league?.seasonScoring === 'weekly') {
+            const pts = eventPointsMap[event.id]?.[player.id] || 0;
+            eventTotals[event.id] = pts > 0 ? `${pts} pts` : '0 pts';
+            scoreValue = pts;
+          } else {
+            const scoreMap = playerEventScores.reduce((map, row) => {
+              map[String(row.orderNumber)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
+              return map;
+            }, {});
 
-          // Pass eventTargets to calculateTurnResults for correct par calculation in Golf
-          const { total, totalDisplay } = engine.calculateTurnResults(eventTargets, scoreMap); 
-          eventTotals[event.id] = totalDisplay;
-          totalSeasonPoints += total; 
+            // Pass eventTargets to calculateTurnResults for correct par calculation in Golf
+            const { total, totalDisplay } = engine.calculateTurnResults(eventTargets, scoreMap); 
+            eventTotals[event.id] = totalDisplay;
+            scoreValue = total;
+          }
+          individualScores.push({ eventId: event.id, value: scoreValue });
         } else { eventTotals[event.id] = null; }
       });
 
+      // Drop lowest scores logic
+      const dropCount = Number(league?.dropLowestWeeks || 0);
+      let scoresToSum = [...individualScores];
+      
+      if (dropCount > 0 && individualScores.length > 0) {
+        // Sort individualScores by performance: Best to Worst. 
+        // engine.compareScores(a, b) returns positive if b is better than a.
+        scoresToSum.sort((a, b) => {
+          if (league?.seasonScoring === 'weekly') return b.value - a.value;
+          return engine.compareScores(a.value, b.value);
+        });
+
+        // The worst scores are at the end of the sorted array. 
+        const numToDrop = Math.min(dropCount, scoresToSum.length);
+        const dropped = scoresToSum.splice(-numToDrop);
+        
+        dropped.forEach(d => {
+          if (eventTotals[d.eventId]) {
+            eventTotals[d.eventId] = `<span style="text-decoration: line-through; opacity: 0.5;">${eventTotals[d.eventId]}</span>`;
+          }
+        });
+      }
+
+      totalSeasonPoints = scoresToSum.reduce((sum, s) => sum + s.value, 0);
       return { player, eventTotals, totalSeasonPoints, playedTargets: getPlayedTargets(player.id) };
-    }).sort((a, b) => engine.compareScores(a.totalSeasonPoints, b.totalSeasonPoints));
+    });
+
+    // Sorting: If weekly points, always sort descending (most points win). 
+    // If cumulative, use engine comparison (Bowling high-wins, Golf low-wins).
+    rows.sort((a, b) => {
+      if (league?.seasonScoring === 'weekly') return b.totalSeasonPoints - a.totalSeasonPoints;
+      return engine.compareScores(a.totalSeasonPoints, b.totalSeasonPoints);
+    });
 
     renderFilterUI(players);
 
@@ -249,7 +335,7 @@ export async function initStandingsPage() {
         <td style="text-align: center;">${idx + 1}</td>
         <td class="player-name-cell"></td>
         ${events.map(e => `<td>${row.eventTotals[e.id] !== null ? row.eventTotals[e.id] : '−'}</td>`).join('')}
-        <td class="standings-total">${engine.formatTotalScore(row.totalSeasonPoints, row.playedTargets)}</td>
+        <td class="standings-total">${league?.seasonScoring === 'weekly' ? `${row.totalSeasonPoints} pts` : engine.formatTotalScore(row.totalSeasonPoints, row.playedTargets)}</td>
       </tr>
     `;}).join('');
 
@@ -323,7 +409,22 @@ export async function initStandingsPage() {
     if (eventId === 'summary') return renderLeagueSummary(leagueId);
 
     const players = league?.players || [];
-    const machines = await PB_API.getTargetScores(eventId);
+    const rawMachines = await PB_API.getTargetScores(eventId);
+    
+    const machines = rawMachines.map(t => ({
+      ...t,
+      machineId: t.machineId || t.machine_id,
+      machineName: t.machineName || t.machine_name,
+      orderNumber: t.orderNumber || t.order_number,
+      value1: Number(t.value1 || 0),
+      value2: Number(t.value2 || 0),
+      values: t.values || {
+        1: Number(t.score1 || 0), 2: Number(t.score2 || 0), 3: Number(t.score3 || 0), 
+        4: Number(t.score4 || 0), 5: Number(t.score5 || 0), 6: Number(t.score6 || 0), 
+        7: Number(t.score7 || 0), 8: Number(t.score8 || 0), 9: Number(t.score9 || 0), 10: Number(t.score10 || 0)
+      }
+    }));
+
     const allEventScores = await PB_API.getScores(null, Number(eventId));
     
     const scoresByPlayer = allEventScores.reduce((acc, s) => {

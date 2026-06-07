@@ -12,6 +12,7 @@ import { ROUTES } from '@scripts/routes.js';
  */
 export async function initLeaguesPage() {
   const isAuthorized = await isManagementAuthorized();
+  const leagueFormTitle = document.getElementById('league-form-title');
   const leagueForm = document.getElementById('league-form');
   const leagueNameInput = document.getElementById('league-name');
   const leagueDateInput = document.getElementById('league-start-date');
@@ -23,11 +24,16 @@ export async function initLeaguesPage() {
 
   let allLeagues = [];
   let filterInstance = null;
+  let editingLeagueId = null;
 
   // Setup "Create League" toggle behavior
   const dateRow = leagueDateInput.closest('.form-row');
   const formatRow = document.getElementById('league-format-row');
   const leagueFormatInput = document.getElementById('league-scoring-format');
+  const leagueSeasonScoringInput = document.getElementById('league-season-scoring');
+  const seasonScoringRow = document.getElementById('league-season-scoring-row');
+  const leagueDropLowestInput = document.getElementById('league-drop-weeks');
+  const dropLowestRow = document.getElementById('league-drop-weeks-row');
 
   if (leagueFormatInput) {
     const preferredFormat = getCookie('pb_preferred_format') || 'bowling';
@@ -35,6 +41,13 @@ export async function initLeaguesPage() {
       `<option value="${f.value}" ${f.value === preferredFormat ? 'selected' : ''}>${f.label}</option>`
     ).join('');
     leagueFormatInput.addEventListener('change', () => applyPreferredTheme(leagueFormatInput.value));
+  }
+
+  if (leagueSeasonScoringInput) {
+    leagueSeasonScoringInput.innerHTML = `
+      <option value="weekly" selected>Weekly Points</option>
+      <option value="cumulative">Cumulative Total</option>
+    `;
   }
 
   const eventFormatInput = document.getElementById('event-scoring-format');
@@ -46,6 +59,9 @@ export async function initLeaguesPage() {
   
   // Initially hide the creation fields
   if (dateRow) dateRow.classList.add('hidden');
+  if (formatRow) formatRow.classList.add('hidden');
+  if (seasonScoringRow) seasonScoringRow.classList.add('hidden');
+  if (dropLowestRow) dropLowestRow.classList.add('hidden');
   if (actionsRow) actionsRow.classList.add('hidden');
 
   let createToggle = null;
@@ -59,21 +75,67 @@ export async function initLeaguesPage() {
 
     createToggle.onclick = () => {
       const isHidden = dateRow.classList.contains('hidden');
-      dateRow.classList.toggle('hidden', !isHidden);
-      formatRow.classList.toggle('hidden', !isHidden);
-      actionsRow.classList.toggle('hidden', !isHidden);
-      if (isHidden) {
+      if (!isHidden || editingLeagueId) {
+        resetForm();
+      } else {
+        dateRow.classList.remove('hidden');
+        formatRow.classList.remove('hidden');
+        if (seasonScoringRow) seasonScoringRow.classList.remove('hidden');
+        if (dropLowestRow) dropLowestRow.classList.remove('hidden');
+        actionsRow.classList.remove('hidden');
         createToggle.textContent = 'Cancel';
         createToggle.style.marginTop = '0';
         actionsRow.appendChild(createToggle);
         if (leagueFormatInput) applyPreferredTheme(leagueFormatInput.value);
-      } else {
-        createToggle.textContent = 'Create New League';
-        createToggle.style.marginTop = '10px';
-        leagueNameInput.after(createToggle);
-        applyPreferredTheme(getCookie('pb_preferred_format') || 'bowling');
       }
     };
+  }
+
+  function resetForm() {
+    editingLeagueId = null;
+    leagueForm.reset();
+    if (leagueFormTitle) leagueFormTitle.textContent = 'Add New League';
+    createBtn.textContent = 'Create League';
+
+    dateRow.classList.add('hidden');
+    formatRow.classList.add('hidden');
+    if (seasonScoringRow) seasonScoringRow.classList.add('hidden');
+    if (dropLowestRow) dropLowestRow.classList.add('hidden');
+    actionsRow.classList.add('hidden');
+
+    if (createToggle) {
+      createToggle.textContent = 'Create New League';
+      createToggle.style.marginTop = '10px';
+      leagueNameInput.after(createToggle);
+    }
+    applyPreferredTheme(getCookie('pb_preferred_format') || 'bowling');
+  }
+
+  function editLeague(league) {
+    editingLeagueId = league.id;
+    leagueNameInput.value = league.name;
+    leagueDateInput.value = league.startDate || '';
+    leagueFormatInput.value = league.scoringFormat || 'bowling';
+    if (leagueSeasonScoringInput) leagueSeasonScoringInput.value = league.seasonScoring || 'weekly';
+    if (leagueDropLowestInput) leagueDropLowestInput.value = league.dropLowestWeeks || 0;
+
+    createBtn.textContent = 'Update League';
+    if (leagueFormTitle) leagueFormTitle.textContent = `Edit League: ${league.name}`;
+
+    dateRow.classList.remove('hidden');
+    formatRow.classList.remove('hidden');
+    if (seasonScoringRow) seasonScoringRow.classList.remove('hidden');
+    if (dropLowestRow) dropLowestRow.classList.remove('hidden');
+    actionsRow.classList.remove('hidden');
+    
+    if (createToggle) {
+      createToggle.textContent = 'Cancel';
+      createToggle.style.marginTop = '0';
+      actionsRow.appendChild(createToggle);
+    }
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    applyPreferredTheme(leagueFormatInput.value);
   }
 
   /**
@@ -95,7 +157,7 @@ export async function initLeaguesPage() {
         const headerHtml = `
           <div>
             <h3 style="margin: 0; font-size: 1.05rem;">${league.name}</h3>
-            <small>Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
+            <small>Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}</small>
           </div>
         `;
 
@@ -115,6 +177,7 @@ export async function initLeaguesPage() {
             <div class="notice league-players-empty hidden">No players assigned to this league.</div>
           </div>
           <div style="display: flex; gap: 8px;">
+            ${isAuthorized ? '<button class="edit-league-btn secondary btn-row">Edit League</button>' : ''}
             ${isAuthorized ? '<button class="delete-league-btn btn-row">Delete League</button>' : ''}
           </div>
         `;
@@ -138,6 +201,7 @@ export async function initLeaguesPage() {
 
         // Action listeners
         if (isAuthorized) {
+          row.querySelector('.edit-league-btn').onclick = () => editLeague(league);
           row.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
           row.querySelector('.delete-league-btn').onclick = () => deleteLeague(league.id, league.name);
           row.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
@@ -155,16 +219,17 @@ export async function initLeaguesPage() {
 
     // Duplicate Name Prevention
     const exactMatch = allLeagues.find(l => l.name.trim().toLowerCase() === query);
+    const isEditingThis = exactMatch && String(exactMatch.id) === String(editingLeagueId);
 
     // Hide the "Create" toggle if an exact match exists, unless the creation 
     // form is already open (in which case the button serves as "Cancel").
     const isFormOpen = !dateRow.classList.contains('hidden');
-    if (createToggle) createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
+    if (createToggle) createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen && !isEditingThis);
 
     const dateVal = leagueDateInput.value;
-    createBtn.disabled = !query || !dateVal || !!exactMatch;
+    createBtn.disabled = !query || !dateVal || (!!exactMatch && !isEditingThis);
     
-    if (exactMatch) {
+    if (exactMatch && !isEditingThis) {
       createBtn.title = "A league with this name already exists.";
     } else if (query && !dateVal) {
       createBtn.title = "Start date is required.";
@@ -199,21 +264,19 @@ export async function initLeaguesPage() {
     const name = leagueNameInput.value.trim();
     const date = leagueDateInput.value;
     const scoringFormat = leagueFormatInput.value;
+    const seasonScoring = leagueSeasonScoringInput?.value || 'weekly';
+    const dropLowestWeeks = parseInt(leagueDropLowestInput?.value || '0', 10);
 
     if (!isAuthorized) return;
 
     try {
-      await PB_API.createLeague({ name, startDate: date, scoringFormat });
-      leagueNameInput.value = '';
-      leagueDateInput.value = '';
-      // Collapse creation form back down
-      dateRow.classList.add('hidden');
-      formatRow.classList.add('hidden');
-      actionsRow.classList.add('hidden');
-      createToggle.textContent = 'Create New League';
-      createToggle.style.marginTop = '10px';
-      leagueNameInput.after(createToggle);
-      applyPreferredTheme(getCookie('pb_preferred_format') || 'bowling');
+      const payload = { name, startDate: date, scoringFormat, seasonScoring, dropLowestWeeks };
+      if (editingLeagueId) {
+        await PB_API.updateLeague(editingLeagueId, payload);
+      } else {
+        await PB_API.createLeague(payload);
+      }
+      resetForm();
       await refresh();
     } catch (err) {
       console.error('League creation failed:', err);
@@ -298,7 +361,7 @@ export async function initLeaguesPage() {
 
     const statsEl = card.querySelector('.league-header small');
     if (statsEl) {
-      statsEl.textContent = `Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}`;
+      statsEl.textContent = `Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}`;
     }
   }
 

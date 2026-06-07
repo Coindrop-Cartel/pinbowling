@@ -467,6 +467,21 @@ export async function initScoresPage() {
       PB_API.getTargetScores(eventId)
     ]);
 
+    // Map raw database columns to camelCase and the 'values' object expected by the engine
+    const machinesNormalized = eventTargets.map(t => ({
+      ...t,
+      machineId: t.machineId || t.machine_id,
+      machineName: t.machineName || t.machine_name,
+      orderNumber: t.orderNumber || t.order_number,
+      value1: Number(t.value1 || 0),
+      value2: Number(t.value2 || 0),
+      values: t.values || {
+        1: Number(t.score1 || 0), 2: Number(t.score2 || 0), 3: Number(t.score3 || 0), 
+        4: Number(t.score4 || 0), 5: Number(t.score5 || 0), 6: Number(t.score6 || 0), 
+        7: Number(t.score7 || 0), 8: Number(t.score8 || 0), 9: Number(t.score9 || 0), 10: Number(t.score10 || 0)
+      }
+    }));
+
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
     const event = league?.events?.find(e => String(e.id) === String(eventId));
 
@@ -498,7 +513,7 @@ export async function initScoresPage() {
       scoringHint.textContent = Engine.getScoringHint();
     }
 
-    machines = eventTargets;
+    machines = machinesNormalized;
 
     if (machines.length === 0) {
       warning.textContent = 'No target scores have been configured for the selected event.';

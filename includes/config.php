@@ -221,7 +221,9 @@ function initializeDatabaseSchema($pdo) {
         `name` VARCHAR(255) NOT NULL,
         `type` ENUM('standard', 'session') DEFAULT 'standard',
         `start_date` DATE DEFAULT NULL,
-        `scoring_format` VARCHAR(50) DEFAULT 'bowling'
+        `scoring_format` VARCHAR(50) DEFAULT 'bowling',
+        `season_scoring` ENUM('cumulative', 'weekly') DEFAULT 'weekly',
+        `drop_lowest_weeks` INT DEFAULT 0
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `users` (
@@ -364,7 +366,7 @@ function initializeDatabaseSchema($pdo) {
         }
     }
 
-    /// Ensure 'machines' table has year and manufacturer
+    // Ensure 'leagues' table has required columns and migrations
     $checkLeagues = $pdo->query("SHOW TABLES LIKE 'leagues'")->fetch();
     // Ensure 'leagues' table has the 'type' column for standard vs session distinction
     if ($checkLeagues) {
@@ -379,6 +381,22 @@ function initializeDatabaseSchema($pdo) {
         $checkLeagueScoring = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'scoring_format'")->fetch();
         if (!$checkLeagueScoring) {
             $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `scoring_format` VARCHAR(50) DEFAULT 'bowling' AFTER `start_date` ");
+        }
+    }
+
+    // Ensure 'leagues' table has the 'season_scoring' column for season summary logic
+    if ($checkLeagues) {
+        $checkSeasonScoring = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'season_scoring'")->fetch();
+        if (!$checkSeasonScoring) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `season_scoring` ENUM('cumulative', 'weekly') DEFAULT 'weekly' AFTER `scoring_format` ");
+        }
+    }
+
+    // Ensure 'leagues' table has the 'drop_lowest_weeks' column
+    if ($checkLeagues) {
+        $checkDropLowest = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'drop_lowest_weeks'")->fetch();
+        if (!$checkDropLowest) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `drop_lowest_weeks` INT DEFAULT 0 AFTER `season_scoring` ");
         }
     }
 
