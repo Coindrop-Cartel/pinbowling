@@ -97,9 +97,6 @@ export async function initLeaguesPage() {
             <h3 style="margin: 0; font-size: 1.05rem;">${league.name}</h3>
             <small>Started: ${league.startDate || 'N/A'} | Events: ${league.events?.length || 0} | Players: ${league.players?.length || 0}</small>
           </div>
-          <div style="display: flex; gap: 8px;">
-            ${isAuthorized ? '<button class="delete-league-btn btn-row">Delete</button>' : ''}
-          </div>
         `;
 
         const contentHtml = `
@@ -116,6 +113,9 @@ export async function initLeaguesPage() {
             </div>
             <ul class="league-players-list" style="list-style: none; padding: 0;"></ul>
             <div class="notice league-players-empty hidden">No players assigned to this league.</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            ${isAuthorized ? '<button class="delete-league-btn btn-row">Delete League</button>' : ''}
           </div>
         `;
 

@@ -204,13 +204,20 @@ body {
 
 /* Layout & Containers */
 .page-container {
-  max-width: 1100px;
+  width: 80%;
+  min-width: min(1100px, 100%);
+  max-width: 1800px;
   margin: 40px auto;
   padding: 0 20px;
 }
 
-.standings-page {
-  max-width: 1400px;
+/* Use :has to ensure the 95% width is only applied when the standings wrapper is present.
+   In an SPA, this prevents the layout from "sticking" at 95% when navigating back to 
+   standard pages if the container class isn't properly cleared by the router. */
+.page-container:has(#standings-wrapper) {
+  width: 95%;
+  min-width: min(1400px, 100%);
+  max-width: 2800px;
 }
 
 #standings-wrapper {

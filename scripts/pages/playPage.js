@@ -106,7 +106,6 @@ export async function initPlayPage() {
               ${event.locationName || 'No Location'} | ${event.eventDate} | Players: ${event.roster?.length || 0}
             </div>
             <div style="display: flex; gap: 6px; margin-top: 8px;">
-              <button class="join-btn secondary btn-row">Join</button>
               <button class="play-btn secondary btn-row">Play</button>
               <button class="scoreboard-btn secondary btn-row">Scoreboard</button>
             </div>
@@ -121,56 +120,31 @@ export async function initPlayPage() {
         loadPage(`standings?eventId=${event.id}&leagueId=${event.leagueId}`);
       };
 
-      row.querySelector('.join-btn').onclick = async (e) => {
-        e.stopPropagation();
-        
-        const currentUser = await PB_API.getCurrentUser();
-        let selectedId = null;
-
-        const joinedIds = new Set(event.roster.map(p => p.id));
-        
-        // Auto-join logic for logged-in users
-        if (currentUser?.player_id) {
-            if (joinedIds.has(currentUser.player_id)) {
-                loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${currentUser.player_id}`);
-                return;
-            }
-            selectedId = currentUser.player_id;
-        } else {
-            const available = allPlayersCache.filter(p => !joinedIds.has(p.id));
-            if (available.length === 0) {
-              alert('All registered players have already joined this session.');
-              return;
-            }
-            const options = available.map(p => ({ value: p.id, label: p.playerName }));
-            selectedId = await showPlayerSelectionDialog('Play Session', 'Select your name to start playing:', options, 'Play');
-        }
-
-        if (selectedId) {
-          await PB_API.addLeaguePlayer(event.leagueId, Number(selectedId));
-          loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`);
-        }
-      };
-
       row.querySelector('.play-btn').onclick = async (e) => {
         e.stopPropagation();
         
         const currentUser = await PB_API.getCurrentUser();
+        const joinedIds = new Set(event.roster.map(p => p.id));
         let selectedId = null;
 
         if (currentUser?.player_id) {
             selectedId = currentUser.player_id;
         } else {
-            const roster = event.roster || [];
-            if (roster.length === 0) {
-              alert('No players are assigned to this session yet. Use "Join" to add yourself.');
-              return;
-            }
-            const options = roster.map(p => ({ value: p.id, label: p.playerName }));
+            // For guests, show players from the cache. We filter to non-users to prevent 
+            // guest sessions from hijacking registered accounts.
+            const available = allPlayersCache.filter(p => !p.userId);
+            const options = available.map(p => ({ 
+              value: p.id, 
+              label: joinedIds.has(p.id) ? p.playerName : `${p.playerName} (Join)` 
+            }));
             selectedId = await showPlayerSelectionDialog('Play Session', 'Who is playing?', options, 'Play');
         }
 
         if (selectedId) {
+          // If the selected player isn't in the league yet, join them automatically
+          if (!joinedIds.has(Number(selectedId))) {
+            await PB_API.addLeaguePlayer(event.leagueId, Number(selectedId));
+          }
           loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`);
         }
       };
@@ -562,8 +536,17 @@ export async function initPlayPage() {
         await PB_API.saveTargetScore(targetPayloads);
       }
 
-      // Direct redirect to the scoreboard for the new session
-      loadPage(`standings?eventId=${event.id}&leagueId=${qpLeague.id}`);
+      // Redirect to the scoring page for the new session.
+      // If the user has a player profile, auto-join them and pre-select them.
+      const currentUser = await PB_API.getCurrentUser();
+      let redirectUrl = `scores?eventId=${event.id}&leagueId=${qpLeague.id}`;
+      
+      if (currentUser?.player_id) {
+        await PB_API.addLeaguePlayer(qpLeague.id, currentUser.player_id);
+        redirectUrl += `&playerId=${currentUser.player_id}`;
+      }
+
+      loadPage(redirectUrl);
 
     } catch (err) {
       console.error(err);

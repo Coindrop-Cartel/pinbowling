@@ -240,26 +240,34 @@ export async function initScoresPage() {
   async function renderPlayerSelect() {
     try {
       const leagueId = getActiveLeagueId();
-      let players = [];
+      // Fetch all players to ensure we can resolve IDs from URLs even if the 
+      // league-specific roster fetch doesn't include a newly added player yet.
+      const allPlayers = await PB_API.getPlayers();
+      allPlayersCache.length = 0;
+      allPlayersCache.push(...allPlayers);
+
+      let selectablePlayers = [];
 
       if (leagueId) {
         // Fetch the specific league to get the assigned roster
         const league = await PB_API.getLeague(leagueId);
-        players = league?.players || [];
+        selectablePlayers = league?.players || [];
       } else {
-        // Fallback to the global player registry if no league is active
-        players = (await PB_API.getPlayers()) || [];
+        selectablePlayers = allPlayers;
       }
 
       // Requirement: Unregistered users can only select players that are unregistered guests
       if (!currentUser) {
-        players = players.filter(p => !p.userId);
+        selectablePlayers = selectablePlayers.filter(p => !p.userId);
       }
 
-      allPlayersCache.length = 0;
-      allPlayersCache.push(...players);
-
+      // If a playerId is in the URL, ensure they are at least in the selectable list 
+      // for the current session, even if the roster fetch hasn't updated yet.
       const currentPlayerId = getCurrentPlayerId();
+      if (currentPlayerId && !selectablePlayers.some(p => String(p.id) === String(currentPlayerId))) {
+          const p = allPlayers.find(p => String(p.id) === String(currentPlayerId));
+          if (p) selectablePlayers.unshift(p);
+      }
 
       if (!playerSearchInstance) {
         let searchInput = document.getElementById('player-search');
@@ -275,10 +283,10 @@ export async function initScoresPage() {
         }
 
         if (searchInput && playerSelect) {
-          playerSearchInstance = createSearchableSelect(searchInput, playerSelect, allPlayersCache, {
+          playerSearchInstance = createSearchableSelect(searchInput, playerSelect, selectablePlayers, {
             valueKey: 'id',
             labelKey: 'playerName',
-            placeholder: allPlayersCache.length === 0 ? 'No players configured' : 'Select a player',
+            placeholder: selectablePlayers.length === 0 ? 'No players configured' : 'Select a player',
             onSelect: async (val) => {
               if (!val) {
                 setCurrentPlayerId('');
@@ -295,9 +303,14 @@ export async function initScoresPage() {
         playerSearchInstance.updateOptions('');
       }
 
-      if (currentPlayerId && allPlayersCache.some((player) => String(player.id) === String(currentPlayerId))) {
-        if (playerSelect) playerSelect.value = currentPlayerId;
+      if (currentPlayerId) {
+        const player = allPlayersCache.find(p => String(p.id) === String(currentPlayerId));
+        if (player && playerSelect) {
+          playerSelect.value = currentPlayerId;
+          const searchInput = document.getElementById('player-search');
+          if (searchInput) searchInput.value = player.playerName;
         return currentPlayerId;
+      }
       }
     } catch (err) {
       console.error('Failed to render player selection:', err);
