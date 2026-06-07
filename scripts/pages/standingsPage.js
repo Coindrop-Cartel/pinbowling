@@ -242,7 +242,7 @@ export async function initStandingsPage() {
       tvTitle.textContent = `${league?.name || 'League'} - Season Summary`;
     }
 
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${events.map(e => `<th>${e.eventName}</th>`).join('')}<th>Total</th></tr>`;
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th style="text-align: center;">#</th><th style="text-align: center;">Player</th>${events.map((e, idx) => `<th style="text-align: center;">${idx + 1}</th>`).join('')}<th style="text-align: center;">Total</th></tr>`;
     if (standingsBody) standingsBody.innerHTML = rows.map((row, idx) => {
       return `
       <tr>
@@ -367,7 +367,7 @@ export async function initStandingsPage() {
       return { player, turnResults, total, totalDisplay, ordersWithScores };
     }).sort((a, b) => Engine.compareScores(a.total, b.total));
 
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th>#</th><th>Player</th>${machines.map(m => `<th>${Engine.getTurnHeaderPrefix()} ${m.orderNumber}</th>`).join('')}<th>Total</th></tr>`;
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th style="text-align: center;">#</th><th style="text-align: center;">Player</th>${machines.map(m => `<th style="text-align: center;">${m.orderNumber}</th>`).join('')}<th style="text-align: center;">Total</th></tr>`;
     if (standingsBody) standingsBody.innerHTML = rows.map((res, idx) => {
       let rowHasUpdate = false;
       const turnsHtml = res.turnResults.map(t => {
