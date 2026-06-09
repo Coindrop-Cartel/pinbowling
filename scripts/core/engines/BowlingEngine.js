@@ -74,7 +74,7 @@ export class BowlingEngine extends ScoringEngine {
     if (!isLastRound || !round.values || !round.values[10]) return '';
     const { t1, t2 } = this.getBonusTargets(round, scalingType);
     return `
-      <div style="margin-top: 8px; border-top: 1px dashed #bbb; padding-top: 4px; font-size: 0.8rem; color: var(--pb-primary);">
+      <div class="bonus-targets">
         <div><b>XX:</b> ${formatFn(t1)}</div>
         <div><b>XXX:</b> ${formatFn(t2)}</div>
       </div>

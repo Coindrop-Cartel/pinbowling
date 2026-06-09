@@ -8,30 +8,30 @@
       <form id="league-form" autocomplete="off">
         <div class="form-row">
           <label for="league-name">League Name</label>
-          <input id="league-name" type="text" placeholder="e.g., Summer 2024 League" required style="width: 100%; box-sizing: border-box;" />
+          <input id="league-name" type="text" placeholder="e.g., Summer 2024 League" required />
         </div>
         <div id="league-date-row" class="form-row hidden">
           <label for="league-start-date">Start Date</label>
-          <input id="league-start-date" type="date" required style="width: 100%; box-sizing: border-box;" />
+          <input id="league-start-date" type="date" required />
         </div>
         <div id="league-participants-row" class="form-row hidden">
           <label for="league-participants">League Type</label>
-          <select id="league-participants" style="width: 100%; box-sizing: border-box;">
+          <select id="league-participants">
             <option value="individual" selected>Individual</option>
             <option value="team">Team</option>
           </select>
         </div>
         <div id="league-format-row" class="form-row hidden">
           <label for="league-scoring-format">Default Scoring Format</label>
-          <select id="league-scoring-format" style="width: 100%; box-sizing: border-box;"></select>
+          <select id="league-scoring-format"></select>
         </div>
         <div id="league-season-scoring-row" class="form-row hidden">
           <label for="league-season-scoring">Season Scoring</label>
-          <select id="league-season-scoring" style="width: 100%; box-sizing: border-box;"></select>
+          <select id="league-season-scoring"></select>
         </div>
         <div id="league-drop-weeks-row" class="form-row hidden">
           <label for="league-drop-weeks">Drop Lowest Weeks</label>
-          <input id="league-drop-weeks" type="number" min="0" value="0" style="width: 100%; box-sizing: border-box;" />
+          <input id="league-drop-weeks" type="number" min="0" value="0" />
         </div>
         <div class="form-actions hidden">
           <button type="submit" id="create-league-btn" class="btn-mgmt" disabled>Create League</button>
@@ -55,22 +55,22 @@
         <input type="hidden" id="event-id" />
         <div class="form-row">
           <label for="event-name">Event Name</label>
-          <input id="event-name" type="text" placeholder="e.g., Week 1" required style="width: 100%; box-sizing: border-box;" />
+          <input id="event-name" type="text" placeholder="e.g., Week 1" required />
         </div>
         <div class="form-row">
           <label for="event-date">Event Date</label>
-          <input id="event-date" type="date" style="width: 100%; box-sizing: border-box;" />
+          <input id="event-date" type="date" />
         </div>
         <div class="form-row">
           <label for="event-location">Location</label>
-          <select id="event-location" style="width: 100%; box-sizing: border-box;">
+          <select id="event-location">
             <option value="">Select Location (Optional)</option>
             <!-- Locations will be loaded here -->
           </select>
         </div>
         <div class="form-row">
           <label for="event-scoring-format">Scoring Format</label>
-          <select id="event-scoring-format" style="width: 100%; box-sizing: border-box;"></select>
+          <select id="event-scoring-format"></select>
         </div>
         <div class="form-actions">
           <button type="submit" class="btn-mgmt">Save Event</button>

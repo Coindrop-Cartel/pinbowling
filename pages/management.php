@@ -1,6 +1,6 @@
 <?php $pageTitle = 'System Maintenance'; ?>
 <main class="page-container">
-  <header style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+  <header class="flex-between mb-20">
     <div>
       <h1>System Maintenance</h1>
       <p>Admin-only tools for data cleanup and system security.</p>

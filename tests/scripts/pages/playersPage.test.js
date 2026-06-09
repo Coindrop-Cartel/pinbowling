@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { initPlayersPage } from '@pages/playersPage.js';
 import { PB_API } from '@services/api.js';
 
@@ -39,13 +39,26 @@ vi.mock('@ui/dialogs.js', () => uiMocks);
 
 vi.mock('@services/auth.js', () => ({
   requireAdmin: vi.fn(() => Promise.resolve(true)),
+  initAuthHeader: vi.fn(() => Promise.resolve()), // Mock initAuthHeader to prevent reload calls
 }));
 
 describe('Player Management Page (playersPage.js)', () => {
+  let originalLocation;
+
   beforeEach(() => {
     // Mock layout methods not implemented in JSDOM
     vi.stubGlobal('scrollTo', vi.fn());
     Element.prototype.scrollIntoView = vi.fn();
+
+    // Correct way to mock location in JSDOM/Vitest to avoid "Not implemented" errors
+    originalLocation = window.location;
+    delete window.location;
+    const mockLocation = new URL('http://localhost/players.php');
+    mockLocation.assign = vi.fn();
+    mockLocation.replace = vi.fn();
+    mockLocation.reload = vi.fn();
+    Object.defineProperty(mockLocation, 'href', { writable: true, value: mockLocation.href });
+    window.location = mockLocation;
 
     document.body.innerHTML = `
       <section class="card">
@@ -70,6 +83,11 @@ describe('Player Management Page (playersPage.js)', () => {
       { id: 11, playerName: 'Bob' }
     ]);
     PB_API.getCurrentUser.mockResolvedValue({ id: 1, role: 'admin', player_name: 'Admin User' });
+  });
+
+  afterEach(() => {
+    window.location = originalLocation;
+    vi.restoreAllMocks();
   });
 
   it('should load and render players', async () => {

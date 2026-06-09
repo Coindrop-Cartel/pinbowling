@@ -12,7 +12,7 @@
           <label for="machine-name">Machine Name</label>
           <input id="machine-name" type="text" placeholder="Enter machine name" required />
         </div>
-        <div id="machine-metadata-row" class="form-row hidden" style="display: grid; grid-template-columns: 1fr 2fr; gap: 15px;">
+        <div id="machine-metadata-row" class="form-row hidden grid-1-2">
           <div class="form-row">
             <label for="machine-year">Year</label>
             <select id="machine-year"></select>

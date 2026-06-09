@@ -77,12 +77,12 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh, existi
       const { league, event } = _resolveTournamentData(leagues, activeEventId, activeLeagueId);
       if (league) {
         if (String(league.id) !== String(activeLeagueId)) setActiveLeagueId(league.id);
-        container.innerHTML = `<section class="card tournament-display" style="margin-bottom: 1.5rem;"><div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;"><h2 style="margin: 0;">Current Selection:</h2><p style="margin: 0;"><strong>League:</strong> ${league.name}</p><p style="margin: 0;"><strong>Event:</strong> ${event?.eventName || 'Season Summary'}</p></div></section>`;
+        container.innerHTML = `<section class="card tournament-display mb-20"><div class="flex-col"><h2 class="mb-0">Current Selection:</h2><p class="mb-0"><strong>League:</strong> ${league.name}</p><p class="mb-0"><strong>Event:</strong> ${event?.eventName || 'Season Summary'}</p></div></section>`;
       } else throw new Error('Selection invalid');
     } catch (error) { container.innerHTML = `<div class="notice">Selection context lost.</div>`; }
   } else {
     setActiveLeagueId(''); setActiveEventId('');
-    container.innerHTML = `<section class="card tournament-display" style="margin-bottom: 1.5rem;"><div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;"><h2 style="margin: 0;">No Tournament Selected</h2></div></section>`;
+    container.innerHTML = `<section class="card tournament-display mb-20"><div class="flex-col"><h2 class="mb-0">No Tournament Selected</h2></div></section>`;
   }
   if (onRefresh) await onRefresh();
 }
@@ -100,7 +100,7 @@ export function setupLiveFilter(inputElement, data, { labelKey = 'name', onFilte
 export function renderActionSummary(container, title, actions = []) {
   if (!container) return;
   container.classList.remove('hidden');
-  container.innerHTML = `<div style="display: flex; flex-direction: column; gap: 8px;"><div style="font-weight: bold; font-size: 1.1rem; line-height: 1.2;">${title}</div><div style="display: flex; gap: 8px; flex-wrap: wrap;">${actions.map((act, i) => `<button type="button" class="secondary ${act.hidden ? 'hidden' : ''}" data-idx="${i}" style="padding: 4px 10px; font-size: 0.75rem; width: auto;">${act.text}</button>`).join('')}</div></div>`;
+  container.innerHTML = `<div class="flex-col"><div class="summary-text">${title}</div><div class="flex gap-8 wrap">${actions.map((act, i) => `<button type="button" class="btn-row secondary ${act.hidden ? 'hidden' : ''}" data-idx="${i}">${act.text}</button>`).join('')}</div></div>`;
   container.querySelectorAll('button').forEach(btn => {
     const action = actions[btn.dataset.idx];
     if (action && action.onclick) btn.onclick = action.onclick;
@@ -116,21 +116,21 @@ export async function initTournamentSelector(container, { onRefresh, typeFilter 
   const leagues = typeFilter ? allLeagues.filter(l => l.type === typeFilter || String(l.id) === String(activeLeagueId)) : allLeagues;
 
   target.innerHTML = `
-    <section class="card tournament-selector" style="margin-bottom: 5px; padding: 12px 15px;">
-      <div style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%; box-sizing: border-box;" autocomplete="off">
-        <div style="width: 100%;">
-          <label style="display: block; margin-bottom: 5px;">League Search</label>
-          <input type="text" id="league-search-global" style="width: 100%; box-sizing: border-box; margin-bottom: 0;" placeholder="Type to filter...">
+    <section class="card tournament-selector mb-5 card-pad">
+      <div class="flex-col" autocomplete="off">
+        <div>
+          <label>League Search</label>
+          <input type="text" id="league-search-global" placeholder="Type to filter...">
         </div>
-        <div style="width: 100%;">
-          <label style="display: block; margin-bottom: 5px;">Select League</label>
-          <select class="league-select-shared" style="width: 100%; box-sizing: border-box;">
+        <div>
+          <label>Select League</label>
+          <select class="league-select-shared">
             <option value="">-- Choose League --</option>
           </select>
         </div>
-        <div class="event-select-wrapper shared-ui-hidden" style="width: 100%;">
-          <label style="display: block; margin-bottom: 5px;">Event</label>
-          <select class="event-select-shared" style="width: 100%; box-sizing: border-box;">
+        <div class="event-select-wrapper shared-ui-hidden">
+          <label>Event</label>
+          <select class="event-select-shared">
             <option value="">Select Event</option>
           </select>
         </div>
@@ -188,13 +188,13 @@ export function createExpandableRow(container, options) {
   if (className) row.className = className;
   row.dataset.id = id;
   if (draggable) row.draggable = true;
-  row.style = "margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff; list-style: none;";
-  row.innerHTML = `<div class="row-header" style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #f9f9f9; cursor: pointer;">${headerHtml}${getFormatBadgeHtml(format)}</div>${contentHtml ? `<div class="row-expansion ${isExpanded ? '' : 'hidden'}" style="padding: 12px 15px; border-top: 1px solid #ddd;">${contentHtml}</div>` : ''}`;
+  row.classList.add('list-row');
+  row.innerHTML = `<div class="row-header">${headerHtml}${getFormatBadgeHtml(format)}</div>${contentHtml ? `<div class="row-expansion ${isExpanded ? '' : 'hidden'}">${contentHtml}</div>` : ''}`;
   const header = row.querySelector('.row-header');
   if (onMoveUp || onMoveDown) {
     const reorderContainer = document.createElement('div');
-    reorderContainer.style = 'display: flex; flex-direction: column; gap: 2px; margin-left: 8px; align-items: center; justify-content: center;';
-    reorderContainer.innerHTML = `<button type="button" class="move-up-btn" style="padding: 2px; background: none!important; color: var(--pb-primary)!important; border: none!important; font-size: 0.8rem;">▲</button><button type="button" class="move-down-btn" style="padding: 2px; background: none!important; color: var(--pb-primary)!important; border: none!important; font-size: 0.8rem;">▼</button>`;
+    reorderContainer.className = 'reorder-container';
+    reorderContainer.innerHTML = `<button type="button" class="move-up-btn">▲</button><button type="button" class="move-down-btn">▼</button>`;
     const anchor = row.querySelector('.machine-name-display');
     if (anchor) anchor.after(reorderContainer); else header.appendChild(reorderContainer);
     const up = reorderContainer.querySelector('.move-up-btn');

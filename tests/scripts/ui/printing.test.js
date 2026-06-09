@@ -85,13 +85,14 @@ describe('Printing Utilities (printing.js)', () => {
       const machines = [
         { id: 1, machineName: 'Machine A', orderNumber: 1, values: { 10: 10000 } },
       ];
-      printBlankScoreSheet(machines);
+      printBlankScoreSheet(machines, 'Test League', 'Test Event');
 
       expect(window.open).toHaveBeenCalledWith('', '_blank');
       expect(mockPrintWindow.document.write).toHaveBeenCalled();
       const html = mockPrintWindow.document.write.mock.calls[0][0];
-      expect(html).toContain('Frame 1');
-      expect(html).toContain('Game: <strong>Machine A</strong>');
+      expect(html).toContain('Test League');
+      expect(html).toContain('Test Event');
+      expect(html).toContain('Frame 1: Machine A');
       expect(html).toContain('Strike: <strong>10,000</strong>');
       expect(html).toContain('Ball 1');
       expect(html).toContain('Ball 2');

@@ -1,7 +1,7 @@
 <?php $pageTitle = 'Standings'; ?>
   <main class="page-container standings-page">
     <header>
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <div class="flex-between gap-10 wrap">
         <h1>Standings</h1>
         <button id="tv-mode-btn" class="btn-standard secondary no-print">TV Mode</button>
       </div>
@@ -10,11 +10,11 @@
 
     <div id="tournament-context-area" class="no-print">
       <div id="tournament-selector-ui" class="tournament-selector-container"></div>
-      <div id="player-filter-container" class="hidden" style="margin-bottom: 10px;"></div>
-      <div id="tournament-summary" class="card hidden no-tv" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; margin-bottom: 5px;">
-        <span id="tournament-summary-text" style="font-weight: bold; font-size: 1.1rem;"></span>
-        <div style="display: flex; gap: 8px;">
-          <button id="change-tournament-btn" class="secondary" style="padding: 4px 10px; font-size: 0.85rem;">Change</button>
+      <div id="player-filter-container" class="hidden mb-10"></div>
+      <div id="tournament-summary" class="card hidden no-tv summary-box mb-5">
+        <span id="tournament-summary-text" class="summary-text"></span>
+        <div class="flex gap-8">
+          <button id="change-tournament-btn" class="secondary btn-small">Change</button>
         </div>
       </div>
     </div>

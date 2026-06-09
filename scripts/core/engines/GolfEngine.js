@@ -45,7 +45,7 @@ export class GolfEngine extends ScoringEngine {
   getRowSummaryHtml(round, formatFn) {
     const goal = round.values?.[3] || round.values?.['3'] || round.value1 || 0;
     const par = round.value2 || 3;
-    return `<div class="strike-target" style="font-size: 0.8rem; color: var(--pb-primary); margin-top: 4px;"><b>Target Score:</b> ${formatFn(goal)} &nbsp;&nbsp; <b>Par:</b> ${par}</div>`;
+    return `<div class="strike-target"><b>Target Score:</b> ${formatFn(goal)} &nbsp;&nbsp; <b>Par:</b> ${par}</div>`;
   }
 
   /**

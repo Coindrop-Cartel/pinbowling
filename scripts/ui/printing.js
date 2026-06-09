@@ -16,11 +16,10 @@ export function printMachineScores(machines, format = 'bowling') {
     const scoresHtml = ranks.map((rank) => {
       const formatted = formatNumber(m.values[rank] || 0);
       let fontSize = (formatted.length > 9) ? '1.4rem' : (formatted.length > 7 ? '1.8rem' : '2.5rem');
-
       return `
-        <div style="border: 3px solid #000; position: relative; height: 120px; display: flex; align-items: center; justify-content: center; background: #fff; overflow: hidden; box-sizing: border-box;">
-          <div style="position: absolute; top: 0; right: 0; border-left: 3px solid #000; border-bottom: 3px solid #000; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; background: #f0f0f0;">${rank}</div>
-          <div style="font-size: ${fontSize}; font-weight: bold; text-align: center; width: 100%; white-space: nowrap;">${formatted}</div>
+        <div class="print-rank-card">
+          <div class="print-rank-badge">${rank}</div>
+          <div class="print-rank-value" style="font-size: ${fontSize};">${formatted}</div>
         </div>`;
     }).join('');
 
@@ -28,26 +27,32 @@ export function printMachineScores(machines, format = 'bowling') {
     if (m.orderNumber === maxOrder) {
       const { t1, t2 } = Engine.getBonusTargets(m);
       extraTargets = `
-        <div style="margin-top: 40px; display: flex; justify-content: space-around; width: 100%; font-size: 2.2rem; font-weight: bold; border-top: 4px dashed #000; padding-top: 20px;">
+        <div class="print-extra-targets">
           <div>Target 1: ${formatNumber(t1)}</div>
           <div>Target 2: ${formatNumber(t2)}</div>
         </div>`;
     }
 
     return `
-      <div class="page" style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; page-break-after: always; padding: 40px; box-sizing: border-box;">
-        <div style="border: 6px solid #000; padding: 50px; width: 100%; max-width: 1100px;">
-          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 40px; border-bottom: 6px solid #000; padding-bottom: 15px;">
-            <h1 style="margin: 0; font-size: 4rem;">${Engine.getRoundLabel()} ${m.orderNumber}</h1>
-            <h2 style="margin: 0; font-size: 4rem;">${m.machineName}</h2>
+      <div class="print-page">
+        <div class="print-frame">
+          <div class="print-frame-header">
+            <h1 class="print-title">${Engine.getRoundLabel()} ${m.orderNumber}</h1>
+            <h2 class="print-title">${m.machineName}</h2>
           </div>
-          <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px;">${scoresHtml}</div>
+          <div class="print-grid">${scoresHtml}</div>
           ${extraTargets}
         </div>
       </div>`;
   }).join('');
 
-  printWindow.document.write(`<html><body style="margin:0;">${pagesHtml}</body></html>`);
+  const printCss = `
+    body { margin: 0; font-family: sans-serif; }
+    .print-page { height:100vh; }
+    .print-frame { box-sizing: border-box; }
+  `;
+
+  printWindow.document.write(`<html><head><style>${printCss}</style></head><body>${pagesHtml}</body></html>`);
   printWindow.document.close();
   setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
 }
@@ -64,24 +69,43 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
   const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
   const instructions = `
-    <p style="margin: 5px 0;">${Engine.getScoringHint() || 'Enter your score after each ball until you hit the target score, or run out of balls.'}</p>
+    <p class="muted small" style="margin:5px 0;">${Engine.getScoringHint() || 'Enter your score after each ball until you hit the target score, or run out of balls.'}</p>
   `;
 
-  const framesHtml = machines.map((m) => {
+  // This is the main header for the entire sheet
+  const mainHeaderHtml = `
+    <div class="print-meta">
+      <div class="flex-between" style="margin-bottom:10px;">
+        <div style="font-size:1.4rem;">
+          ${leagueName ? `<div style="margin-bottom:4px;"><strong>League:</strong> ${leagueName}</div>` : ''}
+          <div style="margin-bottom:4px;"><strong>Event:</strong> ${eventName}</div>
+        </div>
+        <div style="text-align:right;">
+          <div>Player: __________________________</div>
+          <div>Date: ________</div>
+        </div>
+      </div>
+      <div style="font-size:0.9rem; line-height:1.4;">
+        ${instructions}
+      </div>
+    </div>
+  `;
+
+  // Now, iterate through machines to create individual frame/hole sections
+  const machineSectionsHtml = machines.map((m) => {
     const isLast = m.orderNumber === maxOrder;
     const lfHint = isLast ? Engine.getLastFrameHint() : null;
     let targetsHtml = '';
-    if (isBowling) {
+    if (isBowling) { // Bowling format
       targetsHtml = `<span>Strike: <strong>${formatNumber(m.values[10])}</strong></span>`;
-      if (isLast) {
+      if (isLast) { // Only for the last frame
         const { t1, t2 } = Engine.getBonusTargets(m);
         targetsHtml += `
           <span style="margin-left: 15px;">Target 1: <strong>${formatNumber(t1)}</strong></span>
           <span style="margin-left: 15px;">Target 2: <strong>${formatNumber(t2)}</strong></span>
         `;
       }
-    } else {
-      // Golf
+    } else { // Golf format
       targetsHtml = `
         <span>Target Score: <strong>${formatNumber(m.values[m.value2] || m.value1)}</strong></span>
         <span style="margin-left: 15px;">Par: <strong>${m.value2}</strong></span>
@@ -89,41 +113,39 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
     }
 
     return `
-    ${lfHint ? `<div style="margin-bottom: 4px; font-size: 0.8rem; font-style: italic;">${lfHint}</div>` : ''}
-    <div style="border: 2px solid #000; margin-bottom: 8px; padding: 8px 12px; page-break-inside: avoid;">
-      <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px;">
-        <span style="font-weight: bold;">${Engine.getRoundLabel()} ${m.orderNumber}</span>
-        <span>Game: <strong>${m.machineName}</strong></span>
-        ${targetsHtml}
-      </div>
-      <div style="display: flex; gap: 20px;">
-        <div style="flex: 1;"><small>Ball 1</small><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
-        <div style="flex: 1;"><small>Ball 2</small><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
-        <div style="flex: 1;"><small>Ball 3</small><div style="border-bottom: 1px solid #000; height: 20px;"></div></div>
-      </div>
-    </div>`;
+      <div class="print-block">
+        <div class="print-block-header">
+          <h3 style="margin: 0;">${Engine.getRoundLabel()} ${m.orderNumber}: ${m.machineName}</h3>
+          <div class="targets-summary">${targetsHtml}</div>
+        </div>
+        ${lfHint ? `<div class="muted small" style="margin-bottom:4px;font-style:italic;">${lfHint}</div>` : ''}
+        <div class="flex" style="gap:20px;">
+          <div class="flex-1"><small>Ball 1</small><div class="score-line"></div></div>
+          <div class="flex-1"><small>Ball 2</small><div class="score-line"></div></div>
+          <div class="flex-1"><small>Ball 3</small><div class="score-line"></div></div>
+        </div>
+      </div>`;
   }).join('');
+
+  const sheetCss = `
+    body { font-family: sans-serif; padding: 20px; line-height: 1.2; }
+    .print-block { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+    .print-block-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #eee; }
+    .targets-summary span { font-size: 0.9rem; }
+    .flex { display: flex; }
+    .flex-1 { flex: 1; }
+    .score-line { border-bottom: 1px solid #000; height: 1.5em; margin-top: 5px; }
+    .flex-between { display: flex; justify-content: space-between; }
+    .muted { opacity: 0.7; }
+    .small { font-size: 0.8rem; }
+  `;
 
   printWindow.document.write(`
     <html>
-      <head><style>body { font-family: sans-serif; padding: 20px; line-height: 1.2; }</style></head>
+      <head><style>${sheetCss}</style></head>
       <body>
-        <div style="border-bottom: 2px solid #000; margin-bottom: 12px; padding-bottom: 6px;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-            <div style="font-size: 1.4rem;">
-              ${leagueName ? `<div style="margin-bottom: 4px;"><strong>League:</strong> ${leagueName}</div>` : ''}
-              <div style="margin-bottom: 4px;"><strong>Event:</strong> ${eventName}</div>
-            </div>
-            <div style="text-align: right;">
-              <div>Player: __________________________</div>
-              <div>Date: ________</div>
-            </div>
-          </div>
-          <div style="font-size: 0.9rem; line-height: 1.4;">
-            ${instructions}
-          </div>
-        </div>
-        ${framesHtml}
+        ${mainHeaderHtml}
+        ${machineSectionsHtml}
       </body>
     </html>`);
   printWindow.document.close();

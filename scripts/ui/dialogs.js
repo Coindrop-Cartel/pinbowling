@@ -6,13 +6,12 @@ import { createSearchableSelect } from './selectors.js';
  */
 function _openModalBase(title, contentHtml) {
   const backdrop = document.createElement('div');
-  backdrop.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;box-sizing:border-box;backdrop-filter:blur(4px);";
+  backdrop.className = 'modal-backdrop';
   
   const card = document.createElement('div');
-  card.className = "card";
-  card.style = "max-width:450px;width:100%;margin:0;box-shadow: 0 10px 25px rgba(0,0,0,0.5);";
+  card.className = "card modal-card";
   
-  card.innerHTML = `<h2 style="margin-top:0;">${title}</h2>${contentHtml}`;
+  card.innerHTML = `<h2 class="mt-0">${title}</h2>${contentHtml}`;
   
   backdrop.appendChild(card);
   document.body.appendChild(backdrop);
@@ -28,12 +27,12 @@ function _openModalBase(title, contentHtml) {
 export function showDialog({ title, message, showInput = false, isPassword = true, confirmText = 'Confirm', cancelText = 'Cancel', customElement = null }) {
   return new Promise((resolve) => {
     const contentHtml = `
-      <p style="margin-bottom:0; line-height:1.5;">${message}</p>
+      <p class="small-hint mb-0">${message}</p>
       <div id="modal-custom-content"></div>
-      ${showInput ? `<div class="form-row" style="margin-top:20px;"><input type="${isPassword ? 'password' : 'text'}" id="modal-input" style="width:100%;box-sizing:border-box;font-size:1.1rem;padding:12px;" /></div>` : ''}
-      <div class="form-actions" style="margin-top:30px; display:flex; gap:12px;">
-        <button id="modal-confirm" style="flex:1;">${confirmText}</button>
-        ${cancelText ? `<button id="modal-cancel" class="secondary" style="flex:1;">${cancelText}</button>` : ''}
+      ${showInput ? `<div class="form-row mt-20"><input type="${isPassword ? 'password' : 'text'}" id="modal-input" class="modal-input" /></div>` : ''}
+      <div class="modal-actions">
+        <button id="modal-confirm" class="flex-1">${confirmText}</button>
+        ${cancelText ? `<button id="modal-cancel" class="secondary flex-1">${cancelText}</button>` : ''}
       </div>
     `;
     const { card, close } = _openModalBase(title, contentHtml);
@@ -66,13 +65,13 @@ export function showChoiceDialog(title, message, choices, initialValue = null) {
   return new Promise((resolve) => {
     let selectedValue = initialValue;
     const contentHtml = `
-      <p style="margin-bottom:20px; line-height:1.5;">${message}</p>
-      <div class="form-actions" style="margin-top:30px; display:flex; gap:12px; flex-wrap: wrap;">
-        ${choices.map(c => `<button type="button" class="choice-btn ${c.class || ''}" data-value="${c.value}" style="flex:1; min-width: 100px; transition: all 0.2s; border: 2px solid #000;">${c.label}</button>`).join('')}
+      <p class="small-hint" style="margin-bottom:20px;">${message}</p>
+      <div class="modal-actions" style="flex-wrap:wrap;">
+        ${choices.map(c => `<button type="button" class="choice-btn ${c.class || ''}" data-value="${c.value}">${c.label}</button>`).join('')}
       </div>
-      <div class="form-actions" style="margin-top:20px; border-top: 1px solid #eee; padding-top: 20px; display:flex; gap:12px;">
-        <button id="modal-save" style="flex:1;">Save</button>
-        <button id="modal-cancel" class="secondary" style="flex:1;">Cancel</button>
+      <div class="modal-actions" style="margin-top:20px; border-top: 1px solid #eee; padding-top: 20px;">
+        <button id="modal-save" class="flex-1">Save</button>
+        <button id="modal-cancel" class="secondary flex-1">Cancel</button>
       </div>
     `;
     const { card, close } = _openModalBase(title, contentHtml);
@@ -97,10 +96,10 @@ export async function showAuthDialog() {
     const renderMode = (isRegister = false, existingBackdrop = null) => {
       const contentHtml = `
         <form id="auth-modal-form">
-          <div class="form-row"><label>Username</label><input type="text" id="auth-username" required style="width:100%;box-sizing:border-box;"></div>
-          <div class="form-row"><label>Password</label><input type="password" id="auth-pass" required style="width:100%;box-sizing:border-box;"></div>
-          ${isRegister ? `<div class="form-row"><label>Player Name</label><input type="text" id="auth-name" required placeholder="e.g. John Doe" style="width:100%;box-sizing:border-box;"></div>` : ''}
-          <div class="form-actions" style="margin-top:20px; flex-direction: column; gap: 10px;">
+          <div class="form-row"><label>Username</label><input type="text" id="auth-username" required class="modal-input"></div>
+          <div class="form-row"><label>Password</label><input type="password" id="auth-pass" required class="modal-input"></div>
+          ${isRegister ? `<div class="form-row"><label>Player Name</label><input type="text" id="auth-name" required placeholder="e.g. John Doe" class="modal-input"></div>` : ''}
+          <div class="modal-actions column">
             <button type="submit" style="width:100%;">${isRegister ? 'Register' : 'Login'}</button>
             <button type="button" id="auth-switch" class="secondary" style="width:100%; border:none; background:none; text-decoration:underline; font-size:0.9rem;">
               ${isRegister ? 'Already have an account? Sign In' : 'Need an account? Register now'}
@@ -154,14 +153,14 @@ export async function showAuthDialog() {
 export async function showPlayerSelectionDialog(title, message, options, confirmText = 'Add Player') {
   return new Promise((resolve) => {
     const contentHtml = `
-      <p style="margin-bottom:0; line-height:1.5;">${message}</p>
-      <div class="form-row" style="margin-top:20px;">
-        <input type="text" id="player-search-modal" style="width:100%;box-sizing:border-box;font-size:1.1rem;padding:12px;" placeholder="Search players...">
-        <select id="player-select-modal" style="width:100%;box-sizing:border-box;font-size:1.1rem;padding:12px;margin-top:10px;"></select>
+      <p class="small-hint mb-0">${message}</p>
+      <div class="form-row mt-20">
+        <input type="text" id="player-search-modal" class="modal-input" placeholder="Search players...">
+        <select id="player-select-modal" class="modal-input" style="margin-top:10px;"></select>
       </div>
-      <div class="form-actions" style="margin-top:30px; display:flex; gap:12px;">
-        <button id="modal-confirm" style="flex:1;">${confirmText}</button>
-        <button id="modal-cancel" class="secondary" style="flex:1;">Cancel</button>
+      <div class="modal-actions">
+        <button id="modal-confirm" class="flex-1">${confirmText}</button>
+        <button id="modal-cancel" class="secondary flex-1">Cancel</button>
       </div>
     `;
     const { card, close } = _openModalBase(title, contentHtml);

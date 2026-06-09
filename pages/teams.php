@@ -12,12 +12,12 @@
         <label for="team-name">Team Name</label>
         <input id="team-name" type="text" placeholder="e.g., The Silverballs" required />
       </div>
-      <div style="display: flex; gap: 20px;">
-        <div class="form-row" style="flex: 1;">
+      <div class="flex gap-20">
+        <div class="form-row flex-1">
           <label for="team-city">City</label>
           <input id="team-city" type="text" placeholder="e.g., Chicago" />
         </div>
-        <div class="form-row" style="flex: 1;">
+        <div class="form-row flex-1">
           <label for="team-state">State</label>
           <input id="team-state" type="text" placeholder="e.g., IL" />
         </div>

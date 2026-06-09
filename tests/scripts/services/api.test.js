@@ -110,6 +110,38 @@ describe('API Client (api.js)', () => {
   });
 
   describe('fetchJSON Advanced Logic', () => {
+    it('should filter out null and undefined values from params', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      
+      await fetchJSON('test.php', { 
+        params: { a: 1, b: null, c: undefined, d: 'val' } 
+      });
+
+      const url = fetch.mock.calls[0][0];
+      expect(url).toContain('a=1');
+      expect(url).toContain('d=val');
+      expect(url).not.toContain('b=');
+      expect(url).not.toContain('c=');
+    });
+
+    it('should append params using & if the URL already contains a query string', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      
+      await fetchJSON('test.php?existing=true', { params: { new: 'yes' } });
+
+      const url = fetch.mock.calls[0][0];
+      expect(url).toBe('http://localhost/app/test.php?existing=true&new=yes');
+    });
+
+    it('should sanitize paths by removing leading slashes', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      
+      await fetchJSON('/service/test.php');
+
+      const url = fetch.mock.calls[0][0];
+      expect(url).toBe('http://localhost/app/service/test.php');
+    });
+
     it('should throw error with message from JSON response on failure', async () => {
       fetch.mockResolvedValue({
         ok: false,
@@ -155,6 +187,13 @@ describe('API Client (api.js)', () => {
       const callArgs = fetch.mock.calls[0][1];
       expect(callArgs.body).toBe(JSON.stringify({}));
     });
+
+    it('should throw a network error if fetch itself rejects', async () => {
+      const networkError = new Error('Failed to fetch');
+      fetch.mockRejectedValue(networkError);
+
+      await expect(fetchJSON('test.php')).rejects.toThrow('Failed to fetch');
+    });
   });
 
   describe('PB_API Helper Methods', () => {
@@ -198,6 +237,18 @@ describe('API Client (api.js)', () => {
       );
     });
 
+    it('saveScore should send a POST request with the score data', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ success: true }) });
+      const scoreData = { eventId: 1, playerId: 2, ball1: 10 };
+      
+      await PB_API.saveScore(scoreData);
+      
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('service/scoreService.php'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify(scoreData) })
+      );
+    });
+
     it('updateEvent should use PUT tunneling and include task parameters', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 99 }) });
       const eventData = { eventName: 'Season Finals', leagueId: 5 };
@@ -214,6 +265,24 @@ describe('API Client (api.js)', () => {
       );
     });
 
+    it('getEvents should include leagueId in query if provided', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+      
+      await PB_API.getEvents(42);
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=fixture&leagueId=42'), expect.any(Object));
+      
+      vi.clearAllMocks();
+      await PB_API.getEvents();
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=fixture'), expect.any(Object));
+      expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('leagueId='), expect.any(Object));
+    });
+
+    it('removeLeaguePlayer should construct URL with both leagueId and playerId', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.removeLeaguePlayer(10, 20);
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=member&leagueId=10&playerId=20'), expect.any(Object));
+    });
+
     it('getTargetScores should use leagueId if provided', async () => {
         fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
         await PB_API.getTargetScores(null, 5);
@@ -224,6 +293,19 @@ describe('API Client (api.js)', () => {
         fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
         await PB_API.getTargetScores(10);
         expect(fetch).toHaveBeenCalledWith(expect.stringContaining('eventId=10'), expect.any(Object));
+    });
+
+    it('bulkUpdateTargetOrder should send a POST request to sort task', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      const updates = [{ id: 1, order: 2 }];
+      await PB_API.bulkUpdateTargetOrder(updates);
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=sort'), expect.objectContaining({ method: 'POST' }));
+    });
+
+    it('runCleanup should call the cleanup service via GET', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.runCleanup();
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/cleanupService.php'), expect.any(Object));
     });
 
     it('deleteTargetScore should include threshold task', async () => {
@@ -243,6 +325,12 @@ describe('API Client (api.js)', () => {
           body: JSON.stringify({ locationId: 1, machineId: 10, note: 'Back room' })
         })
       );
+    });
+
+    it('updateUserPassword should target reset task with POST', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.updateUserPassword(5, 'newpass');
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=reset&id=5'), expect.objectContaining({ method: 'POST' }));
     });
 
     it('player management should handle route parameters correctly', async () => {

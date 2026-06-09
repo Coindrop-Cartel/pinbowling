@@ -151,7 +151,6 @@ export async function loadPage(url, pushState = true) {
     }
     document.dispatchEvent(new CustomEvent('pb:pageChanged', { detail: { url } }));
   } catch (err) {
-    console.error('[SPA] Partial load failed, falling back to full reload:', err);
     window.location.href = url;
   }
 }
@@ -203,15 +202,16 @@ export function renderThresholdGrid(values, formatFn = (v) => v, engine = undefi
     .filter(rank => values[rank] !== undefined);
 
   return `
-    <div class="threshold-grid-container" style="background: var(--pb-gray); padding: 8px; border-radius: 4px; font-size: 0.75rem;">
-      ${prefix ? `<div style="font-weight: bold; font-size: 0.65rem; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 2px; opacity: 0.6;">${prefix}:</div>` : ''}
-      <div class="threshold-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px;">
+    <div class="threshold-grid-container">
+      ${prefix ? `<div class="threshold-prefix">${prefix}:</div>` : ''}
+      <div class="threshold-grid">
         ${ranksToDisplay
           .map(rank => {
             const val = values[rank]; // Get value from the full 1-10 map
             const label = engine ? engine.getThresholdLabel(rank, value1, value2) : rank; // Use engine's label for special cases
-            const style = engine ? engine.getThresholdRowStyle(rank, value1, value2) : 'margin: 2px 0;'; // Use engine's style for highlighting
-            return `<div style="${style}"><strong>${label}:</strong> ${formatFn(val)}</div>`;
+            const style = engine ? engine.getThresholdRowStyle(rank, value1, value2) : '';
+            const inline = style ? ` style="${style}"` : '';
+            return `<div class="threshold-row"${inline}><strong>${label}:</strong> ${formatFn(val)}</div>`;
           })
           .join('')
         }

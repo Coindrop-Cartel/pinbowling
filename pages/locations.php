@@ -21,14 +21,14 @@ $pageTitle = 'Manage Locations';
           <label for="location-name">Location Name</label>
           <input id="location-name" type="text" placeholder="e.g. The Silver Ballroom" required />
         </div>
-        <div id="location-city-state-row" class="form-row hidden" style="display: flex; gap: 15px; margin-bottom: 15px;">
-          <div class="form-row" style="flex: 2; margin-bottom: 0;">
+        <div id="location-city-state-row" class="form-row hidden flex gap-15 mb-15">
+          <div class="form-row flex-2">
             <label for="location-city">City</label>
             <input id="location-city" type="text" placeholder="e.g. St. Louis" />
           </div>
-          <div class="form-row" style="flex: 1; margin-bottom: 0;">
+          <div class="form-row flex-1">
             <label for="location-state">State</label>
-            <select id="location-state" style="width: 100%; box-sizing: border-box;">
+            <select id="location-state">
               <option value="">Select State</option>
               <option value="AL">AL</option><option value="AK">AK</option><option value="AZ">AZ</option>
               <option value="AR">AR</option><option value="CA">CA</option><option value="CO">CO</option>

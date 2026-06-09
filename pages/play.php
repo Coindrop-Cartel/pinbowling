@@ -1,6 +1,6 @@
 <?php $pageTitle = 'Quick Play'; ?>
 <main class="page-container">
-  <header style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+  <header class="flex-between mb-20">
     <div>
       <h1>Quick Play</h1>
       <p>Find an existing session for today or create a new custom lineup.</p>
@@ -29,18 +29,18 @@
         </div>
       </div>
 
-      <div id="qp-setup-summary" class="hidden" style="display: flex; justify-content: space-between; align-items: center; background: #f9f9f9; padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #eee;">
-        <div id="qp-summary-text" style="font-weight: bold;"></div>
-        <button type="button" id="qp-change-setup-btn" class="secondary" style="padding: 4px 10px; font-size: 0.8rem;">Change</button>
+      <div id="qp-setup-summary" class="hidden summary-box">
+        <div id="qp-summary-text" class="summary-text"></div>
+        <button type="button" id="qp-change-setup-btn" class="secondary btn-small">Change</button>
       </div>
 
-      <div id="qp-generator-options" class="form-row hidden" style="display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px;">
-        <div style="flex: 1;">
+      <div id="qp-generator-options" class="form-row hidden generator-options">
+        <div class="flex-1">
           <label for="qp-frames">Number of Rounds</label>
           <select id="qp-frames">
           </select>
         </div>
-        <div style="flex: 1;">
+        <div class="flex-1">
           <label for="qp-difficulty">Target Difficulty</label>
           <select id="qp-difficulty">
             <option value="easy">Easy</option>
@@ -48,7 +48,7 @@
             <option value="hard">Hard</option>
           </select>
         </div>
-        <div style="flex: 1;">
+        <div class="flex-1">
           <label for="qp-scaling">Scoring Profile</label>
           <select id="qp-scaling">
             <option value="flat">Flat</option>
@@ -74,8 +74,8 @@
 
   <!-- Preview Section (Populated after Generation) -->
   <section id="qp-preview-section" class="card hidden">
-    <h2>Review Lineup & Targets</h2>
-    <div id="qp-frames-list" style="margin-bottom: 20px;"></div>
+  <h2>Review Lineup & Targets</h2>
+  <div id="qp-frames-list" class="mb-20"></div>
     <div class="form-actions">
       <button id="finalize-qp-btn" class="primary">Create Session</button>
     </div>

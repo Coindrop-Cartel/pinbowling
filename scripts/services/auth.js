@@ -222,3 +222,61 @@ export async function isManagementAuthorized() {
   if (!user) return false;
   return user.role === 'admin' || user.role === 'td';
 }
+
+/**
+ * Determines the access level for scoring a specific player's round.
+ * Centralizes authorization logic so pages don't duplicate permission checks.
+ *
+ * @param {Object|null} currentUser - The currently authenticated user (from PB_API.getCurrentUser()).
+ * @param {Object|null} targetPlayer - The player whose score is being entered.
+ * @param {Object|null} turnValues - Existing score values for the round (ball1, ball2, ball3).
+ * @returns {Promise<{access: 'allowed'|'denied', reason?: string}>}
+ *   - { access: 'allowed' } — the current user may enter/modify this score
+ *   - { access: 'denied', reason: 'Updates locked' } — non-TD/Admin tried to update an existing score
+ *   - { access: 'denied', reason: 'Guest Only' } — non-TD/Admin tried to score another registered player
+ */
+export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues) {
+  const canUpdateAny = await can(PERMISSIONS.UPDATE_ANY_SCORE);
+  const isUpdate = !!(turnValues?.ball1 || turnValues?.ball2 || turnValues?.ball3);
+  const isSelf = currentUser && String(targetPlayer?.id) === String(currentUser.player_id);
+  const isTargetUnregistered = !targetPlayer?.userId;
+
+  if (isUpdate && !canUpdateAny) {
+    return { access: 'denied', reason: 'Updates locked' };
+  }
+  if (!canUpdateAny) {
+    const isAuthorizedToScore = isSelf || isTargetUnregistered;
+    if (!isAuthorizedToScore) {
+      return { access: 'denied', reason: 'Guest Only' };
+    }
+  }
+  return { access: 'allowed' };
+}
+
+/**
+ * Filters leagues to only those visible to the given user.
+ * Unregistered (null) users can only see leagues that have at least one guest player.
+ * Authenticated users see all leagues.
+ *
+ * @param {Array} leagues - Array of league objects, each with a `players` array.
+ * @param {Object|null} user - The currently authenticated user, or null for guests.
+ * @returns {Array} Filtered leagues visible to the user.
+ */
+export function filterLeaguesForUser(leagues, user) {
+  if (user) return leagues;
+  return leagues.filter(l => (l.players || []).some(p => !p.userId));
+}
+
+/**
+ * Filters players to only those selectable by the given user.
+ * Unregistered (null) users can only select unregistered guest players.
+ * Authenticated users can select all players.
+ *
+ * @param {Array} players - Array of player objects, each with a `userId` property.
+ * @param {Object|null} user - The currently authenticated user, or null for guests.
+ * @returns {Array} Filtered players selectable by the user.
+ */
+export function filterPlayersForUser(players, user) {
+  if (user) return players;
+  return players.filter(p => !p.userId);
+}

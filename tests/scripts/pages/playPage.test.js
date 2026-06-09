@@ -16,6 +16,7 @@ vi.mock('@services/api.js', () => ({
 
 vi.mock('@services/auth.js', () => ({
   can: vi.fn(() => Promise.resolve(true)),
+  filterPlayersForUser: vi.fn((players) => players),
   PERMISSIONS: {
     CREATE_SESSION: 'CREATE_SESSION',
     JOIN_SESSION: 'JOIN_SESSION'

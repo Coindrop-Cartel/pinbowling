@@ -22,7 +22,7 @@
         </div>
         <div id="player-format-row" class="form-row hidden">
           <label for="player-scoring-format">Preferred Scoring Format</label>
-          <select id="player-scoring-format" style="width: 100%; box-sizing: border-box;"></select>
+          <select id="player-scoring-format"></select>
         </div>
         <div id="player-form-actions" class="form-actions hidden">
           <button type="submit" id="save-player-button">Save Player</button>
@@ -34,7 +34,7 @@
     <section class="card">
       <h2>Players</h2>
       <div id="player-list-container">
-        <ul id="player-list" class="notice" style="list-style: none; padding: 14px 16px; margin: 0;">
+        <ul id="player-list" class="notice player-list">
           <li>Loading players...</li>
         </ul>
       </div>

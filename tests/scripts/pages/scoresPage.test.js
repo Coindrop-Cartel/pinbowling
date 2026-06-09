@@ -8,7 +8,7 @@ vi.mock('@services/api.js', () => ({
   PB_API: {
     getLeagues: vi.fn(),
     getLeague: vi.fn(),
-    getPlayers: vi.fn(),
+    getPlayers: vi.fn().mockResolvedValue([]),
     getTargetScores: vi.fn(),
     getScores: vi.fn(),
     saveScore: vi.fn(),
@@ -26,6 +26,26 @@ vi.mock('@scripts/utils.js', () => ({
   renderThresholdGrid: vi.fn(() => 'Grid'),
 }));
 
+vi.mock('@services/auth.js', () => ({
+  can: vi.fn().mockResolvedValue(true),
+  getScoreAccessLevel: vi.fn().mockResolvedValue({ access: 'allowed' }),
+  filterLeaguesForUser: vi.fn((leagues) => leagues),
+  filterPlayersForUser: vi.fn((players) => players),
+  PERMISSIONS: {
+    CREATE_SESSION: 'CREATE_SESSION',
+    JOIN_SESSION: 'JOIN_SESSION',
+    ADD_ANY_SCORE: 'ADD_ANY_SCORE',
+    UPDATE_ANY_SCORE: 'UPDATE_ANY_SCORE',
+    MANAGE_LEAGUES: 'MANAGE_LEAGUES',
+    MANAGE_TEAMS: 'MANAGE_TEAMS',
+    MANAGE_MACHINES: 'MANAGE_MACHINES',
+    MANAGE_PLAYERS: 'MANAGE_PLAYERS',
+    ADD_LOCATION_MACHINE: 'ADD_LOCATION_MACHINE',
+    UPDATE_SELF: 'UPDATE_SELF',
+    RUN_CLEANUP: 'RUN_CLEANUP',
+  },
+}));
+
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
     calculateTurnResults: vi.fn(() => ({ turnResults: [], total: 0 })),
@@ -37,6 +57,7 @@ vi.mock('@core/engine.js', () => ({
     formatMark: vi.fn((turn) => turn.mark),
     filterThresholds: vi.fn(v => v),
     formatTotalScore: vi.fn((t) => String(t)),
+    getLastFrameHint: vi.fn(() => ''),
   })),
 }));
 
@@ -95,6 +116,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
 
   it('should load inputs and results when a player is selected', async () => {
     Utils.getCurrentPlayerId.mockReturnValue('20');
+    PB_API.getPlayers.mockResolvedValue([{ id: 20, playerName: 'Alice' }]);
     PB_API.getLeague.mockResolvedValue({ id: 1, players: [{ id: 20, playerName: 'Alice' }] });
     
     await initScoresPage();

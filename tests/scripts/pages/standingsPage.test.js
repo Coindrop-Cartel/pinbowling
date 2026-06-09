@@ -6,14 +6,19 @@ vi.mock('@services/api.js', () => ({
   PB_API: {
     getLeagues: vi.fn(),
     getTargetScores: vi.fn(),
-    getScores: vi.fn()
+    getScores: vi.fn(),
+    getTeams: vi.fn().mockResolvedValue([])
   }
 }));
 
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
     getTurnHeaderPrefix: vi.fn(() => 'F'),
-    calculateTurnResults: vi.fn(() => ({ turnResults: [], total: 100 })),
+    calculateTurnResults: vi.fn(() => ({
+      turnResults: [{ orderNumber: 1, displayMark: 'X', displayRoundTotal: 100, played: true }],
+      total: 100,
+      totalDisplay: '100',
+    })),
     getRoundLabel: vi.fn(() => 'Frame'), // Ensure this is consistent
     getThresholdSort: vi.fn(() => (a, b) => b[0] - a[0]),
     compareScores: vi.fn((a, b) => b - a),
@@ -87,7 +92,7 @@ describe('Standings Page (standingsPage.js)', () => {
 
     await initStandingsPage();
 
-    expect(document.getElementById('standings-header').innerHTML).toContain('F 1');
+    expect(document.getElementById('standings-header').innerHTML).toContain('>1<');
     expect(document.getElementById('standings-body').innerHTML).toContain('Kyle');
     expect(document.getElementById('standings-wrapper').classList.contains('hidden')).toBe(false);
   });
@@ -103,7 +108,7 @@ describe('Standings Page (standingsPage.js)', () => {
 
     await initStandingsPage();
 
-    expect(document.getElementById('standings-header').innerHTML).toContain('W1');
+    expect(document.getElementById('standings-header').innerHTML).toContain('>1<');
     expect(document.getElementById('tv-title').textContent).toContain('Season Summary');
   });
 

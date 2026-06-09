@@ -7,6 +7,7 @@ import { printMachineScores } from '@ui/printing.js';
 import { requireAdmin, isManagementAuthorized } from '@services/auth.js';
 import {navigateTo} from '@scripts/utils.js';
 import { ROUTES } from '@scripts/routes.js';
+import { normalizeTargets } from '@services/normalizer.js';
 
 export async function initEventSetupPage() {
   // Verify authorization before initializing the page logic
@@ -271,43 +272,43 @@ export async function initEventSetupPage() {
           }
         } : null,
         headerHtml: `
-        <div style="display: flex; align-items: center; gap: 12px; width: 100%; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">
-            <div class="drag-handle" style="cursor: grab; color: var(--pb-primary); opacity: 0.5; padding: 0 4px; font-size: 1.2rem;">☰</div>
-            <span style="font-weight: bold; min-width: 30px; text-align: center;">${round.orderNumber}</span>
-            <span style="flex: 1; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" class="machine-name-display">${round.machineName}</span>
+        <div class="flex gap-12 w-100 wrap">
+          <div class="flex gap-12 flex-1 min-250 align-center">
+            <div class="drag-handle">☰</div>
+            <span class="round-number">${round.orderNumber}</span>
+            <span class="machine-name-display">${round.machineName}</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto;" onclick="event.stopPropagation()">
-            <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${Engine.getValue1Label()}:</label>
-              <input type="text" class="score10-input" value="${formatNumber(round.value1)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
+          <div class="flex gap-12 wrap" style="margin-left:auto;" onclick="event.stopPropagation()">
+            <div class="flex gap-6 min-140 flex-1 align-center">
+              <label class="small value-label">${Engine.getValue1Label()}:</label>
+              <input type="text" class="score10-input score-input" value="${formatNumber(round.value1)}">
             </div>
-            <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${Engine.getValue2Label()}:</label>
-              <input type="text" class="score1-input" value="${formatNumber(round.value2)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
+            <div class="flex gap-6 min-140 flex-1 align-center">
+              <label class="small value-label">${Engine.getValue2Label()}:</label>
+              <input type="text" class="score1-input score-input" value="${formatNumber(round.value2)}">
             </div>
           </div>
         </div>
         `,
         contentHtml: `
           <div class="form-row">
-            <label style="font-size: 0.85rem;">Change Machine</label>
-            <input type="text" class="row-machine-search" placeholder="Filter machines..." style="width: 100%; box-sizing: border-box; margin-bottom: 5px;">
-            <select class="row-machine-select" style="width: 100%; box-sizing: border-box;"></select>
+            <label class="small">Change Machine</label>
+            <input type="text" class="row-machine-search" placeholder="Filter machines...">
+            <select class="row-machine-select"></select>
           </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <div style="display: flex; gap: 6px;">
+          <div class="flex-between mb-10">
+            <div class="flex gap-6">
                <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
                <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
                <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
             </div>
-            <div style="display: flex; gap: 4px;">
+            <div class="flex gap-4">
                <button type="button" class="scaling-btn ${scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
                <button type="button" class="scaling-btn ${scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
             </div>
           </div>
           <div class="preview-values-container">${renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2)}</div>
-          ${bonusHtml ? `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd;">${bonusHtml}</div>` : ''}
+          ${bonusHtml ? `<div class="target-details">${bonusHtml}</div>` : ''}
         `,
         onHeaderClick: (e) => {
           expandedTargetId = (expandedTargetId === round.id) ? null : round.id;
@@ -447,10 +448,10 @@ export async function initEventSetupPage() {
       eventId ? PB_API.getTargetScores(eventId) : Promise.resolve([])
     ]);
 
-    // Update the array in-place so the searchable select component sees the new data
+    // Normalize targets and suggested machines into a consistent shape
     currentSuggestedMachines.length = 0;
-    currentSuggestedMachines.push(...suggestedData);
-    currentSuggestedMachines.sort((a, b) => a.machineName.localeCompare(b.machineName));
+    currentSuggestedMachines.push(...(suggestedData || []));
+    currentSuggestedMachines.sort((a, b) => (a.machineName || '').localeCompare(b.machineName || ''));
     
     // Clear search text on fresh load/navigation
     document.getElementById('machine-name').value = '';
@@ -458,7 +459,7 @@ export async function initEventSetupPage() {
     updateQuickFillState('');
 
     isListDirty = false;
-    eventTargets = targets;
+    eventTargets = normalizeTargets(targets || []);
     originalEventTargets = JSON.parse(JSON.stringify(eventTargets));
     await render();
   };

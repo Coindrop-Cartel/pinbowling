@@ -4,7 +4,8 @@ import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId
 import { initTournamentSelector, createSearchableSelect, renderActionSummary } from '@ui/selectors.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
-import { can, PERMISSIONS } from '@services/auth.js';
+import { getScoreAccessLevel, filterLeaguesForUser, filterPlayersForUser } from '@services/auth.js';
+import { normalizeTargets, normalizeScores, groupScoresByPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
 
 /**
  * Initializes the Player Scoring page.
@@ -27,17 +28,16 @@ export async function initScoresPage() {
   const playerSelectionCard = document.getElementById('player-selection-card');
   const scoringCard = document.getElementById('scoring-card');
   const resultsCard = document.getElementById('results-card');
-
+  
+  let allLeaguesCache = []; // Module-level cache for leagues
   // Fetch leagues and current user once at the start. 
-  const [rawLeagues, user] = await Promise.all([
+  const [leaguesFromApi, user] = await Promise.all([
     PB_API.getLeagues(),
     PB_API.getCurrentUser()
   ]);
-
+  allLeaguesCache = leaguesFromApi;
   // Requirement: Unregistered users only see leagues that have at least one guest player.
-  const initialLeagues = !user 
-    ? rawLeagues.filter(l => (l.players || []).some(p => !p.userId))
-    : rawLeagues;
+  const initialLeagues = filterLeaguesForUser(allLeaguesCache, user);
 
   // If we land on the scores page with a session/non-standard league active, 
   // we clear it so the selector resets and refreshes to show standard leagues.
@@ -134,55 +134,31 @@ export async function initScoresPage() {
    * @returns {HTMLElement} The row element.
    */
   async function buildRoundRow(round, turnValues, isLastRound = false, targetPlayer = null) {
-    const row = document.createElement('div');
-    
-    // Centralized Security Logic
-    const canUpdateAny = await can(PERMISSIONS.UPDATE_ANY_SCORE);
-    
-    const isUpdate = !!(turnValues?.ball1 || turnValues?.ball2 || turnValues?.ball3);
-    const isStandardLeague = activeLeague?.type === 'standard';
-    
-    const isSelf = currentUser && String(targetPlayer?.id) === String(currentUser.player_id);
-    const isTargetUnregistered = !targetPlayer?.userId;
-    
-    // Rule: Non-TDs/Admins can only ADD scores, never UPDATE (especially in standard leagues).
-    let accessDenied = false;
-    let msg = '';
-
-    if (isUpdate && !canUpdateAny) {
-        accessDenied = true;
-        msg = 'Updates locked';
-    } else if (!canUpdateAny) {
-        // If they can't manage all, they can only score self or unregistered guests.
-        const isAuthorizedToScore = isSelf || isTargetUnregistered;
-        if (!isAuthorizedToScore) {
-            accessDenied = true;
-            msg = 'Guest Only';
-        }
-    }
+    const row = document.createElement('div'); // Centralized Security Logic
+    const { access: accessLevel, reason: msg } = await getScoreAccessLevel(currentUser, targetPlayer, turnValues);
+    const isAccessDenied = accessLevel === 'denied';
 
     row.className = 'round-row';
-    row.style = "display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 8px 12px; margin-bottom: 5px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;";
     row.dataset.orderNumber = round.orderNumber;
 
     const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
 
     row.innerHTML = `
-      <div class="round-info" style="cursor: pointer; flex: 1; min-width: 200px;">
+      <div class="round-info">
         <div class="round-label"><b>${Engine.getRoundLabel()} ${round.orderNumber}:</b> ${round.machineName}</div>
         ${Engine.getRowSummaryHtml(round, formatNumber)}
         ${bonusHtml}
-        <div class="target-details hidden" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--pb-primary); opacity: 0.8;">
-          <div style="font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; color: var(--pb-primary);">Scoring Thresholds</div>
+        <div class="target-details hidden">
+          <div class="small threshold-heading">Scoring Thresholds</div>
           ${renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2)}
         </div>
       </div>
-      <div class="round-inputs-container" style="display: flex; gap: 0.5rem; align-items: center; ${accessDenied ? 'opacity: 0.5; pointer-events: none;' : ''}"></div>
-      <button class="save-round-button" ${accessDenied ? 'style="display:none;"' : 'disabled'}>Save</button>
+      <div class="round-inputs-container ${isAccessDenied ? 'round-inputs-disabled' : ''}"></div>
+      <button class="save-round-button btn-mgmt" ${isAccessDenied ? 'hidden' : 'disabled'}>Save</button>
     `;
 
-    if (accessDenied) {
-        row.querySelector('.round-inputs-container').insertAdjacentHTML('afterend', `<span style="font-size: 0.7rem; color: #888; text-transform: uppercase;">${msg}</span>`);
+    if (isAccessDenied) {
+      row.querySelector('.round-inputs-container').insertAdjacentHTML('afterend', `<span class="round-msg">${msg}</span>`);
     }
 
     const inputsContainer = row.querySelector('.round-inputs-container');
@@ -257,8 +233,8 @@ export async function initScoresPage() {
       let selectablePlayers = [];
 
       if (leagueId) {
-        // Fetch the specific league to get the assigned roster
-        const league = await PB_API.getLeague(leagueId);
+        // Use the cached leagues to find the specific league and its roster
+        const league = allLeaguesCache.find(l => String(l.id) === String(leagueId));
         
         if (league?.participants === 'team') {
           // In a team league, the selectable players are the members of the assigned teams
@@ -275,9 +251,7 @@ export async function initScoresPage() {
       }
 
       // Requirement: Unregistered users can only select players that are unregistered guests
-      if (!currentUser) {
-        selectablePlayers = selectablePlayers.filter(p => !p.userId);
-      }
+      selectablePlayers = filterPlayersForUser(selectablePlayers, currentUser);
 
       // If a playerId is in the URL, ensure they are at least in the selectable list 
       // for the current session, even if the roster fetch hasn't updated yet.
@@ -342,7 +316,8 @@ export async function initScoresPage() {
    * @param {Object} player The player being scored.
    */
   async function loadScoresIntoForm(scoreRows, player) {
-    const scoreMap = scoreRows.reduce((map, row) => {
+    const normalized = normalizeScores(scoreRows || []);
+    const scoreMap = normalized.reduce((map, row) => {
       map[String(row.orderNumber)] = row;
       return map;
     }, {});
@@ -359,8 +334,7 @@ export async function initScoresPage() {
         const lfHint = Engine.getLastFrameHint?.();
         if (lfHint) {
           const hintDiv = document.createElement('div');
-          hintDiv.className = 'hint';
-          hintDiv.style = "font-size: 0.75rem; padding: 8px 12px; margin-bottom: 5px; border-left-width: 4px;";
+          hintDiv.className = 'hint small';
           hintDiv.innerHTML = lfHint;
           roundsInput.appendChild(hintDiv);
         }
@@ -426,16 +400,7 @@ export async function initScoresPage() {
    * @returns {Object} Map of order_number to ball scores.
    */
   function getScoreMapFromInputs() {
-    const scoreMap = {};
-    roundsInput.querySelectorAll('.round-row').forEach((row) => {
-      const orderNum = Number(row.dataset.orderNumber);
-      scoreMap[orderNum] = {
-        ball1: Number(row.querySelector('[data-ball="1"]').value.replace(/\D/g, '')) || 0,
-        ball2: Number(row.querySelector('[data-ball="2"]').value.replace(/\D/g, '')) || 0,
-        ball3: Number(row.querySelector('[data-ball="3"]').value.replace(/\D/g, '')) || 0,
-      };
-    });
-    return scoreMap;
+    return buildScoreMapFromDOM(roundsInput);
   }
 
   /**
@@ -484,28 +449,17 @@ export async function initScoresPage() {
       PB_API.getLeagues(),
       PB_API.getTargetScores(eventId)
     ]);
+    allLeaguesCache = leagues; // Update the cache with fresh data
 
-    // Map raw database columns to camelCase and the 'values' object expected by the engine
-    const machinesNormalized = eventTargets.map(t => ({
-      ...t,
-      machineId: t.machineId || t.machine_id,
-      machineName: t.machineName || t.machine_name,
-      orderNumber: t.orderNumber || t.order_number,
-      value1: Number(t.value1 || 0),
-      value2: Number(t.value2 || 0),
-      values: t.values || {
-        1: Number(t.score1 || 0), 2: Number(t.score2 || 0), 3: Number(t.score3 || 0), 
-        4: Number(t.score4 || 0), 5: Number(t.score5 || 0), 6: Number(t.score6 || 0), 
-        7: Number(t.score7 || 0), 8: Number(t.score8 || 0), 9: Number(t.score9 || 0), 10: Number(t.score10 || 0)
-      }
-    }));
+    // Normalize targets into engine-friendly shape
+    const machinesNormalized = normalizeTargets(eventTargets);
 
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
     const event = league?.events?.find(e => String(e.id) === String(eventId));
 
     const isSession = league?.type === 'session';
-    const leagueTitle = isSession ? '' : `<div style="font-weight: bold;">League: ${league?.name || 'Unknown'}</div>`;
-    const eventTitle = `<div style="font-size: 0.9rem; opacity: 0.8;">Event: ${event?.eventName || 'Event'}</div>`;
+    const leagueTitle = isSession ? '' : `<div class="meta-strong">League: ${league?.name || 'Unknown'}</div>`;
+    const eventTitle = `<div class="meta-muted">Event: ${event?.eventName || 'Event'}</div>`;
     const summaryTitle = `${leagueTitle}${eventTitle}`;
 
     tournamentSelectorUI.classList.add('hidden');

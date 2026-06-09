@@ -135,6 +135,33 @@ describe('Utility Functions (utils.js)', () => {
     });
   });
 
+  describe('getCookie', () => {
+    it('should return the value of an existing cookie', () => {
+      document.cookie = 'test_cookie=hello; path=/';
+      expect(Utils.getCookie('test_cookie')).toBe('hello');
+    });
+
+    it('should return null for a non-existent cookie', () => {
+      expect(Utils.getCookie('nonexistent')).toBeNull();
+    });
+
+    it('should handle cookies with special characters in value', () => {
+      document.cookie = 'session=abc123def; path=/';
+      expect(Utils.getCookie('session')).toBe('abc123def');
+    });
+
+    it('should not match partial cookie names', () => {
+      document.cookie = 'pb_format=golf; path=/';
+      expect(Utils.getCookie('pb_forma')).toBeNull();
+    });
+
+    it('should handle multiple cookies and find the right one', () => {
+      document.cookie = 'first=val1; path=/';
+      document.cookie = 'second=val2; path=/';
+      expect(Utils.getCookie('second')).toBe('val2');
+    });
+  });
+
   describe('formatNumber', () => {
     it('should format numbers with locale-specific thousands separators', () => {
       expect(Utils.formatNumber(1234567)).toBe('1,234,567'); // Assumes en-US locale for JSDOM
@@ -142,6 +169,22 @@ describe('Utility Functions (utils.js)', () => {
       expect(Utils.formatNumber(123)).toBe('123');
       expect(Utils.formatNumber(0)).toBe('0');
       expect(Utils.formatNumber(1234.56)).toBe('1,234.56');
+    });
+
+    it('should return "0" for undefined', () => {
+      expect(Utils.formatNumber(undefined)).toBe('0');
+    });
+
+    it('should return "0" for null', () => {
+      expect(Utils.formatNumber(null)).toBe('0');
+    });
+
+    it('should return "0" for NaN', () => {
+      expect(Utils.formatNumber(NaN)).toBe('0');
+    });
+
+    it('should handle string numbers', () => {
+      expect(Utils.formatNumber('5000')).toBe('5,000');
     });
   });
 
@@ -195,6 +238,103 @@ describe('Utility Functions (utils.js)', () => {
     });
   });
 
+  describe('navigateTo', () => {
+    it('sets window.location.href when a URL is provided', () => {
+      Object.defineProperty(window, 'location', {
+        value: { href: '' },
+        writable: true,
+      });
+      Utils.navigateTo('http://example.com/page');
+      expect(window.location.href).toBe('http://example.com/page');
+    });
+
+    it('does nothing when url is falsy', () => {
+      const originalHref = window.location.href;
+      Utils.navigateTo('');
+      expect(window.location.href).toBe(originalHref);
+    });
+
+    it('does nothing when url is null', () => {
+      const originalHref = window.location.href;
+      Utils.navigateTo(null);
+      expect(window.location.href).toBe(originalHref);
+    });
+
+    it('does nothing when url is undefined', () => {
+      const originalHref = window.location.href;
+      Utils.navigateTo(undefined);
+      expect(window.location.href).toBe(originalHref);
+    });
+  });
+
+  describe('loadPage', () => {
+    let mainElement;
+    let pushStateSpy;
+    beforeEach(() => {
+      document.body.innerHTML = '<main class="page-container"><p>Old content</p></main>';
+      mainElement = document.querySelector('main.page-container');
+      global.fetch = vi.fn();
+      pushStateSpy = vi.fn();
+      window.history.pushState = pushStateSpy;
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+    it('should fetch page and update main container content', async () => {
+      global.fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<main class="page-container"><p>New content</p></main>') });
+      await Utils.loadPage('http://localhost/leagues.php');
+      expect(global.fetch).toHaveBeenCalledWith('http://localhost/leagues.php', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      expect(mainElement.innerHTML).toContain('New content');
+    });
+    it('should push state by default', async () => {
+      global.fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<main class="page-container">Content</main>') });
+      await Utils.loadPage('http://localhost/leagues.php');
+      expect(pushStateSpy).toHaveBeenCalled();
+    });
+    it('should not push state when pushState is false', async () => {
+      global.fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<main class="page-container">Content</main>') });
+      await Utils.loadPage('http://localhost/leagues.php', false);
+      expect(pushStateSpy).not.toHaveBeenCalled();
+    });
+    it('should dispatch pb:pageChanged event', async () => {
+      global.fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<main class="page-container">Content</main>') });
+      const eventSpy = vi.fn();
+      document.addEventListener('pb:pageChanged', eventSpy);
+      await Utils.loadPage('http://localhost/leagues.php');
+      expect(eventSpy).toHaveBeenCalled();
+      document.removeEventListener('pb:pageChanged', eventSpy);
+    });
+    it('should scroll to top after loading', async () => {
+      global.fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<main class="page-container">Content</main>') });
+      await Utils.loadPage('http://localhost/leagues.php');
+      expect(window.scrollTo).toHaveBeenCalledWith(0, 0);
+    });
+    it('should fall back to full reload if fetch fails', async () => {
+      global.fetch.mockRejectedValue(new Error('Network error'));
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      Object.defineProperty(window, 'location', { value: { href: '' }, writable: true, configurable: true });
+      await Utils.loadPage('http://localhost/leagues.php');
+      expect(window.location.href).toBe('http://localhost/leagues.php');
+      consoleSpy.mockRestore();
+    });
+    it('should fall back to full reload if response is not ok', async () => {
+      global.fetch.mockResolvedValue({ ok: false, status: 404 });
+      Object.defineProperty(window, 'location', { value: { href: '' }, writable: true, configurable: true });
+      await Utils.loadPage('http://localhost/leagues.php');
+      expect(window.location.href).toBe('http://localhost/leagues.php');
+    });
+    it('should fall back to full reload if no main container exists', async () => {
+      document.body.innerHTML = '<div>No main here</div>';
+      Object.defineProperty(window, 'location', { value: { href: '' }, writable: true, configurable: true });
+      await Utils.loadPage('http://localhost/leagues.php');
+      expect(window.location.href).toBe('http://localhost/leagues.php');
+    });
+    it('should handle HTML without main tag by using raw HTML', async () => {
+      global.fetch.mockResolvedValue({ ok: true, text: () => Promise.resolve('<div>Raw content without main</div>') });
+      await Utils.loadPage('http://localhost/leagues.php');
+      expect(mainElement.innerHTML).toContain('Raw content without main');
+    });
+  });
 
   describe('renderPreview', () => {
     let highScoreInput, lowScoreInput, previewValues;
@@ -257,23 +397,104 @@ describe('Utility Functions (utils.js)', () => {
       expect(previewValues.innerHTML).not.toContain('<strong>Target 1:</strong>');
     });
 
-  });
-});
-
-// Additional tests for navigateTo and initNavigation else branch
-describe('navigateTo function', () => {
-  it('sets window.location.href when a URL is provided', () => {
-    Object.defineProperty(window, 'location', {
-      value: { href: '' },
-      writable: true,
+    it('should pass currentScaling to buildRoundValues and getBonusTargetHtml', () => {
+      mockEngineBuildRoundValues.mockReturnValue({ 10: 10000, 1: 1000 });
+      mockEngine.getBonusTargetHtml.mockReturnValue('');
+      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine(), false, 1.5);
+      expect(mockEngineBuildRoundValues).toHaveBeenCalledWith(10000, 1000, 1.5);
+      expect(mockEngine.getBonusTargetHtml).toHaveBeenCalledWith(
+        expect.objectContaining({ values: { 10: 10000, 1: 1000 } }),
+        false,
+        expect.any(Function),
+        1.5
+      );
     });
-    Utils.navigateTo('http://example.com/page');
-    expect(window.location.href).toBe('http://example.com/page');
+
+    it('should strip non-numeric characters from input values', () => {
+      highScoreInput.value = '10,000';
+      lowScoreInput.value = '1,000';
+      mockEngineBuildRoundValues.mockReturnValue({ 10: 10000, 1: 1000 });
+      mockEngine.getBonusTargetHtml.mockReturnValue('');
+      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine());
+      expect(mockEngineBuildRoundValues).toHaveBeenCalledWith(10000, 1000, undefined);
+    });
+
+    it('should call filterThresholds with the built values', () => {
+      const values = { 10: 10000, 5: 5000, 1: 1000 };
+      mockEngineBuildRoundValues.mockReturnValue(values);
+      mockEngine.getBonusTargetHtml.mockReturnValue('');
+      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine());
+      expect(mockEngine.filterThresholds).toHaveBeenCalledWith(values);
+    });
   });
 
-  it('does nothing when url is falsy', () => {
-    const originalHref = window.location.href;
-    Utils.navigateTo('');
-    expect(window.location.href).toBe(originalHref);
+  describe('renderThresholdGrid', () => {
+    it('should return notice div when values is null', () => {
+      const result = Utils.renderThresholdGrid(null);
+      expect(result).toContain('Enter scores to see thresholds');
+    });
+
+    it('should return notice div when values is empty', () => {
+      const result = Utils.renderThresholdGrid({});
+      expect(result).toContain('Enter scores to see thresholds');
+    });
+
+    it('should render grid with engine labels and styles', () => {
+      const values = { 10: 10000, 5: 5000, 1: 1000 };
+      const result = Utils.renderThresholdGrid(values, Utils.formatNumber, mockEngine, 10000, 1000);
+      expect(result).toContain('threshold-grid-container');
+      expect(result).toContain('Pins:'); // prefix
+      expect(result).toContain('<strong>High:</strong>');
+      expect(result).toContain('<strong>Low:</strong>');
+      expect(result).toContain('10,000');
+      expect(result).toContain('1,000');
+    });
+
+    it('should render grid without engine (default behavior)', () => {
+      const values = { 10: 10000, 5: 5000, 1: 1000 };
+      const result = Utils.renderThresholdGrid(values, Utils.formatNumber);
+      expect(result).toContain('threshold-grid-container');
+      expect(result).not.toContain('Pins:'); // no prefix
+      expect(result).toContain('<strong>10:</strong>');
+      expect(result).toContain('<strong>5:</strong>');
+      expect(result).toContain('<strong>1:</strong>');
+    });
+
+    it('should use default descending range when no engine provided', () => {
+      const values = { 10: 10000, 9: 9000, 1: 1000 };
+      const result = Utils.renderThresholdGrid(values, Utils.formatNumber);
+      // Default range is 10,9,8,...,1 - only 10,9,1 have values
+      expect(result).toContain('<strong>10:</strong>');
+      expect(result).toContain('<strong>9:</strong>');
+      expect(result).toContain('<strong>1:</strong>');
+    });
+
+    it('should filter out ranks not present in values', () => {
+      const values = { 10: 10000, 1: 1000 };
+      const result = Utils.renderThresholdGrid(values, Utils.formatNumber, mockEngine, 10000, 1000);
+      expect(result).toContain('<strong>High:</strong>');
+      expect(result).toContain('<strong>Low:</strong>');
+    });
+
+    it('should not include prefix when engine returns empty prefix', () => {
+      mockEngine.getThresholdPrefix.mockReturnValue('');
+      const values = { 10: 10000, 1: 1000 };
+      const result = Utils.renderThresholdGrid(values, Utils.formatNumber, mockEngine, 10000, 1000);
+      expect(result).not.toContain('font-weight: bold'); // prefix div
+      mockEngine.getThresholdPrefix.mockReturnValue('Pins'); // reset
+    });
+
+    it('should use identity formatFn when none provided', () => {
+      const values = { 10: 10000 };
+      const result = Utils.renderThresholdGrid(values);
+      expect(result).toContain('10000'); // raw number, no formatting
+    });
+
+    it('should pass value1 and value2 to engine label and style methods', () => {
+      const values = { 10: 10000, 1: 1000 };
+      Utils.renderThresholdGrid(values, Utils.formatNumber, mockEngine, 10000, 1000);
+      expect(mockEngine.getThresholdLabel).toHaveBeenCalledWith(10, 10000, 1000);
+      expect(mockEngine.getThresholdRowStyle).toHaveBeenCalledWith(10, 10000, 1000);
+    });
   });
 });

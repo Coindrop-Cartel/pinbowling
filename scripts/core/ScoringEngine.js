@@ -163,7 +163,7 @@ export class ScoringEngine {
    * @returns {string}
    */
   getRowSummaryHtml(round, formatFn) {
-    return `<div class="strike-target" style="font-size: 0.8rem; color: var(--pb-primary); margin-top: 4px;"><b>${this.getPrimaryTargetLabel()}:</b> ${formatFn(round.value1)}</div>`;
+    return `<div class="strike-target"><b>${this.getPrimaryTargetLabel()}:</b> ${formatFn(round.value1)}</div>`;
   }
 
   /**
