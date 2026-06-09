@@ -69,14 +69,14 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
   const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
   const instructions = `
-    <p class="muted small" style="margin:5px 0;">${Engine.getScoringHint() || 'Enter your score after each ball until you hit the target score, or run out of balls.'}</p>
+    <p class="muted small" style="margin:2px 0;">${Engine.getScoringHint() || 'Enter your score after each ball until you hit the target score, or run out of balls.'}</p>
   `;
 
   // This is the main header for the entire sheet
   const mainHeaderHtml = `
     <div class="print-meta">
-      <div class="flex-between" style="margin-bottom:10px;">
-        <div style="font-size:1.4rem;">
+      <div class="flex-between" style="margin-bottom:5px;">
+        <div style="font-size:1.2rem;">
           ${leagueName ? `<div style="margin-bottom:4px;"><strong>League:</strong> ${leagueName}</div>` : ''}
           <div style="margin-bottom:4px;"><strong>Event:</strong> ${eventName}</div>
         </div>
@@ -119,7 +119,7 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
           <div class="targets-summary">${targetsHtml}</div>
         </div>
         ${lfHint ? `<div class="muted small" style="margin-bottom:4px;font-style:italic;">${lfHint}</div>` : ''}
-        <div class="flex" style="gap:20px;">
+        <div class="flex" style="gap:15px;">
           <div class="flex-1"><small>Ball 1</small><div class="score-line"></div></div>
           <div class="flex-1"><small>Ball 2</small><div class="score-line"></div></div>
           <div class="flex-1"><small>Ball 3</small><div class="score-line"></div></div>
@@ -128,16 +128,18 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
   }).join('');
 
   const sheetCss = `
-    body { font-family: sans-serif; padding: 20px; line-height: 1.2; }
-    .print-block { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
-    .print-block-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #eee; }
-    .targets-summary span { font-size: 0.9rem; }
+    body { font-family: sans-serif; padding: 10px 20px; line-height: 1.1; font-size: 13px; }
+    .print-meta { border-bottom: 2px solid #000; margin-bottom: 10px; padding-bottom: 5px; }
+    .print-block { border: 1px solid #ccc; padding: 8px 12px; margin-bottom: 6px; border-radius: 4px; page-break-inside: avoid; }
+    .print-block-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px dashed #eee; }
+    .targets-summary span { font-size: 0.85rem; }
     .flex { display: flex; }
     .flex-1 { flex: 1; }
-    .score-line { border-bottom: 1px solid #000; height: 1.5em; margin-top: 5px; }
+    .score-line { border-bottom: 1.5pt solid #000; height: 1.5em; margin-top: 2px; }
     .flex-between { display: flex; justify-content: space-between; }
     .muted { opacity: 0.7; }
-    .small { font-size: 0.8rem; }
+    .small { font-size: 0.75rem; }
+    h3 { font-size: 1rem; margin: 0; }
   `;
 
   printWindow.document.write(`

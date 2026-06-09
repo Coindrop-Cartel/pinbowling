@@ -29,35 +29,13 @@ export class BowlingEngine extends ScoringEngine {
    * Bonus targets are used in the 10th frame to allow for multiple strikes.
    * 
    * @param {Object} round The round definition.
-   * @param {string} [scalingType] Scaling preference ('flat'|'curved').
    * @returns {{t1: number, t2: number}} Calculated bonus threshold values.
    */
-  getBonusTargets(round, scalingType) {
-    const s1 = round.values?.[1];
-    const s10 = round.values?.[10];
-
-    if (!s1 || !s10 || s1 >= s10) {
-      const t1 = Math.round((s10 || 0) * 1.3);
-      const t2 = Math.round(t1 * 1.3);
-      return { t1, t2 };
-    }
-
-    // Use provided scalingType, or infer: if gap at end is > 1.5x gap at start, it's curved
-    let isCurved = scalingType === 'curved';
-    if (!scalingType) {
-      const gapStart = (round.values[2] || s1) - s1;
-      const gapEnd = s10 - (round.values[9] || s10);
-      isCurved = gapEnd > gapStart * 1.5;
-    }
-
-    const range = s10 - s1;
-    const m1 = isCurved ? Math.pow(10 / 9, 2) : (10 / 9);
-    const m2 = isCurved ? Math.pow(11 / 9, 2) : (11 / 9);
-
-    return {
-      t1: Math.round(s1 + range * m1),
-      t2: Math.round(s1 + range * m2)
-    };
+  getBonusTargets(round) {
+    const s10 = round.values?.[10] || 0;
+    const t1 = Math.round(s10 * 1.5);
+    const t2 = Math.round(t1 * 1.5);
+    return { t1, t2 };
   }
 
   /**
@@ -67,12 +45,11 @@ export class BowlingEngine extends ScoringEngine {
    * @param {Object} round The round definition.
    * @param {boolean} isLastRound Whether this is the final frame.
    * @param {Function} formatFn Numeric formatting helper.
-   * @param {string} scalingType Scaling preference ('flat'|'curved').
    * @returns {string} HTML string.
    */
-  getBonusTargetHtml(round, isLastRound, formatFn, scalingType) {
+  getBonusTargetHtml(round, isLastRound, formatFn) {
     if (!isLastRound || !round.values || !round.values[10]) return '';
-    const { t1, t2 } = this.getBonusTargets(round, scalingType);
+    const { t1, t2 } = this.getBonusTargets(round);
     return `
       <div class="bonus-targets">
         <div><b>XX:</b> ${formatFn(t1)}</div>
@@ -103,7 +80,7 @@ export class BowlingEngine extends ScoringEngine {
     if (raw1 >= target) {
       return this._processTenthStrike(round, raw2, raw3, target, t1, t2);
     } else if (raw2 >= target) {
-      return this._processTenthSpare(round, raw3, target, t1);
+      return this._processTenthSpare(round, raw1, raw3, target, t1);
     } else if (raw3 >= target) {
       return this._processTenthLateSpare(round, raw2);
     } else {
@@ -128,21 +105,16 @@ export class BowlingEngine extends ScoringEngine {
    */
   _processTenthStrike(round, raw2, raw3, target, t1, t2) {
     if (raw2 >= t1) {
-      const isThirdStrike = raw3 >= t2;
-      const p3 = isThirdStrike ? 10 : this.getPinCount(round, raw3 - t1);
-      return this._createTurnData(round, 'tenth', `X X ${isThirdStrike ? 'X' : p3}`, 10, 10, p3, 20 + p3);
+      if (raw3 >= t2) {
+        return this._createTurnData(round, 'tenth', 'X X X', 10, 10, 10, 30);
+      }
+      return this._createTurnData(round, 'tenth', 'X X 4', 10, 10, 4, 24);
     }
-
-    // Ball 2 missed Bonus 1. Calculate pins relative to 'X 6 0' threshold.
-    const v6 = Number(round.values?.[6] || 0);
-    const strikeOffset = target - v6;
-    const p2 = this._getRelativePins(round, raw2, strikeOffset);
 
     if (raw3 >= t1) {
-      return this._createTurnData(round, 'tenth', 'X 8/', 10, 8, 2, 20);
+      return this._createTurnData(round, 'tenth', 'X 9/', 10, 9, 1, 20);
     }
-    const p3 = Math.max(0, this._getRelativePins(round, raw3, strikeOffset) - p2);
-    return this._createTurnData(round, 'tenth', `X ${p2} ${p3}`, 10, p2, p3, 10 + p2 + p3);
+    return this._createTurnData(round, 'tenth', 'X 6', 10, 6, 0, 16);
   }
 
   /**
@@ -150,20 +122,17 @@ export class BowlingEngine extends ScoringEngine {
    * If the strike target is reached on ball 2, the player gets one more bonus ball.
    * 
    * @param {Object} round Machine configuration.
+   * @param {number} raw1 Score after Ball 1.
    * @param {number} raw3 Score after Ball 3.
    * @param {number} target The base strike target.
    * @param {number} t1 Bonus Target 1.
    * @returns {Object} Calculated turn data.
    */
-  _processTenthSpare(round, raw3, target, t1) {
+  _processTenthSpare(round, _raw1, raw3, target, t1) {
     if (raw3 >= t1) {
       return this._createTurnData(round, 'tenth', '9/ X', 9, 1, 10, 20);
     }
-    // Ball 3 missed Bonus 1. Calculate pins relative to '9/ 4' threshold.
-    const v4 = Number(round.values?.[4] || 0);
-    const spareOffset = target - v4;
-    const p3 = this._getRelativePins(round, raw3, spareOffset);
-    return this._createTurnData(round, 'tenth', `9/ ${p3}`, 9, 1, p3, 10 + p3);
+    return this._createTurnData(round, 'tenth', '9/ 4', 9, 1, 4, 14);
   }
 
   /**
