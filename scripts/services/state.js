@@ -1,4 +1,9 @@
 /**
+ * State management for local player identity and UI preferences.
+ * All values are persisted in localStorage.
+ */
+
+/**
  * Returns the currently selected player ID from local storage.
  * @returns {string|null} The stored player ID, or null if none is set.
  */
