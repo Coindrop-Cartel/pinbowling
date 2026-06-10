@@ -1,14 +1,23 @@
 import { PB_API } from '@services/api.js';
-import { getScoringEngine } from '@core/engine.js';
-import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormatting, formatNumber, renderThresholdGrid } from '@scripts/utils.js';
-import { createSearchableSelect, initReadOnlyTournamentDisplay, createExpandableRow, setupSortableList } from '@ui/selectors.js';
-import { showPrompt, showAlert } from '@ui/dialogs.js';
-import { printMachineScores } from '@ui/printing.js';
-import { requireAdmin, isManagementAuthorized } from '@services/auth.js';
-import {navigateTo} from '@scripts/utils.js';
+import { isManagementAuthorized, requireAdmin } from '@services/auth.js';
+import { showAlert } from '@ui/dialogs.js';
+import { navigateTo, getActiveEventId, getActiveLeagueId, renderPreview, formatNumber, applyScoreFormatting, renderThresholdGrid } from '@scripts/utils.js';
 import { ROUTES } from '@scripts/routes.js';
+import { getScoringEngine } from '@core/engine.js';
+import { printMachineScores } from '@ui/printing.js';
+import { createSearchableSelect, setupSortableList, createExpandableRow, initReadOnlyTournamentDisplay } from '@ui/selectors.js';
 import { normalizeTargets } from '@services/normalizer.js';
 
+/**
+ * Logic for configuring events within a league (dates, machines, target scores).
+ * @module pages/eventSetup
+ */
+
+/**
+ * Initializes the Event Setup page: loads league/event data and binds UI controls.
+ * @async
+ * @returns {Promise<void>}
+ */
 export async function initEventSetupPage() {
   // Verify authorization before initializing the page logic
   const [authorized, initialLeagues] = await Promise.all([

@@ -61,19 +61,37 @@ vi.mock('@core/engine.js', () => ({
   })),
 }));
 
-const uiMocks = vi.hoisted(() => ({
-  createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() })),
-  initTournamentSelector: vi.fn((container, options) => Promise.resolve(options?.onRefresh?.())),
-  applyPreferredTheme: vi.fn(),
-  renderActionSummary: vi.fn((container, title, actions = []) => {
-    if (container) container.innerHTML = title;
-    if (container) container._actions = actions;
-    if (container) container.classList.remove('hidden');
-  }),
-}));
+vi.mock('@ui/selectors.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual, // Spread actual to ensure all exports exist
+    createSearchableSelect: vi.fn().mockReturnValue({
+      updateOptions: vi.fn(),
+      setData: vi.fn(), // If you add a new method to the real file, add it here too
+    }),
+    initTournamentSelector: vi.fn().mockImplementation(async (container, options) => {
+      if (options?.onRefresh) await options.onRefresh();
+      return {
+        setData: vi.fn(),
+      };
+    }),
+    renderActionSummary: vi.fn((container, title, actions = []) => {
+      if (container) {
+        container.innerHTML = title;
+        container._actions = actions;
+        container.classList.remove('hidden');
+      }
+    }),
+  };
+});
 
-vi.mock('@ui/selectors.js', () => uiMocks);
-vi.mock('@ui/branding.js', () => uiMocks);
+vi.mock('@ui/branding.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    applyPreferredTheme: vi.fn(),
+  };
+});
 
 describe('Scoring Entry Page (scoresPage.js)', () => {
   beforeEach(() => {

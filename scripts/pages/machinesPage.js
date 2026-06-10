@@ -1,16 +1,18 @@
 import { PB_API } from '@services/api.js';
-import { setupLiveFilter, createExpandableRow } from '@ui/selectors.js';
+import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
 import { showConfirm, showAlert } from '@ui/dialogs.js';
 import { requireAdmin } from '@services/auth.js';
-import { navigateTo } from '@scripts/utils.js';
 import { ROUTES } from '@scripts/routes.js';
 
 /**
- * Logic for the Global Machine Registry page.
- * 
- * Provides an interface to manage the master list of pinball machines.
- * Includes live filtering, deduplication checks during entry, and 
- * administrative protection for deletions.
+ * Logic for managing pinball machines and their target score values.
+ * @module pages/machines
+ */
+
+/**
+ * Initializes the Machines page: loads machines, binds CRUD controls, and renders the machine list.
+ * @async
+ * @returns {Promise<void>}
  */
 export async function initMachinesPage() {
   // Batch initial user check and data fetch

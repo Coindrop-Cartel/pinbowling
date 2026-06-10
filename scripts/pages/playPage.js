@@ -1,12 +1,22 @@
 import { PB_API } from '@services/api.js';
-import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
-import { formatNumber, applyScoreFormatting, renderThresholdGrid, getCookie, loadPage } from '@scripts/utils.js';
 import { can, PERMISSIONS, filterPlayersForUser } from '@services/auth.js';
-import { createSearchableSelect, createExpandableRow, setupSortableList } from '@ui/selectors.js';
+import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
+import { getCookie, formatNumber, applyScoreFormatting, loadPage, renderThresholdGrid } from '@scripts/utils.js';
+import { applyPreferredTheme } from '@ui/branding.js';
+import { createExpandableRow, setupSortableList, createSearchableSelect } from '@ui/selectors.js';
 import { showPlayerSelectionDialog } from '@ui/dialogs.js';
-import { getFormatBadgeHtml, applyPreferredTheme } from '@ui/branding.js';
 import { generatePars, generateSessionName, selectRandomMachines, getTargetScoreForDifficulty } from '@services/sessionGenerator.js';
 
+/**
+ * Logic for the Play page where players enter their scores for the current session.
+ * @module pages/play
+ */
+
+/**
+ * Initializes the Play page: loads session data, renders machine/score entry UI, and binds submission controls.
+ * @async
+ * @returns {Promise<void>}
+ */
 export async function initPlayPage() {
   const form = document.getElementById('quick-play-form');
   const locSelect = document.getElementById('qp-location');

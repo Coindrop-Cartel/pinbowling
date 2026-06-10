@@ -1,18 +1,31 @@
 import { PB_API } from '@services/api.js';
-import { setupLiveFilter, createExpandableRow } from '@ui/selectors.js';
-import { showConfirm, showPrompt, showChoiceDialog, showAlert } from '@ui/dialogs.js';
-import { requireAdmin } from '@services/auth.js';
+import { requireAdmin, can, PERMISSIONS } from '@services/auth.js';
+import { showAlert, showPrompt, showChoiceDialog, showConfirm } from '@ui/dialogs.js';
+import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
 
 /**
  * Initializes the Player Management page.
+ * @module pages/players
+ */
+
+/**
+ * Initializes the Players page: loads players, binds CRUD controls, and renders the player list.
+ * @async
+ * @returns {Promise<void>}
  */
 export async function initPlayersPage() {
-  // Batch initial user check and data fetch
-  const [currentUser, playersData] = await Promise.all([
-    PB_API.getCurrentUser(),
-    PB_API.getPlayers()
-  ]);
-
+  let currentUser;
+  let playersData;
+  try {
+    // Batch initial user check and data fetch
+    [currentUser, playersData] = await Promise.all([
+      PB_API.getCurrentUser(),
+      PB_API.getPlayers()
+    ]);
+  } catch (error) {
+    console.error('Error initializing Players page:', error);
+    return; // Stop initialization if initial data fetch fails
+  }
   const isAdmin = currentUser && currentUser.role === 'admin';
   const isTD = currentUser && currentUser.role === 'td';
   const hasElevatedPrivileges = isAdmin || isTD;
@@ -136,14 +149,15 @@ export async function initPlayersPage() {
     
     // Hide the "Create" toggle if an exact match exists, unless the creation 
     // form is already open (in which case the button serves as "Cancel").
-    const isFormOpen = ifpaRow && !ifpaRow.classList.contains('hidden');
-    createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
-
+    if (hasElevatedPrivileges) { // Only apply this logic if the user can actually create/edit
+      const isFormOpen = ifpaRow && !ifpaRow.classList.contains('hidden');
+      createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
+    }
     savePlayerButton.disabled = !query || (!!exactMatch && !isEditingThisPlayer);
     savePlayerButton.title = (exactMatch && !isEditingThisPlayer) ? "This player name already exists." : "";
   };
 
-  filterInstance = setupLiveFilter(playerNameInput, allPlayers, {
+  filterInstance = setupLiveFilter(playerNameInput, () => allPlayers, {
     labelKey: 'playerName',
     onFilter: onFilterUpdate
   });
@@ -210,13 +224,14 @@ export async function initPlayersPage() {
     playerNameInput.value = player.playerName;
     
     // Lock name for non-privileged users UNLESS it is their own profile
-    playerNameInput.disabled = !hasElevatedPrivileges && !isSelf;
+    // If not elevated, name is always disabled. Admins/TDs can edit names.
+    playerNameInput.disabled = !hasElevatedPrivileges;
     
     ifpaIdInput.value = player.ifpaId || '';
     matchplayIdInput.value = player.matchplayId || '';
     if (playerFormTitle) playerFormTitle.textContent = `Edit Player: ${player.playerName}`;
     savePlayerButton.textContent = 'Update Player';
-
+    if (cancelEditButton) cancelEditButton.classList.remove('hidden');
     // Expand fields for editing
     if (ifpaRow) ifpaRow.classList.remove('hidden');
     if (matchplayRow) matchplayRow.classList.remove('hidden');
@@ -226,6 +241,8 @@ export async function initPlayersPage() {
     actionsRow.appendChild(createToggle);
 
     // Show management tools if the player has an account
+    // ... (existing code for resetPassBtn and changeRoleBtn)
+
     const hasAccount = !!player.userId;
     resetPassBtn.classList.toggle('hidden', !hasAccount || !hasElevatedPrivileges);
     changeRoleBtn.classList.toggle('hidden', !hasAccount || !hasElevatedPrivileges);
@@ -266,6 +283,10 @@ export async function initPlayersPage() {
     }
 
     window.scrollTo(0, 0); // Scroll to the form
+    // Ensure validation runs with the updated form state, deferring slightly
+    // to allow DOM updates to fully propagate in some environments (e.g., JSDOM).
+    // This is a common workaround for synchronous DOM reads in test environments.
+    setTimeout(() => filterInstance.performFilter(), 0);
   }
 
   // Centralize cancel logic to the resetForm helper
@@ -329,5 +350,5 @@ export async function initPlayersPage() {
   }
 
   // Initial render with batched data
-  refresh(playersData);
+  await refresh(playersData);
 }

@@ -3,6 +3,9 @@ import { formatNumber } from '@scripts/utils.js';
 
 /**
  * Generates large printable signs showing target scores for each machine.
+ * @param {Array<import('@scripts/types.js').Machine>} machines - The machines to print target scores for.
+ * @param {string} [format='bowling'] - The scoring format ('bowling' or 'golf').
+ * @returns {void}
  */
 export function printMachineScores(machines, format = 'bowling') {
   const printWindow = window.open('', '_blank');
@@ -58,7 +61,12 @@ export function printMachineScores(machines, format = 'bowling') {
 }
 
 /**
- * Generates a printable PDF-like score sheet for manual tracking.
+ * Generates a printable blank score sheet for a league event.
+ * @param {Array<import('@scripts/types.js').Machine>} machines - The machines to include on the score sheet.
+ * @param {string} leagueName - The league name displayed in the header.
+ * @param {string} eventName - The event name displayed in the header.
+ * @param {string} [format='bowling'] - The scoring format ('bowling' or 'golf').
+ * @returns {void}
  */
 export function printBlankScoreSheet(machines, leagueName, eventName, format = 'bowling') {
   const printWindow = window.open('', '_blank');

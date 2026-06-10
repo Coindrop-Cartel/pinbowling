@@ -342,5 +342,350 @@ describe('API Client (api.js)', () => {
         expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
       );
     });
+
+    it('login should POST to authService with credentials', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 1 }) });
+      await PB_API.login('user', 'pass');
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('task=login'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ username: 'user', password: 'pass' }) })
+      );
+    });
+
+    it('logout should POST to authService', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.logout();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('task=logout'),
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+
+    it('register should POST user data to authService', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 5 }) });
+      const data = { username: 'newuser', password: 'pass' };
+      await PB_API.register(data);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('task=register'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify(data) })
+      );
+    });
+
+    it('getCurrentUser should GET from authService me task', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 1, role: 'admin' }) });
+      await PB_API.getCurrentUser();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('task=me'),
+        expect.any(Object)
+      );
+    });
+
+    it('getPlayers should GET from playerService', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+      await PB_API.getPlayers({ search: 'test' });
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('service/playerService.php'),
+        expect.any(Object)
+      );
+    });
+
+    it('createPlayer should POST to playerService', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 10 }) });
+      const player = { playerName: 'New Player' };
+      await PB_API.createPlayer(player);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('service/playerService.php'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify(player) })
+      );
+    });
+
+    it('updatePlayer should PUT to playerService with id', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.updatePlayer(5, { playerName: 'Updated' });
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('id=5'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }) })
+      );
+    });
+
+    it('saveScore should POST score data', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      const score = { eventId: 1, playerId: 2, ball1: 10 };
+      await PB_API.saveScore(score);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('service/scoreService.php'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify(score) })
+      );
+    });
+
+    it('clearScores should DELETE from scoreService with playerId', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.clearScores(42);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('playerId=42'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+      );
+    });
+
+    it('getLeague should GET from leagueService with id', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 7 }) });
+      await PB_API.getLeague(7);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('id=7'),
+        expect.any(Object)
+      );
+    });
+
+    it('updateLeague should PUT league data', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.updateLeague(3, { name: 'Updated' });
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('id=3'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }) })
+      );
+    });
+
+    it('deleteLeague should DELETE with id', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.deleteLeague(9);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('id=9'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+      );
+    });
+
+    it('createEvent should POST event data', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 100 }) });
+      const event = { eventName: 'Finals', leagueId: 5 };
+      await PB_API.createEvent(event);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('task=fixture'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify(event) })
+      );
+    });
+
+    it('deleteEvent should DELETE with id and optional leagueId', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.deleteEvent(10, 5);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('id=10'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+      );
+      expect(fetch.mock.calls[0][0]).toContain('leagueId=5');
+    });
+
+    it('deleteEvent should work without leagueId', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.deleteEvent(10);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('id=10'),
+        expect.any(Object)
+      );
+    });
+
+    it('addLeaguePlayer should POST member data', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.addLeaguePlayer(1, 2);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('task=member'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ leagueId: 1, playerId: 2 }) })
+      );
+    });
+
+    it('createTeam should POST team data', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 1 }) });
+      const data = { name: 'Team A' };
+      await PB_API.createTeam(data);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('service/teamService.php'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify(data) })
+      );
+    });
+
+    it('updateTeam should PUT team data with id', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.updateTeam(3, { name: 'Updated' });
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('id=3'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }) })
+      );
+    });
+
+    it('deleteTeam should DELETE with id', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.deleteTeam(7);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('id=7'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+      );
+    });
+
+    it('addTeamMember should POST member data', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.addTeamMember(1, 2);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('task=member'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ teamId: 1, playerId: 2 }) })
+      );
+    });
+
+    it('removeTeamMember should DELETE with teamId and playerId', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.removeTeamMember(1, 2);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('teamId=1&playerId=2'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+      );
+    });
+
+    it('addLeagueTeam should POST league team data', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.addLeagueTeam(5, 10);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('task=league'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ leagueId: 5, teamId: 10 }) })
+      );
+    });
+
+    it('removeLeagueTeam should DELETE with leagueId and teamId', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.removeLeagueTeam(5, 10);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('leagueId=5&teamId=10'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+      );
+    });
+
+    it('getLocations should GET from locationService', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+      await PB_API.getLocations({ search: 'test' });
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('service/locationService.php'),
+        expect.any(Object)
+      );
+    });
+
+    it('createLocation should POST location data', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 1 }) });
+      const loc = { name: 'Venue' };
+      await PB_API.createLocation(loc);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('service/locationService.php'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify(loc) })
+      );
+    });
+
+    it('updateLocation should PUT location data with id', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.updateLocation(3, { name: 'Updated' });
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('id=3'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }) })
+      );
+    });
+
+    it('deleteLocation should DELETE with id', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.deleteLocation(5);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('id=5'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+      );
+    });
+
+    it('getLocationMachines should GET with locationId', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+      await PB_API.getLocationMachines(10);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('locationId=10'),
+        expect.any(Object)
+      );
+    });
+
+    it('getLocationMachines should work without locationId', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+      await PB_API.getLocationMachines(null);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('task=units'),
+        expect.any(Object)
+      );
+    });
+
+    it('removeLocationMachine should DELETE with locationId and machineId', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.removeLocationMachine(1, 2);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('locationId=1&machineId=2'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+      );
+    });
+
+    it('saveTargetScore should POST target data', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      const target = { eventId: 1, machineId: 2, value1: 100 };
+      await PB_API.saveTargetScore(target);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('task=threshold'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify(target) })
+      );
+    });
+
+    it('updateUserRole should PUT to role task', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.updateUserRole(5, 'admin');
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('task=role&id=5'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }) })
+      );
+    });
+
+    it('updateMachine should PUT machine data with id', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.updateMachine(3, { machineName: 'Updated' });
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('id=3'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }) })
+      );
+    });
+
+    it('deleteMachine should DELETE with id', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await PB_API.deleteMachine(7);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('id=7'),
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+      );
+    });
+
+    it('fetchJSON should pass through full URLs without modification', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await fetchJSON('http://example.com/api/test');
+      expect(fetch).toHaveBeenCalledWith('http://example.com/api/test', expect.any(Object));
+    });
+
+    it('fetchJSON should handle GET requests without body', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await fetchJSON('service/test.php', { method: 'GET' });
+      const callArgs = fetch.mock.calls[0][1];
+      expect(callArgs.body).toBeUndefined();
+    });
+
+    it('fetchJSON should use custom headers when provided', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await fetchJSON('service/test.php', { headers: { 'X-Custom': 'value' } });
+      const callHeaders = fetch.mock.calls[0][1].headers;
+      expect(callHeaders['X-Custom']).toBe('value');
+      expect(callHeaders['X-PB-SECRET']).toBe('test-api-secret');
+    });
+
+    it('fetchJSON should log debug info when PB_DEBUG_MODE is on', async () => {
+      const logSpy = vi.spyOn(console, 'log');
+      window.PB_DEBUG_MODE = true;
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await fetchJSON('service/test.php', { method: 'GET' }); // Ensure it's a GET request for specific log messages
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[API] Constructing GET request to: service/test.php'), expect.objectContaining({ params: undefined }));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/\[API\] Final Request URL:.*http:\/\/localhost\/app\/service\/test\.php/));
+      window.PB_DEBUG_MODE = false;
+    });
   });
 });

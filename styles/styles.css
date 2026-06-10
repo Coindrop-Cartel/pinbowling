@@ -226,22 +226,45 @@ body {
 
 .hero-section {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column; /* Stack children vertically */
+  align-items: center;    /* Center children horizontally */
   gap: 40px;
   margin-bottom: 40px;
 }
 
-.hero-text {
-  flex: 1;
+/* Action buttons below the format logos */
+.hero-action-buttons {
+  display: flex;
+  flex-direction: row; /* Buttons on the same row */
+  justify-content: center; /* Center buttons horizontally */
+  flex-wrap: wrap; /* Allow buttons to wrap to the next line on smaller screens */
+  gap: 15px; /* Space between buttons */
+  width: 100%; /* Take full width of the parent card */
 }
 
+/* New intro text in hero card */
+.hero-intro-text {
+  text-align: center;
+  margin: 0 0 20px 0; /* Space below the text */
+}
+
+/* Adjust hero brand selector to be a card */
 .hero-brand-selector {
+  background: white;
   display: flex;
+  flex-direction: column; /* Stack the intro text, logo row, and button row vertically */
   align-items: center;
   justify-content: center;
   gap: 30px;
   margin-bottom: 20px;
+}
+
+/* New main site logo styling */
+.main-site-logo {
+  display: block;
+  max-width: 400px; /* Adjust as needed */
+  height: auto;
+  margin: 0 auto 15px auto; /* Center and add space below */
 }
 
 .hero-logo-btn {
@@ -256,10 +279,13 @@ body {
   transform: scale(1.1);
 }
 
-.hero-brand-name {
-  font-size: 3rem;
-  margin: 0 auto;
-  white-space: nowrap;
+/* Wrapper for the format logos to maintain gap when parent is flex-col */
+.hero-brand-selector-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  margin-bottom: 20px; /* Space between logos and action buttons */
 }
 
 /* Visual feedback: Fade out the format that isn't active */
@@ -486,7 +512,8 @@ td {
 /* Additional utilities for PHP templates */
 .hero-section { position: relative; }
 .hero-brand-text { text-align: center; margin-bottom: 2rem; }
-.hero-brand-name { margin-bottom: 0.5rem; font-size: clamp(1.5rem, 8vw, 2.5rem); overflow-wrap: break-word; }
+/* .hero-brand-name styling removed as it's replaced by an image */
+/* .hero-brand-text and .hero-brand-name styles removed as they are replaced by an image */
 
 /* Threshold grid components used in event setup and previews */
 .threshold-grid-container { background: var(--pb-gray); padding: 8px; border-radius: 4px; font-size: 0.75rem; }
@@ -985,12 +1012,64 @@ body.tv-mode-active .standings-total {
     font-size: 0.9rem;
   }
 
+  .page-container {
+    width: 100%; /* Override fixed width for mobile */
+    min-width: unset; /* Remove min-width constraint */
+    padding: 0 15px; /* Add some padding on the sides */
+  }
+
+  .hero-action-buttons {
+    flex-wrap: wrap; /* Re-introduce wrapping for mobile */
+  }
+
+  .main-site-logo {
+    max-width: 100%; /* Ensure logo scales down on mobile */
+  }
+
   .hero-brand-selector {
-    gap: 15px;
+    width: 100%; /* Ensure the card takes full width */
+    padding: 20px; /* Reduce padding for mobile */
   }
 
   .hero-logo-btn {
     width: 40%;
     height: auto;
   }
-}
+
+  /* Stack scoring inputs vertically on mobile */
+  .round-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 15px;
+  }
+
+  .round-info {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+
+  .round-inputs-container {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .ball-input-wrapper {
+    flex-direction: column; /* Stack label and input vertically */
+    align-items: flex-start; /* Align label/input to the left */
+    width: 100%; /* Make wrapper take full width */
+  }
+
+  .ball-input-label {
+    display: block; /* Show labels on mobile */
+    font-size: 0.8rem; /* Smaller font for labels */
+    font-weight: bold;
+    margin-bottom: 2px; /* Small space between label and input */
+    text-transform: uppercase;
+    color: var(--pb-black);
+  }
+
+  .roll-input {
+    width: 100%; /* Make input full width within its wrapper */
+    text-align: left; /* Align text left on mobile for easier input */
+  }

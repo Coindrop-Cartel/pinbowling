@@ -1,12 +1,23 @@
 import { PB_API } from '@services/api.js';
-import { getScoringEngine } from '@core/engine.js'; 
-import { getActiveEventId, getActiveLeagueId, setActiveEventId, setActiveLeagueId, formatNumber } from '@scripts/utils.js';
-import { initTournamentSelector, renderActionSummary } from '@ui/selectors.js';
-import { fitTVModeToScreen, applyPreferredTheme } from '@ui/branding.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId } from '@scripts/utils.js';
+import { getScoringEngine } from '@core/engine.js';
+import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { showDialog } from '@ui/dialogs.js';
+import { renderActionSummary, initTournamentSelector } from '@ui/selectors.js';
+import { filterLeaguesForUser } from '@services/auth.js'; // Import for filtering
 import { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer, groupScoresByPlayer, buildScoreMapFromRows } from '@services/normalizer.js';
 import { calculateSeasonSummary } from '@services/seasonCalculator.js';
 
+/**
+ * Logic for the Standings/Scoreboard page showing player rankings and season summaries.
+ * @module pages/standings
+ */
+
+/**
+ * Initializes the Standings page: loads ranking data and renders the standings table.
+ * @async
+ * @returns {Promise<void>}
+ */
 export async function initStandingsPage() {
   const standingsHeader = document.getElementById('standings-header');
   const standingsBody = document.getElementById('standings-body');
@@ -16,6 +27,7 @@ export async function initStandingsPage() {
   const tvTitle = document.getElementById('tv-title');
   const playerFilterContainer = document.getElementById('player-filter-container');
 
+  let tournamentSelector = null;
   let isTvMode = false;
   let refreshInterval = null;
   let scrollInterval = null;
@@ -26,7 +38,8 @@ export async function initStandingsPage() {
   let Engine = getScoringEngine('bowling');
 
   // Fetch initial data to check context
-  const initialLeagues = await PB_API.getLeagues();
+  const allLeagues = await PB_API.getLeagues(); // Use a more descriptive name
+  const currentUser = await PB_API.getCurrentUser(); // Fetch current user for filtering
 
   // If we arrive at standings without an eventId (Standard Nav entry), 
   // we must ensure we aren't "leaking" a session league into the standard scoreboard.
@@ -34,13 +47,14 @@ export async function initStandingsPage() {
   const initialEventId = getActiveEventId();
 
   if (initialLeagueId && !initialEventId) {
-    const active = initialLeagues.find(l => String(l.id) === String(initialLeagueId));
+    const active = allLeagues.find(l => String(l.id) === String(initialLeagueId)); // Use the full list
     // If the active league is a session, clear it to reset the selector to standard leagues
     if (active && active.type !== 'standard') {
       setActiveLeagueId('');
       setActiveEventId('');
     }
   }
+  let lastEventId = initialEventId;
 
   if (tvBtn) {
     tvBtn.addEventListener('click', toggleTvMode);
@@ -271,10 +285,24 @@ export async function initStandingsPage() {
     if (tvBtn) tvBtn.classList.remove('hidden');
     if (standingsEmpty) standingsEmpty.classList.add('hidden');
 
+    // If the event changed, reset player filters to ensure the full scoreboard 
+    // is shown for the new context.
+    if (eventId !== lastEventId) {
+      selectedPlayerIds = [];
+      lastEventId = eventId;
+    }
+
     // Fetch all leagues to support both standard tournaments and one-off sessions
     const leagues = await PB_API.getLeagues();
+
+    if (tournamentSelector) {
+      tournamentSelector.setData(leagues);
+    }
     const league = leagues.find(l => String(l.id) === String(leagueId));
-    const format = league?.scoringFormat || 'bowling';
+    const event = eventId === 'summary' ? { eventName: 'Season Summary' } : league?.events.find(e => String(e.id) === String(eventId));
+    
+    // Priority: Event Format > League Format > Default
+    const format = event?.scoringFormat || league?.scoringFormat || 'bowling';
     Engine = getScoringEngine(format);
     applyPreferredTheme(format);
 
@@ -286,8 +314,6 @@ export async function initStandingsPage() {
     }
 
     if (tournamentSelectorUI && tournamentSummary) {
-      const event = eventId === 'summary' ? { eventName: 'Season Summary' } : league?.events.find(e => String(e.id) === String(eventId));
-      
       const title = league?.type === 'session' 
         ? (event?.eventName || 'Session Scoreboard')
         : `${league?.name || 'League'} - ${event?.eventName || 'Event'}`;
@@ -423,5 +449,9 @@ export async function initStandingsPage() {
     if (standingsWrapper) standingsWrapper.classList.remove('hidden');
   };
 
-  await initTournamentSelector('.tournament-selector-container', { onRefresh: refresh, existingLeagues: initialLeagues });
+  tournamentSelector = await initTournamentSelector('.tournament-selector-container', { 
+    onRefresh: refresh, 
+    existingLeagues: allLeagues, // Pass the full list of leagues
+    currentUser: currentUser // Pass the current user for filtering
+  });
 }

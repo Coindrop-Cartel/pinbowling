@@ -7,7 +7,8 @@ vi.mock('@services/api.js', () => ({
     getLeagues: vi.fn(),
     getTargetScores: vi.fn(),
     getScores: vi.fn(),
-    getTeams: vi.fn().mockResolvedValue([])
+    getTeams: vi.fn().mockResolvedValue([]),
+    getCurrentUser: vi.fn().mockResolvedValue(null)
   }
 }));
 
@@ -39,8 +40,9 @@ vi.mock('@scripts/utils.js', () => ({
 
 const uiMocks = vi.hoisted(() => ({
   fitTVModeToScreen: vi.fn(),
-  initTournamentSelector: vi.fn(async (selector, options) => {
-    if (options.onRefresh) await options.onRefresh();
+  initTournamentSelector: vi.fn().mockImplementation(async (selector, options) => {
+    if (options?.onRefresh) await options.onRefresh();
+    return { setData: vi.fn() };
   }),
   applyPreferredTheme: vi.fn(),
   renderActionSummary: vi.fn((container, title, actions = []) => {

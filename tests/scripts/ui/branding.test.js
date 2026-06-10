@@ -1,17 +1,43 @@
 /** @vitest-environment jsdom */
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { applyPreferredTheme, getFormatBadgeHtml, fitTVModeToScreen } from '@ui/branding.js';
-import { getCookie } from '@scripts/utils.js';
-const mockBowlingEngine = { getThemeClass: () => 'theme-bowling', getLogoImage: () => 'logo-bowling.png', getBrandName: () => 'PinBowling', getPlayActionLabel: () => 'Bowl Now', getScoringDescription: () => 'Bowling-style scoring' };
-const mockGolfEngine = { getThemeClass: () => 'theme-golf', getLogoImage: () => 'logo-golf.png', getBrandName: () => 'PinGolf', getPlayActionLabel: () => 'Play Golf', getScoringDescription: () => 'Golf-style scoring' };
-vi.mock('@core/engine.js', () => ({ getScoringEngine: vi.fn((format) => format === 'golf' ? mockGolfEngine : mockBowlingEngine), }));
+import { getCookie } from '@scripts/utils.js'; // Keep this import
 vi.mock('@scripts/utils.js', () => ({ getCookie: vi.fn(() => 'bowling'), }));
+
+// Dynamic mock for getScoringEngine to return format-specific values (moved to top-level)
+const { getScoringEngineMock } = vi.hoisted(() => ({
+  getScoringEngineMock: vi.fn((format = 'bowling') => ({
+    getBrandName: vi.fn(() => {
+      if (format === 'golf') return 'PinGolf';
+      return 'PinBowling';
+    }),
+    getLogoImage: vi.fn(() => {
+      if (format === 'golf') return 'logo-golf.png';
+      return 'logo-bowling.png';
+    }),
+    getPlayActionLabel: vi.fn(() => {
+      if (format === 'golf') return 'Play Golf';
+      return 'Bowl Now';
+    }),
+    getScoringDescription: vi.fn(() => {
+      if (format === 'golf') return 'Golf-style scoring';
+      return 'Bowling-style scoring';
+    }),
+    getThemeClass: vi.fn(() => `theme-${format}`),
+  })),
+}));
+
+vi.mock('@core/engine.js', () => ({
+  getScoringEngine: getScoringEngineMock,
+}));
+
 describe('Branding Utilities (branding.js)', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     document.body.classList.remove('theme-golf', 'theme-bowling');
     vi.mocked(getCookie).mockReturnValue('bowling');
   });
+
   describe('applyPreferredTheme', () => {
     it('should apply bowling theme by default', () => {
       applyPreferredTheme();

@@ -100,10 +100,9 @@ $themeClass = ($preferredFormat === 'golf') ? 'theme-golf' : '';
 // Global project text (Format Agnostic)
 $siteBrand   = 'Pinball And Stuff';
 $siteSlogan  = "Don't say \"and stuff\", just say \"There is pinball here\".";
-$aboutProject = "Like Pinball, but wish it was scored like Bowling?  Like Pinball, but wish it was scored more like Golf? Like Pinball, but wish it was scored more like Basketball?  
-                Well if it's the first two, we've got a site for you (if it's the 3rd one, find an NBA Fastbreak machine, perferablely linked.  I know a guy). 
-                <br><br> 
-                This project is a free and open-source web application to let folks manage leagues or create one off sessions to kill time at a bar.  
+$heroIntroText = "Like Pinball, but wish it was scored like Bowling? Like Pinball, but wish it was scored more like Golf? Like Pinball, but wish it was scored more like Basketball? 
+                Well if it's the first two, we've got a site for you (if it's the 3rd one, find an NBA Fastbreak machine).";
+$aboutProject = "This project is a free and open-source web application to let folks manage leagues or create one off sessions to kill time at a bar. 
                 At some point the links to the source code on github will be on some other page, but I haven't gotten to that.";
 $aiDisclosure = "I don't feel like AI \"generated\" this site, but at this point it's pretty hard to code without it being involved in some part of your workflow.  
                 I don't consider that \"generating\" code because the design, structure, layout and logos were all designed and reviewed by a human (one human to be specific), 

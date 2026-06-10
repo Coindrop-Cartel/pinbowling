@@ -1,6 +1,7 @@
-/**
+﻿/**
  * State management for local player identity and UI preferences.
  * All values are persisted in localStorage.
+ * @module services/state
  */
 
 /**

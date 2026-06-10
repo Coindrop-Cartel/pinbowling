@@ -1,14 +1,20 @@
 import { PB_API } from '@services/api.js';
-import { requireAdmin, can, PERMISSIONS } from '@services/auth.js';
-import { setDebugEnabled } from '@services/state.js';
-import { showPrompt, showConfirm, showAlert, showAuthDialog } from '@ui/dialogs.js';
-import { renderActionSummary, initTournamentSelector } from '@ui/selectors.js';
-import { navigateTo } from '@scripts/utils.js';
+import { can, PERMISSIONS, requireAdmin } from '@services/auth.js';
+import { showAlert, showAuthDialog, showConfirm, showPrompt } from '@ui/dialogs.js';
 import { ROUTES } from '@scripts/routes.js';
+import { navigateTo } from '@scripts/utils.js';
+import { renderActionSummary } from '@ui/selectors.js';
+import { setDebugEnabled } from '@services/state.js';
 
 /**
- * Logic for the System Management page.
- * Provides tools for password resets and database maintenance.
+ * Logic for the Management admin panel (password-protected tools and settings).
+ * @module pages/management
+ */
+
+/**
+ * Initializes the Management page: authenticates the admin user and reveals admin tools.
+ * @async
+ * @returns {Promise<void>}
  */
 export async function initManagementPage() {
   const authNotice = document.getElementById('management-auth-notice');
@@ -54,7 +60,6 @@ export async function initManagementPage() {
    */
   const renderVersionInfo = () => {
     if (document.getElementById('mgmt-ui-version') || !toolsSection) return;
-    if (window['PB_DEBUG_MODE']) console.log('[Management] Rendering version footer. current state:', window['PB_DEBUG_MODE']);
 
     const versionInfo = document.createElement('div');
     versionInfo.id = 'mgmt-ui-version';
@@ -69,7 +74,6 @@ export async function initManagementPage() {
     `;
     
     const debugToggle = debugLabel.querySelector('input');
-    if (window['PB_DEBUG_MODE']) console.log('[Management] Syncing checkbox UI with window.PB_DEBUG_MODE:', window['PB_DEBUG_MODE']);
     if (debugToggle) {
       debugToggle.checked = Boolean(window['PB_DEBUG_MODE']); // Explicitly sync state from global variable
 

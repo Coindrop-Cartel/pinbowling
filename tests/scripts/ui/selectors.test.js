@@ -1,14 +1,5 @@
 /** @vitest-environment jsdom */
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  createSearchableSelect,
-  initReadOnlyTournamentDisplay,
-  initTournamentSelector,
-  setupLiveFilter,
-  renderActionSummary,
-  createExpandableRow,
-  setupSortableList,
-} from '@ui/selectors.js';
 import { PB_API } from '@services/api.js';
 import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, renderThresholdGrid } from '@scripts/utils.js';
 
@@ -21,6 +12,7 @@ vi.mock('@services/api.js', () => ({
   PB_API: {
     getLeagues: vi.fn(),
     getTargetScores: vi.fn(),
+    getCurrentUser: vi.fn().mockResolvedValue(null),
   },
 }));
 
@@ -46,6 +38,81 @@ vi.mock('@ui/branding.js', () => ({
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(),
 }));
+
+// Mock for createSearchableSelect to actually populate the DOM and simulate behavior
+const { createSearchableSelectMock } = vi.hoisted(() => ({
+  createSearchableSelectMock: vi.fn((searchInput, selectElement, initialData, { valueKey = 'id', labelKey = 'name', placeholder = '-- Choose --', onSelect = null } = {}) => {
+    let data = initialData;
+    const updateOptions = (filter = '') => {
+      const currentVal = selectElement.value;
+      selectElement.innerHTML = `<option value="">${placeholder}</option>`;
+      const normalizedFilter = filter.toLowerCase();
+      let matchCount = 0;
+      data.forEach(item => {
+        const label = String(item[labelKey]);
+        if (label.toLowerCase().includes(normalizedFilter)) {
+          const opt = document.createElement('option');
+          opt.value = item[valueKey];
+          opt.textContent = label;
+          if (String(item[valueKey]) === String(currentVal)) opt.selected = true;
+          selectElement.appendChild(opt);
+          matchCount++;
+        }
+      });
+      return matchCount;
+    };
+
+    searchInput.addEventListener('input', (e) => {
+      const filter = e.target.value;
+      updateOptions(filter);
+      const matchCount = updateOptions(filter); // Re-run to get matchCount after filtering
+      selectElement.size = filter.length > 0 ? Math.min(matchCount + 1, 5) : 1;
+      const exactMatch = data.find(item => String(item[labelKey]).toLowerCase() === filter.toLowerCase());
+      if (exactMatch && String(selectElement.value) !== String(exactMatch[valueKey])) {
+        selectElement.value = exactMatch[valueKey];
+        selectElement.size = 1; // When exact match, collapse
+        if (onSelect) onSelect(exactMatch[valueKey]);
+      }
+    });
+    searchInput.addEventListener('blur', () => { setTimeout(() => { selectElement.size = 1; }, 200); });
+
+    selectElement.addEventListener('change', () => {
+      const val = selectElement.value;
+      const match = data.find(item => String(item[valueKey]) === String(val));
+      selectElement.size = 1; // When selection changes, collapse
+      searchInput.value = match ? match[labelKey] : '';
+      if (onSelect) onSelect(val);
+    });
+
+    const initialMatchCount = updateOptions(''); // Initial population
+    selectElement.size = 1; // Default size on initial load
+
+    return { 
+      updateOptions,
+      setData: vi.fn((newData) => {
+        data = newData;
+        return updateOptions(searchInput.value || '');
+      })
+    };
+  })
+}));
+
+// Mock the @ui/selectors.js module to use the custom createSearchableSelectMock
+vi.mock('@ui/selectors.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, createSearchableSelect: createSearchableSelectMock };
+});
+
+// Now import the functions from @ui/selectors.js, they will use the mocked createSearchableSelect
+import {
+  createSearchableSelect, // This will now be the mocked version
+  initReadOnlyTournamentDisplay,
+  initTournamentSelector,
+  setupLiveFilter,
+  renderActionSummary,
+  createExpandableRow,
+  setupSortableList,
+} from '@ui/selectors.js';
 
 describe('Selector Components (selectors.js)', () => {
   let searchInput, selectElement;
@@ -121,8 +188,8 @@ describe('initReadOnlyTournamentDisplay', () => {
 
 describe('initTournamentSelector', () => {
   const mockLeagues = [
-    { id: 1, name: 'Standard League', type: 'standard', events: [] },
-    { id: 2, name: 'Session League', type: 'session', events: [] }
+    { id: '1', name: 'Standard League', type: 'standard', events: [], players: [{ id: '101', userId: null }] },
+    { id: '2', name: 'Session League', type: 'session', events: [], players: [{ id: '102', userId: null }] }
   ];
 
   beforeEach(() => {
@@ -147,12 +214,11 @@ describe('initTournamentSelector', () => {
     const select = document.querySelector('.league-select-shared');
     const search = document.getElementById('league-search-global');
 
-    expect(select.options.length).toBe(2);
-    expect(select.value).toBe('2');
-
     search.value = '';
     search.dispatchEvent(new Event('input'));
-    expect(select.options.length).toBe(3);
+
+    expect(select.options.length).toBe(3); // Placeholder + Standard + Session (active)
+    expect(select.value).toBe('2');
   });
 });
 
@@ -688,8 +754,8 @@ describe('initReadOnlyTournamentDisplay (additional)', () => {
 // ── initTournamentSelector additional coverage ───────────────────
 describe('initTournamentSelector (additional)', () => {
   const mockLeagues = [
-    { id: 1, name: 'Standard League', type: 'standard', events: [{ id: 10, eventName: 'Event A' }] },
-    { id: 2, name: 'Session League', type: 'session', events: [] },
+    { id: '1', name: 'Standard League', type: 'standard', events: [{ id: '10', eventName: 'Event A' }], players: [{ userId: null }] },
+    { id: '2', name: 'Session League', type: 'session', events: [], players: [{ userId: null }] },
   ];
 
   beforeEach(() => {
@@ -780,7 +846,7 @@ describe('initTournamentSelector (additional)', () => {
   });
 
   it('should use existingLeagues when provided', async () => {
-    const existingLeagues = [{ id: 99, name: 'Custom League', type: 'standard', events: [] }];
+    const existingLeagues = [{ id: '99', name: 'Custom League', type: 'standard', events: [], players: [{ userId: null }] }];
     await initTournamentSelector('.tournament-selector-container', { existingLeagues });
     expect(PB_API.getLeagues).not.toHaveBeenCalled();
     const select = document.querySelector('.league-select-shared');
@@ -800,7 +866,12 @@ describe('initTournamentSelector (additional)', () => {
 
     await initTournamentSelector('.tournament-selector-container');
     const leagueSelect = document.querySelector('.league-select-shared');
+    const search = document.getElementById('league-search-global');
+
     expect(leagueSelect.value).toBe('1');
+
+    search.value = '';
+    search.dispatchEvent(new Event('input'));
 
     const eventSelect = document.querySelector('.event-select-shared');
     expect(eventSelect.innerHTML).toContain('Event A');

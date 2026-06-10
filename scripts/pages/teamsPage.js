@@ -1,10 +1,17 @@
 import { PB_API } from '@services/api.js';
-import { setupLiveFilter, createExpandableRow } from '@ui/selectors.js';
-import { showConfirm, showPlayerSelectionDialog } from '@ui/dialogs.js';
 import { isManagementAuthorized } from '@services/auth.js';
+import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
+import { showConfirm, showPlayerSelectionDialog, showAlert } from '@ui/dialogs.js';
 
 /**
  * Logic for managing Teams and their Roster.
+ * @module pages/teams
+ */
+
+/**
+ * Initializes the Teams page: loads teams, binds CRUD controls, and renders the team list.
+ * @async
+ * @returns {Promise<void>}
  */
 export async function initTeamsPage() {
   const isAuthorized = await isManagementAuthorized();
@@ -51,6 +58,10 @@ export async function initTeamsPage() {
     teamsList.innerHTML = '';
     const hasTeams = filtered.length > 0;
     emptyNotice.classList.toggle('hidden', hasTeams);
+
+    if (!hasTeams) {
+      emptyNotice.textContent = allTeams.length === 0 ? 'No teams created yet.' : 'No matching teams found.';
+    }
 
     filtered.forEach(team => {
       const isExpanded = String(team.id) === String(expandedTeamId);
@@ -129,7 +140,7 @@ export async function initTeamsPage() {
     else saveBtn.title = "";
   };
 
-  filterInstance = setupLiveFilter(teamNameInput, allTeams, {
+  filterInstance = setupLiveFilter(teamNameInput, () => allTeams, {
     labelKey: 'name',
     onFilter: onFilterUpdate
   });
@@ -162,6 +173,8 @@ export async function initTeamsPage() {
 
   teamForm.onsubmit = async (e) => {
     e.preventDefault();
+    if (!teamNameInput.value.trim()) return;
+
     const payload = {
       name: teamNameInput.value.trim(),
       city: teamCityInput.value.trim(),
@@ -177,7 +190,7 @@ export async function initTeamsPage() {
       resetForm();
       await refresh();
     } catch (err) {
-      alert(`Failed to save team: ${err.message}`);
+      showAlert(`Failed to save team: ${err.message}`);
     }
   };
 
@@ -187,7 +200,7 @@ export async function initTeamsPage() {
       await PB_API.deleteTeam(team.id);
       await refresh();
     } catch (err) {
-      alert(`Failed to delete team: ${err.message}`);
+      showAlert(`Failed to delete team: ${err.message}`);
     }
   };
 
@@ -196,7 +209,7 @@ export async function initTeamsPage() {
     const available = allPlayersCache.filter(p => !memberIds.has(p.id));
 
     if (available.length === 0) {
-      alert('All players are already assigned to this team.');
+      showAlert('All players are already assigned to this team.');
       return;
     }
 
@@ -208,7 +221,7 @@ export async function initTeamsPage() {
         await PB_API.addTeamMember(team.id, selectedId);
         await refresh();
       } catch (err) {
-        alert(`Failed to add member: ${err.message}`);
+        showAlert(`Failed to add member: ${err.message}`);
       }
     }
   };
@@ -219,7 +232,7 @@ export async function initTeamsPage() {
       await PB_API.removeTeamMember(teamId, playerId);
       await refresh();
     } catch (err) {
-      alert(`Failed to remove member: ${err.message}`);
+      showAlert(`Failed to remove member: ${err.message}`);
     }
   };
 

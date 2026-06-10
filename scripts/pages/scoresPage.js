@@ -1,21 +1,21 @@
 import { PB_API } from '@services/api.js';
+import { filterLeaguesForUser, filterPlayersForUser, getScoreAccessLevel, can } from '@services/auth.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, formatNumber, applyScoreFormatting, renderThresholdGrid, setCurrentPlayerId, getCurrentPlayerId } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
-import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, setActiveEventId, setActiveLeagueId, setCurrentPlayerId, getCurrentPlayerId, renderThresholdGrid } from '@scripts/utils.js';
-import { initTournamentSelector, createSearchableSelect, renderActionSummary } from '@ui/selectors.js';
+import { createSearchableSelect, renderActionSummary, initTournamentSelector } from '@ui/selectors.js';
+import { normalizeScores, normalizeTargets, buildScoreMapFromDOM, buildScoreMapFromRows } from '@services/normalizer.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
-import { getScoreAccessLevel, filterLeaguesForUser, filterPlayersForUser } from '@services/auth.js';
-import { normalizeTargets, normalizeScores, groupScoresByPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
 
 /**
- * Initializes the Player Scoring page.
- * 
- * This module handles:
- * 1. Rendering the round-by-round input form based on event target scores.
- * 2. Real-time calculation of bowling results (Marks, Running Total).
- * 3. Player selection and roster filtering.
- * 4. Saving cumulative ball data to the backend.
+ * Logic for the Scores page: viewing and editing player scores across events.
+ * @module pages/scores
+ */
+
+/**
+ * Initializes the Scores page: loads score data, renders the score table, and binds editing controls.
  * @async
+ * @returns {Promise<void>}
  */
 export async function initScoresPage() {
   const roundsInput = document.getElementById('rounds-input');
@@ -30,14 +30,15 @@ export async function initScoresPage() {
   const resultsCard = document.getElementById('results-card');
   
   let allLeaguesCache = []; // Module-level cache for leagues
+  let tournamentSelector = null;
   // Fetch leagues and current user once at the start. 
   const [leaguesFromApi, user] = await Promise.all([
     PB_API.getLeagues(),
     PB_API.getCurrentUser()
   ]);
-  allLeaguesCache = leaguesFromApi;
+  allLeaguesCache = leaguesFromApi; // Update the module-level cache
   // Requirement: Unregistered users only see leagues that have at least one guest player.
-  const initialLeagues = filterLeaguesForUser(allLeaguesCache, user);
+  // The initialLeagues filtering logic here is now handled by initTournamentSelector.
 
   // If we land on the scores page with a session/non-standard league active, 
   // we clear it so the selector resets and refreshes to show standard leagues.
@@ -53,12 +54,16 @@ export async function initScoresPage() {
   }
 
   if (initialLeagueId && !initialEventId) {
-    const active = initialLeagues.find(l => String(l.id) === String(initialLeagueId));
+    const active = allLeaguesCache.find(l => String(l.id) === String(initialLeagueId)); // Use the full cache
     if (active && active.type !== 'standard') {
       setActiveLeagueId('');
+      initialLeagueId = '';
       setActiveEventId('');
+      initialEventId = '';
     }
   }
+  let lastEventId = initialEventId;
+  let lastLeagueId = initialLeagueId;
 
   let playerSearchInstance = null;
   let currentUser = user;
@@ -81,6 +86,10 @@ export async function initScoresPage() {
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
     setCurrentPlayerId('');
+    
+    const playerSearch = document.getElementById('player-search');
+    if (playerSearch) playerSearch.value = '';
+    if (playerSelect) playerSelect.value = '';
 
     const search = document.getElementById('league-search-global');
     if (search) {
@@ -94,6 +103,12 @@ export async function initScoresPage() {
     playerSummary.classList.add('hidden');
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
+
+    // Clear selection context when manually changing players
+    setCurrentPlayerId('');
+    const playerSearch = document.getElementById('player-search');
+    if (playerSearch) playerSearch.value = '';
+    if (playerSelect) playerSelect.value = '';
   };
 
   // Default engine
@@ -290,7 +305,7 @@ export async function initScoresPage() {
       }
 
       if (playerSearchInstance) {
-        playerSearchInstance.updateOptions('');
+        playerSearchInstance.setData(selectablePlayers);
       }
 
       if (currentPlayerId) {
@@ -432,7 +447,14 @@ export async function initScoresPage() {
    */
   const refresh = async () => {
     const eventId = getActiveEventId();
+    const leagueId = getActiveLeagueId();
+
     if (!eventId) {
+      setCurrentPlayerId('');
+      const playerSearch = document.getElementById('player-search');
+      if (playerSearch) playerSearch.value = '';
+      if (playerSelect) playerSelect.value = '';
+
       roundsInput.innerHTML = '';
       tournamentSelectorUI.classList.remove('hidden');
       tournamentSummary.classList.add('hidden');
@@ -442,12 +464,29 @@ export async function initScoresPage() {
       return;
     }
     
+    // If the tournament context (league or event) has changed, reset the player 
+    // selection to ensure the search box is cleared and we don't carry over 
+    // a player context that may not exist in the new roster.
+    if (eventId !== lastEventId || leagueId !== lastLeagueId) {
+      const playerSearch = document.getElementById('player-search');
+      if (playerSearch) playerSearch.value = '';
+      if (playerSelect) playerSelect.value = '';
+      setCurrentPlayerId('');
+      lastEventId = eventId;
+      lastLeagueId = leagueId;
+    }
+
     // Fetch leagues and machine targets in parallel. User is already fetched at init.
     const [leagues, eventTargets] = await Promise.all([
       PB_API.getLeagues(),
       PB_API.getTargetScores(eventId)
     ]);
     allLeaguesCache = leagues; // Update the cache with fresh data
+
+    // Refresh the league list in the selector to catch any mid-session roster changes
+    if (tournamentSelector) {
+      tournamentSelector.setData(allLeaguesCache);
+    }
 
     // Normalize targets into engine-friendly shape
     const machinesNormalized = normalizeTargets(eventTargets);
@@ -507,5 +546,9 @@ export async function initScoresPage() {
     }
   };
 
-  await initTournamentSelector('.tournament-selector-container', { onRefresh: refresh, existingLeagues: initialLeagues });
+  tournamentSelector = await initTournamentSelector('.tournament-selector-container', { 
+    onRefresh: refresh, 
+    existingLeagues: allLeaguesCache, // Pass the full list of leagues
+    currentUser: currentUser // Pass the current user for filtering
+  });
 }

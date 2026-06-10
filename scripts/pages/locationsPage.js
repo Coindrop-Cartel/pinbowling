@@ -1,12 +1,19 @@
 import { PB_API } from '@services/api.js';
-import { getScoringEngine } from '@core/engine.js';
-import { applyScoreFormatting, formatNumber } from '@scripts/utils.js';
-import { showConfirm, showPrompt } from '@ui/dialogs.js';
 import { createExpandableRow } from '@ui/selectors.js';
+import { getScoringEngine } from '@core/engine.js';
+import { formatNumber, applyScoreFormatting } from '@scripts/utils.js';
+import { showConfirm } from '@ui/dialogs.js';
 import { requireAdmin } from '@services/auth.js';
 
 /**
  * Logic for managing league locations/venues.
+ * @module pages/locations
+ */
+
+/**
+ * Initializes the Locations page: loads locations, binds CRUD controls, and renders the location list.
+ * @async
+ * @returns {Promise<void>}
  */
 export async function initLocationsPage() {
   const form = document.getElementById('location-form');

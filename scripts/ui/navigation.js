@@ -3,7 +3,10 @@ import { loadPage } from '@scripts/utils.js';
 
 /**
  * Initializes all elements with data-route attributes by setting their href
- * based on the centralized ROUTES configuration.
+ * based on the centralized ROUTES configuration. Also sets up dropdown
+ * toggle behavior and mobile taskbar collapse logic.
+ * @param {string} [containerSelector='.nav-container'] - CSS selector for the navigation container.
+ * @returns {void}
  */
 export const initNavigation = (containerSelector = '.nav-container') => {
   const container = document.querySelector(containerSelector);

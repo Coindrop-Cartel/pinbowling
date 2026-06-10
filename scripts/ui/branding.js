@@ -15,9 +15,17 @@ export function applyPreferredTheme(overrideFormat) {
   document.body.classList.remove('theme-golf', 'theme-bowling');
   const themeClass = engine.getThemeClass();
   if (themeClass) document.body.classList.add(themeClass);
-  
+
+  // Update main site logo (if present on home page)
+  const mainLogo = document.querySelector('.main-site-logo');
+  if (mainLogo) {
+    const lastSlash = mainLogo.src.lastIndexOf('/');
+    const basePath = lastSlash !== -1 ? mainLogo.src.substring(0, lastSlash + 1) : '';
+    mainLogo.src = `${basePath}main-site-logo-${engine.getBrandName().toLowerCase()}.png`;
+  }
+
   // Update dynamic logos (header/nav)
-  const logoImgs = document.querySelectorAll('.nav-logo img, .header-logo img, .site-logo img, #site-logo');
+  const logoImgs = document.querySelectorAll('.nav-logo img, .header-logo img, .site-logo img, #site-logo, .hero-logo-btn');
   logoImgs.forEach(img => {
     const lastSlash = img.src.lastIndexOf('/');
     const basePath = lastSlash !== -1 ? img.src.substring(0, lastSlash + 1) : '';
@@ -25,9 +33,9 @@ export function applyPreferredTheme(overrideFormat) {
     img.alt = engine.getBrandName() + ' Logo';
   });
 
-  // Update the navigation brand name label
-  document.querySelectorAll('.nav-logo span').forEach(el => {
-    el.textContent = engine.getBrandName();
+  // Update nav brand name spans (if present)
+  document.querySelectorAll('.nav-logo span').forEach(span => {
+    span.textContent = engine.getBrandName();
   });
 
   // Update all play CTA links (nav and home button)

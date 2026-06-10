@@ -1,14 +1,21 @@
 import { PB_API } from '@services/api.js';
+import { isManagementAuthorized, runAuthorizedLeagueAction } from '@services/auth.js';
+import { getCookie, getActiveLeagueId, setActiveLeagueId, setActiveEventId, navigateTo } from '@scripts/utils.js';
 import { SCORING_FORMATS } from '@core/engine.js';
-import { setupLiveFilter, createExpandableRow } from '@ui/selectors.js';
-import { showConfirm, showPrompt, showPlayerSelectionDialog } from '@ui/dialogs.js';
-import { runAuthorizedLeagueAction, isManagementAuthorized } from '@services/auth.js';
-import { navigateTo, getActiveLeagueId, setActiveLeagueId, setActiveEventId, getCookie } from '@scripts/utils.js';
 import { applyPreferredTheme } from '@ui/branding.js';
+import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
 import { ROUTES } from '@scripts/routes.js';
+import { showPlayerSelectionDialog, showConfirm } from '@ui/dialogs.js';
 
 /**
  * Logic for managing Leagues and Events.
+ * @module pages/leagues
+ */
+
+/**
+ * Initializes the Leagues page: loads leagues, binds CRUD controls, and renders the league list.
+ * @async
+ * @returns {Promise<void>}
  */
 export async function initLeaguesPage() {
   const isAuthorized = await isManagementAuthorized();
