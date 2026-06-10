@@ -47,6 +47,7 @@ export async function initTeamsPage() {
       allTeams.push(...teams);
       allPlayersCache = players;
       if (filterInstance) {
+        filterInstance.setData(allTeams);
         filterInstance.performFilter();
       }
     } catch (err) {
@@ -140,7 +141,7 @@ export async function initTeamsPage() {
     else saveBtn.title = "";
   };
 
-  filterInstance = setupLiveFilter(teamNameInput, () => allTeams, {
+  filterInstance = setupLiveFilter(teamNameInput, allTeams, {
     labelKey: 'name',
     onFilter: onFilterUpdate
   });

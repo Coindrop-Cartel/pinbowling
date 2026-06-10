@@ -239,6 +239,7 @@ describe('showAuthDialog', () => {
     expect(document.querySelector('#auth-name')).toBeNull(); // No player name in login mode
     const submitBtn = document.querySelector('#auth-modal-form button[type="submit"]');
     expect(submitBtn.textContent).toBe('Login');
+    expect(document.getElementById('auth-switch').textContent).toBe('Need an account? Register now');
     // Cancel
     document.getElementById('auth-cancel').click();
     await promise;
@@ -252,6 +253,7 @@ describe('showAuthDialog', () => {
     expect(document.querySelector('#auth-name')).not.toBeNull();
     const submitBtn = document.querySelector('#auth-modal-form button[type="submit"]');
     expect(submitBtn.textContent).toBe('Register');
+    expect(document.getElementById('auth-switch').textContent).toBe('Already have an account? Login');
     document.getElementById('auth-cancel').click();
     await promise;
   });

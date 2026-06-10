@@ -69,8 +69,8 @@ export function showDialog({
       <div id="modal-custom-content"></div>
       ${showInput ? `<div class="form-row mt-20"><input type="${isPassword ? 'password' : 'text'}" id="modal-input" class="modal-input" /></div>` : ''}
       <div class="modal-actions">
-        <button id="${confirmId}" class="flex-1">${confirmText}</button>
-        ${cancelText ? `<button id="modal-cancel" class="secondary flex-1">${cancelText}</button>` : ''}
+        <button id="${confirmId}">${confirmText}</button>
+        ${cancelText ? `<button id="modal-cancel" class="secondary">${cancelText}</button>` : ''}
       </div>
     `;
     const { card, close } = _openModalBase(title, contentHtml);
@@ -210,7 +210,7 @@ export const showAuthDialog = () => {
       }
 
       card.querySelector('button[type="submit"]').textContent = isLogin ? 'Login' : 'Register';
-      card.querySelector('#auth-switch').textContent = isLogin ? 'Create Account' : 'Back to Login';
+      card.querySelector('#auth-switch').textContent = isLogin ? 'Need an account? Register now' : 'Already have an account? Login';
     };
 
     const contentHtml = `
@@ -218,9 +218,9 @@ export const showAuthDialog = () => {
         <div class="form-row"><label>Username</label><input type="text" id="auth-username" class="modal-input" required></div>
         <div class="form-row"><label>Password</label><input type="password" id="auth-pass" class="modal-input" required></div>
         <div class="modal-actions mt-20">
-          <button type="submit" class="flex-1">Login</button>
-          <button type="button" id="auth-switch" class="secondary flex-1">Create Account</button>
-          <button type="button" id="auth-cancel" class="secondary flex-1">Cancel</button>
+          <button type="submit">Login</button>
+          <button type="button" id="auth-switch" class="btn-link-auth">Need an account? Register now</button>
+          <button type="button" id="auth-cancel" class="secondary">Cancel</button>
         </div>
       </form>
     `;
@@ -257,10 +257,14 @@ export const showAuthDialog = () => {
 };
 
 export async function showPlayerSelectionDialog(title, message, options, confirmText = 'Add Player') {
+  const isTeam = confirmText.toLowerCase().includes('team');
+  const searchPlaceholder = isTeam ? 'Search teams...' : 'Search players...';
+  const selectPlaceholder = isTeam ? '-- Select Team --' : '-- Select Player --';
+
   const customElement = document.createElement('div');
   customElement.className = 'form-row mt-20';
   customElement.innerHTML = `
-    <input type="text" id="player-search-modal" class="modal-input" placeholder="Search players...">
+    <input type="text" id="player-search-modal" class="modal-input" placeholder="${searchPlaceholder}">
     <select id="player-select-modal" class="modal-input mt-10"></select>
   `;
 
@@ -274,11 +278,11 @@ export async function showPlayerSelectionDialog(title, message, options, confirm
       const searchInput = card.querySelector('#player-search-modal');
       const selectElement = card.querySelector('#player-select-modal');
       confirmBtn.disabled = true;
-      selectElement.innerHTML = '<option value="">-- Select Player --</option>' + options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+      selectElement.innerHTML = `<option value="">${selectPlaceholder}</option>` + options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
       createSearchableSelect(searchInput, selectElement, options, {
         valueKey: 'value',
         labelKey: 'label',
-        placeholder: '-- Select Player --',
+        placeholder: selectPlaceholder,
         onSelect: (val) => { confirmBtn.disabled = !val; }
       });
       confirmBtn.onclick = () => close(selectElement.value);

@@ -18,7 +18,15 @@ import { showPlayerSelectionDialog, showConfirm } from '@ui/dialogs.js';
  * @returns {Promise<void>}
  */
 export async function initLeaguesPage() {
-  const isAuthorized = await isManagementAuthorized();
+  let isAuthorized = false;
+  let leaguesData = [];
+  try {
+    [isAuthorized, leaguesData] = await Promise.all([
+      isManagementAuthorized(),
+      PB_API.getLeagues({ type: 'standard' })
+    ]);
+  } catch (err) { console.error('Initialization failed:', err); }
+
   const leagueFormTitle = document.getElementById('league-form-title');
   const leagueForm = document.getElementById('league-form');
   const leagueNameInput = document.getElementById('league-name');
@@ -79,7 +87,7 @@ export async function initLeaguesPage() {
     createToggle = document.createElement('button');
     createToggle.type = 'button';
     createToggle.className = 'secondary btn-mgmt';
-    createToggle.textContent = 'Create New League';
+    createToggle.textContent = 'Create League';
     createToggle.classList.add('mt-10');
     if (leagueNameInput) leagueNameInput.after(createToggle);
 
@@ -96,6 +104,7 @@ export async function initLeaguesPage() {
         actionsRow.classList.remove('hidden');
         createToggle.classList.replace('mt-10', 'mt-0');
         actionsRow.appendChild(createToggle);
+        createToggle.textContent = 'Cancel';
         if (leagueFormatInput) applyPreferredTheme(leagueFormatInput.value);
       }
     };
@@ -104,8 +113,8 @@ export async function initLeaguesPage() {
   function resetForm() {
     editingLeagueId = null;
     leagueForm.reset();
-    if (leagueFormTitle) leagueFormTitle.textContent = 'Add New League';
-    createBtn.textContent = 'Create League';
+    if (leagueFormTitle) leagueFormTitle.textContent = 'Create League';
+    createBtn.textContent = 'Save League';
 
     dateRow.classList.add('hidden');
     formatRow.classList.add('hidden');
@@ -115,7 +124,7 @@ export async function initLeaguesPage() {
     actionsRow.classList.add('hidden');
 
     if (createToggle) {
-      createToggle.textContent = 'Create New League';
+      createToggle.textContent = 'Create League';
       createToggle.classList.replace('mt-0', 'mt-10');
       leagueNameInput.after(createToggle);
     }
@@ -264,14 +273,19 @@ export async function initLeaguesPage() {
 
   leagueDateInput.addEventListener('input', () => filterInstance.performFilter());
 
-  const refresh = async () => {
+  const refresh = async (data = null) => {
     try {
       // Fetch standard leagues only for management (one-off sessions are handled by cleanup)
-      const data = await PB_API.getLeagues({ type: 'standard' });
+      const rawData = Array.isArray(data) ? data : await PB_API.getLeagues({ type: 'standard' });
+      const safeData = Array.isArray(rawData) ? rawData : [];
+
       allLeagues.length = 0;
-      allLeagues.push(...data);
+      allLeagues.push(...safeData);
+
       // Also refresh the global player cache for selection dialogs
       allPlayersCache = await PB_API.getPlayers();
+      
+      filterInstance.setData(allLeagues);
       filterInstance.performFilter();
     } catch (err) {
       console.error('Failed to load leagues:', err);
@@ -388,7 +402,8 @@ export async function initLeaguesPage() {
     const selectedTeamId = await showPlayerSelectionDialog(
         `Add Team to ${leagueName}`,
         'Select a team to add:',
-        teamOptions
+        teamOptions,
+        'Add Team'
     );
 
     if (selectedTeamId) {
@@ -482,7 +497,8 @@ export async function initLeaguesPage() {
     const selectedPlayerId = await showPlayerSelectionDialog(
         `Add Player to ${leagueName}`,
         'Select a player to add:',
-        playerOptions
+        playerOptions,
+        'Add Player'
     );
 
     if (selectedPlayerId) {
@@ -631,5 +647,5 @@ export async function initLeaguesPage() {
     }
   };
 
-  await refresh();
+  await refresh(leaguesData);
 }

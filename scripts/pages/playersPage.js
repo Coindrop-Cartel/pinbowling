@@ -157,7 +157,7 @@ export async function initPlayersPage() {
     savePlayerButton.title = (exactMatch && !isEditingThisPlayer) ? "This player name already exists." : "";
   };
 
-  filterInstance = setupLiveFilter(playerNameInput, () => allPlayers, {
+  filterInstance = setupLiveFilter(playerNameInput, allPlayers, {
     labelKey: 'playerName',
     onFilter: onFilterUpdate
   });
@@ -167,11 +167,17 @@ export async function initPlayersPage() {
   matchplayIdInput.addEventListener('input', () => filterInstance.performFilter());
 
   async function refresh(data = null) {
-    const players = data || await PB_API.getPlayers();
+    const players = Array.isArray(data) ? data : await PB_API.getPlayers();
+    const safePlayers = Array.isArray(players) ? players : [];
+
     // Update array in-place to keep the filter reference valid
     allPlayers.length = 0;
-    allPlayers.push(...players);
-    filterInstance.performFilter();
+    allPlayers.push(...safePlayers);
+    
+    if (filterInstance) {
+      filterInstance.setData(allPlayers);
+      filterInstance.performFilter();
+    }
     resetForm();
   }
 

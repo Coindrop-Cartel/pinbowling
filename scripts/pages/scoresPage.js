@@ -96,6 +96,10 @@ export async function initScoresPage() {
       search.value = '';
       search.dispatchEvent(new Event('input'));
     }
+
+    if (playerSearchInstance) {
+      playerSearchInstance.updateOptions('');
+    }
   };
 
   const handlePlayerChange = () => {
@@ -109,6 +113,10 @@ export async function initScoresPage() {
     const playerSearch = document.getElementById('player-search');
     if (playerSearch) playerSearch.value = '';
     if (playerSelect) playerSelect.value = '';
+
+    if (playerSearchInstance) {
+      playerSearchInstance.updateOptions('');
+    }
   };
 
   // Default engine
@@ -314,8 +322,13 @@ export async function initScoresPage() {
           playerSelect.value = currentPlayerId;
           const searchInput = document.getElementById('player-search');
           if (searchInput) searchInput.value = player.playerName;
-        return currentPlayerId;
-      }
+          return currentPlayerId;
+        }
+      } else {
+        // If no player is active, ensure the UI is physically cleared
+        const searchInput = document.getElementById('player-search');
+        if (searchInput) searchInput.value = '';
+        if (playerSelect) playerSelect.value = '';
       }
     } catch (err) {
       console.error('Failed to render player selection:', err);

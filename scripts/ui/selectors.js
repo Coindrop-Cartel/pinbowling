@@ -45,15 +45,13 @@ export function createSearchableSelect(searchInput, selectElement, initialData, 
     const filter = e.target.value;
     const matchCount = updateOptions(filter);
     selectElement.size = filter.length > 0 ? Math.min(matchCount + 1, 5) : 1;
-    const exactMatch = data.find(item => String(item[labelKey]).toLowerCase() === filter.toLowerCase());
-    if (exactMatch && String(selectElement.value) !== String(exactMatch[valueKey])) {
-      selectElement.value = exactMatch[valueKey];
-      selectElement.size = 1;
-      if (onSelect) onSelect(exactMatch[valueKey]);
-    }
   });
 
-  searchInput.addEventListener('blur', () => { setTimeout(() => { selectElement.size = 1; }, 200); });
+  searchInput.addEventListener('blur', (e) => { 
+    // If focus moved to the select itself, don't collapse immediately
+    if (e.relatedTarget === selectElement) return;
+    setTimeout(() => { selectElement.size = 1; }, 200); 
+  });
   selectElement.addEventListener('change', () => {
     const val = selectElement.value;
     const match = data.find(item => String(item[valueKey]) === String(val));
@@ -122,20 +120,31 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh, existi
 /**
  * Sets up a live text filter on an input element that filters a data array.
  * @param {HTMLInputElement} inputElement - The text input to listen on.
- * @param {Array<Object>} data - The data array to filter.
+ * @param {Array<Object>} initialData - The initial data array to filter.
  * @param {Object} [options] - Configuration options.
  * @param {string} [options.labelKey='name'] - Property name to match the filter against.
  * @param {function(Array, string): void} [options.onFilter=null] - Callback invoked with filtered results and query.
- * @returns {{ performFilter: function(): void }} An object with a performFilter method for manual invocation.
+ * @returns {{ performFilter: function(): void, setData: function(Array): void }} An object with filtering and data update methods.
  */
-export function setupLiveFilter(inputElement, data, { labelKey = 'name', onFilter = null } = {}) {
+export function setupLiveFilter(inputElement, initialData, { labelKey = 'name', onFilter = null } = {}) {
+  let data = Array.isArray(initialData) ? initialData : [];
+
   const performFilter = () => {
     const query = inputElement.value.trim().toLowerCase();
-    const filtered = data.filter(item => String(item[labelKey]).toLowerCase().includes(query));
+    // Defensive check: ensure data is an array before filtering
+    const source = Array.isArray(data) ? data : [];
+    const filtered = source.filter(item => String(item[labelKey] || '').toLowerCase().includes(query));
     if (onFilter) onFilter(filtered, query);
   };
+
   inputElement.addEventListener('input', performFilter);
-  return { performFilter };
+
+  return {
+    performFilter,
+    setData: (newData) => {
+      data = Array.isArray(newData) ? newData : [];
+    }
+  };
 }
 
 /**

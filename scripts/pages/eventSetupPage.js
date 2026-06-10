@@ -2,6 +2,7 @@ import { PB_API } from '@services/api.js';
 import { isManagementAuthorized, requireAdmin } from '@services/auth.js';
 import { showAlert } from '@ui/dialogs.js';
 import { navigateTo, getActiveEventId, getActiveLeagueId, renderPreview, formatNumber, applyScoreFormatting, renderThresholdGrid } from '@scripts/utils.js';
+import { applyPreferredTheme } from '@ui/branding.js';
 import { ROUTES } from '@scripts/routes.js';
 import { getScoringEngine } from '@core/engine.js';
 import { printMachineScores } from '@ui/printing.js';
@@ -441,6 +442,7 @@ export async function initEventSetupPage() {
 
     const format = eventMatch?.scoringFormat || league?.scoringFormat;
     Engine = getScoringEngine(format);
+    applyPreferredTheme(format);
 
     // Update UI labels based on the scoring engine
     if (labelHigh) labelHigh.textContent = Engine.getValue1Label();
