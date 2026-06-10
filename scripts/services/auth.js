@@ -51,7 +51,7 @@ const NAV_PERMISSIONS = {
 };
 
 /**
- * Resets the internal authentication cache.
+ * Resets the internal auth cache (user profile and initialization state).
  * Primarily used for testing isolation and during logout.
  */
 export function resetAuthCache() {
@@ -85,8 +85,10 @@ async function getAuthenticatedUser() {
 }
 
 /**
- * Verifies if the user has global admin access. 
+ * Verifies if the user has global admin access.
  * Prompts for password if not already in session.
+ *
+ * @returns {Promise<boolean>} `true` if the user is an admin, `false` otherwise.
  */
 export async function requireAdmin() {
   if (window.PB_DEBUG_MODE) console.log('[Auth] requireAdmin called.');
@@ -104,6 +106,10 @@ export async function requireAdmin() {
 /**
  * Wraps an action that requires either a League Password or Admin Password.
  * Handles prompting and automatic session clearing if the API returns 401.
+ *
+ * @param {string|number} leagueId - The league ID the action is scoped to.
+ * @param {Function} actionCallback - Async callback to execute once authorized.
+ * @returns {Promise<boolean>} `true` if the action was executed, `false` if unauthorized.
  */
 export async function runAuthorizedLeagueAction(leagueId, actionCallback) {
   const isAuth = await isManagementAuthorized();
@@ -123,7 +129,7 @@ export async function runAuthorizedLeagueAction(leagueId, actionCallback) {
 
 /**
  * Checks if the current user (or guest) has a specific permission.
- * @param {string} permission 
+ * @param {string} permission - Permission constant from the PERMISSIONS registry.
  * @returns {Promise<boolean>}
  */
 export async function can(permission) {
@@ -199,6 +205,8 @@ function updateAuthUI(user) {
 /**
  * Initializes the authentication UI in the page header.
  * Optimized to avoid redundant network requests during SPA-style navigation.
+ *
+ * @returns {Promise<void>}
  */
 export async function initAuthHeader() {
   // If we've already fetched the user in this session, use the cached state 
@@ -216,6 +224,8 @@ export async function initAuthHeader() {
 /**
  * Checks if the current user has either a 'td' or 'admin' role.
  * Use this to conditionally disable or hide management UI elements.
+ *
+ * @returns {Promise<boolean>} `true` if the user is a TD or admin, `false` otherwise.
  */
 export async function isManagementAuthorized() {
   const user = await getAuthenticatedUser();

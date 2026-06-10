@@ -20,6 +20,13 @@ vi.mock('@services/auth.js', () => ({
   requireAdmin: vi.fn(() => Promise.resolve(true)),
 }));
 
+vi.mock('@core/engine.js', () => ({
+  getScoringEngine: vi.fn(() => ({
+    getValue1Label: vi.fn(() => 'High Score'),
+    getInitialValues: vi.fn(() => ({ value1: 1000, value2: 100 })),
+  })),
+}));
+
 const uiMocks = vi.hoisted(() => ({
   showConfirm: vi.fn(() => Promise.resolve(true)),
   showPrompt: vi.fn(),
@@ -60,6 +67,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
     PB_API.getLocations.mockResolvedValue([
       { id: 1, name: 'The Sanctum', city: 'Meriden', state: 'CT', machines: [] }
     ]);
+    PB_API.getMachines.mockResolvedValue([]);
   });
 
   it('should list locations on initialization', async () => {
@@ -88,5 +96,16 @@ describe('Locations Management Page (locationsPage.js)', () => {
       name: 'New Spot',
       city: 'Town'
     }));
+  });
+
+  it('should show machine form when "Add Machine" is clicked', async () => {
+    await initLocationsPage();
+
+    // The mock createExpandableRow puts contentHtml directly in the DOM
+    const addBtn = document.querySelector('.add-mach-btn');
+    await addBtn.click();
+
+    expect(document.getElementById('location-machine-form-card').classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('location-machine-form-card').innerHTML).toContain('Add Machine');
   });
 });

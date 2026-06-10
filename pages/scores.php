@@ -27,12 +27,11 @@
         <button id="change-player-btn" class="secondary btn-small">Change</button>
       </div>
     </section>
-
+    <div id="player-warning" class="notice hidden"></div>
     <section id="scoring-card" class="card hidden mb-5 card-pad">
       <h2 class="mt-0">Enter Scores</h2>
       <div id="scoring-instruction-notice" class="hint hidden small-hint"></div>
       <p id="scoring-hint" class="hint">Enter the cumulative score after each ball. We will do the rest.</p>
-      <div id="player-warning" class="notice hidden"></div>
       <form id="player-form">
         <div id="rounds-input"></div>
       </form>

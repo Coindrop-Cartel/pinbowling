@@ -486,9 +486,10 @@ export async function initScoresPage() {
     machines = machinesNormalized;
 
     if (machines.length === 0) {
-      warning.textContent = 'No target scores have been configured for the selected event.';
+      warning.innerHTML = 'This event has not been setup.';
       warning.classList.remove('hidden');
       roundsInput.innerHTML = '';
+
       return;
     }
 

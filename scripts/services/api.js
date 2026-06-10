@@ -87,6 +87,60 @@ export async function fetchJSON(url, options = {}) {
   }
 }
 
+/**
+ * API client object providing typed methods for all backend service endpoints.
+ * Each method delegates to `fetchJSON` with the appropriate URL, HTTP method, and body.
+ *
+ * @namespace PB_API
+ * @property {Function} login - Authenticate a user. Params: (username, password).
+ * @property {Function} logout - End the current session.
+ * @property {Function} register - Register a new user. Params: (data).
+ * @property {Function} getCurrentUser - Fetch the currently authenticated user profile.
+ * @property {Function} getMachines - Fetch machines. Params: (params).
+ * @property {Function} getPlayers - Fetch players. Params: (params).
+ * @property {Function} getScores - Fetch scores. Params: (playerId, eventId, leagueId).
+ * @property {Function} saveScore - Save a score entry. Params: (score).
+ * @property {Function} deletePlayer - Delete a player by ID. Params: (id).
+ * @property {Function} createMachine - Create a master machine. Params: (machine).
+ * @property {Function} updatePlayer - Update a player. Params: (id, player).
+ * @property {Function} updateUserPassword - Reset a user's password. Params: (userId, password).
+ * @property {Function} updateUserRole - Change a user's role. Params: (userId, role).
+ * @property {Function} updateMachine - Update a master machine. Params: (id, machine).
+ * @property {Function} deleteMachine - Delete a machine by ID. Params: (id).
+ * @property {Function} createPlayer - Create a new player. Params: (player).
+ * @property {Function} clearScores - Clear all scores for a player. Params: (playerId).
+ * @property {Function} getLeagues - Fetch leagues. Params: (params).
+ * @property {Function} getLeague - Fetch a single league. Params: (id).
+ * @property {Function} createLeague - Create a league. Params: (league).
+ * @property {Function} updateLeague - Update a league. Params: (id, league).
+ * @property {Function} deleteLeague - Delete a league. Params: (id).
+ * @property {Function} getEvents - Fetch events for a league. Params: (leagueId, params).
+ * @property {Function} createEvent - Create an event. Params: (event).
+ * @property {Function} updateEvent - Update an event. Params: (id, event).
+ * @property {Function} deleteEvent - Delete an event. Params: (id, leagueId).
+ * @property {Function} addLeaguePlayer - Add a player to a league. Params: (leagueId, playerId).
+ * @property {Function} removeLeaguePlayer - Remove a player from a league. Params: (leagueId, playerId).
+ * @property {Function} getTeams - Fetch all teams.
+ * @property {Function} createTeam - Create a team. Params: (data).
+ * @property {Function} updateTeam - Update a team. Params: (id, data).
+ * @property {Function} deleteTeam - Delete a team. Params: (id).
+ * @property {Function} addTeamMember - Add a member to a team. Params: (teamId, playerId).
+ * @property {Function} removeTeamMember - Remove a member from a team. Params: (teamId, playerId).
+ * @property {Function} addLeagueTeam - Add a team to a league. Params: (leagueId, teamId).
+ * @property {Function} removeLeagueTeam - Remove a team from a league. Params: (leagueId, teamId).
+ * @property {Function} getLocations - Fetch locations. Params: (params).
+ * @property {Function} createLocation - Create a location. Params: (loc).
+ * @property {Function} updateLocation - Update a location. Params: (id, loc).
+ * @property {Function} deleteLocation - Delete a location. Params: (id).
+ * @property {Function} getLocationMachines - Fetch machines at a location. Params: (locationId, params).
+ * @property {Function} addLocationMachine - Add a machine to a location. Params: (locationId, machineId, extra).
+ * @property {Function} removeLocationMachine - Remove a machine from a location. Params: (locationId, machineId).
+ * @property {Function} getTargetScores - Fetch target scores. Params: (eventId, leagueId, params).
+ * @property {Function} bulkUpdateTargetOrder - Bulk-update target sort order. Params: (updates).
+ * @property {Function} runCleanup - Run the database cleanup routine.
+ * @property {Function} saveTargetScore - Save a target score entry. Params: (target).
+ * @property {Function} deleteTargetScore - Delete a target score. Params: (id).
+ */
 export const PB_API = {
   // Auth
   login: (username, password) => fetchJSON('service/authService.php?task=login', { method: 'POST', body: JSON.stringify({ username, password }) }),

@@ -271,7 +271,7 @@ export async function initLocationsPage() {
     machineFormCard.innerHTML = `<h2>Loading Machine Details...</h2>`;
 
     const engine = getScoringEngine();
-    const highScoreLabel = engine.getHighScoreLabel();
+    const highScoreLabel = engine.getValue1Label();
     const defaults = engine.getInitialValues();
 
     const allMachines = await PB_API.getMachines();
