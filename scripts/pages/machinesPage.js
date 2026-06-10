@@ -54,9 +54,8 @@ export async function initMachinesPage() {
 
   const createToggle = document.createElement('button');
   createToggle.type = 'button';
-  createToggle.className = 'secondary btn-mgmt';
+  createToggle.className = 'secondary btn-mgmt mt-10';
   createToggle.textContent = 'Create New Machine';
-  createToggle.style.marginTop = '10px';
   machineNameInput.after(createToggle);
 
   if (!hasElevatedPrivileges) {
@@ -69,7 +68,7 @@ export async function initMachinesPage() {
     if (isHidden) {
       toggleFormVisibility(false);
       createToggle.textContent = 'Cancel';
-      createToggle.style.marginTop = '0';
+      createToggle.classList.replace('mt-10', 'mt-0');
       actionsRow.appendChild(createToggle);
     } else {
       resetForm();
@@ -98,19 +97,19 @@ export async function initMachinesPage() {
       filtered.forEach(m => {
         const info = [m.manufacturer, m.year].filter(Boolean).join(', ');
         const headerHtml = `
-          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            <div style="flex: 1;">
-              <span style="font-weight: bold;">${m.machineName}</span>
-              ${info ? `<br><small style="opacity: 0.7; font-size: 0.8rem;">${info}</small>` : ''}
+          <div class="header-bar">
+            <div class="flex-1">
+              <span class="font-bold">${m.machineName}</span>
+              ${info ? `<br><small class="machine-info">${info}</small>` : ''}
             </div>
-            <div style="display: flex; gap: 8px;">
+            <div class="action-buttons">
               <button type="button" class="edit-mach-btn secondary btn-row">Edit</button>
               ${isAdmin ? `<button type="button" class="delete-mach-btn btn-row">Delete</button>` : ''}
             </div>
           </div>
         `;
 
-        const contentHtml = '<div style="font-size: 0.85rem; color: #666; font-style: italic;">Select Edit to update machine metadata.</div>';
+        const contentHtml = '<div class="content-muted italic">Select Edit to update machine metadata.</div>';
 
         const row = createExpandableRow(machineList, {
           id: m.id,
@@ -160,7 +159,7 @@ export async function initMachinesPage() {
     // Expand fields for editing
     toggleFormVisibility(false);
     createToggle.textContent = 'Cancel';
-    createToggle.style.marginTop = '0';
+    createToggle.classList.replace('mt-10', 'mt-0');
     actionsRow.appendChild(createToggle);
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -184,7 +183,7 @@ export async function initMachinesPage() {
     // Collapse creation fields
     toggleFormVisibility(true);
     createToggle.textContent = 'Create New Machine';
-    createToggle.style.marginTop = '10px';
+    createToggle.classList.replace('mt-0', 'mt-10');
     machineNameInput.after(createToggle);
 
     saveMachineButton.textContent = 'Save Machine';

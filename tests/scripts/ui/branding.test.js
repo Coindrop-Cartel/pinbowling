@@ -100,10 +100,9 @@ describe('Branding Utilities (branding.js)', () => {
       expect(html).toContain('theme-golf');
       expect(html).toContain('PinGolf');
     });
-    it('should include inline styles for badge appearance', () => {
+    it('should include the badge CSS class', () => {
       const html = getFormatBadgeHtml('bowling');
-      expect(html).toContain('border-radius:10px');
-      expect(html).toContain('font-size:0.65rem');
+      expect(html).toContain('class="badge');
     });
   });
   describe('fitTVModeToScreen', () => {

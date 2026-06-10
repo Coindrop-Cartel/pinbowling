@@ -73,7 +73,7 @@ export async function initLeaguesPage() {
     createToggle.type = 'button';
     createToggle.className = 'secondary btn-mgmt';
     createToggle.textContent = 'Create New League';
-    createToggle.style.marginTop = '10px';
+    createToggle.classList.add('mt-10');
     if (leagueNameInput) leagueNameInput.after(createToggle);
 
     createToggle.onclick = () => {
@@ -87,8 +87,7 @@ export async function initLeaguesPage() {
         if (seasonScoringRow) seasonScoringRow.classList.remove('hidden');
         if (dropLowestRow) dropLowestRow.classList.remove('hidden');
         actionsRow.classList.remove('hidden');
-        createToggle.textContent = 'Cancel';
-        createToggle.style.marginTop = '0';
+        createToggle.classList.replace('mt-10', 'mt-0');
         actionsRow.appendChild(createToggle);
         if (leagueFormatInput) applyPreferredTheme(leagueFormatInput.value);
       }
@@ -110,7 +109,7 @@ export async function initLeaguesPage() {
 
     if (createToggle) {
       createToggle.textContent = 'Create New League';
-      createToggle.style.marginTop = '10px';
+      createToggle.classList.replace('mt-0', 'mt-10');
       leagueNameInput.after(createToggle);
     }
     applyPreferredTheme(getCookie('pb_preferred_format') || 'bowling');
@@ -137,7 +136,7 @@ export async function initLeaguesPage() {
     
     if (createToggle) {
       createToggle.textContent = 'Cancel';
-      createToggle.style.marginTop = '0';
+      createToggle.classList.replace('mt-10', 'mt-0');
       actionsRow.appendChild(createToggle);
     }
     
@@ -166,27 +165,26 @@ export async function initLeaguesPage() {
 
         const headerHtml = `
           <div>
-            <h3 style="margin: 0; font-size: 1.05rem;">${league.name}</h3>
+            <h3 class="section-heading">${league.name}</h3>
             <small>Started: ${league.startDate || 'N/A'} | ${league.participants === 'team' ? 'Team' : 'Individual'} | Events: ${league.events?.length || 0} | ${participantLabel}: ${participantCount} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}</small>
           </div>
         `;
 
         const contentHtml = `
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h4 style="margin: 0;">Events</h4>
+          <div class="section-bar">
+            <h4 class="section-subheading">Events</h4>
             ${isAuthorized ? `<button class="add-event-btn secondary btn-row" data-league-id="${league.id}" data-league-name="${league.name}">Add Event</button>` : ''}
           </div>
-          <ul class="league-events-list" style="list-style: none; padding: 0;"></ul>
-
-          <div class="league-players-section" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <h4 style="margin: 0;">${league.participants === 'team' ? 'Teams' : 'Roster'}</h4>
+          <ul class="league-events-list list-unstyled"></ul>
+          <div class="league-players-section roster-section">
+            <div class="section-bar">
+              <h4 class="section-subheading">${league.participants === 'team' ? 'Teams' : 'Roster'}</h4>
               ${isAuthorized ? `<button class="${league.participants === 'team' ? 'add-team-btn' : 'add-player-btn'} secondary btn-row" data-league-id="${league.id}" data-league-name="${league.name}">Add ${league.participants === 'team' ? 'Team' : 'Player'}</button>` : ''}
             </div>
-            <ul class="league-participants-list" style="list-style: none; padding: 0;"></ul>
+            <ul class="league-participants-list list-unstyled"></ul>
             <div class="notice league-participants-empty hidden">No ${league.participants === 'team' ? 'teams' : 'players'} assigned to this league.</div>
           </div>
-          <div style="display: flex; gap: 8px;">
+          <div class="action-buttons">
             ${isAuthorized ? '<button class="edit-league-btn secondary btn-row">Edit League</button>' : ''}
             ${isAuthorized ? '<button class="delete-league-btn btn-row">Delete League</button>' : ''}
           </div>
@@ -306,9 +304,9 @@ export async function initLeaguesPage() {
     const eventsListEl = card.querySelector('.league-events-list');
 
     eventsListEl.innerHTML = (leagueEvents || []).map(e => `
-      <li style="display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;">
+      <li class="list-item-row">
         <span>${e.eventName} <small>(${e.eventDate || 'No Date'})</small></span>
-        <div style="display: flex; gap: 4px;">
+        <div class="small-action-buttons">
           ${isAuthorized ? `<button class="setup-event-btn secondary btn-row" data-league-id="${leagueId}" data-event-id="${e.id}">Setup</button>` : ''}
           ${isAuthorized ? `<button class="edit-event-btn secondary btn-row" data-id="${e.id}">Edit</button>` : ''}
           ${isAuthorized ? `<button class="delete-event-btn btn-row" data-id="${e.id}">Delete</button>` : ''}
@@ -346,7 +344,7 @@ export async function initLeaguesPage() {
         emptyNoticeEl.classList.add('hidden');
         leagueTeams.forEach(team => {
             const li = document.createElement('li');
-            li.style = "display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;";
+            li.className = 'list-item-row';
             li.innerHTML = `
                 <span>${team.name} <small>(${team.city || 'No City'})</small></span>
                 ${isAuthorized ? `<button class="remove-team-btn btn-row" data-league-id="${leagueId}" data-team-id="${team.id}" data-team-name="${team.name}">Delete</button>` : ''}
@@ -426,7 +424,7 @@ export async function initLeaguesPage() {
         leaguePlayers.forEach(lp => {
             if (lp && lp.id) {
                 const li = document.createElement('li');
-                li.style = "display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;";
+                li.className = 'list-item-row';
                 li.innerHTML = `
                     <span>${lp.playerName}</span>
                     ${isAuthorized ? `<button class="remove-player-btn btn-row" data-league-id="${leagueId}" data-player-id="${lp.id}" data-player-name="${lp.playerName}">Delete</button>` : ''}

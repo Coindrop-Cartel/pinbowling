@@ -51,7 +51,7 @@ export function getFormatBadgeHtml(format) {
   const engine = getScoringEngine(format);
   const label = engine.getBrandName();
   const themeClass = engine.getThemeClass();
-  return `<span class="badge ${themeClass}" style="background: var(--pb-primary); color: var(--pb-white); font-size:0.65rem; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle; font-weight: bold; text-transform: uppercase; border: none;">${label}</span>`;
+  return `<span class="badge ${themeClass}">${label}</span>`;
 }
 
 /**

@@ -343,7 +343,7 @@ describe('calculateSeasonSummary', () => {
 
       // Event 100 (score=100) should be dropped and have strikethrough
       const droppedTotal = result.rows[0].eventTotals[100];
-      expect(droppedTotal).toContain('line-through');
+      expect(droppedTotal).toContain('dropped-score');
     });
 
     it('should not drop any weeks when dropLowestWeeks is 0', () => {

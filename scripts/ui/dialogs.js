@@ -65,11 +65,11 @@ export function showChoiceDialog(title, message, choices, initialValue = null) {
   return new Promise((resolve) => {
     let selectedValue = initialValue;
     const contentHtml = `
-      <p class="small-hint" style="margin-bottom:20px;">${message}</p>
-      <div class="modal-actions" style="flex-wrap:wrap;">
+      <p class="small-hint mb-20">${message}</p>
+      <div class="modal-actions wrap">
         ${choices.map(c => `<button type="button" class="choice-btn ${c.class || ''}" data-value="${c.value}">${c.label}</button>`).join('')}
       </div>
-      <div class="modal-actions" style="margin-top:20px; border-top: 1px solid #eee; padding-top: 20px;">
+      <div class="modal-actions border-top-separator">
         <button id="modal-save" class="flex-1">Save</button>
         <button id="modal-cancel" class="secondary flex-1">Cancel</button>
       </div>
@@ -100,11 +100,11 @@ export async function showAuthDialog() {
           <div class="form-row"><label>Password</label><input type="password" id="auth-pass" required class="modal-input"></div>
           ${isRegister ? `<div class="form-row"><label>Player Name</label><input type="text" id="auth-name" required placeholder="e.g. John Doe" class="modal-input"></div>` : ''}
           <div class="modal-actions column">
-            <button type="submit" style="width:100%;">${isRegister ? 'Register' : 'Login'}</button>
-            <button type="button" id="auth-switch" class="secondary" style="width:100%; border:none; background:none; text-decoration:underline; font-size:0.9rem;">
+            <button type="submit" class="btn-full-width">${isRegister ? 'Register' : 'Login'}</button>
+            <button type="button" id="auth-switch" class="secondary btn-full-width btn-link">
               ${isRegister ? 'Already have an account? Sign In' : 'Need an account? Register now'}
             </button>
-            <button type="button" id="auth-cancel" class="secondary" style="width:100%;">Cancel</button>
+            <button type="button" id="auth-cancel" class="secondary btn-full-width">Cancel</button>
           </div>
         </form>
       `;
@@ -113,7 +113,7 @@ export async function showAuthDialog() {
       if (existingBackdrop) {
         backdrop = existingBackdrop;
         card = backdrop.querySelector('.card');
-        card.innerHTML = `<h2 style="margin-top:0;">${isRegister ? 'Create Account' : 'Sign In'}</h2>` + contentHtml;
+        card.innerHTML = `<h2 class="mt-0">${isRegister ? 'Create Account' : 'Sign In'}</h2>` + contentHtml;
       } else {
         const modal = _openModalBase(isRegister ? 'Create Account' : 'Sign In', contentHtml);
         card = modal.card;
@@ -156,7 +156,7 @@ export async function showPlayerSelectionDialog(title, message, options, confirm
       <p class="small-hint mb-0">${message}</p>
       <div class="form-row mt-20">
         <input type="text" id="player-search-modal" class="modal-input" placeholder="Search players...">
-        <select id="player-select-modal" class="modal-input" style="margin-top:10px;"></select>
+        <select id="player-select-modal" class="modal-input mt-10"></select>
       </div>
       <div class="modal-actions">
         <button id="modal-confirm" class="flex-1">${confirmText}</button>

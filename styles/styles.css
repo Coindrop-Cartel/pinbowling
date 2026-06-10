@@ -402,8 +402,10 @@ td {
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
 .flex-center { display:flex; align-items:center; justify-content:center; }
 .gap-6 { gap: 6px; }
+.gap-4 { gap: 4px; }
 .gap-8 { gap: 8px; }
 .text-center { text-align: center; }
+.text-right { text-align: right; }
 .muted { color: #888; }
 .small { font-size: 0.85rem; }
 
@@ -452,6 +454,7 @@ td {
 /* Small layout helpers */
 .flex-col { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; }
 .mb-0 { margin-bottom: 0; }
+.mb-4 { margin-bottom: 4px; }
 
 /* List row and header styles used by selectors and lists */
 .list-row { margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff; list-style: none; }
@@ -510,7 +513,9 @@ td {
 .mr-8 { margin-right: 8px; }
 .justify-end { justify-content: flex-end; }
 .gap-5 { gap: 5px; }
+.gap-6 { gap: 6px; }
 .gap-8 { gap: 8px; }
+.gap-2rem { gap: 2rem; }
 .gap-20 { gap: 20px; }
 .summary-text { font-weight: bold; font-size: 1.1rem; }
 .center { display: flex; justify-content: center; }
@@ -530,6 +535,133 @@ td {
 .player-list { list-style: none; padding: 14px 16px; margin: 0; }
 .summary-box { background: #f9f9f9; padding: 10px 15px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #eee; display:flex; justify-content:space-between; align-items:center; }
 .generator-options { display:flex; gap:15px; border-top:1px solid #eee; padding-top:20px; margin-top:20px; }
+
+/* ── Inline-style migration utilities (Phase 3 #10) ── */
+
+/* Section headings — replaces style="margin: 0; font-size: 1.05rem;" on h3 */
+.section-heading { margin: 0; font-size: 1.05rem; }
+
+/* Section subheadings — replaces style="margin: 0;" on h4 */
+.section-subheading { margin: 0; }
+
+/* List item row — replaces repeated inline flex+bg+padding+radius pattern */
+.list-item-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px; }
+
+/* Unstyled list — replaces style="list-style: none; padding: 0;" */
+.list-unstyled { list-style: none; padding: 0; }
+
+/* Header bar — replaces style="display: flex; justify-content: space-between; align-items: center; width: 100%;" */
+.header-bar { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+
+/* Section bar — replaces style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;" */
+.section-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+
+/* Action buttons — replaces style="display: flex; gap: 8px;" */
+.action-buttons { display: flex; gap: 8px; }
+
+/* Small action buttons — replaces style="display: flex; gap: 4px;" */
+.small-action-buttons { display: flex; gap: 4px; }
+
+/* Badge — replaces inline badge styles on spans */
+.badge {
+  background: var(--pb-primary);
+  color: var(--pb-white);
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  border: none;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* Columns wrap — replaces style="display: flex; gap: 2rem; flex-wrap: wrap;" */
+.columns-wrap { display: flex; gap: 2rem; flex-wrap: wrap; }
+
+/* Roster section — replaces style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;" */
+.roster-section { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px; }
+
+/* Roster section bar — border-bottom variant */
+.roster-section-bar { margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+
+/* Content muted — replaces style="font-size: 0.85rem; color: #666; ..." */
+.content-muted { font-size: 0.85rem; color: #666; }
+
+/* Content muted with column layout */
+.content-muted-col { font-size: 0.85rem; color: #666; display: flex; flex-direction: column; gap: 4px; }
+
+/* Text utilities */
+.font-bold { font-weight: bold; }
+.italic { font-style: italic; }
+.opacity-50 { opacity: 0.5; }
+.opacity-60 { opacity: 0.6; }
+.opacity-70 { opacity: 0.7; }
+
+/* Ellipsis — replaces style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; ..." */
+.ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Player name indent — replaces style="padding-left: 20px;" */
+.player-name-indent { padding-left: 20px; }
+
+/* Player filter grid — replaces complex inline grid in standingsPage */
+.player-filter-grid { max-height: 400px; overflow-y: auto; margin: 15px 0; border: 1px solid #eee; padding: 15px; display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 20px; row-gap: 5px; }
+
+/* Player filter label — replaces inline flex layout for filter checkboxes */
+.player-filter-label { display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer; border-bottom: 1px solid #f5f5f5; min-width: 0; }
+
+/* Large checkbox — replaces style="width: 18px !important; height: 18px !important; ..." */
+.checkbox-lg { width: 18px !important; height: 18px !important; margin: 0 !important; flex-shrink: 0; cursor: pointer; }
+
+/* Full-width button — replaces style="width: 100%;" on buttons */
+.btn-full-width { width: 100%; }
+
+/* Link-style button — replaces style="border:none; background:none; text-decoration:underline; font-size:0.9rem;" */
+.btn-link { border: none; background: none; text-decoration: underline; font-size: 0.9rem; cursor: pointer; }
+
+/* Border top separator — replaces style="margin-top:20px; border-top: 1px solid #eee; padding-top: 20px;" */
+.border-top-separator { margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
+
+/* Version footer — replaces complex inline style in managementPage */
+.version-footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; opacity: 0.5; }
+
+/* Debug toggle label — replaces inline flex layout in managementPage */
+.debug-toggle-label { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+
+/* Search input full — replaces dynamic style assignments in scoresPage */
+.search-input-full { width: 100%; margin-bottom: 10px; box-sizing: border-box; }
+
+/* Dropped score — replaces inline style in seasonCalculator */
+.dropped-score { text-decoration: line-through; opacity: 0.5; }
+
+/* Session item header — replaces inline flex-col in playPage */
+.session-item-header { flex: 1; display: flex; flex-direction: column; }
+
+/* Session stats — replaces inline style in playPage */
+.session-stats { font-size: 0.75rem; opacity: 0.7; margin-top: 2px; }
+
+/* Play action buttons — replaces style="display: flex; gap: 6px; margin-top: 8px;" */
+.play-action-buttons { display: flex; gap: 6px; margin-top: 8px; }
+
+/* Name with badge — replaces style="flex: 1; display: flex; align-items: center; gap: 8px;" */
+.name-with-badge { flex: 1; display: flex; align-items: center; gap: 8px; }
+
+/* Machine info small — replaces style="opacity: 0.7; font-size: 0.8rem;" */
+.machine-info { opacity: 0.7; font-size: 0.8rem; }
+
+/* No-IDs muted italic — replaces style="opacity: 0.6; font-style: italic;" */
+.muted-italic { opacity: 0.6; font-style: italic; }
+
+/* Hero cursor — replaces btn.style.cursor = 'pointer' */
+.hero-logo-btn { cursor: pointer; }
+
+/* Print-specific utilities (used in embedded print CSS) */
+.print-mb-4 { margin-bottom: 4px; }
+.print-mb-5 { margin-bottom: 5px; }
+.print-mt-0 { margin: 0; }
+.print-font-lg { font-size: 1.2rem; }
+.print-instructions { font-size: 0.9rem; line-height: 1.4; }
+.print-hint-italic { margin-bottom: 4px; font-style: italic; }
 
 
 /* TV Mode Styles */

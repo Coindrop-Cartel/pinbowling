@@ -56,22 +56,22 @@ export async function initTeamsPage() {
       const isExpanded = String(team.id) === String(expandedTeamId);
 
       const headerHtml = `
-        <div style="flex: 1;">
-          <h3 style="margin: 0; font-size: 1.05rem;">${team.name}</h3>
+        <div class="flex-1">
+          <h3 class="section-heading">${team.name}</h3>
           <small>${team.city || 'No City'}, ${team.state || 'No State'} | Members: ${team.members?.length || 0}</small>
         </div>
       `;
 
       const contentHtml = `
-        <div class="team-roster-section" style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h4 style="margin: 0;">Roster</h4>
+        <div class="team-roster-section roster-section-bar">
+          <div class="section-bar">
+            <h4 class="section-subheading">Roster</h4>
             ${isAuthorized ? `<button class="add-member-btn secondary btn-row" data-team-id="${team.id}">Add Player</button>` : ''}
           </div>
-          <ul class="team-members-list" style="list-style: none; padding: 0;"></ul>
+          <ul class="team-members-list list-unstyled"></ul>
           <div class="notice team-members-empty hidden">No players assigned to this team.</div>
         </div>
-        <div style="display: flex; gap: 8px;">
+        <div class="action-buttons">
           ${isAuthorized ? '<button class="edit-team-btn secondary btn-row">Edit Team</button>' : ''}
           ${isAuthorized ? '<button class="delete-team-btn btn-row">Delete Team</button>' : ''}
         </div>
@@ -97,7 +97,7 @@ export async function initTeamsPage() {
         membersEmptyEl.classList.add('hidden');
         team.members.forEach(member => {
           const li = document.createElement('li');
-          li.style = "display: flex; justify-content: space-between; margin-bottom: 5px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;";
+          li.className = 'list-item-row';
           li.innerHTML = `
             <span>${member.playerName}</span>
             ${isAuthorized ? `<button class="remove-member-btn btn-row" data-team-id="${team.id}" data-player-id="${member.id}" data-player-name="${member.playerName}">Remove</button>` : ''}

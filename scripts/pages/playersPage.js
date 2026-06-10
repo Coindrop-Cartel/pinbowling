@@ -54,9 +54,8 @@ export async function initPlayersPage() {
 
   const createToggle = document.createElement('button');
   createToggle.type = 'button';
-  createToggle.className = 'secondary btn-mgmt';
+  createToggle.className = 'secondary btn-mgmt mt-10';
   createToggle.textContent = 'Create New Player';
-  createToggle.style.marginTop = '10px';
   playerNameInput.after(createToggle);
 
   if (savePlayerButton) savePlayerButton.classList.add('btn-mgmt');
@@ -74,11 +73,11 @@ export async function initPlayersPage() {
     actionsRow.classList.toggle('hidden', !isHidden);
     if (isHidden) {
       createToggle.textContent = 'Cancel';
-      createToggle.style.marginTop = '0';
+      createToggle.classList.replace('mt-10', 'mt-0');
       actionsRow.appendChild(createToggle);
     } else {
       createToggle.textContent = 'Create New Player';
-      createToggle.style.marginTop = '10px';
+      createToggle.classList.replace('mt-0', 'mt-10');
       playerNameInput.after(createToggle);
     }
   };
@@ -94,12 +93,12 @@ export async function initPlayersPage() {
         const canEdit = hasElevatedPrivileges || isSelf;
 
         const headerHtml = `
-          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-              <strong>${p.playerName}</strong> 
-              ${p.userRole ? `<span class="badge" style="background:var(--pb-primary); color:var(--pb-white); font-size:0.7rem; padding:2px 6px; border-radius:10px; font-weight: bold; text-transform: uppercase;">${p.userRole}</span>` : ''}
+          <div class="header-bar">
+            <div class="name-with-badge">
+              <strong>${p.playerName}</strong>
+              ${p.userRole ? `<span class="badge">${p.userRole}</span>` : ''}
             </div>
-            <div style="display: flex; gap: 8px;">
+            <div class="action-buttons">
               ${canEdit ? `<button type="button" class="edit-player-btn secondary btn-row">Edit</button>` : ''}
               ${isAdmin ? `<button type="button" class="delete-player-btn-inline btn-row">Delete</button>` : ''}
             </div>
@@ -107,10 +106,10 @@ export async function initPlayersPage() {
         `;
 
         const contentHtml = `
-          <div style="font-size: 0.85rem; color: #666; display: flex; flex-direction: column; gap: 4px;">
+          <div class="content-muted-col">
             ${p.ifpaId ? `<div><strong>IFPA ID:</strong> ${p.ifpaId}</div>` : ''}
             ${p.matchplayId ? `<div><strong>MatchPlay ID:</strong> ${p.matchplayId}</div>` : ''}
-            ${!p.ifpaId && !p.matchplayId ? '<div style="opacity: 0.6; font-style: italic;">No external IDs linked.</div>' : ''}
+            ${!p.ifpaId && !p.matchplayId ? '<div class="muted-italic">No external IDs linked.</div>' : ''}
           </div>
         `;
 
@@ -183,7 +182,7 @@ export async function initPlayersPage() {
     if (matchplayRow) matchplayRow.classList.add('hidden');
     if (actionsRow) actionsRow.classList.add('hidden');
     createToggle.textContent = 'Create New Player';
-    createToggle.style.marginTop = '10px';
+    createToggle.classList.replace('mt-0', 'mt-10');
     playerNameInput.after(createToggle);
     
     playerNameInput.disabled = false;
@@ -223,7 +222,7 @@ export async function initPlayersPage() {
     if (matchplayRow) matchplayRow.classList.remove('hidden');
     if (actionsRow) actionsRow.classList.remove('hidden');
     createToggle.textContent = 'Cancel';
-    createToggle.style.marginTop = '0';
+    createToggle.classList.replace('mt-0', 'mt-10');
     actionsRow.appendChild(createToggle);
 
     // Show management tools if the player has an account

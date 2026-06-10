@@ -278,7 +278,7 @@ export async function initEventSetupPage() {
             <span class="round-number">${round.orderNumber}</span>
             <span class="machine-name-display">${round.machineName}</span>
           </div>
-          <div class="flex gap-12 wrap" style="margin-left:auto;" onclick="event.stopPropagation()">
+          <div class="flex gap-12 wrap justify-end" onclick="event.stopPropagation()">
             <div class="flex gap-6 min-140 flex-1 align-center">
               <label class="small value-label">${Engine.getValue1Label()}:</label>
               <input type="text" class="score10-input score-input" value="${formatNumber(round.value1)}">

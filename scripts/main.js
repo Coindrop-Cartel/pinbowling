@@ -34,7 +34,6 @@ export function initApp() {
   // Handle specific brand selection on the Home Page
   const heroLogoBtns = document.querySelectorAll('.hero-logo-btn');
   heroLogoBtns.forEach(btn => {
-    btn.style.cursor = 'pointer';
     btn.onclick = () => {
       const format = btn.dataset.format; // bowling or golf
       document.cookie = `pb_preferred_format=${format}; path=/; max-age=31536000`;

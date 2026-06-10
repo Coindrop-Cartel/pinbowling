@@ -30,9 +30,8 @@ export async function initLocationsPage() {
 
   const createToggle = document.createElement('button');
   createToggle.type = 'button';
-  createToggle.className = 'secondary btn-mgmt';
+  createToggle.className = 'secondary btn-mgmt mt-10';
   createToggle.textContent = 'Create New Location';
-  createToggle.style.marginTop = '10px';
   nameInput.after(createToggle);
 
   if (saveBtn) saveBtn.classList.add('btn-mgmt');
@@ -44,7 +43,7 @@ export async function initLocationsPage() {
       cityStateContainer.classList.remove('hidden');
       actionsRow.classList.remove('hidden');
       createToggle.textContent = 'Cancel';
-      createToggle.style.marginTop = '0';
+      createToggle.classList.replace('mt-10', 'mt-0');
       actionsRow.appendChild(createToggle);
     } else {
       resetForm();
@@ -78,12 +77,12 @@ export async function initLocationsPage() {
         const isExpanded = String(loc.id) === String(expandedLocationId);
 
         const headerHtml = `
-          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            <h3 style="margin: 0; font-size: 1.05rem; flex: 1;">
+          <div class="header-bar">
+            <h3 class="section-heading flex-1">
               ${loc.name}${cityState}<br>
               <small>Machines: (${loc.machines?.length || 0})</small>
             </h3>
-            <div style="display: flex; gap: 8px;">
+            <div class="action-buttons">
               <button class="edit-loc-btn secondary btn-row">Edit</button>
               <button class="delete-loc-btn btn-row">Delete</button>
             </div>
@@ -91,11 +90,11 @@ export async function initLocationsPage() {
         `;
 
         const contentHtml = `
-          <div style="margin-bottom: 15px;">
+          <div class="mb-15">
             <button class="add-mach-btn secondary btn-row">Add Machine to Venue</button>
           </div>
-          <div class="league-details-columns" style="display: flex; gap: 2rem; flex-wrap: wrap;">
-            <div class="machines-list" id="mach-for-loc-${loc.id}" style="flex: 1; min-width: 250px;">
+          <div class="league-details-columns columns-wrap">
+            <div class="machines-list flex-1 min-250" id="mach-for-loc-${loc.id}">
               <div class="mach-list-inner"></div>
               <div class="notice mach-empty hidden">No machines at this venue.</div>
             </div>
@@ -176,7 +175,7 @@ export async function initLocationsPage() {
     if (cityStateContainer) cityStateContainer.classList.remove('hidden');
     if (actionsRow) actionsRow.classList.remove('hidden');
     createToggle.textContent = 'Cancel';
-    createToggle.style.marginTop = '0';
+    createToggle.classList.replace('mt-10', 'mt-0');
     actionsRow.appendChild(createToggle);
 
     onFilterUpdate();
@@ -196,7 +195,7 @@ export async function initLocationsPage() {
     if (cityStateContainer) cityStateContainer.classList.add('hidden');
     if (actionsRow) actionsRow.classList.add('hidden');
     createToggle.textContent = 'Create New Location';
-    createToggle.style.marginTop = '10px';
+    createToggle.classList.replace('mt-0', 'mt-10');
     nameInput.after(createToggle);
 
     onFilterUpdate();
@@ -235,14 +234,13 @@ export async function initLocationsPage() {
 
     machines.forEach(m => {
       const item = document.createElement('div');
-      item.style = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; background: #f9f9f9; padding: 6px 12px; border-radius: 4px;";
-      
+      item.className = 'list-item-row';
       item.innerHTML = `
         <span>
-          <strong style="font-size: 0.95rem;">${m.machineName}</strong><br>
+          <strong class="small">${m.machineName}</strong><br>
           <small>E: ${formatNumber(m.targetEasy)} | M: ${formatNumber(m.targetMed)} | H: ${formatNumber(m.targetHard)}</small>
         </span>
-        <div style="display: flex; gap: 4px;">
+        <div class="small-action-buttons">
           <button class="edit-mach-btn secondary btn-row">Edit</button>
           <button class="remove-mach-btn btn-row">Remove</button>
         </div>

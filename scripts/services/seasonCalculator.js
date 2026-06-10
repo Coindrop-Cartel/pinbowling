@@ -116,7 +116,7 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
       const dropped = scoresToSum.splice(-numToDrop);
       dropped.forEach(d => {
         if (eventTotals[d.eventId]) {
-          eventTotals[d.eventId] = `<span style="text-decoration: line-through; opacity: 0.5;">${eventTotals[d.eventId]}</span>`;
+          eventTotals[d.eventId] = `<span class="dropped-score">${eventTotals[d.eventId]}</span>`;
         }
       });
     }

@@ -69,23 +69,23 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
   const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
   const instructions = `
-    <p class="muted small" style="margin:2px 0;">${Engine.getScoringHint() || 'Enter your score after each ball until you hit the target score, or run out of balls.'}</p>
+    <p class="muted small threshold-row">${Engine.getScoringHint() || 'Enter your score after each ball until you hit the target score, or run out of balls.'}</p>
   `;
 
   // This is the main header for the entire sheet
   const mainHeaderHtml = `
     <div class="print-meta">
-      <div class="flex-between" style="margin-bottom:5px;">
-        <div style="font-size:1.2rem;">
-          ${leagueName ? `<div style="margin-bottom:4px;"><strong>League:</strong> ${leagueName}</div>` : ''}
-          <div style="margin-bottom:4px;"><strong>Event:</strong> ${eventName}</div>
+      <div class="flex-between print-mb-5">
+        <div class="print-font-lg">
+          ${leagueName ? `<div class="print-mb-4"><strong>League:</strong> ${leagueName}</div>` : ''}
+          <div class="print-mb-4"><strong>Event:</strong> ${eventName}</div>
         </div>
-        <div style="text-align:right;">
+        <div class="text-right">
           <div>Player: __________________________</div>
           <div>Date: ________</div>
         </div>
       </div>
-      <div style="font-size:0.9rem; line-height:1.4;">
+      <div class="print-instructions">
         ${instructions}
       </div>
     </div>
@@ -101,25 +101,25 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
       if (isLast) { // Only for the last frame
         const { t1, t2 } = Engine.getBonusTargets(m);
         targetsHtml += `
-          <span style="margin-left: 15px;">Target 1: <strong>${formatNumber(t1)}</strong></span>
-          <span style="margin-left: 15px;">Target 2: <strong>${formatNumber(t2)}</strong></span>
+          <span class="ml-15">Target 1: <strong>${formatNumber(t1)}</strong></span>
+          <span class="ml-15">Target 2: <strong>${formatNumber(t2)}</strong></span>
         `;
       }
     } else { // Golf format
       targetsHtml = `
         <span>Target Score: <strong>${formatNumber(m.values[m.value2] || m.value1)}</strong></span>
-        <span style="margin-left: 15px;">Par: <strong>${m.value2}</strong></span>
+        <span class="ml-15">Par: <strong>${m.value2}</strong></span>
       `;
     }
 
     return `
       <div class="print-block">
         <div class="print-block-header">
-          <h3 style="margin: 0;">${Engine.getRoundLabel()} ${m.orderNumber}: ${m.machineName}</h3>
+          <h3 class="print-mt-0">${Engine.getRoundLabel()} ${m.orderNumber}: ${m.machineName}</h3>
           <div class="targets-summary">${targetsHtml}</div>
         </div>
-        ${lfHint ? `<div class="muted small" style="margin-bottom:4px;font-style:italic;">${lfHint}</div>` : ''}
-        <div class="flex" style="gap:15px;">
+        ${lfHint ? `<div class="muted small print-hint-italic">${lfHint}</div>` : ''}
+        <div class="flex gap-15">
           <div class="flex-1"><small>Ball 1</small><div class="score-line"></div></div>
           <div class="flex-1"><small>Ball 2</small><div class="score-line"></div></div>
           <div class="flex-1"><small>Ball 3</small><div class="score-line"></div></div>
@@ -140,6 +140,16 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
     .muted { opacity: 0.7; }
     .small { font-size: 0.75rem; }
     h3 { font-size: 1rem; margin: 0; }
+    .threshold-row { margin: 2px 0; }
+    .print-mb-4 { margin-bottom: 4px; }
+    .print-mb-5 { margin-bottom: 5px; }
+    .print-mt-0 { margin: 0; }
+    .print-font-lg { font-size: 1.2rem; }
+    .print-instructions { font-size: 0.9rem; line-height: 1.4; }
+    .print-hint-italic { margin-bottom: 4px; font-style: italic; }
+    .text-right { text-align: right; }
+    .ml-15 { margin-left: 15px; }
+    .gap-15 { gap: 15px; }
   `;
 
   printWindow.document.write(`

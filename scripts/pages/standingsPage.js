@@ -126,13 +126,14 @@ export async function initStandingsPage() {
    */
   async function openPlayerFilterDialog(players) {
     const content = document.createElement('div');
-    content.style = "max-height: 400px; overflow-y: auto; margin: 15px 0; border: 1px solid #eee; padding: 15px; display: grid; grid-template-columns: repeat(2, 1fr); column-gap: 20px; row-gap: 5px;";
+    content.className = 'player-filter-grid';
     
     players.sort((a,b) => a.playerName.localeCompare(b.playerName)).forEach(p => {
         const label = document.createElement('label');
-      label.style = "display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer; border-bottom: 1px solid #f5f5f5; min-width: 0;";
-        const isChecked = selectedPlayerIds.length === 0 || selectedPlayerIds.includes(String(p.id));
-      label.innerHTML = `<input type="checkbox" value="${p.id}" ${isChecked ? 'checked' : ''} style="width: 18px !important; height: 18px !important; margin: 0 !important; flex-shrink: 0; cursor: pointer;"> <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.95rem; flex: 1;">${p.playerName}</span>`;
+      label.className = 'player-filter-label';
+      const isChecked = selectedPlayerIds.length === 0 || selectedPlayerIds.includes(String(p.id));
+      label.innerHTML = `<input type="checkbox" value="${p.id}" ${isChecked ? 'checked' : ''} class="checkbox-lg">
+        <span class="ellipsis flex-1">${p.playerName}</span>`;
       content.appendChild(label);
       });
 
@@ -221,16 +222,29 @@ export async function initStandingsPage() {
 
     const playerLabel = isTeamLeague ? 'Team' : 'Player';
 
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${events.map((e, idx) => `<th class="text-center">${idx + 1}</th>`).join('')}<th class="text-center">Total</th></tr>`;
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${events.map((e, i) => `<th class="text-center">${i + 1}</th>`).join('')}<th class="text-center">Total</th></tr>`;
     
     if (standingsBody) {
-      standingsBody.innerHTML = rows.map((row, idx) => `
-        <tr>
-          <td style="text-align: center;">${idx + 1}</td>
-          <td class="player-name-cell">${isTeamLeague ? row.entity.name : row.entity.playerName}</td>
-          ${events.map(e => `<td>${row.eventTotals[e.id] !== null ? row.eventTotals[e.id] : '−'}</td>`).join('')}
-          <td class="standings-total">${league?.seasonScoring === 'weekly' ? `${row.totalSeasonPoints} pts` : engine.formatTotalScore(row.totalSeasonPoints, row.playedTargets)}</td>
-        </tr>`).join('');
+      standingsBody.innerHTML = rows.map((res, idx) => {
+        const entityName = isTeamLeague ? res.entity.name : res.entity.playerName;
+        
+        const eventsHtml = events.map(e => {
+          const val = res.eventTotals[e.id] || '-';
+          return `<td class="standings-round">${val}</td>`;
+        }).join('');
+
+        const totalDisplay = league?.seasonScoring === 'weekly' 
+          ? `${res.totalSeasonPoints} pts` 
+          : Engine.formatTotalScore(res.totalSeasonPoints);
+
+        return `
+          <tr>
+            <td>${idx + 1}</td>
+            <td class="player-name-cell">${entityName}</td>
+            ${eventsHtml}
+            <td class="standings-total">${totalDisplay}</td>
+          </tr>`;
+      }).join('');
     }
 
     if (standingsEmpty) standingsEmpty.classList.add('hidden');
@@ -353,7 +367,7 @@ export async function initStandingsPage() {
     const isTeamLeague = league?.participants === 'team';
     const playerLabel = isTeamLeague ? 'Team' : 'Player';
 
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th style="text-align: center;">#</th><th style="text-align: center;">${playerLabel}</th>${machines.map(m => `<th style="text-align: center;">${m.orderNumber}</th>`).join('')}<th style="text-align: center;">Total</th></tr>`;
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${machines.map(m => `<th class="text-center">${m.orderNumber}</th>`).join('')}<th class="text-center">Total</th></tr>`;
     
     if (standingsBody) {
       if (isTeamLeague) {
@@ -377,7 +391,7 @@ export async function initStandingsPage() {
               if (isNew) rowHasUpdate = true;
               return `<td class="standings-round ${t.played ? 'has-score' : 'no-score'} ${(isTvMode && isNew) ? 'score-just-updated' : ''}"><div class="standings-mark">${t.displayMark}</div><div class="standings-round-score">${t.displayRoundTotal}</div></td>`;
             }).join('');
-              return `<tr><td></td><td class="player-name-cell" style="padding-left: 20px;">${res.player.playerName}</td>${turnsHtml}<td class="standings-total ${rowHasUpdate ? 'score-just-updated' : ''}">${res.totalDisplay}</td></tr>`;
+              return `<tr><td></td><td class="player-name-cell player-name-indent">${res.player.playerName}</td>${turnsHtml}<td class="standings-total ${rowHasUpdate ? 'score-just-updated' : ''}">${res.totalDisplay}</td></tr>`;
           }).join('');
           return teamHeader + memberRows;
         }).join('');

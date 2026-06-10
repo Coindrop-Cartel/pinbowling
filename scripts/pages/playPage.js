@@ -99,14 +99,14 @@ export async function initPlayPage() {
         className: 'session-item',
         format: event.scoringFormat,
         headerHtml: `
-          <div style="flex: 1; display: flex; flex-direction: column;">
-            <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="session-item-header">
+            <div class="flex-center gap-8">
               <strong>${event.eventName}</strong>
             </div>
-            <div class="session-stats" style="font-size: 0.75rem; opacity: 0.7; margin-top: 2px;">
+            <div class="session-stats">
               ${event.locationName || 'No Location'} | ${event.eventDate} | Players: ${event.roster?.length || 0}
             </div>
-            <div style="display: flex; gap: 6px; margin-top: 8px;">
+            <div class="play-action-buttons">
               <button class="play-btn secondary btn-row">Play</button>
               <button class="scoreboard-btn secondary btn-row">Scoreboard</button>
             </div>
@@ -312,14 +312,14 @@ export async function initPlayPage() {
       const isExpanded = expandedTempId === frame.tempId;
       const engine = getScoringEngine(currentSessionFormat);
 
-      const headerHtml = `
+      const headerHtml =  `
         <div class="flex gap-12 w-100 wrap">
           <div class="flex gap-12 flex-1 min-250 align-center">
             <div class="drag-handle">☰</div>
-            <span class="round-number">${frame.orderNumber}</span>
+            <span class="round-number">${index + 1}</span>
             <span class="machine-name-display">${frame.machineName}</span>
           </div>
-          <div class="flex gap-12 wrap" style="margin-left:auto;" onclick="event.stopPropagation()">
+          <div class="flex gap-12 wrap justify-end" onclick="event.stopPropagation()">
             <div class="flex gap-6 min-140 flex-1 align-center">
               <label class="small value-label">${engine.getValue1Label()}:</label>
               <input type="text" class="score10-input score-input" value="${formatNumber(frame.value1)}">

@@ -58,13 +58,13 @@ export async function initManagementPage() {
 
     const versionInfo = document.createElement('div');
     versionInfo.id = 'mgmt-ui-version';
-    versionInfo.style = "margin-top: 3rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; opacity: 0.5;";
+    versionInfo.className = 'version-footer';
 
     // Debug Mode Toggle
     const debugLabel = document.createElement('label');
-    debugLabel.style = "display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;";
+    debugLabel.className = 'debug-toggle-label';
     debugLabel.innerHTML = `
-      <input type="checkbox" id="mgmt-debug-toggle" style="margin:0;">
+      <input type="checkbox" id="mgmt-debug-toggle" class="mb-0">
       <span>Debug Logs</span>
     `;
     

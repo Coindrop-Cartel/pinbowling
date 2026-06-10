@@ -154,7 +154,7 @@ export async function initScoresPage() {
         </div>
       </div>
       <div class="round-inputs-container ${isAccessDenied ? 'round-inputs-disabled' : ''}"></div>
-      <button class="save-round-button btn-mgmt" ${isAccessDenied ? 'hidden' : 'disabled'}>Save</button>
+      <button class="save-round-button btn-mgmt" ${isAccessDenied ? 'hidden' : ''} disabled>Save</button>
     `;
 
     if (isAccessDenied) {
@@ -268,9 +268,7 @@ export async function initScoresPage() {
           searchInput.id = 'player-search';
           searchInput.type = 'text';
           searchInput.placeholder = 'Type to search player...';
-          searchInput.style.width = '100%';
-          searchInput.style.marginBottom = '10px';
-          searchInput.style.boxSizing = 'border-box';
+          searchInput.className = 'search-input-full';
           if (playerSelect) playerSelect.before(searchInput);
         }
 
