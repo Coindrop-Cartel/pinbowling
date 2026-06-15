@@ -103,29 +103,31 @@ describe('Leagues Page (leaguesPage.js)', () => {
     vi.useFakeTimers();
 
     document.body.innerHTML = `
-      <form id="league-form">
-        <h2 id="league-form-title">Add New League</h2>
-        <input id="league-name" />
-        <button id="create-league-toggle" type="button">Create League</button>
-        <div id="league-date-row" class="form-row hidden">
-          <input id="league-start-date" />
-        </div>
-        <div id="league-format-row" class="hidden">
-          <select id="league-scoring-format"></select>
-        </div>
-        <div id="league-season-scoring-row" class="form-row hidden">
-          <select id="league-season-scoring"></select>
-        </div>
-        <div id="league-participants-row" class="form-row hidden">
-          <input id="league-participants" type="number" />
-        </div>
-        <div id="league-drop-weeks-row" class="form-row hidden">
-          <input id="league-drop-weeks" type="number" />
-        </div>
-        <div class="form-actions hidden">
-          <button id="create-league-btn"></button>
-        </div>
-      </form>
+      <section class="card">
+        <form id="league-form">
+          <h2 id="league-form-title">Add New League</h2>
+          <input id="league-name" />
+          <button id="create-league-toggle" type="button">Create League</button>
+          <div id="league-date-row" class="form-row hidden">
+            <input id="league-start-date" />
+          </div>
+          <div id="league-format-row" class="hidden">
+            <select id="league-scoring-format"></select>
+          </div>
+          <div id="league-season-scoring-row" class="form-row hidden">
+            <select id="league-season-scoring"></select>
+          </div>
+          <div id="league-participants-row" class="form-row hidden">
+            <input id="league-participants" type="number" />
+          </div>
+          <div id="league-drop-weeks-row" class="form-row hidden">
+            <input id="league-drop-weeks" type="number" />
+          </div>
+          <div class="form-actions hidden">
+            <button id="create-league-btn"></button>
+          </div>
+        </form>
+      </section>
       <div id="leagues-list"></div>
       <div id="leagues-list-empty"></div>
       <div id="event-form-card" class="hidden">
