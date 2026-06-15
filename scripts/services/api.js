@@ -9,6 +9,12 @@ const base = window.APP_BASE || window.location.pathname.substring(0, window.loc
 const APP_BASE = base.endsWith('/') ? base.slice(0, -1) : base;
 
 /**
+ * Determines if debug logging is enabled via localStorage.
+ * @returns {boolean}
+ */
+const isDebug = () => localStorage.getItem('pb_debug') === 'true';
+
+/**
  * Wrapper for the Fetch API that automatically includes security headers 
  * and handles standardized JSON error responses.
  */
@@ -29,17 +35,9 @@ export async function fetchJSON(url, options = {}) {
     }
   }
 
-  if (window.PB_DEBUG_MODE) console.log(`[API] Constructing ${method} request to: ${url}`, { params: options.params, finalUrl });
+  if (isDebug()) console.log(`[API] Constructing ${method} request to: ${url}`, { params: options.params, finalUrl });
 
-  // Tunnel DELETE and PUT via POST to bypass potential server-level method blocking.
-  // This ensures the project setup is synchronized and robust across different hosts.
   const headers = { ...options.headers };
-
-  if (method === 'DELETE' || method === 'PUT') {
-    headers['X-HTTP-Method-Override'] = method;
-    method = 'POST';
-  }
-
   const finalHeaders = {
     'Content-Type': 'application/json',
     ...headers
@@ -51,7 +49,7 @@ export async function fetchJSON(url, options = {}) {
   const sanitizedPath = finalUrl.startsWith('http') ? finalUrl : finalUrl.replace(/^\//, '');
   const fullUrl = sanitizedPath.startsWith('http') ? sanitizedPath : `${window.location.origin}${APP_BASE}/${sanitizedPath}`;
   
-  if (window.PB_DEBUG_MODE) console.log(`[API] Final Request URL: ${fullUrl}`);
+  if (isDebug()) console.log(`[API] Final Request URL: ${fullUrl}`);
   
   // Prepare fetch options, ensuring a body is sent for POST requests (even if tunneled)
   // to prevent server-side resets for bodyless POSTs.
@@ -63,7 +61,7 @@ export async function fetchJSON(url, options = {}) {
 
   // CRITICAL: The fetch spec prohibits 'body' on GET/HEAD requests.
   // We must only attach the body if the method is intended to carry one.
-  if (method === 'POST') {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     fetchOptions.body = options.body || JSON.stringify({});
   }
 

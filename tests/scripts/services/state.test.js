@@ -53,7 +53,7 @@ describe('State Management (state.js)', () => {
     });
 
     it('returns false when debug is set to a non-"true" value', () => {
-      localStorage.setItem('pb_debug_enabled', 'false');
+      localStorage.setItem('pb_debug', 'false');
       expect(getDebugEnabled()).toBe(false);
     });
 
@@ -70,12 +70,12 @@ describe('State Management (state.js)', () => {
 
     it('stores the string "true" in localStorage when enabled', () => {
       setDebugEnabled(true);
-      expect(localStorage.getItem('pb_debug_enabled')).toBe('true');
+      expect(localStorage.getItem('pb_debug')).toBe('true');
     });
 
     it('stores the string "false" in localStorage when disabled', () => {
       setDebugEnabled(false);
-      expect(localStorage.getItem('pb_debug_enabled')).toBe('false');
+      expect(localStorage.getItem('pb_debug')).toBe('false');
     });
   });
 });

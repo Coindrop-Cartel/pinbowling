@@ -1,4 +1,4 @@
-﻿/**
+﻿﻿/**
  * State management for local player identity and UI preferences.
  * All values are persisted in localStorage.
  * @module services/state
@@ -20,10 +20,10 @@ export const setCurrentPlayerId = (id) => id ? localStorage.setItem('currentPlay
  * Returns whether debug mode is enabled.
  * @returns {boolean} `true` if debug mode is enabled, `false` otherwise.
  */
-export const getDebugEnabled = () => localStorage.getItem('pb_debug_enabled') === 'true';
+export const getDebugEnabled = () => localStorage.getItem('pb_debug') === 'true';
 
 /**
  * Enables or disables debug mode in local storage.
  * @param {boolean} enabled - Whether to enable debug mode.
  */
-export const setDebugEnabled = (enabled) => localStorage.setItem('pb_debug_enabled', enabled);
+export const setDebugEnabled = (enabled) => localStorage.setItem('pb_debug', enabled);

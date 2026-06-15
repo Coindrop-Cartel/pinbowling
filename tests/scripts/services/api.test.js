@@ -83,7 +83,7 @@ describe('API Client (api.js)', () => {
     expect(callHeaders['Content-Type']).toBe('application/json');
   });
 
-  it('fetchJSON should tunnel PUT/DELETE via POST with X-HTTP-Method-Override', async () => {
+  it('fetchJSON should use native PUT/DELETE methods', async () => {
     fetch.mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({})
@@ -92,8 +92,8 @@ describe('API Client (api.js)', () => {
     await fetchJSON('service/machineService.php?id=1', { method: 'PUT', body: JSON.stringify({ name: 'New' }) });
 
     const callArgs = fetch.mock.calls[0];
-    expect(callArgs[1].method).toBe('POST');
-    expect(callArgs[1].headers['X-HTTP-Method-Override']).toBe('PUT');
+    expect(callArgs[1].method).toBe('PUT');
+    expect(callArgs[1].headers['X-HTTP-Method-Override']).toBeUndefined();
   });
 
   it('PB_API helper methods should call fetchJSON with correct routes', async () => {
@@ -253,10 +253,9 @@ describe('API Client (api.js)', () => {
       await PB_API.updateEvent(99, eventData);
       
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('service/leagueService.php?task=fixture&id=99'),
+        'http://localhost/app/service/leagueService.php?task=fixture&id=99',
         expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }),
+          method: 'PUT',
           body: JSON.stringify(eventData)
         })
       );
@@ -342,8 +341,11 @@ describe('API Client (api.js)', () => {
 
       await PB_API.deletePlayer(42);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('service/playerService.php?id=42'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+        'http://localhost/app/service/playerService.php?id=42',
+        expect.objectContaining({ 
+          method: 'DELETE',
+          body: '{}'
+        })
       );
     });
 
@@ -407,8 +409,8 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.updatePlayer(5, { playerName: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('id=5'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }) })
+        'http://localhost/app/service/playerService.php?id=5',
+        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ playerName: 'Updated' }) })
       );
     });
 
@@ -426,8 +428,11 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.clearScores(42);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('playerId=42'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+        'http://localhost/app/service/scoreService.php?playerId=42',
+        expect.objectContaining({ 
+          method: 'DELETE',
+          body: '{}'
+        })
       );
     });
 
@@ -444,8 +449,8 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.updateLeague(3, { name: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('id=3'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }) })
+        'http://localhost/app/service/leagueService.php?id=3',
+        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ name: 'Updated' }) })
       );
     });
 
@@ -453,8 +458,11 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.deleteLeague(9);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('id=9'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+        'http://localhost/app/service/leagueService.php?id=9',
+        expect.objectContaining({ 
+          method: 'DELETE',
+          body: '{}'
+        })
       );
     });
 
@@ -472,8 +480,11 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.deleteEvent(10, 5);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('id=10'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+        'http://localhost/app/service/leagueService.php?task=fixture&id=10&leagueId=5',
+        expect.objectContaining({ 
+          method: 'DELETE',
+          body: '{}'
+        })
       );
       expect(fetch.mock.calls[0][0]).toContain('leagueId=5');
     });
@@ -510,8 +521,8 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.updateTeam(3, { name: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('id=3'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }) })
+        'http://localhost/app/service/teamService.php?id=3',
+        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ name: 'Updated' }) })
       );
     });
 
@@ -519,8 +530,11 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.deleteTeam(7);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('id=7'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+        'http://localhost/app/service/teamService.php?id=7',
+        expect.objectContaining({ 
+          method: 'DELETE',
+          body: '{}'
+        })
       );
     });
 
@@ -537,8 +551,11 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.removeTeamMember(1, 2);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('teamId=1&playerId=2'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+        'http://localhost/app/service/teamService.php?task=member&teamId=1&playerId=2',
+        expect.objectContaining({ 
+          method: 'DELETE',
+          body: '{}'
+        })
       );
     });
 
@@ -555,8 +572,11 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.removeLeagueTeam(5, 10);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('leagueId=5&teamId=10'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+        'http://localhost/app/service/teamService.php?task=league&leagueId=5&teamId=10',
+        expect.objectContaining({ 
+          method: 'DELETE',
+          body: '{}'
+        })
       );
     });
 
@@ -583,8 +603,8 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.updateLocation(3, { name: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('id=3'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }) })
+        'http://localhost/app/service/locationService.php?id=3',
+        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ name: 'Updated' }) })
       );
     });
 
@@ -592,8 +612,11 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.deleteLocation(5);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('id=5'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+        'http://localhost/app/service/locationService.php?id=5',
+        expect.objectContaining({ 
+          method: 'DELETE',
+          body: '{}'
+        })
       );
     });
 
@@ -619,8 +642,11 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.removeLocationMachine(1, 2);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('locationId=1&machineId=2'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+        'http://localhost/app/service/locationService.php?task=units&locationId=1&machineId=2',
+        expect.objectContaining({ 
+          method: 'DELETE',
+          body: '{}'
+        })
       );
     });
 
@@ -638,8 +664,8 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.updateUserRole(5, 'admin');
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('task=role&id=5'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }) })
+        'http://localhost/app/service/playerService.php?task=role&id=5',
+        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ role: 'admin' }) })
       );
     });
 
@@ -647,8 +673,8 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.updateMachine(3, { machineName: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('id=3'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'PUT' }) })
+        'http://localhost/app/service/machineService.php?id=3',
+        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ machineName: 'Updated' }) })
       );
     });
 
@@ -656,8 +682,11 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.deleteMachine(7);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('id=7'),
-        expect.objectContaining({ headers: expect.objectContaining({ 'X-HTTP-Method-Override': 'DELETE' }) })
+        'http://localhost/app/service/machineService.php?id=7',
+        expect.objectContaining({ 
+          method: 'DELETE',
+          body: '{}'
+        })
       );
     });
 
@@ -681,14 +710,13 @@ describe('API Client (api.js)', () => {
       expect(callHeaders['X-Custom']).toBe('value');
     });
 
-    it('fetchJSON should log debug info when PB_DEBUG_MODE is on', async () => {
+    it('fetchJSON should log debug info when pb_debug is on', async () => {
       const logSpy = vi.spyOn(console, 'log');
-      window.PB_DEBUG_MODE = true;
+      localStorage.setItem('pb_debug', 'true');
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await fetchJSON('service/test.php', { method: 'GET' }); // Ensure it's a GET request for specific log messages
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[API] Constructing GET request to: service/test.php'), expect.objectContaining({ params: undefined }));
       expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/\[API\] Final Request URL:.*http:\/\/localhost\/app\/service\/test\.php/));
-      window.PB_DEBUG_MODE = false;
     });
   });
 });

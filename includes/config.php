@@ -100,7 +100,6 @@ if (is_readable($packageFile)) {
 }
 
 $adminPassword = envValue($loadedEnv, ['ADMIN_PASSWORD']);
-$debugMode = false; // Initial state; toggled via Management UI and persisted in localStorage.
 
 // --- Security Warnings ---
 if (php_sapi_name() !== 'cli' && !defined('PHPUNIT_RUNNING')) {

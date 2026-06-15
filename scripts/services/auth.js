@@ -111,7 +111,7 @@ export async function runAuthorizedLeagueAction(leagueId, actionCallback) {
   }
 
   try {
-    if (window.PB_DEBUG_MODE) console.log('[Auth] Executing authorized callback...');
+    if (localStorage.getItem('pb_debug') === 'true') console.log('[Auth] Executing authorized callback...');
     await actionCallback();
     return true;
   } catch (err) {
@@ -243,6 +243,7 @@ export async function isManagementAuthorized() {
  */
 export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues) {
   const canUpdateAny = await can(PERMISSIONS.UPDATE_ANY_SCORE);
+  const canUpdateSelf = await can(PERMISSIONS.UPDATE_SELF);
   const canAddAny = await can(PERMISSIONS.ADD_ANY_SCORE);
   const isUpdate = !!(turnValues?.ball1 || turnValues?.ball2 || turnValues?.ball3);
   const isSelf = currentUser && String(targetPlayer?.id) === String(currentUser.player_id);
@@ -254,8 +255,8 @@ export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues)
     return { access: 'denied', reason: 'Login required to update registered players scores.' };
   }
 
-  // A registered user cannot update scores of another registered user unless they have full permissions.
-  if (!canUpdateAny && !isSelf && !isTargetUnregistered) {
+  // A registered user cannot update scores of another registered user unless they have management permissions.
+  if (!canUpdateAny && !isTargetUnregistered && !(isSelf && canUpdateSelf)) {
     return { access: 'denied', reason: 'Cannot update other registered players scores.' };
   }
 
@@ -264,14 +265,13 @@ export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues)
     return { access: 'allowed' };
   }
 
-  // If it's an update, and user is not self, and doesn't have update any, deny.
-  // self players can always update their own scores for now.
-  if (isUpdate && !canUpdateAny && !isSelf) {
+  // If it's an update, ensure user has either global or self-update permissions.
+  if (isUpdate && !canUpdateAny && !(isSelf && canUpdateSelf)) {
     return { access: 'denied', reason: 'Updates locked to self or TD/Admin.' };
   }
 
-  // Allow adding new scores for self or unregistered players without requiring UPDATE_ANY_SCORE
-  if (!isUpdate && !canAddAny && !isSelf && !isTargetUnregistered) {
+  // Allow adding new scores for self (with permission) or unregistered players.
+  if (!isUpdate && !canAddAny && !isTargetUnregistered && !(isSelf && canUpdateSelf)) {
     return { access: 'denied', reason: 'Cannot add scores for other registered players.' };
   }
 

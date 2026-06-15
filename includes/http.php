@@ -3,18 +3,10 @@
  * HTTP Utilities and Header Management for the PinBowling backend.
  */
 
-// Handle HTTP Method Tunneling for environments that block DELETE/PUT.
-// This allows us to use POST with a special header to perform other actions.
-$headers = function_exists('getallheaders') ? getallheaders() : [];
-$methodOverride = $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] ?? $headers['X-HTTP-Method-Override'] ?? $headers['x-http-method-override'] ?? null;
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $methodOverride) {
-    $_SERVER['REQUEST_METHOD'] = strtoupper($methodOverride);
-}
-
 // Set global CORS headers to prevent NetworkErrors during preflighted requests (DELETE, PUT, etc.)
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-PB-SECRET, X-HTTP-Method-Override');
+header('Access-Control-Allow-Headers: Content-Type, X-PB-SECRET');
 
 // Handle CORS preflight requests globally. This is required because custom 
 // headers like X-PB-SECRET trigger an OPTIONS request for ALL method types.

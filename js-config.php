@@ -20,11 +20,10 @@ header('Content-Type: application/javascript');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 
-// Pass the secrets from PHP/ENV to global JS variables
-echo "window.PB_DEBUG_MODE = " . json_encode($debugMode) . ";\n";
+// Pass server-side metadata to global JS variables
 echo "window.PB_UI_VERSION = " . json_encode($uiVersion) . ";";
 
 // Log the version to console if the user has debug mode enabled in their browser
-echo "\nif (localStorage.getItem('pb_debug_enabled') === 'true') {";
+echo "\nif (localStorage.getItem('pb_debug') === 'true') {";
 echo "  console.log('[Config Bridge] Server delivered UI Version: ' + " . json_encode($uiVersion) . ");";
 echo "}";

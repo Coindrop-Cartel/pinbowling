@@ -25,7 +25,7 @@ export function applyPreferredTheme(overrideFormat) {
   }
 
   // Update dynamic logos (header/nav)
-  const logoImgs = document.querySelectorAll('.nav-logo img, .header-logo img, .site-logo img, #site-logo, .hero-logo-btn');
+  const logoImgs = document.querySelectorAll('.nav-logo img, .header-logo img, .site-logo img, #site-logo');
   logoImgs.forEach(img => {
     const lastSlash = img.src.lastIndexOf('/');
     const basePath = lastSlash !== -1 ? img.src.substring(0, lastSlash + 1) : '';
