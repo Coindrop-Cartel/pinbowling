@@ -19,11 +19,12 @@ vi.mock('@services/api.js', () => ({
 
 const uiMocks = vi.hoisted(() => ({
   setupLiveFilter: vi.fn((input, data, options) => {
+    let currentData = typeof data === 'function' ? data() : data;
     const filterInstance = {
+      setData: vi.fn((newData) => { currentData = newData; }),
       performFilter: vi.fn(() => {
-        const currentData = typeof data === 'function' ? data() : data;
-        const query = (input ? input.value || '' : '').toLowerCase(); // Ensure input is not null
-        const filtered = currentData.filter(item => 
+        const query = (input ? input.value || '' : '').toLowerCase();
+        const filtered = currentData.filter(item =>
           (item[options.labelKey || 'playerName'] || '').toLowerCase().includes(query)
         );
         options.onFilter(filtered, query);

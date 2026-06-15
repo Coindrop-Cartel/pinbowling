@@ -18,6 +18,7 @@
       <div id="player-selector-ui" class="card-pad">
         <h2>Player Selection</h2>
         <div class="form-row">
+          <input id="player-search" type="text" placeholder="Type to search player..." class="search-input-full" />
           <label for="player-select">Player</label>
           <select id="player-select"></select>
         </div>

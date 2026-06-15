@@ -4,42 +4,6 @@
  */
 require_once __DIR__ . '/../includes/config.php';
 
-/**
- * Helper to transform database rows from Location_Machines into camelCase JSON.
- * @param array $row
- * @return array
- */
-function serializeLocationMachine($row) {
-    return [
-        'locationId' => (int)$row['location_id'],
-        'machineId' => (int)$row['machine_id'],
-        'machineName' => $row['machine_name'],
-        'value1' => (int)($row['value1'] ?? 0),
-        'value2' => (int)($row['value2'] ?? 0),
-        'values' => [
-            1 => (int)$row['score1'], 2 => (int)$row['score2'], 3 => (int)$row['score3'], 4 => (int)$row['score4'], 5 => (int)$row['score5'],
-            6 => (int)$row['score6'], 7 => (int)$row['score7'], 8 => (int)$row['score8'], 9 => (int)$row['score9'], 10 => (int)$row['score10'],
-        ],
-        'targetEasy' => (int)$row['target_easy'],
-        'targetMed' => (int)$row['target_med'],
-        'targetHard' => (int)$row['target_hard']
-    ];
-}
-
-/**
- * Helper to transform database rows from Locations into camelCase JSON.
- * @param array $row
- * @return array
- */
-function serializeLocation($row) {
-    return [
-        'id' => (int)$row['id'],
-        'name' => $row['name'],
-        'city' => $row['city'],
-        'state' => $row['state']
-    ];
-}
-
 try {
     $pdo = getDbConnection();
     $method = $_SERVER['REQUEST_METHOD'];

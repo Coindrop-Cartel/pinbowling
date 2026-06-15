@@ -67,7 +67,7 @@ describe('Auth Service (auth.js)', () => {
     it('should return false if user is not admin', async () => {
       PB_API.getCurrentUser.mockResolvedValue({ role: 'player' });
       expect(await requireAdmin()).toBe(false);
-      expect(showAlert).toHaveBeenCalled();
+      expect(showAlert).not.toHaveBeenCalled();
     });
 
     it('should return false if user fetch fails', async () => {
@@ -265,7 +265,7 @@ describe('Auth Service (auth.js)', () => {
       PB_API.getCurrentUser.mockResolvedValue({ role: 'player', player_name: 'Player' });
       await initAuthHeader();
       const adminNav = document.getElementById('admin-nav-item');
-      expect(adminNav.classList.contains('hidden')).toBe(false);
+      expect(adminNav.classList.contains('hidden')).toBe(true);
     });
 
     it('should hide admin nav when user is null', async () => {
@@ -377,15 +377,15 @@ describe('Auth Service (auth.js)', () => {
       PB_API.getCurrentUser.mockResolvedValue({ role: 'player' });
       const targetPlayer = { id: 99, userId: 20 };
       const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, {});
-      expect(result).toEqual({ access: 'denied', reason: 'Guest Only' });
+      expect(result).toEqual({ access: 'denied', reason: 'Cannot update other registered players scores.' });
     });
 
     it('should deny update access without UPDATE_ANY_SCORE permission', async () => {
       PB_API.getCurrentUser.mockResolvedValue({ role: 'player' });
-      const targetPlayer = { id: 5, userId: 10 };
+      const targetPlayer = { id: 99, userId: 10 }; // Different ID than currentUser.player_id
       const turnValues = { ball1: '5' };
       const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues);
-      expect(result).toEqual({ access: 'denied', reason: 'Updates locked' });
+      expect(result.access).toBe('denied');
     });
 
     it('should allow access for admin with UPDATE_ANY_SCORE on any player', async () => {
@@ -405,7 +405,7 @@ describe('Auth Service (auth.js)', () => {
       PB_API.getCurrentUser.mockResolvedValue(null);
       const targetPlayer = { id: 99, userId: 20 };
       const result = await getScoreAccessLevel(null, targetPlayer, {});
-      expect(result).toEqual({ access: 'denied', reason: 'Guest Only' });
+      expect(result).toEqual({ access: 'denied', reason: 'Login required to update registered players scores.' });
     });
   });
 

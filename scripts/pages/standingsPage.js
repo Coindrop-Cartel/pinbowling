@@ -243,8 +243,10 @@ export async function initStandingsPage() {
         const entityName = isTeamLeague ? res.entity.name : res.entity.playerName;
         
         const eventsHtml = events.map(e => {
-          const val = res.eventTotals[e.id] || '-';
-          return `<td class="standings-round">${val}</td>`;
+          const eventData = res.eventTotals[e.id];
+          if (!eventData || eventData.displayValue === undefined) return `<td class="standings-round">-</td>`;
+          const spanClass = eventData.isDropped ? ' class="dropped-score"' : '';
+          return `<td class="standings-round"><span${spanClass}>${eventData.displayValue}</span></td>`;
         }).join('');
 
         const totalDisplay = league?.seasonScoring === 'weekly' 

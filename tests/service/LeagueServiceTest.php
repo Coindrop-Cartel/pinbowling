@@ -9,7 +9,7 @@ class LeagueServiceTest extends TestCase {
     
     protected function setUp(): void {
         // Satisfy the API Secret check for includes/config.php
-        $_SERVER['HTTP_X_PB_SECRET'] = 'bowl-2024-secret';
+        $_SERVER['HTTP_X_PB_SECRET'] = 'test-secret-for-ci';
         
         // Include the service to access its functions
         require_once __DIR__ . '/../../service/leagueService.php';

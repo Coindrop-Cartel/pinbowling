@@ -1,9 +1,20 @@
 Options -MultiViews
 RewriteEngine On
 
+# 1. Enforce Clean URLs: Redirect direct .php requests to clean version
+# Do not redirect API calls in the service directory or the system configuration script.
+# This prevents breaking POST requests and ensures versioned asset loading for PHP files.
+# We also exclude versioned paths (v1.x.x/) as these are handled dynamically by index.php.
+RewriteCond %{REQUEST_URI} !/(service/|js-config\.php|v[0-9.]+/|includes/) [NC]
+# Capture the full URL path from the original request to avoid filesystem path leakage.
+# %1 captures the path without the .php extension.
+RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ ([^\ ]+)\.php
+RewriteRule ^ %1 [L,R=301]
+
 # Redirect external requests for index or index.php back to the root folder
-RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /.*index(\.php)?\ HTTP/ [NC]
-RewriteRule ^index(\.php)?$ %{CONTEXT_PREFIX}/ [R=301,L]
+# This avoids exposing /index in the URL and fixes the absolute path leak.
+RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ ([^\ ]+)/index(\.php)?
+RewriteRule ^ %1/ [R=301,L]
 
 # If the requested path isn't an existing file or directory,
 # send the request to index.php to be handled by our router.

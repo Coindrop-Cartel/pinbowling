@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
-import { can, PERMISSIONS, requireAdmin } from '@services/auth.js';
+import { can, PERMISSIONS } from '@services/auth.js';
 import { showAlert, showAuthDialog, showConfirm, showPrompt } from '@ui/dialogs.js';
-import { ROUTES } from '@scripts/routes.js';
+import { ROUTES, ROUTE_PATHS } from '@scripts/routes.js';
 import { navigateTo } from '@scripts/utils.js';
 import { renderActionSummary } from '@ui/selectors.js';
 import { setDebugEnabled } from '@services/state.js';
@@ -35,9 +35,7 @@ export async function initManagementPage() {
     } else if (user) {
       // Logged in but not an admin? Shoo!
       showAlert('Administrator access is required for system maintenance.', 'Access Denied');
-      // Casting ROUTES to any to allow property access on the array type
-      const routes = /** @type {any} */ (ROUTES);
-      navigateTo(routes.HOME());
+      navigateTo(ROUTE_PATHS.HOME());
       return;
     }
     renderVersionInfo();
@@ -59,37 +57,22 @@ export async function initManagementPage() {
    * Adds a subtle version indicator to the bottom of the management tools.
    */
   const renderVersionInfo = () => {
-    if (document.getElementById('mgmt-ui-version') || !toolsSection) return;
+    const versionInfo = document.getElementById('mgmt-ui-version');
+    if (!versionInfo || !toolsSection) return;
 
-    const versionInfo = document.createElement('div');
-    versionInfo.id = 'mgmt-ui-version';
-    versionInfo.className = 'version-footer';
+    versionInfo.classList.remove('hidden');
+    const versionText = document.getElementById('mgmt-ui-version-text');
+    if (versionText) versionText.textContent = `System UI Version: ${window['PB_UI_VERSION'] || '1.0.0'}`;
 
-    // Debug Mode Toggle
-    const debugLabel = document.createElement('label');
-    debugLabel.className = 'debug-toggle-label';
-    debugLabel.innerHTML = `
-      <input type="checkbox" id="mgmt-debug-toggle" class="mb-0">
-      <span>Debug Logs</span>
-    `;
-    
-    const debugToggle = debugLabel.querySelector('input');
+    const debugToggle = document.getElementById('mgmt-debug-toggle');
     if (debugToggle) {
       debugToggle.checked = Boolean(window['PB_DEBUG_MODE']); // Explicitly sync state from global variable
-
       debugToggle.onchange = () => {
         const isEnabled = debugToggle.checked;
         window['PB_DEBUG_MODE'] = isEnabled;
         setDebugEnabled(isEnabled);
       };
     }
-
-    const versionText = document.createElement('span');
-    versionText.textContent = `System UI Version: ${window['PB_UI_VERSION'] || '1.0.0'}`;
-
-    versionInfo.appendChild(debugLabel);
-    versionInfo.appendChild(versionText);
-    if (toolsSection) (toolsSection.parentElement || document.body).appendChild(versionInfo);
   };
 
   if (loginBtn) {
@@ -121,15 +104,16 @@ export async function initManagementPage() {
     
     if (!confirmed) return;
 
-    if (!await requireAdmin()) return;
-
     const daysInput = await showPrompt('Enter retention period in days (leagues older than this will be deleted):', 'Cleanup Configuration', false);
     if (daysInput === null) return; // User cancelled the prompt
     const days = parseInt(daysInput, 10) || 30;
 
     try {
-      // Using bracket notation to bypass linter warning on specific method signature
-      const result = await PB_API['runCleanup'](days);
+      if (!await can(PERMISSIONS.RUN_CLEANUP)) {
+        showAlert('Unauthorized: Administrator privileges are required for this action.', 'Access Denied');
+        return;
+      }
+      const result = await PB_API.runCleanup(days);
       showAlert(`Cleanup successful! Removed ${result.leagues_cleaned || 0} session leagues older than ${days} days.`, 'Success');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

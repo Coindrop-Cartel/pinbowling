@@ -14,20 +14,6 @@
  */
 require_once __DIR__ . '/../includes/config.php';
 
-/**
- * Helper to transform Players into camelCase.
- */
-function serializePlayer($row) {
-    return [
-        'id' => (int)$row['id'],
-        'playerName' => $row['player_name'],
-        'ifpaId' => $row['ifpa_id'],
-        'matchplayId' => $row['matchplay_id'],
-        'userRole' => $row['user_role'] ?? null,
-        'userId' => isset($row['user_id']) ? (int)$row['user_id'] : null
-    ];
-}
-
 try {
     $pdo = getDbConnection();
     $method = $_SERVER['REQUEST_METHOD'];

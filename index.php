@@ -15,7 +15,9 @@ header('Pragma: no-cache');
 
 // 1. Parse the request path
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
-$path = parse_url($requestUri, PHP_URL_PATH);
+$parsedUrl = parse_url($requestUri);
+$path = $parsedUrl['path'] ?? '';
+$query = $parsedUrl['query'] ?? '';
 
 // 2. Calculate the route relative to the script's directory
 // This ensures it works whether the app is in the root or a subfolder
@@ -59,9 +61,12 @@ if (preg_match('/^v[0-9.]+\/(.*)$/', $route, $matches)) {
 
 // 3.5 Authorization Guard for Management Routes
 // Prevent unauthorized users from loading management-only HTML templates
-$managementRoutes = ['config', 'locations', 'machines', 'players', 'management'];
+$managementRoutes = ['config', 'machines', 'teams'];
 $checkRoute = str_replace('.php', '', $route);
 if (in_array($checkRoute, $managementRoutes)) {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
     $user = getCurrentUser();
     if (!$user || ($user['role'] !== 'admin' && $user['role'] !== 'td')) {
         header("Location: " . rtrim($baseUrl, '/') . "/");
@@ -80,14 +85,25 @@ if ($route !== '') {
 
     // Map the route to the /pages directory
     $pageName = (strpos($route, '.php') === false) ? $route . '.php' : $route;
-    $pagesFile = __DIR__ . '/pages/' . basename($pageName);
+    
+    // Look for the file in /pages, /service, or the root, preserving subdirectories
+    $pagesFile = __DIR__ . '/pages/' . $pageName;
+    $serviceFile = __DIR__ . '/' . $pageName; // Handles service/authService.php etc.
     $rootFile = __DIR__ . '/' . basename($pageName);
 
     if (file_exists($pagesFile)) {
         $targetFile = $pagesFile;
+    } elseif (file_exists($serviceFile)) {
+        // If index.php is acting as a router for service files,
+        // ensure $_GET is populated from the original query string.
+        if (!empty($query)) {
+            parse_str($query, $_GET);
+        }
+        include $serviceFile;
+        exit;
     } elseif (file_exists($rootFile)) {
-        // Allow routing to root-level PHP files (like js-config.php)
-        $targetFile = $rootFile;
+        include $rootFile;
+        exit;
     }
 }
 

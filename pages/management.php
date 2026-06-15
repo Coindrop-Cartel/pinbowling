@@ -19,4 +19,12 @@
       <button id="mgmt-run-cleanup-btn" class="danger">Run Cleanup Script</button>
     </section>
   </div>
+
+  <div id="mgmt-ui-version" class="version-footer hidden">
+    <label class="debug-toggle-label">
+      <input type="checkbox" id="mgmt-debug-toggle" class="mb-0">
+      <span>Debug Logs</span>
+    </label>
+    <span id="mgmt-ui-version-text">System UI Version: <?php echo $uiVersion; ?></span>
+  </div>
 </main>

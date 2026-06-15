@@ -9,6 +9,7 @@
         <div class="form-row">
           <label for="league-name">League Name</label>
           <input id="league-name" type="text" placeholder="e.g., Summer 2024 League" required />
+          <button id="create-league-toggle" type="button" class="secondary btn-mgmt mt-10">Create League</button>
         </div>
         <div id="league-date-row" class="form-row hidden">
           <label for="league-start-date">Start Date</label>

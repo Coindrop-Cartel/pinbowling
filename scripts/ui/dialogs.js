@@ -155,20 +155,18 @@ export const showChoiceDialog = (title, message, choices, initialValue = null) =
     btn.textContent = choice.label;
     btn.dataset.value = choice.value;
 
-    const updateStyle = (selected) => {
+    const updateStyle = () => {
       const isSelected = String(choice.value) === String(selectedValue);
-      btn.style.backgroundColor = isSelected ? '#000' : '#fff';
-      btn.style.color = isSelected ? '#fff' : '#000';
+      btn.classList.toggle('is-selected', isSelected);
     };
 
-    updateStyle(selectedValue);
+    updateStyle();
 
     btn.onclick = () => {
       selectedValue = choice.value;
       buttons.forEach(b => {
         const isMatch = String(b.dataset.value) === String(selectedValue);
-        b.style.backgroundColor = isMatch ? '#000' : '#fff';
-        b.style.color = isMatch ? '#fff' : '#000';
+        b.classList.toggle('is-selected', isMatch);
       });
     };
     container.appendChild(btn);

@@ -35,9 +35,10 @@ const uiMocks = vi.hoisted(() => ({
   showPlayerSelectionDialog: vi.fn(),
   showAlert: vi.fn(),
   setupLiveFilter: vi.fn((input, data, options) => {
+    let currentData = typeof data === 'function' ? data() : data;
     const filterInstance = {
+      setData: vi.fn((newData) => { currentData = newData; }),
       performFilter: vi.fn(() => {
-        const currentData = typeof data === 'function' ? data() : data;
         if (options && options.onFilter) {
           const query = (input ? input.value || '' : '').toLowerCase();
           const filtered = currentData.filter(item =>

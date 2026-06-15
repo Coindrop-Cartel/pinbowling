@@ -7,7 +7,7 @@
 import { initNavigation } from '@ui/navigation.js';
 import { initMachinesPage } from '@pages/machinesPage.js';
 import { initLocationsPage } from '@pages/locationsPage.js';
-import { initEventSetupPage } from '@scripts/pages/eventSetupPage.js';
+import { initEventSetupPage } from '@pages/eventSetupPage.js';
 import { initPlayersPage } from '@pages/playersPage.js';
 import { initScoresPage } from '@pages/scoresPage.js';
 import { initTeamsPage } from '@pages/teamsPage.js';
@@ -21,6 +21,7 @@ import { getCookie } from '@scripts/utils.js';
 import { initAuthHeader } from '@services/auth.js';
 import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { loadPage } from '@scripts/utils.js';
+import { showAlert } from '@ui/dialogs.js';
 
 /**
  * Main entry point. Identifies which page is currently loaded 
@@ -66,6 +67,14 @@ export function initApp() {
 }
 
 async function ready() {
+  // Global listener for unhandled promise rejections (e.g. 401 Unauthorized errors from playPage.js)
+  window.addEventListener('unhandledrejection', (event) => {
+    const message = event.reason?.message || String(event.reason || 'Unknown error');
+    if (message.includes('Unauthorized')) {
+      showAlert(message, 'Access Denied');
+    }
+  });
+
   // Restore debug mode from local storage if previously toggled in Management UI
   window.PB_DEBUG_MODE = getDebugEnabled();
 

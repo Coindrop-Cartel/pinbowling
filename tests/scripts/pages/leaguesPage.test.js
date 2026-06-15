@@ -11,6 +11,8 @@ vi.mock('@services/api.js', () => ({
     deleteLeague: vi.fn(),
     addLeaguePlayer: vi.fn(),
     removeLeaguePlayer: vi.fn(),
+    addLeagueTeam: vi.fn(),
+    removeLeagueTeam: vi.fn(),
     createEvent: vi.fn(),
     updateEvent: vi.fn(),
     deleteEvent: vi.fn(),
@@ -46,9 +48,14 @@ vi.mock('@scripts/utils.js', async (importOriginal) => {
 });
 
 const uiMocks = vi.hoisted(() => ({
-  setupLiveFilter: vi.fn((input, data, options) => ({
-    performFilter: () => options.onFilter(data, input.value.toLowerCase())
-  })),
+  setupLiveFilter: vi.fn((input, data, options) => {
+    let currentData = typeof data === 'function' ? data() : data;
+    const filterInstance = {
+      setData: vi.fn((newData) => { currentData = newData; }),
+      performFilter: () => options.onFilter(currentData, (input ? input.value || '' : '').toLowerCase())
+    };
+    return filterInstance;
+  }),
   showConfirm: vi.fn(),
   showPrompt: vi.fn(),
   showPlayerSelectionDialog: vi.fn(),
@@ -71,6 +78,13 @@ const uiMocks = vi.hoisted(() => ({
   }),
 }));
 
+vi.mock('@core/engine.js', () => ({
+  SCORING_FORMATS: [
+    { value: 'bowling', label: 'Bowling (Marks & Frames)' },
+    { value: 'golf', label: 'Golf (Strokes vs Par)' }
+  ],
+  getScoringEngine: vi.fn()
+}));
 vi.mock('@ui/selectors.js', () => uiMocks);
 vi.mock('@ui/dialogs.js', () => uiMocks);
 vi.mock('@ui/branding.js', () => uiMocks);
@@ -90,15 +104,26 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
     document.body.innerHTML = `
       <form id="league-form">
+        <h2 id="league-form-title">Add New League</h2>
         <input id="league-name" />
+        <button id="create-league-toggle" type="button">Create League</button>
         <div id="league-date-row" class="form-row hidden">
-           <input id="league-start-date" />
+          <input id="league-start-date" />
         </div>
         <div id="league-format-row" class="hidden">
-           <select id="league-scoring-format"></select>
+          <select id="league-scoring-format"></select>
+        </div>
+        <div id="league-season-scoring-row" class="form-row hidden">
+          <select id="league-season-scoring"></select>
+        </div>
+        <div id="league-participants-row" class="form-row hidden">
+          <input id="league-participants" type="number" />
+        </div>
+        <div id="league-drop-weeks-row" class="form-row hidden">
+          <input id="league-drop-weeks" type="number" />
         </div>
         <div class="form-actions hidden">
-           <button id="create-league-btn"></button>
+          <button id="create-league-btn"></button>
         </div>
       </form>
       <div id="leagues-list"></div>
@@ -175,8 +200,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
     PB_API.getLeagues.mockResolvedValue([]);
     await initLeaguesPage();
 
-    const nameInput = document.getElementById('league-name');
-    const toggle = nameInput.nextElementSibling; // The "Create New League" button
+    const toggle = document.getElementById('create-league-toggle');
     const dateRow = document.getElementById('league-start-date').closest('.form-row');
 
     expect(dateRow.classList.contains('hidden')).toBe(true);

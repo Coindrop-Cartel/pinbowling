@@ -191,12 +191,10 @@ describe('showChoiceDialog', () => {
     // Click second choice
     choiceBtns[1].click();
 
-    // Second should be selected (black bg, white text)
-    expect(choiceBtns[1].style.backgroundColor).toBe('rgb(0, 0, 0)');
-    expect(choiceBtns[1].style.color).toBe('rgb(255, 255, 255)');
+    // Second should be selected
+    expect(choiceBtns[1].classList.contains('is-selected')).toBe(true);
     // First should be unselected
-    expect(choiceBtns[0].style.backgroundColor).toBe('rgb(255, 255, 255)');
-    expect(choiceBtns[0].style.color).toBe('rgb(0, 0, 0)');
+    expect(choiceBtns[0].classList.contains('is-selected')).toBe(false);
   });
 
   it('should apply custom CSS class to choice buttons', () => {
@@ -215,8 +213,8 @@ describe('showChoiceDialog', () => {
 
     const choiceBtns = document.querySelectorAll('.choice-btn');
     // 'b' should be pre-selected
-    expect(choiceBtns[1].style.backgroundColor).toBe('rgb(0, 0, 0)');
-    expect(choiceBtns[0].style.backgroundColor).toBe('rgb(255, 255, 255)');
+    expect(choiceBtns[1].classList.contains('is-selected')).toBe(true);
+    expect(choiceBtns[0].classList.contains('is-selected')).toBe(false);
   });
 
   it('should resolve with initialValue when saved without clicking a choice', async () => {

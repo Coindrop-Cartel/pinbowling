@@ -16,66 +16,6 @@
  */
 require_once __DIR__ . '/../includes/config.php';
 
-/**
- * Helper to transform Events into camelCase.
- */
-function serializeEvent($row) {
-    return [
-        'id' => (int)$row['id'],
-        'leagueId' => (int)$row['league_id'],
-        'locationId' => isset($row['location_id']) ? (int)$row['location_id'] : null,
-        'eventName' => $row['event_name'],
-        'eventDate' => $row['event_date'],
-        'locationName' => $row['location_name'] ?? null,
-        'scoringFormat' => $row['scoring_format'] ?? 'bowling'
-    ];
-}
-
-/**
- * Helper to transform Players into camelCase.
- */
-function serializePlayer($row) {
-    return [
-        'id' => (int)$row['id'],
-        'playerName' => $row['player_name'],
-        'ifpaId' => $row['ifpa_id'] ?? null,
-        'matchplayId' => $row['matchplay_id'] ?? null,
-        'userId' => isset($row['user_id']) ? (int)$row['user_id'] : (isset($row['userId']) ? (int)$row['userId'] : null)
-    ];
-}
-
-/**
- * Helper to transform Leagues into camelCase.
- */
-function serializeLeague($row) {
-    return [
-        'id' => (int)$row['id'],
-        'name' => $row['name'],
-        'type' => $row['type'] ?? 'standard',
-        'participants' => $row['participants'] ?? 'individual',
-        'startDate' => $row['start_date'],
-        'scoringFormat' => $row['scoring_format'] ?? 'bowling',
-        'seasonScoring' => $row['season_scoring'] ?? 'weekly',
-        'dropLowestWeeks' => (int)($row['drop_lowest_weeks'] ?? 0),
-        'teams' => isset($row['teams']) ? array_map('serializeTeamWithMembers', $row['teams']) : [],
-        'events' => isset($row['events']) ? array_map('serializeEvent', $row['events']) : [],
-        // Players are already standardized in playerService, keeping key consistent
-        'players' => isset($row['players']) ? array_map('serializePlayer', $row['players']) : []
-    ];
-}
-
-function serializeTeamWithMembers($row) {
-    return [
-        'id' => (int)$row['id'],
-        'name' => $row['name'],
-        'city' => $row['city'] ?? null,
-        'state' => $row['state'] ?? null,
-        'members' => isset($row['members']) ? array_map(function($m) {
-            return ['id' => (int)$m['id'], 'playerName' => $m['player_name']];
-        }, $row['members']) : []
-    ];
-}
-
 // Prevent immediate execution during unit testing
 if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING === true) {
     return;
@@ -141,6 +81,7 @@ try {
                     $league['teams'] = $teams;
 
                     sendJson(serializeLeague($league));
+                    exit; // Ensure execution stops after sending valid data
                 }
                 sendJson(['error' => 'League not found'], 404);
             }
@@ -228,16 +169,29 @@ try {
     // POST: Create new League or Event (Protected by API Secret and Role)
     if ($method === 'POST') {
         // Enforce that only TDs or Admins can perform creation tasks
-        validateTDAccess();
-
         if ($task === 'member') {
             if (empty($input['leagueId']) || empty($input['playerId'])) {
                 sendJson(['error' => 'leagueId and playerId are required'], 400);
             }
+            
+            // Check if the player being added is an unregistered guest.
+            // Unregistered guests can be added to sessions without TD/Admin access.
+            // A player is "registered" if they have an associated entry in the 'users' table.
+            $stmtPlayer = $pdo->prepare('SELECT u.id FROM players p JOIN users u ON p.id = u.player_id WHERE p.id = ?');
+            $stmtPlayer->execute([(int)$input['playerId']]);
+            $playerUserId = $stmtPlayer->fetchColumn();
+
+            // If playerUserId is null, the player is unregistered. Allow adding them.
+            // Otherwise, require TD access to add a registered player.
+            if ($playerUserId !== false && $playerUserId !== null) {
+                validateTDAccess();
+            }
+
             $stmt = $pdo->prepare('INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)');
             $stmt->execute([(int)$input['leagueId'], (int)$input['playerId']]);
             sendJson(['success' => true]);
         } else if ($task === 'fixture') {
+            validateTDAccess();
             if (empty($input['leagueId']) || empty($input['eventName'])) {
                 sendJson(['error' => 'leagueId and eventName are required'], 400);
             }
@@ -304,8 +258,16 @@ try {
         if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
 
         if ($task === 'fixture') {
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
+            $sql = 'UPDATE events SET location_id = ?, event_name = ?, event_date = ?, scoring_format = ? WHERE id = ?';
+            $params = [
+                !empty($input['locationId']) ? (int)$input['locationId'] : null, 
+                $input['eventName'], 
+                $input['eventDate'] ?? null,
+                $input['scoringFormat'] ?? 'bowling',
+                $id
+            ];
+            $pdo->prepare($sql)->execute($params);
+
             $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id WHERE e.id = ?');
         } else {
             $sql = 'UPDATE leagues SET name = ?, start_date = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ? WHERE id = ?';

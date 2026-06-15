@@ -1,5 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { filterLeaguesForUser, filterPlayersForUser, getScoreAccessLevel, can } from '@services/auth.js';
+import { showAlert } from '@ui/dialogs.js';
 import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, formatNumber, applyScoreFormatting, renderThresholdGrid, setCurrentPlayerId, getCurrentPlayerId } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector } from '@ui/selectors.js';
@@ -32,10 +33,18 @@ export async function initScoresPage() {
   let allLeaguesCache = []; // Module-level cache for leagues
   let tournamentSelector = null;
   // Fetch leagues and current user once at the start. 
-  const [leaguesFromApi, user] = await Promise.all([
-    PB_API.getLeagues(),
-    PB_API.getCurrentUser()
+  const [leaguesFromApi, userResult] = await Promise.all([
+    PB_API.getLeagues().catch(err => {
+      console.error("Failed to fetch leagues:", err);
+      return [];
+    }),
+    // Allow getCurrentUser to fail gracefully if the user is not logged in.
+    // The rest of the page logic can then handle the null user.
+    PB_API.getCurrentUser().catch(err => {
+      return null;
+    })
   ]);
+  const user = userResult;
   allLeaguesCache = leaguesFromApi; // Update the module-level cache
   // Requirement: Unregistered users only see leagues that have at least one guest player.
   // The initialLeagues filtering logic here is now handled by initTournamentSelector.
@@ -219,20 +228,26 @@ export async function initScoresPage() {
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
 
-      await PB_API.saveScore({
-        playerId: Number(currentPlayerId),
-        orderNumber: Number(round.orderNumber),
-        eventId: Number(getActiveEventId()),
-        leagueId: Number(getActiveLeagueId()),
-        machineId: Number(round.machineId),
-        ball1,
-        ball2,
-        ball3,
-      });
-
-      saveBtn.textContent = 'Save';
-      saveBtn.classList.remove('is-dirty');
-      renderCurrentResults();
+      try {
+        await PB_API.saveScore({
+          playerId: Number(currentPlayerId),
+          orderNumber: Number(round.orderNumber),
+          eventId: Number(getActiveEventId()),
+          leagueId: Number(getActiveLeagueId()),
+          machineId: Number(round.machineId),
+          ball1,
+          ball2,
+          ball3,
+        });
+        saveBtn.classList.remove('is-dirty');
+        renderCurrentResults();
+      } catch (err) {
+        const message = err?.message || String(err);
+        showAlert('Failed to save score: ' + message, 'Error');
+        saveBtn.disabled = false; // Re-enable so user can try again
+      } finally {
+        saveBtn.textContent = 'Save';
+      }
     });
 
     return row;
@@ -286,14 +301,6 @@ export async function initScoresPage() {
 
       if (!playerSearchInstance) {
         let searchInput = document.getElementById('player-search');
-        if (!searchInput) {
-          searchInput = document.createElement('input');
-          searchInput.id = 'player-search';
-          searchInput.type = 'text';
-          searchInput.placeholder = 'Type to search player...';
-          searchInput.className = 'search-input-full';
-          if (playerSelect) playerSelect.before(searchInput);
-        }
 
         if (searchInput && playerSelect) {
           playerSearchInstance = createSearchableSelect(searchInput, playerSelect, selectablePlayers, {
@@ -463,7 +470,9 @@ export async function initScoresPage() {
     const leagueId = getActiveLeagueId();
 
     if (!eventId) {
-      setCurrentPlayerId('');
+      if (getCurrentPlayerId()) {
+        setCurrentPlayerId('');
+      }
       const playerSearch = document.getElementById('player-search');
       if (playerSearch) playerSearch.value = '';
       if (playerSelect) playerSelect.value = '';
@@ -481,10 +490,12 @@ export async function initScoresPage() {
     // selection to ensure the search box is cleared and we don't carry over 
     // a player context that may not exist in the new roster.
     if (eventId !== lastEventId || leagueId !== lastLeagueId) {
-      const playerSearch = document.getElementById('player-search');
-      if (playerSearch) playerSearch.value = '';
-      if (playerSelect) playerSelect.value = '';
-      setCurrentPlayerId('');
+      if (getCurrentPlayerId()) {
+        const playerSearch = document.getElementById('player-search');
+        if (playerSearch) playerSearch.value = '';
+        if (playerSelect) playerSelect.value = '';
+        setCurrentPlayerId('');
+      }
       lastEventId = eventId;
       lastLeagueId = leagueId;
     }

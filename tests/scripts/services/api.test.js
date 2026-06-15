@@ -12,8 +12,6 @@ vi.hoisted(() => {
     origin: 'http://localhost',
     pathname: '/app/index.php'
   });
-
-  window.PB_API_SECRET = 'test-api-secret';
   
   // Mock fetch globally for use in all tests
   global.fetch = vi.fn();
@@ -82,7 +80,6 @@ describe('API Client (api.js)', () => {
     await fetchJSON('service/machineService.php');
 
     const callHeaders = fetch.mock.calls[0][1].headers;
-    expect(callHeaders['X-PB-SECRET']).toBe('test-api-secret');
     expect(callHeaders['Content-Type']).toBe('application/json');
   });
 
@@ -306,6 +303,13 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.runCleanup();
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/cleanupService.php'), expect.any(Object));
+    });
+
+    it('runCleanup should pass the days parameter if provided', async () => {
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      // Verification for Issue 1.4 bug fix
+      await PB_API.runCleanup(15);
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/cleanupService.php?days=15'), expect.any(Object));
     });
 
     it('deleteTargetScore should include threshold task', async () => {
@@ -675,7 +679,6 @@ describe('API Client (api.js)', () => {
       await fetchJSON('service/test.php', { headers: { 'X-Custom': 'value' } });
       const callHeaders = fetch.mock.calls[0][1].headers;
       expect(callHeaders['X-Custom']).toBe('value');
-      expect(callHeaders['X-PB-SECRET']).toBe('test-api-secret');
     });
 
     it('fetchJSON should log debug info when PB_DEBUG_MODE is on', async () => {

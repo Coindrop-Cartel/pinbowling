@@ -212,7 +212,7 @@ describe('calculateSeasonSummary', () => {
         league, players, events, targetsByEvent, scoresByEventAndPlayer, engine
       });
 
-      expect(result.rows[0].eventTotals[100]).toContain('pts');
+      expect(result.rows[0].eventTotals[100].displayValue).toContain('pts');
     });
 
     it('should sort rows by totalSeasonPoints descending for weekly', () => {
@@ -342,8 +342,8 @@ describe('calculateSeasonSummary', () => {
       });
 
       // Event 100 (score=100) should be dropped and have strikethrough
-      const droppedTotal = result.rows[0].eventTotals[100];
-      expect(droppedTotal).toContain('dropped-score');
+      const droppedData = result.rows[0].eventTotals[100];
+      expect(droppedData.isDropped).toBe(true);
     });
 
     it('should not drop any weeks when dropLowestWeeks is 0', () => {
@@ -366,9 +366,9 @@ describe('calculateSeasonSummary', () => {
       });
 
       expect(result.rows[0].totalSeasonPoints).toBe(400);
-      // No strikethrough
-      expect(result.rows[0].eventTotals[100]).not.toContain('line-through');
-      expect(result.rows[0].eventTotals[101]).not.toContain('line-through');
+      // No dropped flags
+      expect(result.rows[0].eventTotals[100].isDropped).toBe(false);
+      expect(result.rows[0].eventTotals[101].isDropped).toBe(false);
     });
 
     it('should drop multiple weeks when dropLowestWeeks > 1', () => {
@@ -577,7 +577,7 @@ describe('calculateSeasonSummary', () => {
       });
 
       expect(engine.formatTotalScore).toHaveBeenCalledWith(42);
-      expect(result.rows[0].eventTotals[100]).toBe('42');
+      expect(result.rows[0].eventTotals[100].displayValue).toBe('42');
     });
 
     it('should handle league with null/undefined properties gracefully', () => {
@@ -688,7 +688,7 @@ describe('calculateSeasonSummary', () => {
 
       // t1 total = 100 + 300 = 400, only team → 1 pt
       expect(result.rows[0].totalSeasonPoints).toBe(1);
-      expect(result.rows[0].eventTotals[100]).toContain('1 pts');
+      expect(result.rows[0].eventTotals[100].displayValue).toContain('1 pts');
     });
   });
 

@@ -7,16 +7,19 @@
  */
 require_once __DIR__ . '/includes/config.php';
 
+// Restrict access to authenticated admin users only
+validateAdminAccess();
+
 try {
     $pdo = getDbConnection();
 
     $stmt = $pdo->query('SELECT DATABASE() AS dbname, @@hostname AS hostname');
     $info = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    global $DB_HOST, $DB_PORT, $DB_NAME;
-    $configuredHost = $DB_HOST;
-    $configuredPort = $DB_PORT;
-    $configuredDb = $DB_NAME;
+    global $dbHost, $dbPort, $dbName;
+    $configuredHost = $dbHost;
+    $configuredPort = $dbPort;
+    $configuredDb = $dbName;
 
     $phpVersion = PHP_VERSION;
     $pdoDrivers = PDO::getAvailableDrivers();

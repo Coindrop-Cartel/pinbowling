@@ -1,5 +1,3 @@
-import { initNavigation } from '@ui/navigation.js';
-
 /**
  * Utility functions and state management helpers.
  */
@@ -41,9 +39,8 @@ function setUrlParam(key, value) {
   else url.searchParams.delete(key);
   window.history.replaceState({}, '', url);
   
-  // Re-run navigation logic to update header HREFs based on the new parameters.
-  // This ensures that "Scores" in the header points to the newly selected league.
-  initNavigation();
+  // Notify the app that state has changed. main.js listens for this to refresh UI/Navigation.
+  document.dispatchEvent(new CustomEvent('pb:pageChanged', { detail: { url: url.href } }));
 }
 
 /** @returns {string|null} The currently active league ID from the URL. */
@@ -209,9 +206,8 @@ export function renderThresholdGrid(values, formatFn = (v) => v, engine = undefi
           .map(rank => {
             const val = values[rank]; // Get value from the full 1-10 map
             const label = engine ? engine.getThresholdLabel(rank, value1, value2) : rank; // Use engine's label for special cases
-            const style = engine ? engine.getThresholdRowStyle(rank, value1, value2) : '';
-            const inline = style ? ` style="${style}"` : '';
-            return `<div class="threshold-row"${inline}><strong>${label}:</strong> ${formatFn(val)}</div>`;
+            const rowClass = engine ? engine.getThresholdRowClass(rank, value1, value2) : '';
+            return `<div class="threshold-row ${rowClass}"><strong>${label}:</strong> ${formatFn(val)}</div>`;
           })
           .join('')
         }

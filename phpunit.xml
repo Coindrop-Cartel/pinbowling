@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/13.1/phpunit.xsd"
-         bootstrap="vendor/autoload.php"
+         bootstrap="tests/bootstrap.php"
          colors="true">
     <testsuites>
         <testsuite name="Service Test Suite">
             <directory>tests/service</directory>
+        </testsuite>
+        <testsuite name="Includes Test Suite">
+            <directory>tests/includes</directory>
         </testsuite>
     </testsuites>
     <coverage>
@@ -15,7 +18,7 @@
         </report>
     </coverage>
     <php>
-        <env name="API_SECRET" value="bowl-2024-secret"/>
+        <env name="API_SECRET" value="test-secret-for-ci"/>
         <const name="PHPUNIT_RUNNING" value="true"/>
     </php>
     <source>

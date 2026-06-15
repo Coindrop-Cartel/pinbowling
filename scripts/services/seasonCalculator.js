@@ -17,7 +17,7 @@ import { groupTargetsByEvent, buildScoreMapFromRows } from '@services/normalizer
  *   Nested map of `{ [eventId]: { [playerId]: score[] } }` from `groupScoresByEventAndPlayer`.
  * @param {Object} params.engine - ScoringEngine instance with `calculateTurnResults`, `compareScores`, and `formatTotalScore` methods.
  * @param {string[]} [params.selectedPlayerIds=[]] - Optional array of player IDs to filter to; empty array means all players.
- * @returns {{ rows: Array<{ entity: Object, eventTotals: Object, totalSeasonPoints: number, playedTargets: Object[] }>, isTeamLeague: boolean }}
+ * @returns {{ rows: Array<{ entity: Object, eventTotals: Object<number, {displayValue: string, isDropped: boolean}|null>, totalSeasonPoints: number, playedTargets: Object[] }>, isTeamLeague: boolean }}
  *   `rows` — sorted summary rows for each player/team;
  *   `isTeamLeague` — whether the league uses team-based scoring.
  */
@@ -114,7 +114,8 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
       }
 
       if (hasData) {
-        eventTotals[event.id] = league?.seasonScoring === 'weekly' ? `${scoreValue} pts` : engine.formatTotalScore(scoreValue);
+        const displayValue = league?.seasonScoring === 'weekly' ? `${scoreValue} pts` : engine.formatTotalScore(scoreValue);
+        eventTotals[event.id] = { displayValue, isDropped: false };
         individualScores.push({ eventId: event.id, value: scoreValue });
       } else {
         eventTotals[event.id] = null;
@@ -123,7 +124,7 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
 
     // Drop lowest
     const dropCount = Number(league?.dropLowestWeeks || 0);
-    let scoresToSum = [...individualScores];
+    let scoresToSum = [...individualScores]; // Create a mutable copy for sorting and splicing
     if (dropCount > 0 && individualScores.length > 0) {
       scoresToSum.sort((a, b) => {
         if (league?.seasonScoring === 'weekly') return b.value - a.value;
@@ -133,7 +134,7 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
       const dropped = scoresToSum.splice(-numToDrop);
       dropped.forEach(d => {
         if (eventTotals[d.eventId]) {
-          eventTotals[d.eventId] = `<span class="dropped-score">${eventTotals[d.eventId]}</span>`;
+          eventTotals[d.eventId].isDropped = true;
         }
       });
     }

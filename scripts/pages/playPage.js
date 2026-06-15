@@ -134,7 +134,10 @@ export async function initPlayPage() {
       row.querySelector('.play-btn').onclick = async (e) => {
         e.stopPropagation();
         
-        const currentUser = await PB_API.getCurrentUser();
+        const currentUser = await PB_API.getCurrentUser().catch(err => {
+          console.warn("Failed to fetch current user, likely not logged in:", err);
+          return null;
+        });
         const joinedIds = new Set(event.roster.map(p => p.id));
         let selectedId = null;
 

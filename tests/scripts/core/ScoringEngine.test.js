@@ -300,20 +300,18 @@ describe('ScoringEngine (Base Class)', () => {
     });
   });
 
-  // ── getThresholdRowStyle ─────────────────────────────────────────────
-  describe('getThresholdRowStyle', () => {
+  // ── getThresholdRowClass ─────────────────────────────────────────────
+  describe('getThresholdRowClass', () => {
     it('should highlight start and end ranks', () => {
       const e = new ScoringEngine({ thresholdStart: 10, thresholdEnd: 1 });
-      const style = e.getThresholdRowStyle(10, 10000, 1000);
-      expect(style).toContain('font-weight: bold');
-      expect(style).toContain('color: var(--pb-primary)');
+      const className = e.getThresholdRowClass(10, 10000, 1000);
+      expect(className).toBe('threshold-major');
     });
 
     it('should dim non-major ranks', () => {
       const e = new ScoringEngine({ thresholdStart: 10, thresholdEnd: 1 });
-      const style = e.getThresholdRowStyle(5, 5000, 1000);
-      expect(style).toContain('opacity: 0.8');
-      expect(style).not.toContain('font-weight: bold');
+      const className = e.getThresholdRowClass(5, 5000, 1000);
+      expect(className).toBe('threshold-minor');
     });
   });
 

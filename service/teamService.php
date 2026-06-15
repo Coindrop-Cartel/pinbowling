@@ -1,18 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
 
-function serializeTeam($row) {
-    return [
-        'id' => (int)$row['id'],
-        'name' => $row['name'],
-        'city' => $row['city'],
-        'state' => $row['state'],
-        'members' => isset($row['members']) ? array_map(function($m) {
-            return ['id' => (int)$m['id'], 'playerName' => $m['player_name']];
-        }, $row['members']) : []
-    ];
-}
-
 try {
     $pdo = getDbConnection();
     $method = $_SERVER['REQUEST_METHOD'];

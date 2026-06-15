@@ -13,7 +13,7 @@ const mockEngine = {
     if (Number(r) === 1) return 'Low';
     return r;
   }),
-  getThresholdRowStyle: vi.fn(() => 'margin: 2px 0;'),
+  getThresholdRowClass: vi.fn(() => 'threshold-minor'),
   getThresholdSort: vi.fn(() => (a, b) => Number(b[0]) - Number(a[0])),
   getInitialValues: vi.fn(() => ({ value1: 5000000, value2: 500000 })),
   formatTotalScore: vi.fn((total) => String(total)),
@@ -494,7 +494,7 @@ describe('Utility Functions (utils.js)', () => {
       const values = { 10: 10000, 1: 1000 };
       Utils.renderThresholdGrid(values, Utils.formatNumber, mockEngine, 10000, 1000);
       expect(mockEngine.getThresholdLabel).toHaveBeenCalledWith(10, 10000, 1000);
-      expect(mockEngine.getThresholdRowStyle).toHaveBeenCalledWith(10, 10000, 1000);
+      expect(mockEngine.getThresholdRowClass).toHaveBeenCalledWith(10, 10000, 1000);
     });
   });
 });

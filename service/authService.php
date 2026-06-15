@@ -5,12 +5,14 @@
  */
 require_once __DIR__ . '/../includes/config.php';
 
-// Protect all auth tasks with the API Secret to ensure requests come from the application
-validateApiSecret();
-
 $pdo = getDbConnection();
 $task = $_GET['task'] ?? '';
 $input = getJsonInput();
+
+// Security Gatekeeper: Task 'me' must be public to allow session checks for guests.
+if ($task !== 'me' && $task !== 'login') {
+    validateSessionOrSecret();
+}
 
 switch ($task) {
     case 'login':

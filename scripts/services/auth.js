@@ -35,7 +35,7 @@ const ROLE_PERMISSIONS = {
   'admin': ['*'],
   'td': [PERMISSIONS.CREATE_SESSION, PERMISSIONS.JOIN_SESSION, PERMISSIONS.ADD_ANY_SCORE, PERMISSIONS.UPDATE_ANY_SCORE, PERMISSIONS.MANAGE_LEAGUES, PERMISSIONS.MANAGE_TEAMS, PERMISSIONS.MANAGE_MACHINES, PERMISSIONS.MANAGE_PLAYERS, PERMISSIONS.ADD_LOCATION_MACHINE],
   'player': [PERMISSIONS.CREATE_SESSION, PERMISSIONS.JOIN_SESSION, PERMISSIONS.ADD_LOCATION_MACHINE, PERMISSIONS.UPDATE_SELF],
-  'unregistered': [PERMISSIONS.JOIN_SESSION]
+  'unregistered': [PERMISSIONS.JOIN_SESSION, PERMISSIONS.ADD_ANY_SCORE, PERMISSIONS.UPDATE_ANY_SCORE]
 };
 
 /**
@@ -44,8 +44,8 @@ const ROLE_PERMISSIONS = {
 const NAV_PERMISSIONS = {
   '#nav-leagues': PERMISSIONS.MANAGE_LEAGUES,
   '#nav-machines': PERMISSIONS.MANAGE_MACHINES,
-  '#nav-locations': PERMISSIONS.JOIN_SESSION, // Visible to any registered user
-  '#nav-players': PERMISSIONS.JOIN_SESSION,   // Visible to any registered user
+  '#nav-locations': null, // Visible to all
+  '#nav-players': null,   // Visible to all
   '#nav-teams': PERMISSIONS.MANAGE_TEAMS,
   '#nav-maintenance': PERMISSIONS.RUN_CLEANUP
 };
@@ -86,21 +86,13 @@ async function getAuthenticatedUser() {
 
 /**
  * Verifies if the user has global admin access.
- * Prompts for password if not already in session.
+ * Note: Resolved Roadmap Issue 11 - Side effects removed. Callers handle UI feedback.
  *
  * @returns {Promise<boolean>} `true` if the user is an admin, `false` otherwise.
  */
 export async function requireAdmin() {
-  if (window.PB_DEBUG_MODE) console.log('[Auth] requireAdmin called.');
-
   const user = await getAuthenticatedUser();
-  if (user && user.role === 'admin') {
-    if (window.PB_DEBUG_MODE) console.log('[Auth] Admin role verified via session.');
-    return true;
-  }
-  
-  showAlert('Unauthorized: Administrator privileges are required for this action.', 'Access Denied');
-  return false;
+  return user?.role === 'admin';
 }
 
 /**
@@ -123,6 +115,11 @@ export async function runAuthorizedLeagueAction(leagueId, actionCallback) {
     await actionCallback();
     return true;
   } catch (err) {
+    const message = err?.message || String(err);
+    if (message.includes('Unauthorized')) {
+      showAlert(message, 'Access Denied');
+      return false;
+    }
     throw err;
   }
 }
@@ -161,9 +158,9 @@ function updateAuthUI(user) {
       const el = adminNav.querySelector(selector);
       if (el) {
         const perms = ROLE_PERMISSIONS[role] || [];
-        const hasAccess = perms.includes('*') || perms.includes(permission);
+        const hasAccess = !permission || perms.includes('*') || perms.includes(permission);
         el.classList.toggle('hidden', !hasAccess);
-        if (hasAccess) visibleChildren++;
+        if (hasAccess && permission) visibleChildren++;
       }
     });
 
@@ -228,9 +225,8 @@ export async function initAuthHeader() {
  * @returns {Promise<boolean>} `true` if the user is a TD or admin, `false` otherwise.
  */
 export async function isManagementAuthorized() {
-  const user = await getAuthenticatedUser();
-  if (!user) return false;
-  return user.role === 'admin' || user.role === 'td';
+  // Standardized via Issue 10: Call can() with management permission
+  return await can(PERMISSIONS.MANAGE_LEAGUES);
 }
 
 /**
@@ -247,19 +243,38 @@ export async function isManagementAuthorized() {
  */
 export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues) {
   const canUpdateAny = await can(PERMISSIONS.UPDATE_ANY_SCORE);
+  const canAddAny = await can(PERMISSIONS.ADD_ANY_SCORE);
   const isUpdate = !!(turnValues?.ball1 || turnValues?.ball2 || turnValues?.ball3);
   const isSelf = currentUser && String(targetPlayer?.id) === String(currentUser.player_id);
   const isTargetUnregistered = !targetPlayer?.userId;
 
-  if (isUpdate && !canUpdateAny) {
-    return { access: 'denied', reason: 'Updates locked' };
+  if (!currentUser) {
+    // Unregistered users can only update scores for unregistered players.
+    if (isTargetUnregistered) return { access: 'allowed' };
+    return { access: 'denied', reason: 'Login required to update registered players scores.' };
   }
-  if (!canUpdateAny) {
-    const isAuthorizedToScore = isSelf || isTargetUnregistered;
-    if (!isAuthorizedToScore) {
-      return { access: 'denied', reason: 'Guest Only' };
-    }
+
+  // A registered user cannot update scores of another registered user unless they have full permissions.
+  if (!canUpdateAny && !isSelf && !isTargetUnregistered) {
+    return { access: 'denied', reason: 'Cannot update other registered players scores.' };
   }
+
+  // Any logged-in user can update an unregistered player's score.
+  if (!canUpdateAny && isTargetUnregistered) {
+    return { access: 'allowed' };
+  }
+
+  // If it's an update, and user is not self, and doesn't have update any, deny.
+  // self players can always update their own scores for now.
+  if (isUpdate && !canUpdateAny && !isSelf) {
+    return { access: 'denied', reason: 'Updates locked to self or TD/Admin.' };
+  }
+
+  // Allow adding new scores for self or unregistered players without requiring UPDATE_ANY_SCORE
+  if (!isUpdate && !canAddAny && !isSelf && !isTargetUnregistered) {
+    return { access: 'denied', reason: 'Cannot add scores for other registered players.' };
+  }
+
   return { access: 'allowed' };
 }
 

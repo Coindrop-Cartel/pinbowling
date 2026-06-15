@@ -214,14 +214,13 @@ export class ScoringEngine {
   }
 
   /**
-   * Returns CSS styles for a threshold display element.
+   * Returns CSS class string for a threshold display element.
+   * Default implementation returns a class based on whether it's a major threshold.
    */
-  getThresholdRowStyle(rank, _value1, _value2) {
+  getThresholdRowClass(rank, _value1, _value2) {
     const r = Number(rank);
     const isMajor = r === this.getThresholdStart() || r === this.getThresholdEnd();
-    return isMajor 
-      ? 'margin: 2px 0; font-weight: bold; color: var(--pb-primary);' 
-      : 'margin: 2px 0; opacity: 0.8;';
+    return isMajor ? 'threshold-major' : 'threshold-minor';
   }
 
   /**

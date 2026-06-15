@@ -3,6 +3,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { initManagementPage } from '@pages/managementPage.js';
 import { PB_API } from '@services/api.js';
 import * as Auth from '@services/auth.js';
+import { ROUTE_PATHS } from '@scripts/routes.js';
 import * as State from '@services/state.js';
 
 import { showAuthDialog, showConfirm, showPrompt, showAlert } from '@ui/dialogs.js'; // Import dialogs
@@ -66,7 +67,10 @@ describe('Management Page (managementPage.js)', () => {
         <select id="mgmt-league-select"></select>
         <button id="mgmt-reset-pass-btn">Reset</button>
         <button id="mgmt-run-cleanup-btn">Cleanup</button>
-        <div id="mgmt-ui-version"></div>
+      </div>
+      <div id="mgmt-ui-version">
+        <span id="mgmt-ui-version-text"></span>
+        <input type="checkbox" id="mgmt-debug-toggle">
       </div>
       <button id="admin-login-btn">Login</button>
     `;
@@ -104,7 +108,7 @@ describe('Management Page (managementPage.js)', () => {
     const tools = document.getElementById('management-tools');
     expect(tools.classList.contains('hidden')).toBe(false);
     const versionDisplay = document.getElementById('mgmt-ui-version');
-    expect(versionDisplay.textContent).toContain('1.2.3');
+    expect(document.getElementById('mgmt-ui-version-text').textContent).toContain('1.2.3');
   });
   it('should render debug toggle checkbox synced with PB_DEBUG_MODE', async () => {
     window.PB_DEBUG_MODE = true;

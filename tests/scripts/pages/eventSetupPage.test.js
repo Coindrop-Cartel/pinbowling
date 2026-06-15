@@ -27,10 +27,16 @@ vi.mock('@scripts/utils.js', () => ({
   applyScoreFormatting: vi.fn(),
   formatNumber: (n) => String(n),
   navigateTo: vi.fn(),
+  getCookie: vi.fn(() => 'bowling'),
 }));
 
 vi.mock('@scripts/routes.js', () => ({
   ROUTES: {
+    HOME: () => '/',
+    LEAGUES: (id) => `/leagues?id=${id}`,
+    LEAGUE_SETUP: (o) => `/setup?l=${o.leagueId}&e=${o.eventId}`
+  },
+  ROUTE_PATHS: {
     HOME: () => '/',
     LEAGUES: (id) => `/leagues?id=${id}`,
     LEAGUE_SETUP: (o) => `/setup?l=${o.leagueId}&e=${o.eventId}`
@@ -58,6 +64,12 @@ vi.mock('@ui/dialogs.js', () => uiMocks);
 
 vi.mock('@ui/printing.js', () => ({
   printMachineScores: vi.fn(),
+}));
+vi.mock('@services/normalizer.js', () => ({
+  normalizeTargets: vi.fn((t) => t),
+}));
+vi.mock('@ui/branding.js', () => ({
+  applyPreferredTheme: vi.fn(),
 }));
 
 vi.mock('@core/engine.js', () => ({
@@ -140,7 +152,7 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
     Auth.isManagementAuthorized.mockResolvedValue(false);
     await initEventSetupPage();
     expect(uiMocks.showAlert).toHaveBeenCalledWith(expect.stringContaining('Unauthorized'), 'Access Denied');
-    expect(Utils.navigateTo).toHaveBeenCalledWith(ROUTES.HOME);
+    expect(Utils.navigateTo).toHaveBeenCalledWith('/');
   });
 
   it('should load machine suggestions and targets on init', async () => {

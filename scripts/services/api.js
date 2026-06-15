@@ -2,8 +2,6 @@
  * API Client and State Management
  */
 
-const API_SECRET = window.PB_API_SECRET || "";
-
 // Calculate the base application path once to ensure relative API calls resolve correctly
 // regardless of clean URL routing (e.g., /leagues vs /leagues.php)
 // This prevents 404 errors when navigating sub-directories or using .htaccess rewrites.
@@ -44,7 +42,6 @@ export async function fetchJSON(url, options = {}) {
 
   const finalHeaders = {
     'Content-Type': 'application/json',
-    'X-PB-SECRET': API_SECRET,
     ...headers
   };
 
@@ -137,7 +134,7 @@ export async function fetchJSON(url, options = {}) {
  * @property {Function} removeLocationMachine - Remove a machine from a location. Params: (locationId, machineId).
  * @property {Function} getTargetScores - Fetch target scores. Params: (eventId, leagueId, params).
  * @property {Function} bulkUpdateTargetOrder - Bulk-update target sort order. Params: (updates).
- * @property {Function} runCleanup - Run the database cleanup routine.
+ * @property {Function} runCleanup - Run the database cleanup routine. Params: (days).
  * @property {Function} saveTargetScore - Save a target score entry. Params: (target).
  * @property {Function} deleteTargetScore - Delete a target score. Params: (id).
  */
@@ -203,7 +200,7 @@ export const PB_API = {
   getTargetScores: (eventId, leagueId, params) => 
     fetchJSON(`service/machineService.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`, { params }),
   bulkUpdateTargetOrder: (updates) => fetchJSON('service/machineService.php?task=sort', { method: 'POST', body: JSON.stringify(updates) }),
-  runCleanup: () => fetchJSON('service/cleanupService.php'),
+  runCleanup: (days) => fetchJSON('service/cleanupService.php' + (days ? `?days=${days}` : '')),
   saveTargetScore: (target) => {
     const url = `service/machineService.php?task=threshold`;
     return fetchJSON(url, { method: 'POST', body: JSON.stringify(target) });

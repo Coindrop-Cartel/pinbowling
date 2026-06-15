@@ -18,26 +18,6 @@
  */
 require_once __DIR__ . '/../includes/config.php';
 
-/**
- * Helper to transform flat database rows into camelCase JSON.
- * @param array $row
- * @return array
- */
-function serializeScore($row) {
-    return [
-        'id' => (int)$row['id'],
-        'playerId' => (int)$row['player_id'],
-        'eventId' => isset($row['event_id']) ? (int)$row['event_id'] : null,
-        'orderNumber' => (int)$row['order_number'],
-        'machineId' => (int)$row['machine_id'],
-        'machineName' => $row['machine_name'] ?? null,
-        'ball1' => (int)$row['ball1'],
-        'ball2' => (int)$row['ball2'],
-        'ball3' => (int)$row['ball3'],
-        'status' => $row['status'] ?? 'approved'
-    ];
-}
-
 try {
     $pdo = getDbConnection();
     $method = $_SERVER['REQUEST_METHOD'];

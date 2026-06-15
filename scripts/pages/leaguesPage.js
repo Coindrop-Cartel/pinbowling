@@ -82,14 +82,13 @@ export async function initLeaguesPage() {
   if (dropLowestRow) dropLowestRow.classList.add('hidden');
   if (actionsRow) actionsRow.classList.add('hidden');
 
-  let createToggle = null;
-  if (isAuthorized) {
-    createToggle = document.createElement('button');
-    createToggle.type = 'button';
-    createToggle.className = 'secondary btn-mgmt';
-    createToggle.textContent = 'Create League';
-    createToggle.classList.add('mt-10');
-    if (leagueNameInput) leagueNameInput.after(createToggle);
+  if (!isAuthorized && leagueForm) {
+    leagueForm.closest('.card').classList.add('hidden');
+  }
+
+  let createToggle = document.getElementById('create-league-toggle');
+  if (createToggle) createToggle.classList.toggle('hidden', !isAuthorized);
+  if (createToggle && isAuthorized) {
 
     createToggle.onclick = () => {
       const isHidden = dateRow.classList.contains('hidden');
@@ -252,7 +251,8 @@ export async function initLeaguesPage() {
     // Hide the "Create" toggle if an exact match exists, unless the creation 
     // form is already open (in which case the button serves as "Cancel").
     const isFormOpen = !dateRow.classList.contains('hidden');
-    if (createToggle) createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen && !isEditingThis);
+    const shouldHide = !isAuthorized || (!!exactMatch && !isFormOpen && !isEditingThis);
+    if (createToggle) createToggle.classList.toggle('hidden', shouldHide);
 
     const dateVal = leagueDateInput.value;
     createBtn.disabled = !query || !dateVal || (!!exactMatch && !isEditingThis);

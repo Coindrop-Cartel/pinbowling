@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><?php echo isset($pageTitle) ? "Pinball And Stuff - Don't say \"and stuff\"" : "Pinball And Stuff"; ?></title>
-  <link rel="stylesheet" id="theme-stylesheet" href="<?php echo versionedAsset($baseUrl . '/' . ($stylesDir ? $stylesDir . '/' : '') . 'styles.css'); ?>" />
+  <link rel="stylesheet" id="theme-stylesheet" href="<?php echo versionedAsset($baseUrl . '/styles/styles.css'); ?>" />
   <link rel="icon" type="image/png" href="<?php echo versionedAsset($baseUrl . '/images/logo.png'); ?>" />
   <script>
     // Bridge PHP calculated base path to JavaScript
