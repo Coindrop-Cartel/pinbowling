@@ -36,6 +36,7 @@ vi.mock('@scripts/utils.js', () => ({
   getActiveLeagueId: vi.fn(),
   setActiveEventId: vi.fn(),
   formatNumber: vi.fn(n => n?.toLocaleString() || '0'),
+  escapeHTML: vi.fn(str => str), // Mock escapeHTML
 }));
 
 const uiMocks = vi.hoisted(() => ({

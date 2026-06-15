@@ -1,5 +1,5 @@
 import { PB_API } from '@services/api.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId } from '@scripts/utils.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, escapeHTML } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
 import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { showDialog } from '@ui/dialogs.js';
@@ -240,7 +240,7 @@ export async function initStandingsPage() {
     
     if (standingsBody) {
       standingsBody.innerHTML = rows.map((res, idx) => {
-        const entityName = isTeamLeague ? res.entity.name : res.entity.playerName;
+        const entityName = isTeamLeague ? escapeHTML(res.entity.name) : escapeHTML(res.entity.playerName);
         
         const eventsHtml = events.map(e => {
           const eventData = res.eventTotals[e.id];
@@ -317,8 +317,8 @@ export async function initStandingsPage() {
 
     if (tournamentSelectorUI && tournamentSummary) {
       const title = league?.type === 'session' 
-        ? (event?.eventName || 'Session Scoreboard')
-        : `${league?.name || 'League'} - ${event?.eventName || 'Event'}`;
+        ? (escapeHTML(event?.eventName) || 'Session Scoreboard')
+        : `${escapeHTML(league?.name || 'League')} - ${escapeHTML(event?.eventName || 'Event')}`;
 
       tournamentSelectorUI.classList.add('hidden');
       
@@ -410,7 +410,7 @@ export async function initStandingsPage() {
         }).sort((a, b) => Engine.compareScores(a.teamTotal, b.teamTotal));
 
         standingsBody.innerHTML = teamResults.map((tr, idx) => {
-          const teamHeader = `<tr class="team-header"><td class="text-center">${idx + 1}</td><td colspan="${machines.length + 1}">${tr.team.name}</td><td class="standings-total">${Engine.formatTotalScore(tr.teamTotal)}</td></tr>`;
+          const teamHeader = `<tr class="team-header"><td class="text-center">${idx + 1}</td><td colspan="${machines.length + 1}">${escapeHTML(tr.team.name)}</td><td class="standings-total">${Engine.formatTotalScore(tr.teamTotal)}</td></tr>`;
           const memberRows = tr.teamMembers.map(res => {
             let rowHasUpdate = false;
             const turnsHtml = res.turnResults.map(t => {
@@ -419,7 +419,7 @@ export async function initStandingsPage() {
               if (isNew) rowHasUpdate = true;
               return `<td class="standings-round ${t.played ? 'has-score' : 'no-score'} ${(isTvMode && isNew) ? 'score-just-updated' : ''}"><div class="standings-mark">${t.displayMark}</div><div class="standings-round-score">${t.displayRoundTotal}</div></td>`;
             }).join('');
-              return `<tr><td></td><td class="player-name-cell player-name-indent">${res.player.playerName}</td>${turnsHtml}<td class="standings-total ${rowHasUpdate ? 'score-just-updated' : ''}">${res.totalDisplay}</td></tr>`;
+              return `<tr><td></td><td class="player-name-cell player-name-indent">${escapeHTML(res.player.playerName)}</td>${turnsHtml}<td class="standings-total ${rowHasUpdate ? 'score-just-updated' : ''}">${res.totalDisplay}</td></tr>`;
           }).join('');
           return teamHeader + memberRows;
         }).join('');
@@ -437,7 +437,7 @@ export async function initStandingsPage() {
           return `
           <tr>
             <td>${idx + 1}</td>
-            <td class="player-name-cell">${res.player.playerName}</td>
+            <td class="player-name-cell">${escapeHTML(res.player.playerName)}</td>
             ${turnsHtml}
             <td class="standings-total ${rowHasUpdate ? 'score-just-updated' : ''}">${res.totalDisplay}</td>
           </tr>`;

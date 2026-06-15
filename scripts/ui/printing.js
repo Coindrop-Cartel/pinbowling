@@ -1,5 +1,5 @@
 import { getScoringEngine } from '@core/engine.js';
-import { formatNumber } from '@scripts/utils.js';
+import { formatNumber, escapeHTML } from '@scripts/utils.js';
 
 /**
  * Generates large printable signs showing target scores for each machine.
@@ -40,8 +40,8 @@ export function printMachineScores(machines, format = 'bowling') {
       <div class="print-page">
         <div class="print-frame">
           <div class="print-frame-header">
-            <h1 class="print-title">${Engine.getRoundLabel()} ${m.orderNumber}</h1>
-            <h2 class="print-title">${m.machineName}</h2>
+            <h1 class="print-title">${escapeHTML(Engine.getRoundLabel())} ${m.orderNumber}</h1>
+            <h2 class="print-title">${escapeHTML(m.machineName)}</h2>
           </div>
           <div class="print-grid">${scoresHtml}</div>
           ${extraTargets}
@@ -85,8 +85,8 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
     <div class="print-meta">
       <div class="flex-between print-mb-5">
         <div class="print-font-lg">
-          ${leagueName ? `<div class="print-mb-4"><strong>League:</strong> ${leagueName}</div>` : ''}
-          <div class="print-mb-4"><strong>Event:</strong> ${eventName}</div>
+          ${leagueName ? `<div class="print-mb-4"><strong>League:</strong> ${escapeHTML(leagueName)}</div>` : ''}
+          <div class="print-mb-4"><strong>Event:</strong> ${escapeHTML(eventName)}</div>
         </div>
         <div class="text-right">
           <div>Player: __________________________</div>
@@ -123,7 +123,7 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
     return `
       <div class="print-block">
         <div class="print-block-header">
-          <h3 class="print-mt-0">${Engine.getRoundLabel()} ${m.orderNumber}: ${m.machineName}</h3>
+          <h3 class="print-mt-0">${escapeHTML(Engine.getRoundLabel())} ${m.orderNumber}: ${escapeHTML(m.machineName)}</h3>
           <div class="targets-summary">${targetsHtml}</div>
         </div>
         ${lfHint ? `<div class="muted small print-hint-italic">${lfHint}</div>` : ''}

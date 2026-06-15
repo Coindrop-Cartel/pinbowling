@@ -51,6 +51,7 @@ vi.mock('@scripts/utils.js', () => ({
   renderThresholdGrid: vi.fn(() => 'Grid'),
   getCookie: vi.fn(() => 'bowling'),
   loadPage: vi.fn(),
+  escapeHTML: vi.fn(str => str), // Mock escapeHTML
 }));
 
 const uiMocks = vi.hoisted(() => ({

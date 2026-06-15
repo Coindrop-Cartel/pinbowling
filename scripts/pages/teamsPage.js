@@ -2,6 +2,7 @@ import { PB_API } from '@services/api.js';
 import { isManagementAuthorized } from '@services/auth.js';
 import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
 import { showConfirm, showPlayerSelectionDialog, showAlert } from '@ui/dialogs.js';
+import { escapeHTML } from '@scripts/utils.js';
 
 /**
  * Logic for managing Teams and their Roster.
@@ -69,8 +70,8 @@ export async function initTeamsPage() {
 
       const headerHtml = `
         <div class="flex-1">
-          <h3 class="section-heading">${team.name}</h3>
-          <small>${team.city || 'No City'}, ${team.state || 'No State'} | Members: ${team.members?.length || 0}</small>
+          <h3 class="section-heading">${escapeHTML(team.name)}</h3>
+          <small>${escapeHTML(team.city) || 'No City'}, ${escapeHTML(team.state) || 'No State'} | Members: ${team.members?.length || 0}</small>
         </div>
       `;
 
@@ -111,7 +112,7 @@ export async function initTeamsPage() {
           const li = document.createElement('li');
           li.className = 'list-item-row';
           li.innerHTML = `
-            <span>${member.playerName}</span>
+            <span>${escapeHTML(member.playerName)}</span>
             ${isAuthorized ? `<button class="remove-member-btn btn-row" data-team-id="${team.id}" data-player-id="${member.id}" data-player-name="${member.playerName}">Remove</button>` : ''}
           `;
           membersListEl.appendChild(li);

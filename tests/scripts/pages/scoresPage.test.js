@@ -24,6 +24,7 @@ vi.mock('@scripts/utils.js', () => ({
   formatNumber: (n) => String(n),
   applyScoreFormatting: vi.fn(),
   renderThresholdGrid: vi.fn(() => 'Grid'),
+  escapeHTML: vi.fn(str => str), // Mock escapeHTML
 }));
 
 vi.mock('@services/auth.js', () => ({

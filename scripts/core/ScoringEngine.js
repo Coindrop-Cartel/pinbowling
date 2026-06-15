@@ -1,3 +1,5 @@
+import { escapeHTML } from '../utils.js';
+
 /**
  * Base class for all scoring logic in the PinBowling application.
  */
@@ -163,7 +165,7 @@ export class ScoringEngine {
    * @returns {string}
    */
   getRowSummaryHtml(round, formatFn) {
-    return `<div class="strike-target"><b>${this.getPrimaryTargetLabel()}:</b> ${formatFn(round.value1)}</div>`;
+    return `<div class="strike-target"><b>${escapeHTML(this.getPrimaryTargetLabel())}:</b> ${formatFn(round.value1)}</div>`;
   }
 
   /**

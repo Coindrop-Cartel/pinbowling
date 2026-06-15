@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { isManagementAuthorized, requireAdmin } from '@services/auth.js';
 import { showAlert } from '@ui/dialogs.js';
-import { navigateTo, getActiveEventId, getActiveLeagueId, renderPreview, formatNumber, applyScoreFormatting, renderThresholdGrid } from '@scripts/utils.js';
+import { navigateTo, getActiveEventId, getActiveLeagueId, renderPreview, formatNumber, applyScoreFormatting, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
 import { applyPreferredTheme } from '@ui/branding.js'; // Import for filtering
 import { ROUTE_PATHS } from '@scripts/routes.js';
 import { getScoringEngine } from '@core/engine.js';
@@ -286,7 +286,7 @@ export async function initEventSetupPage() {
           <div class="flex gap-12 flex-1 min-250 align-center">
             <div class="drag-handle">☰</div>
             <span class="round-number">${round.orderNumber}</span>
-            <span class="machine-name-display">${round.machineName}</span>
+            <span class="machine-name-display">${escapeHTML(round.machineName)}</span>
           </div>
           <div class="flex gap-12 wrap justify-end" onclick="event.stopPropagation()">
             <div class="flex gap-6 min-140 flex-1 align-center">

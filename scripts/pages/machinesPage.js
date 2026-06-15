@@ -3,6 +3,7 @@ import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
 import { showConfirm, showAlert } from '@ui/dialogs.js';
 import { requireAdmin } from '@services/auth.js';
 import { ROUTES } from '@scripts/routes.js';
+import { escapeHTML } from '@scripts/utils.js';
 
 /**
  * Logic for managing pinball machines and their target score values.
@@ -101,8 +102,8 @@ export async function initMachinesPage() {
         const headerHtml = `
           <div class="header-bar">
             <div class="flex-1">
-              <span class="font-bold">${m.machineName}</span>
-              ${info ? `<br><small class="machine-info">${info}</small>` : ''}
+              <span class="font-bold">${escapeHTML(m.machineName)}</span>
+              ${info ? `<br><small class="machine-info">${escapeHTML(info)}</small>` : ''}
             </div>
             <div class="action-buttons">
               <button type="button" class="edit-mach-btn secondary btn-row">Edit</button>

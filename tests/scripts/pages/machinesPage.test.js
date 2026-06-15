@@ -17,7 +17,11 @@ vi.mock('@services/auth.js', () => ({
 }));
 
 vi.mock('@scripts/utils.js', () => ({
-  navigateTo: vi.fn(),
+  navigateTo: vi.fn(), // Keep existing mock
+  escapeHTML: vi.fn(str => str), // Add escapeHTML mock
+  // If there are other utils functions used in machinesPage.js that are not mocked,
+  // they should be added here or the mock should use the partial mock pattern.
+  // For now, assuming only navigateTo and escapeHTML are relevant.
 }));
 
 const uiMocks = vi.hoisted(() => ({
@@ -31,8 +35,20 @@ const uiMocks = vi.hoisted(() => ({
   showConfirm: vi.fn(),
   showAlert: vi.fn(),
   createExpandableRow: vi.fn((container, options) => {
-    const row = document.createElement(options.tag || 'div');
-    row.innerHTML = options.headerHtml + (options.contentHtml || '');
+    const row = document.createElement(options.tag || 'div'); // Use options.tag for flexibility
+    row.dataset.id = options.id; // Ensure data-id is set for selectors
+
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'row-header'; // Match actual selectors.js implementation
+    headerDiv.innerHTML = options.headerHtml || '';
+    row.appendChild(headerDiv);
+
+    if (options.contentHtml) {
+      const contentDiv = document.createElement('div');
+      contentDiv.className = `row-expansion ${options.isExpanded ? '' : 'hidden'}`; // Match actual selectors.js implementation
+      contentDiv.innerHTML = options.contentHtml;
+      row.appendChild(contentDiv);
+    }
     row.className = options.className || ''; // Ensure class is applied for querySelector
     container.appendChild(row);
     return row;

@@ -1,6 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { isManagementAuthorized, runAuthorizedLeagueAction } from '@services/auth.js';
-import { getCookie, getActiveLeagueId, setActiveLeagueId, setActiveEventId, navigateTo } from '@scripts/utils.js';
+import { getCookie, getActiveLeagueId, setActiveLeagueId, setActiveEventId, navigateTo, escapeHTML } from '@scripts/utils.js';
 import { SCORING_FORMATS } from '@core/engine.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
@@ -180,21 +180,21 @@ export async function initLeaguesPage() {
 
         const headerHtml = `
           <div>
-            <h3 class="section-heading">${league.name}</h3>
-            <small>Started: ${league.startDate || 'N/A'} | ${league.participants === 'team' ? 'Team' : 'Individual'} | Events: ${league.events?.length || 0} | ${participantLabel}: ${participantCount} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}</small>
+            <h3 class="section-heading">${escapeHTML(league.name)}</h3>
+            <small>Started: ${escapeHTML(league.startDate) || 'N/A'} | ${league.participants === 'team' ? 'Team' : 'Individual'} | Events: ${league.events?.length || 0} | ${participantLabel}: ${participantCount} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}</small>
           </div>
         `;
 
         const contentHtml = `
           <div class="section-bar">
             <h4 class="section-subheading">Events</h4>
-            ${isAuthorized ? `<button class="add-event-btn secondary btn-row" data-league-id="${league.id}" data-league-name="${league.name}">Add Event</button>` : ''}
+            ${isAuthorized ? `<button class="add-event-btn secondary btn-row" data-league-id="${league.id}" data-league-name="${escapeHTML(league.name)}">Add Event</button>` : ''}
           </div>
           <ul class="league-events-list list-unstyled"></ul>
           <div class="league-players-section roster-section">
             <div class="section-bar">
               <h4 class="section-subheading">${league.participants === 'team' ? 'Teams' : 'Roster'}</h4>
-              ${isAuthorized ? `<button class="${league.participants === 'team' ? 'add-team-btn' : 'add-player-btn'} secondary btn-row" data-league-id="${league.id}" data-league-name="${league.name}">Add ${league.participants === 'team' ? 'Team' : 'Player'}</button>` : ''}
+              ${isAuthorized ? `<button class="${league.participants === 'team' ? 'add-team-btn' : 'add-player-btn'} secondary btn-row" data-league-id="${league.id}" data-league-name="${escapeHTML(league.name)}">Add ${league.participants === 'team' ? 'Team' : 'Player'}</button>` : ''}
             </div>
             <ul class="league-participants-list list-unstyled"></ul>
             <div class="notice league-participants-empty hidden">No ${league.participants === 'team' ? 'teams' : 'players'} assigned to this league.</div>
@@ -326,7 +326,7 @@ export async function initLeaguesPage() {
 
     eventsListEl.innerHTML = (leagueEvents || []).map(e => `
       <li class="list-item-row">
-        <span>${e.eventName} <small>(${e.eventDate || 'No Date'})</small></span>
+        <span>${escapeHTML(e.eventName)} <small>(${escapeHTML(e.eventDate) || 'No Date'})</small></span>
         <div class="small-action-buttons">
           ${isAuthorized ? `<button class="setup-event-btn secondary btn-row" data-league-id="${leagueId}" data-event-id="${e.id}">Setup</button>` : ''}
           ${isAuthorized ? `<button class="edit-event-btn secondary btn-row" data-id="${e.id}">Edit</button>` : ''}
@@ -367,8 +367,8 @@ export async function initLeaguesPage() {
             const li = document.createElement('li');
             li.className = 'list-item-row';
             li.innerHTML = `
-                <span>${team.name} <small>(${team.city || 'No City'})</small></span>
-                ${isAuthorized ? `<button class="remove-team-btn btn-row" data-league-id="${leagueId}" data-team-id="${team.id}" data-team-name="${team.name}">Delete</button>` : ''}
+                <span>${escapeHTML(team.name)} <small>(${escapeHTML(team.city) || 'No City'})</small></span>
+                ${isAuthorized ? `<button class="remove-team-btn btn-row" data-league-id="${leagueId}" data-team-id="${team.id}" data-team-name="${escapeHTML(team.name)}">Delete</button>` : ''}
             `;
             teamsListEl.appendChild(li);
         });
@@ -448,8 +448,8 @@ export async function initLeaguesPage() {
                 const li = document.createElement('li');
                 li.className = 'list-item-row';
                 li.innerHTML = `
-                    <span>${lp.playerName}</span>
-                    ${isAuthorized ? `<button class="remove-player-btn btn-row" data-league-id="${leagueId}" data-player-id="${lp.id}" data-player-name="${lp.playerName}">Delete</button>` : ''}
+                    <span>${escapeHTML(lp.playerName)}</span>
+                    ${isAuthorized ? `<button class="remove-player-btn btn-row" data-league-id="${leagueId}" data-player-id="${lp.id}" data-player-name="${escapeHTML(lp.playerName)}">Delete</button>` : ''}
                 `;
                 playersListEl.appendChild(li);
             }
@@ -560,7 +560,7 @@ export async function initLeaguesPage() {
   async function showEventForm(leagueId, leagueName, event = null) {
     eventFormCard.classList.remove('hidden');
     const titleEl = document.getElementById('event-form-title');
-    titleEl.innerHTML = event ? `Edit Event: ${event.eventName}` : `Add Event to League: <span id="event-form-league-name">${leagueName}</span>`;
+    titleEl.innerHTML = event ? `Edit Event: ${escapeHTML(event.eventName)}` : `Add Event to League: <span id="event-form-league-name">${escapeHTML(leagueName)}</span>`;
     
     document.getElementById('event-league-id').value = leagueId;
     document.getElementById('event-id').value = event ? event.id : '';

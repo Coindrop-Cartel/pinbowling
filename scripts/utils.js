@@ -4,6 +4,24 @@
 
 /** @typedef {import('@scripts/types.js').ScoringEngine} ScoringEngine */
 
+/**
+ * Escapes a string for safe usage in HTML.
+ * @param {string|any} str
+ * @returns {string}
+ */
+export function escapeHTML(str) {
+  if (typeof str !== 'string') {
+    if (str === null || str === undefined) return '';
+    str = String(str);
+  }
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /** 
  * Helper to retrieve a value from the current URL search string.
  * @param {string} key 

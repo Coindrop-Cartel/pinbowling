@@ -9,15 +9,10 @@ PinBowling is a specialized scoring application designed to map pinball scores t
 ## Project Structure
 
 - `/service`: RESTful PHP data services for CRUD operations.
-- `/includes`: Core configuration, database initialization, and security utilities.
+- `/includes`: Core configuration, database initialization, and security utilities. Contains `/pages` templates.
 - `/scripts`: Frontend ES modules for UI components, scoring engines, and API interaction.
 - `/docs`: Documentation including API specifications.
 - `js-config.php`: Secure bridge for passing server-side environment variables to the frontend.
-
-## API Documentation
-
-The project includes a comprehensive OpenAPI 3.0 specification. You can find the detailed endpoint documentation in:
-`docs/openapi.yaml`
 
 Key endpoints include:
 - `service/leagueService.php`: Manage bowling leagues, seasonal events, and rosters.
@@ -53,7 +48,7 @@ Edit `config.php` and replace the placeholder values:
 
 ## Deployment
 
-To ensure client-side cache clearing after a deployment, increment the version string in **`version.txt`**. The application uses this value as the `UI_VERSION` for CSS and JS query strings.
+To ensure client-side cache clearing after a deployment, increment the version in **`package.json`** (e.g., via `npm version patch`). The application reads this value as the `UI_VERSION` for CSS and JS query strings.
 
 If your hosting provider exports environment variables for database credentials, the scripts can also read:
 

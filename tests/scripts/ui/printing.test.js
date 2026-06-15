@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { printMachineScores, printBlankScoreSheet } from '@ui/printing.js';
+import { printMachineScores, printBlankScoreSheet } from '@ui/printing.js'; // Import actual functions
 
 // Mock engine and scoring labels
 const mockEngine = {
@@ -12,6 +12,12 @@ const mockEngine = {
 
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => mockEngine),
+}));
+
+// Mock utils.js to provide escapeHTML
+vi.mock('@scripts/utils.js', () => ({
+  formatNumber: vi.fn(n => n?.toLocaleString() || '0'),
+  escapeHTML: vi.fn(str => str)
 }));
 
 describe('Printing Utilities (printing.js)', () => {

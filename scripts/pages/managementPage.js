@@ -2,7 +2,7 @@ import { PB_API } from '@services/api.js';
 import { can, PERMISSIONS } from '@services/auth.js';
 import { showAlert, showAuthDialog, showConfirm, showPrompt } from '@ui/dialogs.js';
 import { ROUTES, ROUTE_PATHS } from '@scripts/routes.js';
-import { navigateTo } from '@scripts/utils.js';
+import { navigateTo, escapeHTML } from '@scripts/utils.js';
 import { renderActionSummary } from '@ui/selectors.js';
 import { setDebugEnabled } from '@services/state.js';
 
@@ -48,7 +48,7 @@ export async function initManagementPage() {
     authNotice?.classList.add('hidden');
     toolsSection?.classList.remove('hidden');
 
-    renderActionSummary(toolsSection, 'System Maintenance', [
+    renderActionSummary(toolsSection, `System Maintenance for ${escapeHTML(user.username)}`, [
       { text: 'Run Database Cleanup', onclick: handleCleanup, hidden: user.role !== 'admin' }
     ]);
   };

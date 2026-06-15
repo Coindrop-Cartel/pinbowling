@@ -2,6 +2,7 @@ import { PB_API } from '@services/api.js';
 import { requireAdmin, can, PERMISSIONS } from '@services/auth.js';
 import { showAlert, showPrompt, showChoiceDialog, showConfirm } from '@ui/dialogs.js';
 import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
+import { escapeHTML } from '@scripts/utils.js';
 
 /**
  * Initializes the Player Management page.
@@ -108,8 +109,8 @@ export async function initPlayersPage() {
         const headerHtml = `
           <div class="header-bar">
             <div class="name-with-badge">
-              <strong>${p.playerName}</strong>
-              ${p.userRole ? `<span class="badge">${p.userRole}</span>` : ''}
+              <strong>${escapeHTML(p.playerName)}</strong>
+              ${p.userRole ? `<span class="badge">${escapeHTML(p.userRole)}</span>` : ''}
             </div>
             <div class="action-buttons">
               ${canEdit ? `<button type="button" class="edit-player-btn secondary btn-row">Edit</button>` : ''}
@@ -120,8 +121,8 @@ export async function initPlayersPage() {
 
         const contentHtml = `
           <div class="content-muted-col">
-            ${p.ifpaId ? `<div><strong>IFPA ID:</strong> ${p.ifpaId}</div>` : ''}
-            ${p.matchplayId ? `<div><strong>MatchPlay ID:</strong> ${p.matchplayId}</div>` : ''}
+            ${p.ifpaId ? `<div><strong>IFPA ID:</strong> ${escapeHTML(p.ifpaId)}</div>` : ''}
+            ${p.matchplayId ? `<div><strong>MatchPlay ID:</strong> ${escapeHTML(p.matchplayId)}</div>` : ''}
             ${!p.ifpaId && !p.matchplayId ? '<div class="muted-italic">No external IDs linked.</div>' : ''}
           </div>
         `;

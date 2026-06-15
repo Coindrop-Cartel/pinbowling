@@ -5,6 +5,11 @@
  * and security validation.
  */
 
+// Define absolute path constants to simulate JS-style aliases (@pages, @inc)
+define('PB_BASE_DIR', dirname(__DIR__));
+define('PB_INC_DIR', __DIR__);
+define('PB_PAGES_DIR', PB_INC_DIR . '/pages');
+
 /**
  * Manually parses a .env file into PHP's environment arrays.
  * Useful for shared hosting environments where putenv/$_ENV are required.
@@ -83,11 +88,16 @@ $stylesDir = 'styles'; // Folder name for CSS files. Set to '' if files are in t
 
 $apiSecret = envValue($loadedEnv, ['API_SECRET']);
 // UI_VERSION is used for asset cache-busting. 
-// It is read from version.txt to allow cache-busting updates without touching environment secrets.
-$versionFile = __DIR__ . '/../version.txt';
-$isReadable = is_readable($versionFile);
-$uiVersion = $isReadable ? trim(file_get_contents($versionFile)) : '1.0.0';
-$uiVersionSource = $isReadable ? 'version.txt' : 'Hardcoded Fallback';
+// It is read from package.json to ensure the source of truth is unified with the JS environment.
+$packageFile = PB_BASE_DIR . '/package.json';
+if (is_readable($packageFile)) {
+    $packageData = json_decode(file_get_contents($packageFile), true);
+    $uiVersion = $packageData['version'] ?? '1.0.0';
+    $uiVersionSource = 'package.json';
+} else {
+    $uiVersion = '1.0.0';
+    $uiVersionSource = 'Hardcoded Fallback';
+}
 
 $adminPassword = envValue($loadedEnv, ['ADMIN_PASSWORD']);
 $debugMode = false; // Initial state; toggled via Management UI and persisted in localStorage.
@@ -194,8 +204,11 @@ function getDbConnection($mockPdo = null) {
 }
 
 // Include modularized HTTP and Utility helpers
-require_once __DIR__ . '/http.php';
+require_once PB_INC_DIR . '/http.php';
 // Include modularized auth helpers
-require_once __DIR__ . '/auth.php';
+require_once PB_INC_DIR . '/auth.php';
 // Include data serializers
-require_once __DIR__ . '/serializers.php';
+require_once PB_INC_DIR . '/serializers.php';
+
+// Add the includes directory to the PHP include_path to allow cleaner require statements
+set_include_path(get_include_path() . PATH_SEPARATOR . PB_INC_DIR);

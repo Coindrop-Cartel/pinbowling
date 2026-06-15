@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { can, PERMISSIONS, filterPlayersForUser } from '@services/auth.js';
 import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
-import { getCookie, formatNumber, applyScoreFormatting, loadPage, renderThresholdGrid } from '@scripts/utils.js';
+import { getCookie, formatNumber, applyScoreFormatting, loadPage, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { createExpandableRow, setupSortableList, createSearchableSelect } from '@ui/selectors.js';
 import { showPlayerSelectionDialog } from '@ui/dialogs.js';
@@ -111,10 +111,10 @@ export async function initPlayPage() {
         headerHtml: `
           <div class="session-item-header">
             <div class="flex-center gap-8">
-              <strong>${event.eventName}</strong>
+              <strong>${escapeHTML(event.eventName)}</strong>
             </div>
             <div class="session-stats">
-              ${event.locationName || 'No Location'} | ${event.eventDate} | Players: ${event.roster?.length || 0}
+              ${escapeHTML(event.locationName) || 'No Location'} | ${escapeHTML(event.eventDate)} | Players: ${event.roster?.length || 0}
             </div>
             <div class="play-action-buttons">
               <button class="play-btn secondary btn-row">Play</button>
@@ -330,7 +330,7 @@ export async function initPlayPage() {
           <div class="flex gap-12 flex-1 min-250 align-center">
             <div class="drag-handle">☰</div>
             <span class="round-number">${index + 1}</span>
-            <span class="machine-name-display">${frame.machineName}</span>
+            <span class="machine-name-display">${escapeHTML(frame.machineName)}</span>
           </div>
           <div class="flex gap-12 wrap justify-end" onclick="event.stopPropagation()">
             <div class="flex gap-6 min-140 flex-1 align-center">

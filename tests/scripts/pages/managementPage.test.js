@@ -147,7 +147,7 @@ describe('Management Page (managementPage.js)', () => {
     await initManagementPage();
     // Find the cleanup action button from renderActionSummary
     const calls = vi.mocked(renderActionSummary).mock.calls;
-    const summaryCall = calls.find(c => c[1] === 'System Maintenance');
+    const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
     const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
     await cleanupAction.onclick();
     expect(PB_API.runCleanup).toHaveBeenCalledWith(60);
@@ -160,7 +160,7 @@ describe('Management Page (managementPage.js)', () => {
     showPrompt.mockResolvedValue(null);
     await initManagementPage();
     const calls = vi.mocked(renderActionSummary).mock.calls;
-    const summaryCall = calls.find(c => c[1] === 'System Maintenance');
+    const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
     const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
     await cleanupAction.onclick();
     expect(PB_API.runCleanup).not.toHaveBeenCalled();
@@ -171,7 +171,7 @@ describe('Management Page (managementPage.js)', () => {
     showConfirm.mockResolvedValue(false);
     await initManagementPage();
     const calls = vi.mocked(renderActionSummary).mock.calls;
-    const summaryCall = calls.find(c => c[1] === 'System Maintenance');
+    const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
     const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
     await cleanupAction.onclick();
     expect(PB_API.runCleanup).not.toHaveBeenCalled();
@@ -185,7 +185,7 @@ describe('Management Page (managementPage.js)', () => {
     showPrompt.mockResolvedValue('30');
     await initManagementPage();
     const calls = vi.mocked(renderActionSummary).mock.calls;
-    const summaryCall = calls.find(c => c[1] === 'System Maintenance');
+    const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
     const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
     await cleanupAction.onclick();
     expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('DB locked'), 'Error');
@@ -195,7 +195,7 @@ describe('Management Page (managementPage.js)', () => {
     Auth.can.mockResolvedValue(true);
     await initManagementPage();
     const calls = vi.mocked(renderActionSummary).mock.calls;
-    const summaryCall = calls.find(c => c[1] === 'System Maintenance');
+    const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
     const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
     expect(cleanupAction.hidden).toBe(true);
   });

@@ -26,7 +26,8 @@ vi.mock('@services/auth.js', () => ({
 vi.mock('@scripts/utils.js', () => ({
   applyScoreFormatting: vi.fn(),
   formatNumber: vi.fn(n => String(n)),
-  getActiveLeagueId: vi.fn(() => '1')
+  getActiveLeagueId: vi.fn(() => '1'),
+  escapeHTML: vi.fn(str => str), // Mock escapeHTML
 }));
 
 const uiMocks = vi.hoisted(() => ({
@@ -52,15 +53,24 @@ const uiMocks = vi.hoisted(() => ({
     return filterInstance;
   }),
   createExpandableRow: vi.fn((container, options) => {
-    const row = document.createElement('div');
+    const row = document.createElement(options.tag || 'div');
+    row.dataset.id = options.id;
+
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'row-header';
+    headerDiv.innerHTML = options.headerHtml || '';
+    row.appendChild(headerDiv);
+
+    if (options.contentHtml) {
+      const contentDiv = document.createElement('div');
+      contentDiv.className = `row-expansion ${options.isExpanded ? '' : 'hidden'}`;
+      contentDiv.innerHTML = options.contentHtml;
+      row.appendChild(contentDiv);
+    }
     row.className = options.className || 'team-registry-item';
-    row.innerHTML = `
-      <div class="team-header">${options.headerHtml || ''}</div>
-      <div class="team-details ${options.isExpanded ? '' : 'hidden'}">${options.contentHtml || ''}</div>
-    `;
     container.appendChild(row);
-    if (options.onHeaderClick) {
-      row.querySelector('.team-header').addEventListener('click', options.onHeaderClick);
+    if (options.onHeaderClick && headerDiv) {
+      headerDiv.addEventListener('click', options.onHeaderClick);
     }
     return row;
   }),
@@ -368,7 +378,7 @@ describe('Teams Page (teamsPage.js)', () => {
       showPlayerSelectionDialog.mockResolvedValue('77');
       PB_API.addTeamMember.mockResolvedValue({ success: true });
       await initTeamsPage();
-      document.querySelector('.team-header').click();
+      document.querySelector('.row-header').click();
       const addMemberBtn = document.querySelector('.add-member-btn');
       addMemberBtn.click();
       await vi.waitFor(() => {
@@ -386,7 +396,7 @@ describe('Teams Page (teamsPage.js)', () => {
       ]);
       showPlayerSelectionDialog.mockResolvedValue(null);
       await initTeamsPage();
-      document.querySelector('.team-header').click();
+      document.querySelector('.row-header').click();
       const addMemberBtn = document.querySelector('.add-member-btn');
       addMemberBtn.click();
       await vi.waitFor(() => {
@@ -402,7 +412,7 @@ describe('Teams Page (teamsPage.js)', () => {
       PB_API.getTeams.mockResolvedValue(mockTeams);
       PB_API.getPlayers.mockResolvedValue([{ id: 99, playerName: 'John Doe' }]);
       await initTeamsPage();
-      document.querySelector('.team-header').click();
+      document.querySelector('.row-header').click();
       const addMemberBtn = document.querySelector('.add-member-btn');
       addMemberBtn.click();
       await vi.waitFor(() => {
@@ -416,7 +426,7 @@ describe('Teams Page (teamsPage.js)', () => {
       PB_API.getPlayers.mockResolvedValue([{ id: 77, playerName: 'New Player' }]);
       showPlayerSelectionDialog.mockResolvedValue(null);
       await initTeamsPage();
-      document.querySelector('.team-header').click();
+      document.querySelector('.row-header').click();
       const addMemberBtn = document.querySelector('.add-member-btn');
       addMemberBtn.click();
       await vi.waitFor(() => {
@@ -431,7 +441,7 @@ describe('Teams Page (teamsPage.js)', () => {
       showPlayerSelectionDialog.mockResolvedValue('77');
       PB_API.addTeamMember.mockRejectedValue(new Error('Add member failed'));
       await initTeamsPage();
-      document.querySelector('.team-header').click();
+      document.querySelector('.row-header').click();
       const addMemberBtn = document.querySelector('.add-member-btn');
       addMemberBtn.click();
       await vi.waitFor(() => {
@@ -448,7 +458,7 @@ describe('Teams Page (teamsPage.js)', () => {
       showConfirm.mockResolvedValue(true);
       PB_API.removeTeamMember.mockResolvedValue({ success: true });
       await initTeamsPage();
-      document.querySelector('.team-header').click();
+      document.querySelector('.row-header').click();
       const removeBtn = document.querySelector('.remove-member-btn');
       removeBtn.click();
       await vi.waitFor(() => {
@@ -463,7 +473,7 @@ describe('Teams Page (teamsPage.js)', () => {
       PB_API.getPlayers.mockResolvedValue([]);
       showConfirm.mockResolvedValue(false);
       await initTeamsPage();
-      document.querySelector('.team-header').click();
+      document.querySelector('.row-header').click();
       const removeBtn = document.querySelector('.remove-member-btn');
       removeBtn.click();
       await vi.waitFor(() => {
@@ -478,7 +488,7 @@ describe('Teams Page (teamsPage.js)', () => {
       showConfirm.mockResolvedValue(true);
       PB_API.removeTeamMember.mockRejectedValue(new Error('Remove failed'));
       await initTeamsPage();
-      document.querySelector('.team-header').click();
+      document.querySelector('.row-header').click();
       const removeBtn = document.querySelector('.remove-member-btn');
       removeBtn.click();
       await vi.waitFor(() => {

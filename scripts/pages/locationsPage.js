@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { createExpandableRow } from '@ui/selectors.js';
 import { getScoringEngine } from '@core/engine.js';
-import { formatNumber, applyScoreFormatting } from '@scripts/utils.js';
+import { formatNumber, applyScoreFormatting, escapeHTML } from '@scripts/utils.js';
 import { showConfirm } from '@ui/dialogs.js';
 import { requireAdmin } from '@services/auth.js';
 
@@ -86,7 +86,7 @@ export async function initLocationsPage() {
         const headerHtml = `
           <div class="header-bar">
             <h3 class="section-heading flex-1">
-              ${loc.name}${cityState}<br>
+              ${escapeHTML(loc.name)}${escapeHTML(cityState)}<br>
               <small>Machines: (${loc.machines?.length || 0})</small>
             </h3>
             <div class="action-buttons">
@@ -244,7 +244,7 @@ export async function initLocationsPage() {
       item.className = 'list-item-row';
       item.innerHTML = `
         <span>
-          <strong class="small">${m.machineName}</strong><br>
+          <strong class="small">${escapeHTML(m.machineName)}</strong><br>
           <small>E: ${formatNumber(m.targetEasy)} | M: ${formatNumber(m.targetMed)} | H: ${formatNumber(m.targetHard)}</small>
         </span>
         <div class="small-action-buttons">

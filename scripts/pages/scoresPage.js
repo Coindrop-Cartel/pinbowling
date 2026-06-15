@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { filterLeaguesForUser, filterPlayersForUser, getScoreAccessLevel, can } from '@services/auth.js';
 import { showAlert } from '@ui/dialogs.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, formatNumber, applyScoreFormatting, renderThresholdGrid, setCurrentPlayerId, getCurrentPlayerId } from '@scripts/utils.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, formatNumber, applyScoreFormatting, renderThresholdGrid, setCurrentPlayerId, getCurrentPlayerId, escapeHTML } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector } from '@ui/selectors.js';
 import { normalizeScores, normalizeTargets, buildScoreMapFromDOM, buildScoreMapFromRows } from '@services/normalizer.js';
@@ -177,7 +177,7 @@ export async function initScoresPage() {
 
     row.innerHTML = `
       <div class="round-info">
-        <div class="round-label"><b>${Engine.getRoundLabel()} ${round.orderNumber}:</b> ${round.machineName}</div>
+        <div class="round-label"><b>${escapeHTML(Engine.getRoundLabel())} ${round.orderNumber}:</b> ${escapeHTML(round.machineName)}</div>
         ${Engine.getRowSummaryHtml(round, formatNumber)}
         ${bonusHtml}
         <div class="target-details hidden">
@@ -190,7 +190,7 @@ export async function initScoresPage() {
     `;
 
     if (isAccessDenied) {
-      row.querySelector('.round-inputs-container').insertAdjacentHTML('afterend', `<span class="round-msg">${msg}</span>`);
+      row.querySelector('.round-inputs-container').insertAdjacentHTML('afterend', `<span class="round-msg">${escapeHTML(msg)}</span>`);
     }
 
     const inputsContainer = row.querySelector('.round-inputs-container');
@@ -519,8 +519,8 @@ export async function initScoresPage() {
     const event = league?.events?.find(e => String(e.id) === String(eventId));
 
     const isSession = league?.type === 'session';
-    const leagueTitle = isSession ? '' : `<div class="meta-strong">League: ${league?.name || 'Unknown'}</div>`;
-    const eventTitle = `<div class="meta-muted">Event: ${event?.eventName || 'Event'}</div>`;
+    const leagueTitle = isSession ? '' : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;
+    const eventTitle = `<div class="meta-muted">Event: ${escapeHTML(event?.eventName || 'Event')}</div>`;
     const summaryTitle = `${leagueTitle}${eventTitle}`;
 
     tournamentSelectorUI.classList.add('hidden');

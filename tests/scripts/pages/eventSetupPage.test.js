@@ -24,6 +24,7 @@ vi.mock('@scripts/utils.js', () => ({
   getActiveLeagueId: vi.fn(),
   renderPreview: vi.fn(),
   renderThresholdGrid: vi.fn(() => '<div>Grid</div>'),
+  escapeHTML: vi.fn(str => str),
   applyScoreFormatting: vi.fn(),
   formatNumber: (n) => String(n),
   navigateTo: vi.fn(),
@@ -50,11 +51,26 @@ const uiMocks = vi.hoisted(() => ({
   initReadOnlyTournamentDisplay: vi.fn((container, refresh) => Promise.resolve(refresh())),
   initTournamentSelector: vi.fn(),
   createExpandableRow: vi.fn((container, options) => {
-    const div = document.createElement('div');
-    div.className = options.className || '';
-    div.innerHTML = (options.headerHtml || '') + (options.contentHtml || '');
-    container.appendChild(div);
-    return div;
+    const row = document.createElement(options.tag || 'div');
+    row.dataset.id = options.id;
+
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'row-header';
+    headerDiv.innerHTML = options.headerHtml || '';
+    row.appendChild(headerDiv);
+
+    if (options.contentHtml) {
+      const contentDiv = document.createElement('div');
+      contentDiv.className = `row-expansion ${options.isExpanded ? '' : 'hidden'}`;
+      contentDiv.innerHTML = options.contentHtml;
+      row.appendChild(contentDiv);
+    }
+    row.className = options.className || '';
+    container.appendChild(row);
+    if (options.onHeaderClick && headerDiv) {
+      headerDiv.addEventListener('click', options.onHeaderClick);
+    }
+    return row;
   }),
   setupSortableList: vi.fn(),
 }));
