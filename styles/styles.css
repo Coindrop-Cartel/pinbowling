@@ -59,7 +59,9 @@ body {
   text-transform: uppercase;
   font-size: 1.5rem;
   letter-spacing: -1px;
-  white-space: nowrap;
+  white-space: nowrap;  /* Fixed min-width ensures adjacent nav links don't move when brand text changes. */
+  min-width: 260px;
+  display: flex;
 }
 
 .nav-logo img {
@@ -130,6 +132,13 @@ body {
 
 .dropdown.is-open .dropdown-content {
   display: block;
+}
+
+/* Stabilize the right side of the navbar to prevent shifts during login/logout/navigation. */
+.auth-header {
+  min-width: 220px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* Auth Header Components */
@@ -420,6 +429,11 @@ td {
 }
 
 .hidden {
+  display: none !important;
+}
+
+/* Utility for elements that must be hidden until auth/permission is verified */
+.auth-gated, .mgmt-only {
   display: none !important;
 }
 
@@ -943,6 +957,7 @@ body.tv-mode-active .standings-total {
     flex: 1;
     order: 1;
     font-size: 1.2rem;
+    min-width: unset;
   }
 
   .nav-logo img {
@@ -961,6 +976,7 @@ body.tv-mode-active .standings-total {
     gap: 8px;
     font-size: 0.8rem;
     white-space: nowrap;
+    min-width: unset;
   }
 
   #header-logout-btn, #header-login-btn {

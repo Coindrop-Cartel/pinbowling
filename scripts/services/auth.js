@@ -149,6 +149,19 @@ function updateAuthUI(user) {
   const container = document.getElementById('auth-header-container');
   const adminNav = document.getElementById('admin-nav-item');
   const role = user?.role || 'unregistered';
+  const userId = user ? String(user.id) : 'guest';
+
+  // Localized Update Optimization:
+  // Only re-render the auth container if the authentication state or the user has changed.
+  const currentState = container?.getAttribute('data-auth-state');
+  const shouldUpdateHeader = currentState !== userId;
+
+  if (container) {
+    container.setAttribute('data-auth-state', userId);
+  }
+
+  // If the user identity hasn't changed, skip all DOM manipulations to prevent flickering.
+  if (!container || !shouldUpdateHeader) return;
 
   // Handle global restricted navigation items
   if (adminNav) {
@@ -168,8 +181,6 @@ function updateAuthUI(user) {
     // Hide the entire "Admin" dropdown if the user has no accessible sub-items
     adminNav.classList.toggle('hidden', visibleChildren === 0 || !user);
   }
-
-  if (!container) return;
 
   if (user) {
     container.innerHTML = `

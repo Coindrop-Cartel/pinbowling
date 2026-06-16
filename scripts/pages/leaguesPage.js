@@ -18,6 +18,17 @@ import { showPlayerSelectionDialog, showConfirm } from '@ui/dialogs.js';
  * @returns {Promise<void>}
  */
 export async function initLeaguesPage() {
+  const leagueForm = document.getElementById('league-form');
+  const createToggle = document.getElementById('create-league-toggle');
+  const leaguesList = document.getElementById('leagues-list');
+  const emptyNotice = document.getElementById('leagues-list-empty');
+  const eventFormCard = document.getElementById('event-form-card');
+
+  // Immediate visibility reset to prevent FOUC while checking permissions.
+  if (leagueForm) leagueForm.closest('.card')?.classList.add('hidden');
+  if (createToggle) createToggle.classList.add('hidden');
+  if (eventFormCard) eventFormCard.classList.add('hidden');
+
   let isAuthorized = false;
   let leaguesData = [];
   try {
@@ -27,14 +38,10 @@ export async function initLeaguesPage() {
     ]);
   } catch (err) { console.error('Initialization failed:', err); }
 
-  const leagueFormTitle = document.getElementById('league-form-title');
-  const leagueForm = document.getElementById('league-form');
   const leagueNameInput = document.getElementById('league-name');
   const leagueDateInput = document.getElementById('league-start-date');
   const createBtn = document.getElementById('create-league-btn');
-  const leaguesList = document.getElementById('leagues-list');
-  const emptyNotice = document.getElementById('leagues-list-empty');
-  const eventFormCard = document.getElementById('event-form-card');
+  const leagueFormTitle = document.getElementById('league-form-title');
   let allPlayersCache = []; // Cache all players for selection dialogs
 
   let allLeagues = [];
@@ -82,14 +89,13 @@ export async function initLeaguesPage() {
   if (dropLowestRow) dropLowestRow.classList.add('hidden');
   if (actionsRow) actionsRow.classList.add('hidden');
 
-  if (!isAuthorized && leagueForm) {
-    leagueForm.closest('.card').classList.add('hidden');
+  // Reveal the league creation card only if authorized
+  if (isAuthorized && leagueForm) {
+    leagueForm.closest('.card').classList.remove('hidden');
   }
 
-  let createToggle = document.getElementById('create-league-toggle');
-  if (createToggle) createToggle.classList.toggle('hidden', !isAuthorized);
   if (createToggle && isAuthorized) {
-
+    createToggle.classList.remove('hidden');
     createToggle.onclick = () => {
       const isHidden = dateRow.classList.contains('hidden');
       if (!isHidden || editingLeagueId) {
@@ -251,6 +257,7 @@ export async function initLeaguesPage() {
     // Hide the "Create" toggle if an exact match exists, unless the creation 
     // form is already open (in which case the button serves as "Cancel").
     const isFormOpen = !dateRow.classList.contains('hidden');
+    // Only show the toggle if authorized and there isn't a duplicate name conflict
     const shouldHide = !isAuthorized || (!!exactMatch && !isFormOpen && !isEditingThis);
     if (createToggle) createToggle.classList.toggle('hidden', shouldHide);
 

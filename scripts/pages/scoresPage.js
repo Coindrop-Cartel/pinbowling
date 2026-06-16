@@ -29,7 +29,15 @@ export async function initScoresPage() {
   const playerSelectionCard = document.getElementById('player-selection-card');
   const scoringCard = document.getElementById('scoring-card');
   const resultsCard = document.getElementById('results-card');
+  const tournamentSelectorUI = document.getElementById('tournament-selector-ui');
+  const tournamentSummary = document.getElementById('tournament-summary');
+  const playerSelectorUI = document.getElementById('player-selector-ui');
+  const playerSummary = document.getElementById('player-summary');
   
+  // Immediate visibility reset to prevent FOUC while loading data.
+  [playerSelectionCard, scoringCard, resultsCard, tournamentSummary, playerSummary, warning].forEach(el => el?.classList.add('hidden'));
+  if (playerSelect) playerSelect.disabled = true;
+
   let allLeaguesCache = []; // Module-level cache for leagues
   let tournamentSelector = null;
   // Fetch leagues and current user once at the start. 
@@ -80,13 +88,6 @@ export async function initScoresPage() {
   let allPlayersCache = [];
   let machines = [];
 
-  // Selection UI Toggles
-  const tournamentSelectorUI = document.getElementById('tournament-selector-ui');
-  const tournamentSummary = document.getElementById('tournament-summary');
-
-  const playerSelectorUI = document.getElementById('player-selector-ui');
-  const playerSummary = document.getElementById('player-summary');
-
   const handleTournamentChange = () => {
     tournamentSelectorUI.classList.remove('hidden');
     tournamentSummary.classList.add('hidden');
@@ -130,9 +131,6 @@ export async function initScoresPage() {
 
   // Default engine
   let Engine = getScoringEngine('bowling');
-
-  warning.classList.add('hidden');
-  playerSelect.disabled = false;
 
   /**
    * Helper to create a formatted numeric input for pinball scores.
@@ -322,6 +320,7 @@ export async function initScoresPage() {
       if (playerSearchInstance) {
         playerSearchInstance.setData(selectablePlayers);
       }
+      if (playerSelect) playerSelect.disabled = false;
 
       if (currentPlayerId) {
         const player = allPlayersCache.find(p => String(p.id) === String(currentPlayerId));
@@ -357,7 +356,8 @@ export async function initScoresPage() {
     
     const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
-    roundsInput.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
     for (const round of machines) {
       const isLastRound = round.orderNumber === maxOrder;
       const turnValues = scoreMap[String(round.orderNumber)];
@@ -369,13 +369,16 @@ export async function initScoresPage() {
           const hintDiv = document.createElement('div');
           hintDiv.className = 'hint small';
           hintDiv.innerHTML = lfHint;
-          roundsInput.appendChild(hintDiv);
+          fragment.appendChild(hintDiv);
         }
       }
 
       const row = await buildRoundRow(round, turnValues, isLastRound, player);
-      roundsInput.appendChild(row);
+      fragment.appendChild(row);
     }
+
+    roundsInput.innerHTML = '';
+    roundsInput.appendChild(fragment);
   }
 
   /**
@@ -412,19 +415,21 @@ export async function initScoresPage() {
     }
 
     const player = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
-    playerSelectorUI.classList.add('hidden');
+    playerSelectorUI?.classList.add('hidden');
 
-    renderActionSummary(playerSummary, `Player: ${player?.playerName || 'Selected'}`, [
-      { text: 'Change', onclick: handlePlayerChange }
-    ]);
+    const scores = await PB_API.scores.get(Number(activePlayerId), Number(getActiveEventId()));
+    await loadScoresIntoForm(scores, player);
 
+    // Reveal UI only after data is loaded and DOM is prepared
     warning.classList.add('hidden');
     scoringCard.classList.remove('hidden');
     resultsCard.classList.remove('hidden');
+    playerSummary?.classList.remove('hidden');
+    renderActionSummary(playerSummary, `Player: ${player?.playerName || 'Selected'}`, [
+      { text: 'Change', onclick: handlePlayerChange }
+    ]);
     roundsInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
-    
-    const scores = await PB_API.scores.get(Number(activePlayerId), Number(getActiveEventId()));
-    await loadScoresIntoForm(scores, player);
+
     renderCurrentResults();
   }
 
@@ -518,6 +523,7 @@ export async function initScoresPage() {
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
     const event = league?.events?.find(e => String(e.id) === String(eventId));
 
+    const format = event?.scoringFormat || league?.scoringFormat || 'bowling';
     const isSession = league?.type === 'session';
     const leagueTitle = isSession ? '' : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;
     const eventTitle = `<div class="meta-muted">Event: ${escapeHTML(event?.eventName || 'Event')}</div>`;
@@ -530,7 +536,6 @@ export async function initScoresPage() {
     ]);
 
     activeLeague = league;
-    const format = event?.scoringFormat || league?.scoringFormat || 'bowling';
     Engine = getScoringEngine(format);
     applyPreferredTheme(format);
 

@@ -95,8 +95,8 @@ $dbCharset = 'utf8mb4';
 $stylesDir = 'styles'; // Folder name for CSS files. Set to '' if files are in the root.
 
 $apiSecret = envValue($loadedEnv, ['API_SECRET']);
-// UI_VERSION is used for asset cache-busting. 
-// It is read from package.json to ensure the source of truth is unified with the JS environment.
+// UI_VERSION is used for asset cache-busting.
+// package.json is the single source of truth for versioning across the project.
 $packageFile = PB_BASE_DIR . '/package.json';
 if (is_readable($packageFile)) {
     $packageData = json_decode(file_get_contents($packageFile), true);

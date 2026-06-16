@@ -182,7 +182,7 @@ describe('Auth Service (auth.js)', () => {
 
   describe('initAuthHeader', () => {
     it('should display hi message and logout button for authenticated users', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'player', player_name: 'TestPlayer' });
+      PB_API.auth.me.mockResolvedValue({ id: 10, role: 'player', player_name: 'TestPlayer' });
       await initAuthHeader();
       const container = document.getElementById('auth-header-container');
       expect(container.innerHTML).toContain('Hi, TestPlayer');
@@ -190,14 +190,14 @@ describe('Auth Service (auth.js)', () => {
     });
 
     it('should reveal admin navigation and maintenance tools for admins', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'admin', player_name: 'Admin' });
+      PB_API.auth.me.mockResolvedValue({ id: 11, role: 'admin', player_name: 'Admin' });
       await initAuthHeader();
       const adminNav = document.getElementById('admin-nav-item');
       expect(adminNav.classList.contains('hidden')).toBe(false);
     });
 
     it('should reveal admin navigation but hide maintenance for TDs', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'td', player_name: 'TD' });
+      PB_API.auth.me.mockResolvedValue({ id: 12, role: 'td', player_name: 'TD' });
       await initAuthHeader();
       const adminNav = document.getElementById('admin-nav-item');
       expect(adminNav.classList.contains('hidden')).toBe(false);
@@ -206,7 +206,7 @@ describe('Auth Service (auth.js)', () => {
     });
 
     it('should display logout button for unregistered user (user object is truthy)', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'unregistered' });
+      PB_API.auth.me.mockResolvedValue({ id: 99, role: 'unregistered' });
       await initAuthHeader();
       const container = document.getElementById('auth-header-container');
       expect(container.querySelector('#header-logout-btn')).not.toBeNull();
@@ -220,7 +220,7 @@ describe('Auth Service (auth.js)', () => {
     });
 
     it('should trigger logout API on logout click', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'player', player_name: 'Player' });
+      PB_API.auth.me.mockResolvedValue({ id: 1, role: 'player', player_name: 'Player' });
       await initAuthHeader();
       const btn = document.getElementById('header-logout-btn');
       btn.click();
@@ -258,7 +258,7 @@ describe('Auth Service (auth.js)', () => {
     });
 
     it('should use cached user on second call without network request', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'player', player_name: 'Cached' });
+      PB_API.auth.me.mockResolvedValue({ id: 5, role: 'player', player_name: 'Cached' });
       await initAuthHeader();
       const callCount = PB_API.auth.me.mock.calls.length;
       await initAuthHeader();
@@ -266,7 +266,7 @@ describe('Auth Service (auth.js)', () => {
     });
 
     it('should hide admin nav when user has no accessible sub-items (player)', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'player', player_name: 'Player' });
+      PB_API.auth.me.mockResolvedValue({ id: 1, role: 'player', player_name: 'Player' });
       await initAuthHeader();
       const adminNav = document.getElementById('admin-nav-item');
       expect(adminNav.classList.contains('hidden')).toBe(true);
@@ -281,12 +281,12 @@ describe('Auth Service (auth.js)', () => {
 
     it('should handle missing auth-header-container gracefully', async () => {
       document.body.innerHTML = '<div id="admin-nav-item"></div>';
-      PB_API.auth.me.mockResolvedValue({ role: 'player' });
+      PB_API.auth.me.mockResolvedValue({ id: 1, role: 'player' });
       await expect(initAuthHeader()).resolves.toBeUndefined();
     });
 
     it('should handle logout failure gracefully', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'player', player_name: 'Player' });
+      PB_API.auth.me.mockResolvedValue({ id: 1, role: 'player', player_name: 'Player' });
       PB_API.auth.logout.mockRejectedValue(new Error('Logout failed'));
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       await initAuthHeader();
@@ -298,14 +298,14 @@ describe('Auth Service (auth.js)', () => {
     });
 
     it('should use username fallback when player_name is missing', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'player', username: 'FallbackUser' });
+      PB_API.auth.me.mockResolvedValue({ id: 1, role: 'player', username: 'FallbackUser' });
       await initAuthHeader();
       const container = document.getElementById('auth-header-container');
       expect(container.innerHTML).toContain('FallbackUser');
     });
 
     it('should show correct nav items for td role', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'td', player_name: 'TD' });
+      PB_API.auth.me.mockResolvedValue({ id: 1, role: 'td', player_name: 'TD' });
       await initAuthHeader();
       expect(document.getElementById('nav-leagues').classList.contains('hidden')).toBe(false);
       expect(document.getElementById('nav-machines').classList.contains('hidden')).toBe(false);
@@ -315,17 +315,17 @@ describe('Auth Service (auth.js)', () => {
     });
 
     it('should show only locations and players for unregistered user', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'unregistered' });
+      PB_API.auth.me.mockResolvedValue({ id: 1, role: 'unregistered' });
       await initAuthHeader();
       expect(document.getElementById('nav-locations').classList.contains('hidden')).toBe(false);
       expect(document.getElementById('nav-players').classList.contains('hidden')).toBe(false);
     });
 
     it('should clear cached user and allow re-fetch', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'player', player_name: 'First' });
+      PB_API.auth.me.mockResolvedValue({ id: 1, role: 'player', player_name: 'First' });
       await initAuthHeader();
       resetAuthCache();
-      PB_API.auth.me.mockResolvedValue({ role: 'admin', player_name: 'Second' });
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'admin', player_name: 'Second' });
       await initAuthHeader();
       const container = document.getElementById('auth-header-container');
       expect(container.innerHTML).toContain('Second');
@@ -334,10 +334,10 @@ describe('Auth Service (auth.js)', () => {
 
   describe('resetAuthCache', () => {
     it('should clear cached user data', async () => {
-      PB_API.auth.me.mockResolvedValue({ role: 'player', player_name: 'Cached' });
+      PB_API.auth.me.mockResolvedValue({ id: 1, role: 'player', player_name: 'Cached' });
       await initAuthHeader();
       resetAuthCache();
-      PB_API.auth.me.mockResolvedValue({ role: 'admin', player_name: 'NewAdmin' });
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'admin', player_name: 'NewAdmin' });
       await initAuthHeader();
       expect(PB_API.auth.me).toHaveBeenCalledTimes(2);
     });
