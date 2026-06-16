@@ -6,13 +6,13 @@ import * as Utils from '@scripts/utils.js';
 
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    getLeagues: vi.fn(),
-    getLeague: vi.fn(),
-    getPlayers: vi.fn().mockResolvedValue([]),
-    getTargetScores: vi.fn(),
-    getScores: vi.fn(),
-    saveScore: vi.fn(),
-    getCurrentUser: vi.fn(),
+    leagues: {
+      getAll: vi.fn(),
+    },
+    players: { getAll: vi.fn().mockResolvedValue([]) },
+    machines: { getTargets: vi.fn() },
+    scores: { get: vi.fn(), save: vi.fn() },
+    auth: { me: vi.fn() },
   },
 }));
 
@@ -120,11 +120,10 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
     vi.clearAllMocks();
     Utils.getActiveLeagueId.mockReturnValue('1');
     Utils.getActiveEventId.mockReturnValue('101');
-    PB_API.getLeagues.mockResolvedValue([{ id: '1', events: [{ id: '101', eventName: 'Week 1' }] }]);
-    PB_API.getLeague.mockResolvedValue({ id: '1', players: [] });
-    PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineName: 'M1', machineId: 5, values: { 10: 100 } }]);
-    PB_API.getScores.mockResolvedValue([]);
-    PB_API.getCurrentUser.mockResolvedValue(null);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: '1', name: 'Standard League', players: [], events: [{ id: '101', eventName: 'Week 1' }] }]);
+    PB_API.machines.getTargets.mockResolvedValue([{ orderNumber: 1, machineName: 'M1', machineId: 5, values: { 10: 100 } }]);
+    PB_API.scores.get.mockResolvedValue([]);
+    PB_API.auth.me.mockResolvedValue(null);
   });
 
   it('should hide selector and show summary when event is active', async () => {
@@ -135,8 +134,8 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
 
   it('should load inputs and results when a player is selected', async () => {
     Utils.getCurrentPlayerId.mockReturnValue('20');
-    PB_API.getPlayers.mockResolvedValue([{ id: 20, playerName: 'Alice' }]);
-    PB_API.getLeague.mockResolvedValue({ id: 1, players: [{ id: 20, playerName: 'Alice' }] });
+    PB_API.players.getAll.mockResolvedValue([{ id: 20, playerName: 'Alice' }]);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, players: [{ id: 20, playerName: 'Alice' }] }]);
     
     await initScoresPage();
     

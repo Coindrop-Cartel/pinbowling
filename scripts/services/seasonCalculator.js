@@ -16,10 +16,13 @@ import { groupTargetsByEvent, buildScoreMapFromRows } from '@services/normalizer
  * @param {Object<number, Object<number, Object[]>>} params.scoresByEventAndPlayer
  *   Nested map of `{ [eventId]: { [playerId]: score[] } }` from `groupScoresByEventAndPlayer`.
  * @param {Object} params.engine - ScoringEngine instance with `calculateTurnResults`, `compareScores`, and `formatTotalScore` methods.
- * @param {string[]} [params.selectedPlayerIds=[]] - Optional array of player IDs to filter to; empty array means all players.
- * @returns {{ rows: Array<{ entity: Object, eventTotals: Object<number, {displayValue: string, isDropped: boolean}|null>, totalSeasonPoints: number, playedTargets: Object[] }>, isTeamLeague: boolean }}
- *   `rows` — sorted summary rows for each player/team;
- *   `isTeamLeague` — whether the league uses team-based scoring.
+ * @param {string[]} [params.selectedPlayerIds=[]] - Array of player IDs to filter the results.
+ * @returns {Object} The calculated season summary.
+ * @returns {boolean} returns.isTeamLeague - Indicates if the league is team-based.
+ * @returns {Array} returns.rows - Sorted summary rows.
+ * @returns {Object} returns.rows[].entity - The player or team object.
+ * @returns {Object<number, {displayValue: string, isDropped: boolean}|null>} returns.rows[].eventTotals - Totals keyed by event ID.
+ * @returns {number} returns.rows[].totalSeasonPoints - Aggregate points after applying drop-weeks.
  */
 export function calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, engine, selectedPlayerIds = [] }) {
   const isTeamLeague = league?.participants === 'team';

@@ -18,8 +18,8 @@ import { escapeHTML } from '@scripts/utils.js';
 export async function initMachinesPage() {
   // Batch initial user check and data fetch
   const [currentUser, machinesData] = await Promise.all([
-    PB_API.getCurrentUser(),
-    PB_API.getMachines()
+    PB_API.auth.me(),
+    PB_API.machines.getAll()
   ]);
 
   const isAdmin = currentUser && currentUser.role === 'admin';
@@ -204,7 +204,7 @@ export async function initMachinesPage() {
 
   async function refresh(data = null) {
     try {
-      const machines = data || await PB_API.getMachines();
+      const machines = data || await PB_API.machines.getAll();
       allMachines.length = 0;
       allMachines.push(...machines);
       filterInstance.performFilter();
@@ -233,9 +233,9 @@ export async function initMachinesPage() {
 
     try {
       if (id) {
-        await PB_API.updateMachine(id, payload); 
+        await PB_API.machines.update(id, payload); 
       } else {
-        await PB_API.createMachine(payload);
+        await PB_API.machines.create(payload);
       }
       await refresh();
     } catch (err) {
@@ -246,7 +246,7 @@ export async function initMachinesPage() {
   async function deleteMachine(id) {
     if (!await requireAdmin(`Enter Admin Password to confirm deletion of the machine:`)) return;
     try {
-      await PB_API.deleteMachine(id);
+      await PB_API.machines.delete(id);
       await refresh();
     } catch (error) {
       showAlert(`Error deleting machine: ${error.message}`);

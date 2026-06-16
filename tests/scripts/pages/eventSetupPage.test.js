@@ -9,13 +9,18 @@ import { printMachineScores } from '@ui/printing.js';
 
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    getLeagues: vi.fn(),
-    getMachines: vi.fn(),
-    getTargetScores: vi.fn(),
-    getLocationMachines: vi.fn(),
-    saveTargetScore: vi.fn(),
-    createMachine: vi.fn(),
-    bulkUpdateTargetOrder: vi.fn(),
+    leagues: {
+      getAll: vi.fn(),
+    },
+    machines: {
+      getAll: vi.fn(),
+      getTargets: vi.fn(),
+      saveTarget: vi.fn(),
+      create: vi.fn(),
+    },
+    locations: {
+      getMachines: vi.fn(),
+    }
   },
 }));
 
@@ -147,10 +152,10 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
     `;
 
     vi.clearAllMocks();
-    PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'League', events: [{ id: 101, locationId: 1 }] }]);
-    PB_API.getMachines.mockResolvedValue([{ id: 1, machineName: 'Iron Maiden' }]);
-    PB_API.getTargetScores.mockResolvedValue([]);
-    PB_API.getLocationMachines.mockResolvedValue([]);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'League', events: [{ id: 101, locationId: 1 }] }]);
+    PB_API.machines.getAll.mockResolvedValue([{ id: 1, machineName: 'Iron Maiden' }]);
+    PB_API.machines.getTargets.mockResolvedValue([]);
+    PB_API.locations.getMachines.mockResolvedValue([]);
     Utils.getActiveLeagueId.mockReturnValue('1');
     Utils.getActiveEventId.mockReturnValue('101');
 
@@ -173,8 +178,8 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
 
   it('should load machine suggestions and targets on init', async () => {
     await initEventSetupPage();
-    expect(PB_API.getMachines).toHaveBeenCalled();
-    expect(PB_API.getTargetScores).toHaveBeenCalledWith('101');
+    expect(PB_API.machines.getAll).toHaveBeenCalled();
+    expect(PB_API.machines.getTargets).toHaveBeenCalledWith('101');
   });
 
   it('should show the config form when "Add Target" is clicked', async () => {
@@ -208,9 +213,9 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
   it('should handle quick fill buttons', async () => {
     const machine = { id: 1, machineName: 'Iron Maiden', targetEasy: 1000, targetMed: 2000, targetHard: 3000 };
     // Ensure machines are returned before initialization
-    PB_API.getMachines.mockResolvedValue([machine]);
+    PB_API.machines.getAll.mockResolvedValue([machine]);
     // Mock location machines as the active event has locationId: 1
-    PB_API.getLocationMachines.mockResolvedValue([machine]);
+    PB_API.locations.getMachines.mockResolvedValue([machine]);
     await initEventSetupPage();
 
     // Manually trigger onSelect of the searchable select to set selectedMachineTargets
@@ -228,12 +233,12 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
     const printBtn = document.getElementById('print-machines-btn');
     printBtn.click();
     
-    await vi.waitFor(() => expect(PB_API.getLeagues).toHaveBeenCalled());
+    await vi.waitFor(() => expect(PB_API.leagues.getAll).toHaveBeenCalled());
     expect(printMachineScores).toHaveBeenCalled();
   });
 
   it('should handle reordering rounds and saving the batch', async () => {
-    PB_API.getTargetScores.mockResolvedValue([
+    PB_API.machines.getTargets.mockResolvedValue([
       { id: 1, machineId: 10, orderNumber: 1, machineName: 'M1', values: {} },
       { id: 2, machineId: 20, orderNumber: 2, machineName: 'M2', values: {} }
     ]);
@@ -244,15 +249,15 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
 
     expect(document.getElementById('reorder-actions').classList.contains('hidden')).toBe(false);
     
-    PB_API.saveTargetScore.mockResolvedValue({ success: true });
+    PB_API.machines.saveTarget.mockResolvedValue({ success: true });
     document.getElementById('save-order-btn').click();
     
-    await vi.waitFor(() => expect(PB_API.saveTargetScore).toHaveBeenCalled());
+    await vi.waitFor(() => expect(PB_API.machines.saveTarget).toHaveBeenCalled());
   });
 
   it('should call saveTargetScore on form submission', async () => {
     Auth.requireAdmin.mockResolvedValue(true);
-    PB_API.saveTargetScore.mockResolvedValue({ success: true });
+    PB_API.machines.saveTarget.mockResolvedValue({ success: true });
     
     await initEventSetupPage();
     
@@ -271,7 +276,7 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
 
     await vi.waitFor(() => expect(Auth.requireAdmin).toHaveBeenCalled());
     expect(Auth.requireAdmin).toHaveBeenCalled();
-    expect(PB_API.saveTargetScore).toHaveBeenCalledWith(expect.objectContaining({
+    expect(PB_API.machines.saveTarget).toHaveBeenCalledWith(expect.objectContaining({
         orderNumber: 1,
         machineId: 1
     }));

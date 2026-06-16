@@ -103,7 +103,7 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh, existi
   const activeLeagueId = getActiveLeagueId();
   if (activeEventId) {
     try {
-      const leagues = existingLeagues || await PB_API.getLeagues();
+      const leagues = existingLeagues || await PB_API.leagues.getAll();
       const { league, event } = _resolveTournamentData(leagues, activeEventId, activeLeagueId);
       if (league) {
         if (String(league.id) !== String(activeLeagueId)) setActiveLeagueId(league.id);
@@ -179,7 +179,7 @@ export async function initTournamentSelector(container, { onRefresh, typeFilter 
   if (!target) return;
   const initialEventId = getActiveEventId();
   const initialLeagueId = getActiveLeagueId();
-  let allLeagues = existingLeagues || await PB_API.getLeagues();
+  let allLeagues = existingLeagues || await PB_API.leagues.getAll();
 
   // Apply user-based filtering (e.g. unregistered users only see leagues with guests)
   const getFilteredLeagues = (list) => {

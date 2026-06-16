@@ -9,13 +9,17 @@ import { getScoringEngine } from '@core/engine.js';
 
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    getLocations: vi.fn(),
-    getMachines: vi.fn(),
-    createLocation: vi.fn(),
-    updateLocation: vi.fn(),
-    deleteLocation: vi.fn(),
-    addLocationMachine: vi.fn(),
-    removeLocationMachine: vi.fn(),
+    locations: {
+      getAll: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      addMachine: vi.fn(),
+      removeMachine: vi.fn(),
+    },
+    machines: {
+      getAll: vi.fn(),
+    }
   },
 }));
 
@@ -51,12 +55,12 @@ const uiMocks = vi.hoisted(() => ({
     const row = document.createElement(options.tag || 'div');
     row.className = options.className || 'location-registry-item';
     row.innerHTML = `
-      <div class="header-bar">${options.headerHtml || ''}</div>
+      <div class="row-header">${options.headerHtml || ''}</div>
       <div class="content-area ${options.isExpanded ? '' : 'hidden'}">${options.contentHtml || ''}</div>
     `;
     container.appendChild(row);
     if (options.onHeaderClick) {
-      row.querySelector('.header-bar').addEventListener('click', options.onHeaderClick);
+      row.querySelector('.row-header').addEventListener('click', options.onHeaderClick);
     }
     return row;
   }),
@@ -87,11 +91,11 @@ describe('Locations Management Page (locationsPage.js)', () => {
       <div id="location-machine-form-card" class="hidden"></div>
     `;
     vi.clearAllMocks();
-    PB_API.getLocations.mockResolvedValue([
+    PB_API.locations.getAll.mockResolvedValue([
       { id: 1, name: 'The Sanctum', city: 'Meriden', state: 'CT', machines: [] },
       { id: 2, name: 'Pin Palace', city: 'Austin', state: 'TX', machines: [] },
     ]);
-    PB_API.getMachines.mockResolvedValue([]);
+    PB_API.machines.getAll.mockResolvedValue([]);
     requireAdmin.mockResolvedValue(true);
     showConfirm.mockResolvedValue(true);
   });
@@ -103,13 +107,13 @@ describe('Locations Management Page (locationsPage.js)', () => {
   describe('Initialization', () => {
     it('should list locations on initialization', async () => {
       await initLocationsPage();
-      expect(PB_API.getLocations).toHaveBeenCalled();
+      expect(PB_API.locations.getAll).toHaveBeenCalled();
       expect(document.getElementById('locations-list').textContent).toContain('The Sanctum');
       expect(document.getElementById('locations-list').textContent).toContain('Pin Palace');
     });
 
     it('should show empty notice when no locations exist', async () => {
-      PB_API.getLocations.mockResolvedValue([]);
+      PB_API.locations.getAll.mockResolvedValue([]);
       await initLocationsPage();
       const emptyNotice = document.getElementById('locations-list-empty');
       expect(emptyNotice.classList.contains('hidden')).toBe(false);
@@ -130,7 +134,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
 
     it('should handle API errors gracefully', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      PB_API.getLocations.mockRejectedValue(new Error('Network Error'));
+      PB_API.locations.getAll.mockRejectedValue(new Error('Network Error'));
       await initLocationsPage();
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
@@ -210,7 +214,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
       document.getElementById('location-city').value = 'Town';
       document.getElementById('location-state').value = 'ST';
       await document.getElementById('location-form').dispatchEvent(new Event('submit'));
-      expect(PB_API.createLocation).toHaveBeenCalledWith(expect.objectContaining({
+      expect(PB_API.locations.create).toHaveBeenCalledWith(expect.objectContaining({
         name: 'New Spot',
         city: 'Town',
         state: 'ST',
@@ -237,7 +241,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
       document.getElementById('location-city').value = 'Town';
       document.getElementById('location-state').value = 'ST';
       await document.getElementById('location-form').dispatchEvent(new Event('submit'));
-      expect(PB_API.createLocation).not.toHaveBeenCalled();
+      expect(PB_API.locations.create).not.toHaveBeenCalled();
     });
 
     it('should not submit if location name is empty', async () => {
@@ -246,7 +250,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
       toggle.click();
       document.getElementById('location-name').value = '';
       await document.getElementById('location-form').dispatchEvent(new Event('submit'));
-      expect(PB_API.createLocation).not.toHaveBeenCalled();
+      expect(PB_API.locations.create).not.toHaveBeenCalled();
     });
   });
 
@@ -257,7 +261,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
       editBtn.click();
       document.getElementById('location-city').value = 'New Haven';
       await document.getElementById('location-form').dispatchEvent(new Event('submit'));
-      expect(PB_API.updateLocation).toHaveBeenCalledWith(1, expect.objectContaining({
+      expect(PB_API.locations.update).toHaveBeenCalledWith(1, expect.objectContaining({
         city: 'New Haven',
       }));
     });
@@ -276,7 +280,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
       const editBtn = document.querySelector('.edit-loc-btn');
       editBtn.click();
       await document.getElementById('location-form').dispatchEvent(new Event('submit'));
-      expect(PB_API.updateLocation).not.toHaveBeenCalled();
+      expect(PB_API.locations.update).not.toHaveBeenCalled();
     });
   });
 
@@ -296,7 +300,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
       const deleteBtn = document.querySelector('.delete-loc-btn');
       deleteBtn.click();
       await vi.waitFor(() => {
-        expect(PB_API.deleteLocation).toHaveBeenCalledWith(1);
+        expect(PB_API.locations.delete).toHaveBeenCalledWith(1);
       });
     });
 
@@ -315,7 +319,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
       const deleteBtn = document.querySelector('.delete-loc-btn');
       deleteBtn.click();
       await vi.waitFor(() => {
-        expect(PB_API.deleteLocation).not.toHaveBeenCalled();
+        expect(PB_API.locations.delete).not.toHaveBeenCalled();
       });
     });
 
@@ -325,12 +329,12 @@ describe('Locations Management Page (locationsPage.js)', () => {
       const deleteBtn = document.querySelector('.delete-loc-btn');
       deleteBtn.click();
       await vi.waitFor(() => {
-        expect(PB_API.deleteLocation).not.toHaveBeenCalled();
+        expect(PB_API.locations.delete).not.toHaveBeenCalled();
       });
     });
 
     it('should handle API error on delete', async () => {
-      PB_API.deleteLocation.mockRejectedValue(new Error('Delete failed'));
+      PB_API.locations.delete.mockRejectedValue(new Error('Delete failed'));
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       await initLocationsPage();
       const deleteBtn = document.querySelector('.delete-loc-btn');
@@ -404,7 +408,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
     });
 
     it('should render machines for a location', async () => {
-      PB_API.getLocations.mockResolvedValue([
+      PB_API.locations.getAll.mockResolvedValue([
         {
           id: 1,
           name: 'The Sanctum',
@@ -427,7 +431,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
     });
 
     it('should call removeLocationMachine when Remove is clicked', async () => {
-      PB_API.getLocations.mockResolvedValue([
+      PB_API.locations.getAll.mockResolvedValue([
         {
           id: 1,
           name: 'The Sanctum',
@@ -442,13 +446,13 @@ describe('Locations Management Page (locationsPage.js)', () => {
       const removeBtn = document.querySelector('.remove-mach-btn');
       removeBtn.click();
       await vi.waitFor(() => {
-        expect(PB_API.removeLocationMachine).toHaveBeenCalledWith(1, 10);
+        expect(PB_API.locations.removeMachine).toHaveBeenCalledWith(1, 10);
       });
     });
 
     it('should not remove machine if confirmation is cancelled', async () => {
       showConfirm.mockResolvedValue(false);
-      PB_API.getLocations.mockResolvedValue([
+      PB_API.locations.getAll.mockResolvedValue([
         {
           id: 1,
           name: 'The Sanctum',
@@ -463,12 +467,12 @@ describe('Locations Management Page (locationsPage.js)', () => {
       const removeBtn = document.querySelector('.remove-mach-btn');
       removeBtn.click();
       await vi.waitFor(() => {
-        expect(PB_API.removeLocationMachine).not.toHaveBeenCalled();
+        expect(PB_API.locations.removeMachine).not.toHaveBeenCalled();
       });
     });
 
     it('should save machine with target scores when save is clicked', async () => {
-      PB_API.getMachines.mockResolvedValue([{ id: 10, machineName: 'Iron Maiden' }]);
+      PB_API.machines.getAll.mockResolvedValue([{ id: 10, machineName: 'Iron Maiden' }]);
       await initLocationsPage();
       const addBtn = document.querySelector('.add-mach-btn');
       await addBtn.click();
@@ -486,13 +490,13 @@ describe('Locations Management Page (locationsPage.js)', () => {
       if (saveMachBtn) {
         saveMachBtn.click();
         await vi.waitFor(() => {
-          expect(PB_API.addLocationMachine).toHaveBeenCalled();
+          expect(PB_API.locations.addMachine).toHaveBeenCalled();
         });
       }
     });
 
     it('should not save machine if no machine is selected', async () => {
-      PB_API.getMachines.mockResolvedValue([{ id: 10, machineName: 'Iron Maiden' }]);
+      PB_API.machines.getAll.mockResolvedValue([{ id: 10, machineName: 'Iron Maiden' }]);
       await initLocationsPage();
       const addBtn = document.querySelector('.add-mach-btn');
       await addBtn.click();
@@ -501,12 +505,12 @@ describe('Locations Management Page (locationsPage.js)', () => {
       if (saveMachBtn) {
         saveMachBtn.click();
         // No machine selected (value is empty string)
-        expect(PB_API.addLocationMachine).not.toHaveBeenCalled();
+        expect(PB_API.locations.addMachine).not.toHaveBeenCalled();
       }
     });
 
     it('should hide machine form when Cancel is clicked', async () => {
-      PB_API.getMachines.mockResolvedValue([{ id: 10, machineName: 'Iron Maiden' }]);
+      PB_API.machines.getAll.mockResolvedValue([{ id: 10, machineName: 'Iron Maiden' }]);
       await initLocationsPage();
       const addBtn = document.querySelector('.add-mach-btn');
       await addBtn.click();
@@ -518,7 +522,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
     });
 
     it('should show Edit Machine form with existing values', async () => {
-      PB_API.getLocations.mockResolvedValue([
+      PB_API.locations.getAll.mockResolvedValue([
         {
           id: 1,
           name: 'The Sanctum',
@@ -529,7 +533,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
           ],
         },
       ]);
-      PB_API.getMachines.mockResolvedValue([{ id: 10, machineName: 'Iron Maiden' }]);
+      PB_API.machines.getAll.mockResolvedValue([{ id: 10, machineName: 'Iron Maiden' }]);
       await initLocationsPage();
       const editMachBtn = document.querySelector('.edit-mach-btn');
       if (editMachBtn) {
@@ -540,8 +544,8 @@ describe('Locations Management Page (locationsPage.js)', () => {
     });
 
     it('should handle API error when saving machine', async () => {
-      PB_API.getMachines.mockResolvedValue([{ id: 10, machineName: 'Iron Maiden' }]);
-      PB_API.addLocationMachine.mockRejectedValue(new Error('Save failed'));
+      PB_API.machines.getAll.mockResolvedValue([{ id: 10, machineName: 'Iron Maiden' }]);
+      PB_API.locations.addMachine.mockRejectedValue(new Error('Save failed'));
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       await initLocationsPage();
       const addBtn = document.querySelector('.add-mach-btn');
@@ -608,7 +612,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
   describe('Expandable Rows', () => {
     it('should toggle expansion on header click', async () => {
       await initLocationsPage();
-      const header = document.querySelector('.header-bar');
+      const header = document.querySelector('.row-header');
       header.click();
       const contentArea = document.querySelector('.content-area');
       expect(contentArea.classList.contains('hidden')).toBe(false);

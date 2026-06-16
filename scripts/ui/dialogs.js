@@ -237,15 +237,15 @@ export const showAuthDialog = () => {
       try {
         let user;
         if (mode === 'login') {
-          user = await PB_API.login(username, password);
+          user = await PB_API.auth.login(username, password);
         } else {
-          let reg = await PB_API.register({ username, password, playerName });
+          let reg = await PB_API.auth.register({ username, password, playerName });
           if (reg.claimRequired) {
             if (await showConfirm(reg.message, 'Claim Profile')) {
-              reg = await PB_API.register({ username, password, playerName, confirmClaim: true });
+              reg = await PB_API.auth.register({ username, password, playerName, confirmClaim: true });
             } else return;
           }
-          user = await PB_API.login(username, password);
+          user = await PB_API.auth.login(username, password);
         }
         close(user, resolve);
       } catch (err) { showAlert(err.message, 'Auth Failed'); }

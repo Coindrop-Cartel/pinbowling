@@ -20,8 +20,8 @@ export async function initPlayersPage() {
   try {
     // Batch initial user check and data fetch
     [currentUser, playersData] = await Promise.all([
-      PB_API.getCurrentUser(),
-      PB_API.getPlayers()
+      PB_API.auth.me(),
+      PB_API.players.getAll()
     ]);
   } catch (error) {
     console.error('Error initializing Players page:', error);
@@ -168,7 +168,7 @@ export async function initPlayersPage() {
   matchplayIdInput.addEventListener('input', () => filterInstance.performFilter());
 
   async function refresh(data = null) {
-    const players = Array.isArray(data) ? data : await PB_API.getPlayers();
+    const players = Array.isArray(data) ? data : await PB_API.players.getAll();
     const safePlayers = Array.isArray(players) ? players : [];
 
     // Update array in-place to keep the filter reference valid
@@ -259,7 +259,7 @@ export async function initPlayersPage() {
         const newPass = await showPrompt(`Enter a new temporary password for ${player.playerName}:`, 'Reset User Password', false);
         if (newPass) {
            try {
-             await PB_API.updateUserPassword(player.userId, newPass);
+             await PB_API.players.updatePassword(player.userId, newPass);
              showAlert(`Password updated successfully for ${player.playerName}.`, 'Success');
            } catch (err) {
              showAlert(err.message, 'Update Failed');
@@ -277,7 +277,7 @@ export async function initPlayersPage() {
         const newRole = await showChoiceDialog('Change User Role', `Assign a new role for ${player.playerName}:`, choices, player.userRole);
         if (newRole && newRole !== player.userRole) {
           try {
-            await PB_API.updateUserRole(player.userId, newRole);
+            await PB_API.players.updateRole(player.userId, newRole);
             await refresh();
             // Refresh the current player object from the cache to sync the edit form state
             const updated = allPlayers.find(p => p.id === playerId);
@@ -325,9 +325,9 @@ export async function initPlayersPage() {
 
     try {
       if (id) {
-        await PB_API.updatePlayer(id, payload);
+        await PB_API.players.update(id, payload);
       } else {
-        await PB_API.createPlayer(payload);
+        await PB_API.players.create(payload);
       }
       await refresh();
       resetForm();
@@ -340,7 +340,7 @@ export async function initPlayersPage() {
     const player = allPlayers.find(p => p.id === playerId);
     if (!player) return;
     
-    if (!await showConfirm(`Are you sure you want to delete player "${player.playerName}"? This action cannot be undone and will remove all their associated scores.`, 'Delete Player')) {
+    if (!await showConfirm(`Are you sure you want to delete player "${escapeHTML(player.playerName)}"? This action cannot be undone and will remove all their associated scores.`, 'Delete Player')) {
       return;
     }
 
@@ -349,7 +349,7 @@ export async function initPlayersPage() {
     }
 
     try {
-      await PB_API.deletePlayer(playerId);
+      await PB_API.players.delete(playerId);
       await refresh();
     } catch (error) {
       alert(`Error deleting player: ${error.message}`);

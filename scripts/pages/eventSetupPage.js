@@ -23,7 +23,7 @@ export async function initEventSetupPage() {
   // Verify authorization before initializing the page logic
   const [authorized, initialLeagues] = await Promise.all([
     isManagementAuthorized(),
-    PB_API.getLeagues()
+    PB_API.leagues.getAll()
   ]);
 
   if (!authorized) {
@@ -80,7 +80,7 @@ export async function initEventSetupPage() {
     printMachinesBtn.addEventListener('click', async () => {
       const eventId = getActiveEventId();
       if (!eventId) return alert('Select an event first.');
-      const leagues = await PB_API.getLeagues();
+      const leagues = await PB_API.leagues.getAll();
       const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
       printMachineScores(eventTargets, league?.scoringFormat || 'bowling');
     });
@@ -416,7 +416,7 @@ export async function initEventSetupPage() {
     });
 
     try {
-      await PB_API.saveTargetScore(payload);
+      await PB_API.machines.saveTarget(payload);
       isListDirty = false;
       originalEventTargets = JSON.parse(JSON.stringify(eventTargets));
       expandedTargetId = null;
@@ -431,8 +431,8 @@ export async function initEventSetupPage() {
     
     // Batch the initial global data fetches
     const [machines, leaguesData] = await Promise.all([
-      PB_API.getMachines(),
-      PB_API.getLeagues()
+      PB_API.machines.getAll(),
+      PB_API.leagues.getAll()
     ]);
 
     masterMachines = machines;
@@ -455,8 +455,8 @@ export async function initEventSetupPage() {
     const locationId = eventMatch?.locationId;
 
     const [suggestedData, targets] = await Promise.all([
-      locationId ? PB_API.getLocationMachines(locationId) : Promise.resolve(masterMachines),
-      eventId ? PB_API.getTargetScores(eventId) : Promise.resolve([])
+      locationId ? PB_API.locations.getMachines(locationId) : Promise.resolve(masterMachines),
+      eventId ? PB_API.machines.getTargets(eventId) : Promise.resolve([])
     ]);
 
     // Normalize targets and suggested machines into a consistent shape
@@ -520,7 +520,7 @@ export async function initEventSetupPage() {
     // we create it first to obtain a global 'machine_id'.
     let masterMachine = masterMachines.find(m => m.machineName.toLowerCase() === machineName.toLowerCase());
     if (!masterMachine) {
-        masterMachine = await PB_API.createMachine(machineName);
+        masterMachine = await PB_API.machines.create({ machineName });
         masterMachines.push(masterMachine);
     }
 
@@ -535,7 +535,7 @@ export async function initEventSetupPage() {
     };
 
     try {
-      await PB_API.saveTargetScore(payload);
+      await PB_API.machines.saveTarget(payload);
       await refresh();
       resetForm();
     } catch (err) {

@@ -6,10 +6,10 @@
 // Set global CORS headers to prevent NetworkErrors during preflighted requests (DELETE, PUT, etc.)
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-PB-SECRET');
+header('Access-Control-Allow-Headers: Content-Type, X-CSRF-TOKEN');
 
 // Handle CORS preflight requests globally. This is required because custom 
-// headers like X-PB-SECRET trigger an OPTIONS request for ALL method types.
+// headers like X-CSRF-TOKEN trigger an OPTIONS request for ALL method types.
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
@@ -52,6 +52,25 @@ function getHeader($name) {
         ?? $headers_cache[strtolower($name)] 
         ?? $_SERVER["REDIRECT_$serverKey"] 
         ?? null;
+}
+
+/**
+ * Verifies the CSRF token provided in the request header against the session.
+ * State-changing methods (POST, PUT, DELETE) must provide a valid token.
+ * 
+ * @return bool
+ */
+function verifyCsrfToken() {
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    // Safe methods do not require CSRF validation
+    if (in_array($method, ['GET', 'HEAD', 'OPTIONS'])) {
+        return true;
+    }
+
+    $providedToken = getHeader('X-CSRF-TOKEN');
+    $sessionToken = $_SESSION['csrf_token'] ?? '';
+
+    return !empty($providedToken) && hash_equals($sessionToken, $providedToken);
 }
 
 /**

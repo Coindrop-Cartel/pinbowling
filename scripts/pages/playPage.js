@@ -70,7 +70,7 @@ export async function initPlayPage() {
 
   async function refreshSessionsData() {
     // Fetch only session-type leagues directly from the server
-    const sessionLeagues = await PB_API.getLeagues({ type: 'session' });
+    const sessionLeagues = await PB_API.leagues.getAll({ type: 'session' });
     const today = new Date().toISOString().split('T')[0];
     
     todayEvents = [];
@@ -82,7 +82,7 @@ export async function initPlayPage() {
       });
     });
 
-    allPlayersCache = await PB_API.getPlayers();
+    allPlayersCache = await PB_API.players.getAll();
   }
 
   function renderExistingSessions() {
@@ -134,7 +134,7 @@ export async function initPlayPage() {
       row.querySelector('.play-btn').onclick = async (e) => {
         e.stopPropagation();
         
-        const currentUser = await PB_API.getCurrentUser().catch(err => {
+        const currentUser = await PB_API.auth.me().catch(err => {
           console.warn("Failed to fetch current user, likely not logged in:", err);
           return null;
         });
@@ -157,7 +157,7 @@ export async function initPlayPage() {
         if (selectedId) {
           // If the selected player isn't in the league yet, join them automatically
           if (!joinedIds.has(Number(selectedId))) {
-            await PB_API.addLeaguePlayer(event.leagueId, Number(selectedId));
+            await PB_API.leagues.addPlayer(event.leagueId, Number(selectedId));
           }
           loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`);
         }
@@ -172,7 +172,7 @@ export async function initPlayPage() {
 
   // Batch initial data fetches for smoother loading
   const [locations] = await Promise.all([
-    PB_API.getLocations(),
+    PB_API.locations.getAll(),
     refreshSessionsData()
   ]);
 
@@ -490,7 +490,7 @@ export async function initPlayPage() {
     finalizeBtn.textContent = 'Starting Session...';
 
     try {
-      const newLeague = await PB_API.createLeague({ 
+      const newLeague = await PB_API.leagues.create({ 
         name: eventName, 
         startDate: now.toISOString().split('T')[0],
         type: 'session',
@@ -503,7 +503,7 @@ export async function initPlayPage() {
 
       const qpLeague = newLeague;
 
-      const newEvent = await PB_API.createEvent({
+      const newEvent = await PB_API.events.create({
         leagueId: qpLeague.id,
         eventName: eventName,
         eventDate: now.toISOString().split('T')[0],
@@ -533,16 +533,16 @@ export async function initPlayPage() {
       if (targetPayloads.length > 0) {
         // Sending all targets in a single request prevents 403 Forbidden 
         // errors caused by server-side rate-limiting or flood protection.
-        await PB_API.saveTargetScore(targetPayloads);
+        await PB_API.machines.saveTarget(targetPayloads);
       }
 
       // Redirect to the scoring page for the new session.
       // If the user has a player profile, auto-join them and pre-select them.
-      const currentUser = await PB_API.getCurrentUser();
+      const currentUser = await PB_API.auth.me();
       let redirectUrl = `scores?eventId=${event.id}&leagueId=${qpLeague.id}`;
       
       if (currentUser?.player_id) {
-        await PB_API.addLeaguePlayer(qpLeague.id, currentUser.player_id);
+        await PB_API.leagues.addPlayer(qpLeague.id, currentUser.player_id);
         redirectUrl += `&playerId=${currentUser.player_id}`;
       }
 

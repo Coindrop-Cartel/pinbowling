@@ -10,9 +10,15 @@ vi.hoisted(() => {
 
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    getLeagues: vi.fn(),
-    getTargetScores: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue(null),
+    leagues: {
+      getAll: vi.fn()
+    },
+    machines: {
+      getTargets: vi.fn()
+    },
+    auth: {
+      me: vi.fn().mockResolvedValue(null)
+    }
   },
 }));
 
@@ -179,7 +185,7 @@ describe('initReadOnlyTournamentDisplay', () => {
     const mockLeagues = [{ id: 5, name: 'Season League', events: [] }];
     getActiveLeagueId.mockReturnValue('5');
     getActiveEventId.mockReturnValue('summary');
-    PB_API.getLeagues.mockResolvedValue(mockLeagues);
+    PB_API.leagues.getAll.mockResolvedValue(mockLeagues);
 
     await initReadOnlyTournamentDisplay(container);
     expect(container.innerHTML).toMatch(/Event:.*Season Summary/);
@@ -195,7 +201,7 @@ describe('initTournamentSelector', () => {
   beforeEach(() => {
     document.body.innerHTML = '<div class="tournament-selector-container"></div>';
     vi.clearAllMocks();
-    PB_API.getLeagues.mockResolvedValue(mockLeagues);
+    PB_API.leagues.getAll.mockResolvedValue(mockLeagues);
     getActiveLeagueId.mockReturnValue('');
   });
 
@@ -679,7 +685,7 @@ describe('initReadOnlyTournamentDisplay (additional)', () => {
     }];
     getActiveEventId.mockReturnValue('10');
     getActiveLeagueId.mockReturnValue('5');
-    PB_API.getLeagues.mockResolvedValue(mockLeagues);
+    PB_API.leagues.getAll.mockResolvedValue(mockLeagues);
 
     await initReadOnlyTournamentDisplay(container);
     expect(container.innerHTML).toContain('Test League');
@@ -694,7 +700,7 @@ describe('initReadOnlyTournamentDisplay (additional)', () => {
     }];
     getActiveEventId.mockReturnValue('10');
     getActiveLeagueId.mockReturnValue('99'); // Different from resolved league
-    PB_API.getLeagues.mockResolvedValue(mockLeagues);
+    PB_API.leagues.getAll.mockResolvedValue(mockLeagues);
 
     await initReadOnlyTournamentDisplay(container);
     expect(setActiveLeagueId).toHaveBeenCalledWith(5);
@@ -708,7 +714,7 @@ describe('initReadOnlyTournamentDisplay (additional)', () => {
     }];
     getActiveEventId.mockReturnValue('999'); // Non-existent event
     getActiveLeagueId.mockReturnValue('');
-    PB_API.getLeagues.mockResolvedValue(mockLeagues);
+    PB_API.leagues.getAll.mockResolvedValue(mockLeagues);
 
     await initReadOnlyTournamentDisplay(container);
     expect(container.innerHTML).toContain('Selection context lost');
@@ -724,7 +730,7 @@ describe('initReadOnlyTournamentDisplay (additional)', () => {
     getActiveLeagueId.mockReturnValue('3');
 
     await initReadOnlyTournamentDisplay(container, null, existingLeagues);
-    expect(PB_API.getLeagues).not.toHaveBeenCalled();
+    expect(PB_API.leagues.getAll).not.toHaveBeenCalled();
     expect(container.innerHTML).toContain('Existing League');
   });
 
@@ -761,7 +767,7 @@ describe('initTournamentSelector (additional)', () => {
   beforeEach(() => {
     document.body.innerHTML = '<div class="tournament-selector-container"></div>';
     vi.clearAllMocks();
-    PB_API.getLeagues.mockResolvedValue(mockLeagues);
+    PB_API.leagues.getAll.mockResolvedValue(mockLeagues);
     getActiveLeagueId.mockReturnValue('');
     getActiveEventId.mockReturnValue('');
   });
@@ -848,7 +854,7 @@ describe('initTournamentSelector (additional)', () => {
   it('should use existingLeagues when provided', async () => {
     const existingLeagues = [{ id: '99', name: 'Custom League', type: 'standard', events: [], players: [{ userId: null }] }];
     await initTournamentSelector('.tournament-selector-container', { existingLeagues });
-    expect(PB_API.getLeagues).not.toHaveBeenCalled();
+    expect(PB_API.leagues.getAll).not.toHaveBeenCalled();
     const select = document.querySelector('.league-select-shared');
     expect(select.innerHTML).toContain('Custom League');
   });

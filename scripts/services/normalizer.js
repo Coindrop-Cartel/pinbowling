@@ -18,8 +18,10 @@
  * @param {string|number} [t.score8] - Target score for ball 8.
  * @param {string|number} [t.score9] - Target score for ball 9.
  * @param {string|number} [t.score10] - Target score for ball 10.
- * @returns {{ id: number, eventId: number, machineId: number, orderNumber: number, values: Object<number> }}
- *   Normalized target with camelCase fields and a `values` map keyed by ball number.
+ * @returns {Object} Normalized target object.
+ * @returns {number} returns.id - Target record ID.
+ * @returns {Object<number, number>} returns.values - Map of ball number to target score.
+ * @returns {number} returns.value1 - Primary target score (e.g. Strike/Par).
  */
 export function normalizeTarget(t) {
   return {
@@ -127,7 +129,7 @@ export function groupScoresByPlayer(scores) {
  * Each entry contains ball scores as `{ ball1, ball2, ball3 }`.
  *
  * @param {Object[]} rows - Array of score row objects with `orderNumber`, `ball1`, `ball2`, `ball3` properties.
- * @returns {Object<number, { ball1: number, ball2: number, ball3: number }>?}
+ * @returns {Object<string, { ball1: number, ball2: number, ball3: number }>}
  *   Map of `{ [orderNumber]: { ball1, ball2, ball3 } }`.
  */
 export function buildScoreMapFromRows(rows) {
@@ -142,7 +144,7 @@ export function buildScoreMapFromRows(rows) {
  * keyed by order number. Each entry contains ball scores from `[data-ball]` inputs.
  *
  * @param {HTMLElement} container - DOM element containing `.round-row` elements with `[data-ball]` inputs.
- * @returns {Object<number, { ball1: number, ball2: number, ball3: number }>?}
+ * @returns {Object<string, { ball1: number, ball2: number, ball3: number }>}
  *   Map of `{ [orderNumber]: { ball1, ball2, ball3 } }`.
  */
 export function buildScoreMapFromDOM(container) {

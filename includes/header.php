@@ -1,7 +1,7 @@
 <nav class="navbar">
   <div class="nav-container">
     <a href="<?php echo rtrim($baseUrl, '/') . '/'; ?>" class="nav-logo" data-route="HOME">
-      <img src="<?php echo $baseUrl; ?>/images/<?php echo $active['logo']; ?>" alt="<?php echo $active['brand']; ?> Logo">
+      <img src="<?php echo versionedAsset($baseUrl . '/images/' . $active['logo']); ?>" alt="<?php echo $active['brand']; ?> Logo">
       <span><?php echo $active['brand']; ?></span>
     </a>
     <ul class="nav-links">

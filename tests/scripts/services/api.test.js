@@ -102,7 +102,7 @@ describe('API Client (api.js)', () => {
       json: () => Promise.resolve([])
     });
 
-    await PB_API.getMachines();
+    await PB_API.machines.getAll();
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/machineService.php'), expect.any(Object));
   });
 
@@ -191,39 +191,52 @@ describe('API Client (api.js)', () => {
 
       await expect(fetchJSON('test.php')).rejects.toThrow('Failed to fetch');
     });
+
+    it('fetchJSON should include CSRF token for state-changing requests if present', async () => {
+      window.PB_CSRF_TOKEN = 'test-token';
+      fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+
+      await fetchJSON('test.php', { method: 'POST' });
+
+      const callHeaders = fetch.mock.calls[0][1].headers;
+      expect(callHeaders['X-CSRF-TOKEN']).toBe('test-token');
+      
+      // Cleanup global state
+      delete window.PB_CSRF_TOKEN;
+    });
   });
 
   describe('PB_API Helper Methods', () => {
-    it('getScores should return an empty array if no event or league ID is provided', async () => {
-      const result = await PB_API.getScores();
+    it('scores.get should return an empty array if no event or league ID is provided', async () => {
+      const result = await PB_API.scores.get();
       expect(result).toEqual([]);
       expect(fetch).not.toHaveBeenCalled();
     });
 
-    it('getScores should construct URL based on parameters', async () => {
+    it('scores.get should construct URL based on parameters', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
 
       // League Summary Mode
-      await PB_API.getScores(null, null, 100);
+      await PB_API.scores.get(null, null, 100);
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('leagueId=100'), expect.any(Object));
 
       // Player Event Mode
       vi.clearAllMocks();
-      await PB_API.getScores(1, 2);
+      await PB_API.scores.get(1, 2);
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('eventId=2&playerId=1'), expect.any(Object));
     });
     
-    it('getScores should construct leagueId URL correctly', async () => {
+    it('scores.get should construct leagueId URL correctly', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
-      await PB_API.getScores(null, null, 88);
+      await PB_API.scores.get(null, null, 88);
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('leagueId=88'), expect.any(Object));
     });
 
-    it('createLeague should send a POST request with the league data', async () => {
+    it('leagues.create should send a POST request with the league data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ success: true }) });
       const leagueData = { name: 'Major League Pinball', startDate: '2024-05-01' };
       
-      await PB_API.createLeague(leagueData);
+      await PB_API.leagues.create(leagueData);
       
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('service/leagueService.php'),
@@ -234,11 +247,11 @@ describe('API Client (api.js)', () => {
       );
     });
 
-    it('saveScore should send a POST request with the score data', async () => {
+    it('scores.save should send a POST request with the score data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ success: true }) });
       const scoreData = { eventId: 1, playerId: 2, ball1: 10 };
       
-      await PB_API.saveScore(scoreData);
+      await PB_API.scores.save(scoreData);
       
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('service/scoreService.php'),
@@ -246,11 +259,11 @@ describe('API Client (api.js)', () => {
       );
     });
 
-    it('updateEvent should use PUT tunneling and include task parameters', async () => {
+    it('events.update should use PUT and include task parameters', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 99 }) });
       const eventData = { eventName: 'Season Finals', leagueId: 5 };
       
-      await PB_API.updateEvent(99, eventData);
+      await PB_API.events.update(99, eventData);
       
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/leagueService.php?task=fixture&id=99',
@@ -261,66 +274,66 @@ describe('API Client (api.js)', () => {
       );
     });
 
-    it('getEvents should include leagueId in query if provided', async () => {
+    it('events.getAll should include leagueId in query if provided', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
       
-      await PB_API.getEvents(42);
+      await PB_API.events.getAll(42);
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=fixture&leagueId=42'), expect.any(Object));
       
       vi.clearAllMocks();
-      await PB_API.getEvents();
+      await PB_API.events.getAll();
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=fixture'), expect.any(Object));
       expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('leagueId='), expect.any(Object));
     });
 
-    it('removeLeaguePlayer should construct URL with both leagueId and playerId', async () => {
+    it('leagues.removePlayer should construct URL with both leagueId and playerId', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.removeLeaguePlayer(10, 20);
+      await PB_API.leagues.removePlayer(10, 20);
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=member&leagueId=10&playerId=20'), expect.any(Object));
     });
 
-    it('getTargetScores should use leagueId if provided', async () => {
+    it('machines.getTargets should use leagueId if provided', async () => {
         fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
-        await PB_API.getTargetScores(null, 5);
+        await PB_API.machines.getTargets(null, 5);
         expect(fetch).toHaveBeenCalledWith(expect.stringContaining('leagueId=5'), expect.any(Object));
     });
 
-    it('getTargetScores should prioritize eventId if both are missing', async () => {
+    it('machines.getTargets should prioritize eventId if both are missing', async () => {
         fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
-        await PB_API.getTargetScores(10);
+        await PB_API.machines.getTargets(10);
         expect(fetch).toHaveBeenCalledWith(expect.stringContaining('eventId=10'), expect.any(Object));
     });
 
-    it('bulkUpdateTargetOrder should send a POST request to sort task', async () => {
+    it('machines.bulkUpdateSort should send a POST request to sort task', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       const updates = [{ id: 1, order: 2 }];
-      await PB_API.bulkUpdateTargetOrder(updates);
+      await PB_API.machines.bulkUpdateSort(updates);
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=sort'), expect.objectContaining({ method: 'POST' }));
     });
 
-    it('runCleanup should call the cleanup service via GET', async () => {
+    it('system.runCleanup should call the cleanup service via GET', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.runCleanup();
+      await PB_API.system.runCleanup();
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/cleanupService.php'), expect.any(Object));
     });
 
-    it('runCleanup should pass the days parameter if provided', async () => {
+    it('system.runCleanup should pass the days parameter if provided', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       // Verification for Issue 1.4 bug fix
-      await PB_API.runCleanup(15);
+      await PB_API.system.runCleanup(15);
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/cleanupService.php?days=15'), expect.any(Object));
     });
 
-    it('deleteTargetScore should include threshold task', async () => {
+    it('machines.deleteTarget should include threshold task', async () => {
         fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-        await PB_API.deleteTargetScore(123);
+        await PB_API.machines.deleteTarget(123);
         expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=threshold'), expect.any(Object));
     });
 
-    it('location management methods should target the correct API and task', async () => {
+    it('locations management methods should target the correct API and task', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
 
-      await PB_API.addLocationMachine(1, 10, { note: 'Back room' });
+      await PB_API.locations.addMachine(1, 10, { note: 'Back room' });
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('service/locationService.php?task=units'),
         expect.objectContaining({
@@ -330,16 +343,16 @@ describe('API Client (api.js)', () => {
       );
     });
 
-    it('updateUserPassword should target reset task with POST', async () => {
+    it('players.updatePassword should target reset task with POST', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.updateUserPassword(5, 'newpass');
+      await PB_API.players.updatePassword(5, 'newpass');
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=reset&id=5'), expect.objectContaining({ method: 'POST' }));
     });
 
-    it('player management should handle route parameters correctly', async () => {
+    it('players management should handle route parameters correctly', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ success: true }) });
 
-      await PB_API.deletePlayer(42);
+      await PB_API.players.delete(42);
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/playerService.php?id=42',
         expect.objectContaining({ 
@@ -349,84 +362,84 @@ describe('API Client (api.js)', () => {
       );
     });
 
-    it('login should POST to authService with credentials', async () => {
+    it('auth.login should POST to authService with credentials', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 1 }) });
-      await PB_API.login('user', 'pass');
+      await PB_API.auth.login('user', 'pass');
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('task=login'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify({ username: 'user', password: 'pass' }) })
       );
     });
 
-    it('logout should POST to authService', async () => {
+    it('auth.logout should POST to authService', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.logout();
+      await PB_API.auth.logout();
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('task=logout'),
         expect.objectContaining({ method: 'POST' })
       );
     });
 
-    it('register should POST user data to authService', async () => {
+    it('auth.register should POST user data to authService', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 5 }) });
       const data = { username: 'newuser', password: 'pass' };
-      await PB_API.register(data);
+      await PB_API.auth.register(data);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('task=register'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(data) })
       );
     });
 
-    it('getCurrentUser should GET from authService me task', async () => {
+    it('auth.me should GET from authService me task', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 1, role: 'admin' }) });
-      await PB_API.getCurrentUser();
+      await PB_API.auth.me();
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('task=me'),
         expect.any(Object)
       );
     });
 
-    it('getPlayers should GET from playerService', async () => {
+    it('players.getAll should GET from playerService', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
-      await PB_API.getPlayers({ search: 'test' });
+      await PB_API.players.getAll({ search: 'test' });
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('service/playerService.php'),
         expect.any(Object)
       );
     });
 
-    it('createPlayer should POST to playerService', async () => {
+    it('players.create should POST to playerService', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 10 }) });
       const player = { playerName: 'New Player' };
-      await PB_API.createPlayer(player);
+      await PB_API.players.create(player);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('service/playerService.php'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(player) })
       );
     });
 
-    it('updatePlayer should PUT to playerService with id', async () => {
+    it('players.update should PUT to playerService with id', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.updatePlayer(5, { playerName: 'Updated' });
+      await PB_API.players.update(5, { playerName: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/playerService.php?id=5',
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ playerName: 'Updated' }) })
       );
     });
 
-    it('saveScore should POST score data', async () => {
+    it('scores.save should POST score data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       const score = { eventId: 1, playerId: 2, ball1: 10 };
-      await PB_API.saveScore(score);
+      await PB_API.scores.save(score);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('service/scoreService.php'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(score) })
       );
     });
 
-    it('clearScores should DELETE from scoreService with playerId', async () => {
+    it('scores.clear should DELETE from scoreService with playerId', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.clearScores(42);
+      await PB_API.scores.clear(42);
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/scoreService.php?playerId=42',
         expect.objectContaining({ 
@@ -436,27 +449,27 @@ describe('API Client (api.js)', () => {
       );
     });
 
-    it('getLeague should GET from leagueService with id', async () => {
+    it('leagues.get should GET from leagueService with id', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 7 }) });
-      await PB_API.getLeague(7);
+      await PB_API.leagues.get(7);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('id=7'),
         expect.any(Object)
       );
     });
 
-    it('updateLeague should PUT league data', async () => {
+    it('leagues.update should PUT league data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.updateLeague(3, { name: 'Updated' });
+      await PB_API.leagues.update(3, { name: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/leagueService.php?id=3',
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ name: 'Updated' }) })
       );
     });
 
-    it('deleteLeague should DELETE with id', async () => {
+    it('leagues.delete should DELETE with id', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.deleteLeague(9);
+      await PB_API.leagues.delete(9);
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/leagueService.php?id=9',
         expect.objectContaining({ 
@@ -466,19 +479,19 @@ describe('API Client (api.js)', () => {
       );
     });
 
-    it('createEvent should POST event data', async () => {
+    it('events.create should POST event data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 100 }) });
       const event = { eventName: 'Finals', leagueId: 5 };
-      await PB_API.createEvent(event);
+      await PB_API.events.create(event);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('task=fixture'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(event) })
       );
     });
 
-    it('deleteEvent should DELETE with id and optional leagueId', async () => {
+    it('events.delete should DELETE with id and optional leagueId', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.deleteEvent(10, 5);
+      await PB_API.events.delete(10, 5);
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/leagueService.php?task=fixture&id=10&leagueId=5',
         expect.objectContaining({ 
@@ -489,46 +502,46 @@ describe('API Client (api.js)', () => {
       expect(fetch.mock.calls[0][0]).toContain('leagueId=5');
     });
 
-    it('deleteEvent should work without leagueId', async () => {
+    it('events.delete should work without leagueId', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.deleteEvent(10);
+      await PB_API.events.delete(10);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('id=10'),
         expect.any(Object)
       );
     });
 
-    it('addLeaguePlayer should POST member data', async () => {
+    it('leagues.addPlayer should POST member data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.addLeaguePlayer(1, 2);
+      await PB_API.leagues.addPlayer(1, 2);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('task=member'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify({ leagueId: 1, playerId: 2 }) })
       );
     });
 
-    it('createTeam should POST team data', async () => {
+    it('teams.create should POST team data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 1 }) });
       const data = { name: 'Team A' };
-      await PB_API.createTeam(data);
+      await PB_API.teams.create(data);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('service/teamService.php'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(data) })
       );
     });
 
-    it('updateTeam should PUT team data with id', async () => {
+    it('teams.update should PUT team data with id', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.updateTeam(3, { name: 'Updated' });
+      await PB_API.teams.update(3, { name: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/teamService.php?id=3',
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ name: 'Updated' }) })
       );
     });
 
-    it('deleteTeam should DELETE with id', async () => {
+    it('teams.delete should DELETE with id', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.deleteTeam(7);
+      await PB_API.teams.delete(7);
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/teamService.php?id=7',
         expect.objectContaining({ 
@@ -538,18 +551,18 @@ describe('API Client (api.js)', () => {
       );
     });
 
-    it('addTeamMember should POST member data', async () => {
+    it('teams.addMember should POST member data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.addTeamMember(1, 2);
+      await PB_API.teams.addMember(1, 2);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('task=member'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify({ teamId: 1, playerId: 2 }) })
       );
     });
 
-    it('removeTeamMember should DELETE with teamId and playerId', async () => {
+    it('teams.removeMember should DELETE', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.removeTeamMember(1, 2);
+      await PB_API.teams.removeMember(1, 2);
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/teamService.php?task=member&teamId=1&playerId=2',
         expect.objectContaining({ 
@@ -559,18 +572,18 @@ describe('API Client (api.js)', () => {
       );
     });
 
-    it('addLeagueTeam should POST league team data', async () => {
+    it('teams.addToLeague should POST league team data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.addLeagueTeam(5, 10);
+      await PB_API.teams.addToLeague(5, 10);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('task=league'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify({ leagueId: 5, teamId: 10 }) })
       );
     });
 
-    it('removeLeagueTeam should DELETE with leagueId and teamId', async () => {
+    it('teams.removeFromLeague should DELETE', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.removeLeagueTeam(5, 10);
+      await PB_API.teams.removeFromLeague(5, 10);
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/teamService.php?task=league&leagueId=5&teamId=10',
         expect.objectContaining({ 
@@ -580,37 +593,37 @@ describe('API Client (api.js)', () => {
       );
     });
 
-    it('getLocations should GET from locationService', async () => {
+    it('locations.getAll should GET from locationService', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
-      await PB_API.getLocations({ search: 'test' });
+      await PB_API.locations.getAll({ search: 'test' });
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('service/locationService.php'),
         expect.any(Object)
       );
     });
 
-    it('createLocation should POST location data', async () => {
+    it('locations.create should POST location data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 1 }) });
       const loc = { name: 'Venue' };
-      await PB_API.createLocation(loc);
+      await PB_API.locations.create(loc);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('service/locationService.php'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(loc) })
       );
     });
 
-    it('updateLocation should PUT location data with id', async () => {
+    it('locations.update should PUT location data with id', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.updateLocation(3, { name: 'Updated' });
+      await PB_API.locations.update(3, { name: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/locationService.php?id=3',
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ name: 'Updated' }) })
       );
     });
 
-    it('deleteLocation should DELETE with id', async () => {
+    it('locations.delete should DELETE with id', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.deleteLocation(5);
+      await PB_API.locations.delete(5);
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/locationService.php?id=5',
         expect.objectContaining({ 
@@ -620,27 +633,27 @@ describe('API Client (api.js)', () => {
       );
     });
 
-    it('getLocationMachines should GET with locationId', async () => {
+    it('locations.getMachines should GET with locationId', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
-      await PB_API.getLocationMachines(10);
+      await PB_API.locations.getMachines(10);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('locationId=10'),
         expect.any(Object)
       );
     });
 
-    it('getLocationMachines should work without locationId', async () => {
+    it('locations.getMachines should work without locationId', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
-      await PB_API.getLocationMachines(null);
+      await PB_API.locations.getMachines(null);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('task=units'),
         expect.any(Object)
       );
     });
 
-    it('removeLocationMachine should DELETE with locationId and machineId', async () => {
+    it('locations.removeMachine should DELETE', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.removeLocationMachine(1, 2);
+      await PB_API.locations.removeMachine(1, 2);
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/locationService.php?task=units&locationId=1&machineId=2',
         expect.objectContaining({ 
@@ -650,40 +663,40 @@ describe('API Client (api.js)', () => {
       );
     });
 
-    it('saveTargetScore should POST target data', async () => {
+    it('machines.saveTarget should POST target data', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       const target = { eventId: 1, machineId: 2, value1: 100 };
-      await PB_API.saveTargetScore(target);
+      await PB_API.machines.saveTarget(target);
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('task=threshold'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(target) })
       );
     });
 
-    it('updateUserRole should PUT to role task', async () => {
+    it('players.updateRole should PUT to role task', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.updateUserRole(5, 'admin');
+      await PB_API.players.updateRole(5, 'admin');
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/playerService.php?task=role&id=5',
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ role: 'admin' }) })
       );
     });
 
-    it('updateMachine should PUT machine data with id', async () => {
+    it('machines.update should PUT machine data with id', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.updateMachine(3, { machineName: 'Updated' });
+      await PB_API.machines.update(3, { machineName: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/machineService.php?id=3',
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ machineName: 'Updated' }) })
       );
     });
 
-    it('deleteMachine should DELETE with id', async () => {
+    it('machines.delete should DELETE with id', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await PB_API.deleteMachine(7);
+      await PB_API.machines.delete(7);
       expect(fetch).toHaveBeenCalledWith(
         'http://localhost/app/service/machineService.php?id=7',
-        expect.objectContaining({ 
+        expect.objectContaining({
           method: 'DELETE',
           body: '{}'
         })

@@ -26,7 +26,7 @@ export async function initManagementPage() {
    */
   const initialize = async () => {
     const [user, isAuthorized] = await Promise.all([
-      PB_API.getCurrentUser(),
+      PB_API.auth.me(),
       can(PERMISSIONS.RUN_CLEANUP) // Maintenance check
     ]);
 
@@ -113,7 +113,7 @@ export async function initManagementPage() {
         showAlert('Unauthorized: Administrator privileges are required for this action.', 'Access Denied');
         return;
       }
-      const result = await PB_API.runCleanup(days);
+      const result = await PB_API.system.runCleanup(days);
       showAlert(`Cleanup successful! Removed ${result.leagues_cleaned || 0} session leagues older than ${days} days.`, 'Success');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

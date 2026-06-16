@@ -4,11 +4,13 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 // Mock dependencies
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    getLeagues: vi.fn(),
-    getTargetScores: vi.fn(),
-    getScores: vi.fn(),
-    getTeams: vi.fn().mockResolvedValue([]),
-    getCurrentUser: vi.fn().mockResolvedValue(null)
+    leagues: { getAll: vi.fn() },
+    machines: { getTargets: vi.fn() },
+    scores: { get: vi.fn() },
+    teams: { getAll: vi.fn().mockResolvedValue([]) },
+    auth: {
+      me: vi.fn().mockResolvedValue(null)
+    }
   }
 }));
 
@@ -87,11 +89,11 @@ describe('Standings Page (standingsPage.js)', () => {
   it('should render event standings when an event is selected', async () => {
     getActiveLeagueId.mockReturnValue('1');
     getActiveEventId.mockReturnValue('101');
-    PB_API.getLeagues.mockResolvedValue([{ 
+    PB_API.leagues.getAll.mockResolvedValue([{ 
       id: '1', name: 'L1', players: [{ id: '7', playerName: 'Kyle' }], events: [{ id: '101', eventName: 'W1' }] 
     }]);
-    PB_API.getTargetScores.mockResolvedValue([{ orderNumber: 1, machineName: 'M1' }]);
-    PB_API.getScores.mockResolvedValue([]);
+    PB_API.machines.getTargets.mockResolvedValue([{ orderNumber: 1, machineName: 'M1' }]);
+    PB_API.scores.get.mockResolvedValue([]);
 
     await initStandingsPage();
 
@@ -103,11 +105,11 @@ describe('Standings Page (standingsPage.js)', () => {
   it('should render league summary when "summary" event is selected', async () => {
     getActiveLeagueId.mockReturnValue('1');
     getActiveEventId.mockReturnValue('summary');
-    PB_API.getLeagues.mockResolvedValue([{ 
+    PB_API.leagues.getAll.mockResolvedValue([{ 
       id: '1', name: 'L1', players: [{ id: '7', playerName: 'Kyle' }], events: [{ id: '101', eventName: 'W1' }] // Ensure eventName is present
     }]);
-    PB_API.getTargetScores.mockResolvedValue([{ eventId: '101', orderNumber: 1, machineName: 'M1' }]);
-    PB_API.getScores.mockResolvedValue([{ eventId: '101', playerId: '7', orderNumber: 1, ball1: 1000 }]);
+    PB_API.machines.getTargets.mockResolvedValue([{ eventId: '101', orderNumber: 1, machineName: 'M1' }]);
+    PB_API.scores.get.mockResolvedValue([{ eventId: '101', playerId: '7', orderNumber: 1, ball1: 1000 }]);
 
     await initStandingsPage();
 
@@ -118,27 +120,27 @@ describe('Standings Page (standingsPage.js)', () => {
   it('should enter TV mode and set up refresh interval', async () => {
     getActiveLeagueId.mockReturnValue('1');
     getActiveEventId.mockReturnValue('101');
-    PB_API.getLeagues.mockResolvedValue([]);
-    PB_API.getTargetScores.mockResolvedValue([]);
-    PB_API.getScores.mockResolvedValue([]);
+    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.machines.getTargets.mockResolvedValue([]);
+    PB_API.scores.get.mockResolvedValue([]);
 
     await initStandingsPage();
     
     const tvBtn = document.getElementById('tv-mode-btn');
     tvBtn.click();
-
+    
     expect(document.body.classList.contains('tv-mode-active')).toBe(true);
     
     // Advance time and check if refresh is triggered
     vi.advanceTimersByTime(16000); 
     // 1 (init) + 1 (initial refresh) + 1 (timer refresh) = 3
-    expect(PB_API.getLeagues).toHaveBeenCalledTimes(3); 
+    expect(PB_API.leagues.getAll).toHaveBeenCalledTimes(3); 
   });
 
   it('should show selector and hide standings when Change button is clicked', async () => {
     getActiveLeagueId.mockReturnValue('1');
     getActiveEventId.mockReturnValue('101');
-    PB_API.getLeagues.mockResolvedValue([{ id: '1', name: 'L1', events: [{ id: '101' }] }]);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: '1', name: 'L1', events: [{ id: '101' }] }]);
     
     await initStandingsPage();
 

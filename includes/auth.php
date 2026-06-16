@@ -42,6 +42,7 @@ function validateLeagueAccess($pdo, $leagueId) {
     // 1. Master Overrides: Session Role or API Secret
     $user = getCurrentUser();
     if ($user && ($user['role'] === 'admin' || $user['role'] === 'td')) {
+        if (!verifyCsrfToken()) sendJson(['error' => 'CSRF validation failed'], 403);
         return;
     }
 
@@ -67,6 +68,7 @@ function validateAdminAccess() {
     
     $user = getCurrentUser();
     if ($user && $user['role'] === 'admin') {
+        if (!verifyCsrfToken()) sendJson(['error' => 'CSRF validation failed'], 403);
         return;
     }
 
@@ -87,6 +89,7 @@ function validateTDAccess() {
     
     $user = getCurrentUser();
     if ($user && ($user['role'] === 'admin' || $user['role'] === 'td')) {
+        if (!verifyCsrfToken()) sendJson(['error' => 'CSRF validation failed'], 403);
         return;
     }
 
@@ -105,9 +108,10 @@ function validateSessionOrSecret() {
     }
     $user = getCurrentUser();
     if ($user) {
+        if (!verifyCsrfToken()) sendJson(['error' => 'CSRF validation failed'], 403);
         return;
     }
-    sendJson(['error' => 'Unauthorized: Invalid or missing API secret'], 401);
+    sendJson(['error' => 'Unauthorized: Invalid or missing authentication'], 401);
 }
 
 /**

@@ -1,5 +1,6 @@
 import { showAlert, showAuthDialog } from '@ui/dialogs.js';
 import { PB_API } from '@services/api.js';
+import { getDebugEnabled } from '@services/state.js';
 
 let _cachedUser = null;
 let _userFetchPromise = null;
@@ -69,7 +70,7 @@ async function getAuthenticatedUser() {
   if (_isInitialized) return _cachedUser;
   if (_userFetchPromise) return _userFetchPromise;
 
-  _userFetchPromise = PB_API.getCurrentUser()
+  _userFetchPromise = PB_API.auth.me()
     .then(user => {
       _cachedUser = user;
       _isInitialized = true;
@@ -111,7 +112,7 @@ export async function runAuthorizedLeagueAction(leagueId, actionCallback) {
   }
 
   try {
-    if (localStorage.getItem('pb_debug') === 'true') console.log('[Auth] Executing authorized callback...');
+    if (getDebugEnabled()) console.log('[Auth] Executing authorized callback...');
     await actionCallback();
     return true;
   } catch (err) {
@@ -179,7 +180,7 @@ function updateAuthUI(user) {
     `;
     container.querySelector('#header-logout-btn').onclick = async () => {
       try {
-        await PB_API.logout();
+        await PB_API.auth.logout();
         resetAuthCache();
         // Refresh the entire page on logout to clear session data and reset permissions
         window.location.reload();

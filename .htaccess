@@ -4,6 +4,10 @@ RewriteEngine On
 # 1. Enforce Clean URLs: Redirect direct .php requests to clean version
 # Do not redirect API calls in the service directory or the system configuration script.
 # This prevents breaking POST requests and ensures versioned asset loading for PHP files.
+#
+# Strip version prefix for static assets (CSS, JS, images, etc.)
+# This allows for cache-busting while serving the actual file from its original path.
+RewriteRule ^(.*)v[0-9\.]+/+(.*)$ $1$2 [L]
 # We also exclude versioned paths (v1.x.x/) as these are handled dynamically by index.php.
 RewriteCond %{REQUEST_URI} !/(service/|js-config\.php|v[0-9.]+/|includes/) [NC]
 # Capture the full URL path from the original request to avoid filesystem path leakage.

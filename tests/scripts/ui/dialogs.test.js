@@ -18,9 +18,11 @@ vi.hoisted(() => {
 
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    login: vi.fn(),
-    register: vi.fn(),
-    getCurrentUser: vi.fn(),
+    auth: {
+      login: vi.fn(),
+      register: vi.fn(),
+      me: vi.fn()
+    }
   },
 }));
 
@@ -258,7 +260,7 @@ describe('showAuthDialog', () => {
 
   it('should resolve with user on successful login', async () => {
     const mockUser = { id: 1, username: 'testuser' };
-    PB_API.login.mockResolvedValue(mockUser);
+    PB_API.auth.login.mockResolvedValue(mockUser);
     const promise = showAuthDialog();
     await vi.advanceTimersByTimeAsync(50);
 
@@ -267,7 +269,7 @@ describe('showAuthDialog', () => {
     document.querySelector('#auth-modal-form').dispatchEvent(new Event('submit', { cancelable: true }));
 
     const result = await promise;
-    expect(PB_API.login).toHaveBeenCalledWith('testuser', 'password123');
+    expect(PB_API.auth.login).toHaveBeenCalledWith('testuser', 'password123');
     expect(result).toEqual(mockUser);
   });
 
@@ -280,8 +282,8 @@ describe('showAuthDialog', () => {
   });
 
   it('should call register API on register form submit', async () => {
-    PB_API.register.mockResolvedValue({});
-    PB_API.login.mockResolvedValue({ id: 2, username: 'newuser' });
+    PB_API.auth.register.mockResolvedValue({});
+    PB_API.auth.login.mockResolvedValue({ id: 2, username: 'newuser' });
     const promise = showAuthDialog();
     await vi.advanceTimersByTimeAsync(50);
 
@@ -294,18 +296,18 @@ describe('showAuthDialog', () => {
     document.querySelector('#auth-modal-form').dispatchEvent(new Event('submit', { cancelable: true }));
 
     const result = await promise;
-    expect(PB_API.register).toHaveBeenCalledWith({
+    expect(PB_API.auth.register).toHaveBeenCalledWith({
       username: 'newuser',
       password: 'pass123',
       playerName: 'New Player',
     });
-    expect(PB_API.login).toHaveBeenCalledWith('newuser', 'pass123');
+    expect(PB_API.auth.login).toHaveBeenCalledWith('newuser', 'pass123');
   });
 
   it('should handle claimRequired flow in register', async () => {
-    PB_API.register.mockResolvedValueOnce({ claimRequired: true, message: 'Claim your profile?' });
-    PB_API.register.mockResolvedValueOnce({});
-    PB_API.login.mockResolvedValue({ id: 3, username: 'claimer' });
+    PB_API.auth.register.mockResolvedValueOnce({ claimRequired: true, message: 'Claim your profile?' });
+    PB_API.auth.register.mockResolvedValueOnce({});
+    PB_API.auth.login.mockResolvedValue({ id: 3, username: 'claimer' });
     const promise = showAuthDialog();
     await vi.advanceTimersByTimeAsync(50);
 
@@ -329,8 +331,8 @@ describe('showAuthDialog', () => {
 
     await vi.advanceTimersByTimeAsync(50);
     const result = await promise;
-    expect(PB_API.register).toHaveBeenCalledTimes(2);
-    expect(PB_API.register).toHaveBeenLastCalledWith({
+    expect(PB_API.auth.register).toHaveBeenCalledTimes(2);
+    expect(PB_API.auth.register).toHaveBeenLastCalledWith({
       username: 'claimer',
       password: 'pass',
       playerName: 'Claimer',
@@ -339,7 +341,7 @@ describe('showAuthDialog', () => {
   });
 
   it('should show alert on authentication failure', async () => {
-    PB_API.login.mockRejectedValue(new Error('Invalid credentials'));
+    PB_API.auth.login.mockRejectedValue(new Error('Invalid credentials'));
     const promise = showAuthDialog();
     await vi.advanceTimersByTimeAsync(50);
 

@@ -4,20 +4,30 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 // Mock dependencies
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    getLeagues: vi.fn(),
-    getPlayers: vi.fn(),
-    getLocations: vi.fn(),
-    createLeague: vi.fn(),
-    deleteLeague: vi.fn(),
-    addLeaguePlayer: vi.fn(),
-    removeLeaguePlayer: vi.fn(),
-    addLeagueTeam: vi.fn(),
-    removeLeagueTeam: vi.fn(),
-    createEvent: vi.fn(),
-    updateEvent: vi.fn(),
-    deleteEvent: vi.fn(),
-    updateLeague: vi.fn(),
-    getTeams: vi.fn()
+    leagues: {
+      getAll: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      addPlayer: vi.fn(),
+      removePlayer: vi.fn()
+    },
+    players: {
+      getAll: vi.fn()
+    },
+    locations: {
+      getAll: vi.fn()
+    },
+    teams: {
+      getAll: vi.fn(),
+      addToLeague: vi.fn(),
+      removeFromLeague: vi.fn()
+    },
+    events: {
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn()
+    }
   }
 }));
 
@@ -153,8 +163,8 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
   it('should handle unauthorized access by hiding management tools', async () => {
     isManagementAuthorized.mockResolvedValue(false);
-    PB_API.getLeagues.mockResolvedValue([]);
-    PB_API.getPlayers.mockResolvedValue([]);
+    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.players.getAll.mockResolvedValue([]);
 
     await initLeaguesPage();
 
@@ -166,8 +176,8 @@ describe('Leagues Page (leaguesPage.js)', () => {
   it('should render the league list and toggle expansion', async () => {
     isManagementAuthorized.mockResolvedValue(true);
     const mockLeagues = [{ id: 1, name: 'L1', players: [], events: [] }];
-    PB_API.getLeagues.mockResolvedValue(mockLeagues);
-    PB_API.getPlayers.mockResolvedValue([]);
+    PB_API.leagues.getAll.mockResolvedValue(mockLeagues);
+    PB_API.players.getAll.mockResolvedValue([]);
 
     await initLeaguesPage();
 
@@ -183,8 +193,8 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
   it('should prompt for player selection when adding a player', async () => {
     isManagementAuthorized.mockResolvedValue(true);
-    PB_API.getLeagues.mockResolvedValue([{ id: 1, name: 'L1', players: [] }]);
-    PB_API.getPlayers.mockResolvedValue([{ id: 10, playerName: 'Kyle' }]);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', players: [] }]);
+    PB_API.players.getAll.mockResolvedValue([{ id: 10, playerName: 'Kyle' }]);
     showPlayerSelectionDialog.mockResolvedValue('10');
 
     await initLeaguesPage();
@@ -193,13 +203,13 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
     expect(showPlayerSelectionDialog).toHaveBeenCalled();
     await vi.waitFor(() => {
-      expect(PB_API.addLeaguePlayer).toHaveBeenCalledWith(1, 10);
+      expect(PB_API.leagues.addPlayer).toHaveBeenCalledWith(1, 10);
     });
   });
 
   it('should toggle the create league form', async () => {
     isManagementAuthorized.mockResolvedValue(true);
-    PB_API.getLeagues.mockResolvedValue([]);
+    PB_API.leagues.getAll.mockResolvedValue([]);
     await initLeaguesPage();
 
     const toggle = document.getElementById('create-league-toggle');
@@ -214,7 +224,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
   it('should create a new league on form submission', async () => {
     isManagementAuthorized.mockResolvedValue(true);
-    PB_API.getLeagues.mockResolvedValue([]);
+    PB_API.leagues.getAll.mockResolvedValue([]);
     await initLeaguesPage();
 
     document.getElementById('league-name').value = 'New Season';
@@ -224,7 +234,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
     document.getElementById('league-name').dispatchEvent(new Event('input'));
     
     document.getElementById('league-form').dispatchEvent(new Event('submit'));
-    expect(PB_API.createLeague).toHaveBeenCalledWith(expect.objectContaining({
+    expect(PB_API.leagues.create).toHaveBeenCalledWith(expect.objectContaining({
       name: 'New Season',
       startDate: '2024-01-01'
     }));
@@ -232,10 +242,10 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
   it('should remove a player from a league after confirmation', async () => {
     isManagementAuthorized.mockResolvedValue(true);
-    PB_API.getLeagues.mockResolvedValue([{ 
+    PB_API.leagues.getAll.mockResolvedValue([{ 
       id: 1, name: 'L1', players: [{ id: 10, playerName: 'Kyle' }] 
     }]);
-    PB_API.getPlayers.mockResolvedValue([]);
+    PB_API.players.getAll.mockResolvedValue([]);
     showConfirm.mockResolvedValue(true);
 
     await initLeaguesPage();
@@ -245,6 +255,6 @@ describe('Leagues Page (leaguesPage.js)', () => {
     removeBtn.click();
 
     expect(showConfirm).toHaveBeenCalled();
-    await vi.waitFor(() => expect(PB_API.removeLeaguePlayer).toHaveBeenCalledWith(1, 10));
+    await vi.waitFor(() => expect(PB_API.leagues.removePlayer).toHaveBeenCalledWith(1, 10));
   });
 });

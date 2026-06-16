@@ -1,5 +1,5 @@
 import { PB_API } from '@services/api.js';
-import { filterLeaguesForUser, filterPlayersForUser, getScoreAccessLevel, can } from '@services/auth.js';
+import { filterPlayersForUser, getScoreAccessLevel, can } from '@services/auth.js';
 import { showAlert } from '@ui/dialogs.js';
 import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, formatNumber, applyScoreFormatting, renderThresholdGrid, setCurrentPlayerId, getCurrentPlayerId, escapeHTML } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
@@ -34,13 +34,13 @@ export async function initScoresPage() {
   let tournamentSelector = null;
   // Fetch leagues and current user once at the start. 
   const [leaguesFromApi, userResult] = await Promise.all([
-    PB_API.getLeagues().catch(err => {
+    PB_API.leagues.getAll().catch(err => {
       console.error("Failed to fetch leagues:", err);
       return [];
     }),
     // Allow getCurrentUser to fail gracefully if the user is not logged in.
     // The rest of the page logic can then handle the null user.
-    PB_API.getCurrentUser().catch(err => {
+    PB_API.auth.me().catch(err => {
       return null;
     })
   ]);
@@ -229,7 +229,7 @@ export async function initScoresPage() {
       saveBtn.textContent = 'Saving...';
 
       try {
-        await PB_API.saveScore({
+        await PB_API.scores.save({
           playerId: Number(currentPlayerId),
           orderNumber: Number(round.orderNumber),
           eventId: Number(getActiveEventId()),
@@ -264,7 +264,7 @@ export async function initScoresPage() {
       const leagueId = getActiveLeagueId();
       // Fetch all players to ensure we can resolve IDs from URLs even if the 
       // league-specific roster fetch doesn't include a newly added player yet.
-      const allPlayers = await PB_API.getPlayers();
+      const allPlayers = await PB_API.players.getAll();
       allPlayersCache.length = 0;
       allPlayersCache.push(...allPlayers);
 
@@ -423,7 +423,7 @@ export async function initScoresPage() {
     resultsCard.classList.remove('hidden');
     roundsInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
     
-    const scores = await PB_API.getScores(Number(activePlayerId), Number(getActiveEventId()));
+    const scores = await PB_API.scores.get(Number(activePlayerId), Number(getActiveEventId()));
     await loadScoresIntoForm(scores, player);
     renderCurrentResults();
   }
@@ -502,8 +502,8 @@ export async function initScoresPage() {
 
     // Fetch leagues and machine targets in parallel. User is already fetched at init.
     const [leagues, eventTargets] = await Promise.all([
-      PB_API.getLeagues(),
-      PB_API.getTargetScores(eventId)
+      PB_API.leagues.getAll(),
+      PB_API.machines.getTargets(eventId)
     ]);
     allLeaguesCache = leagues; // Update the cache with fresh data
 

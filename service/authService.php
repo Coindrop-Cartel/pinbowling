@@ -35,9 +35,6 @@ switch ($task) {
 
         if ($user && password_verify($password, $user['password_hash'])) {
             // Start session and store user data (minus the hash)
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
             unset($user['password_hash']);
             $_SESSION['user'] = $user;
             sendJson($user);
@@ -47,9 +44,6 @@ switch ($task) {
         break;
 
     case 'logout':
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
         $_SESSION = [];
         session_destroy();
         sendJson(['success' => true]);

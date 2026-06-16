@@ -10,6 +10,14 @@ define('PB_BASE_DIR', dirname(__DIR__));
 define('PB_INC_DIR', __DIR__);
 define('PB_PAGES_DIR', PB_INC_DIR . '/pages');
 
+// Ensure a session is started to support CSRF protection and authentication.
+if (session_status() === PHP_SESSION_NONE && !defined('PHPUNIT_RUNNING')) {
+    session_start();
+}
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 /**
  * Manually parses a .env file into PHP's environment arrays.
  * Useful for shared hosting environments where putenv/$_ENV are required.
@@ -92,11 +100,19 @@ $apiSecret = envValue($loadedEnv, ['API_SECRET']);
 $packageFile = PB_BASE_DIR . '/package.json';
 if (is_readable($packageFile)) {
     $packageData = json_decode(file_get_contents($packageFile), true);
-    $uiVersion = $packageData['version'] ?? '1.0.0';
-    $uiVersionSource = 'package.json';
+    if (json_last_error() === JSON_ERROR_NONE && isset($packageData['version'])) {
+        $uiVersion = $packageData['version'];
+        $uiVersionSource = 'package.json';
+        error_log("[PinBowling DEBUG] Successfully read UI Version '{$uiVersion}' from {$packageFile}");
+    } else {
+        $uiVersion = '1.0.0';
+        $uiVersionSource = 'Hardcoded Fallback (JSON parse error or missing version key)';
+        error_log("[PinBowling DEBUG] Failed to parse package.json or missing 'version' key at {$packageFile}. JSON Error: " . json_last_error_msg());
+    }
 } else {
     $uiVersion = '1.0.0';
     $uiVersionSource = 'Hardcoded Fallback';
+    error_log("[PinBowling DEBUG] package.json not found or not readable at {$packageFile}. Falling back to {$uiVersion}.");
 }
 
 $adminPassword = envValue($loadedEnv, ['ADMIN_PASSWORD']);

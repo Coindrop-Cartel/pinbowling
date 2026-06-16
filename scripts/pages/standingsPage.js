@@ -38,8 +38,8 @@ export async function initStandingsPage() {
   let Engine = getScoringEngine('bowling');
 
   // Fetch initial data to check context
-  const allLeagues = await PB_API.getLeagues(); // Use a more descriptive name
-  const currentUser = await PB_API.getCurrentUser(); // Fetch current user for filtering
+  const allLeagues = await PB_API.leagues.getAll(); // Use a more descriptive name
+  const currentUser = await PB_API.auth.me(); // Fetch current user for filtering
 
   // If we arrive at standings without an eventId (Standard Nav entry), 
   // we must ensure we aren't "leaking" a session league into the standard scoreboard.
@@ -193,8 +193,8 @@ export async function initStandingsPage() {
   const renderLeagueSummary = async (leagueId) => {
     // Fetch leagues and teams in parallel to support team-based grouping
     const [leagues, allTeamsData] = await Promise.all([
-      PB_API.getLeagues(),
-      PB_API.getTeams()
+      PB_API.leagues.getAll(),
+      PB_API.teams.getAll()
     ]);
     const league = leagues.find(l => String(l.id) === String(leagueId));
     const format = league?.scoringFormat || 'bowling';
@@ -215,8 +215,8 @@ export async function initStandingsPage() {
     const events = league?.events || [];
 
     const [rawScores, allLeagueTargets] = await Promise.all([
-      PB_API.getScores(null, null, leagueId),
-      PB_API.getTargetScores(null, leagueId)
+      PB_API.scores.get(null, null, leagueId),
+      PB_API.machines.getTargets(null, leagueId)
     ]);
 
     const normalizedLeagueTargets = normalizeTargets(allLeagueTargets);
@@ -295,7 +295,7 @@ export async function initStandingsPage() {
     }
 
     // Fetch all leagues to support both standard tournaments and one-off sessions
-    const leagues = await PB_API.getLeagues();
+    const leagues = await PB_API.leagues.getAll();
 
     if (tournamentSelector) {
       tournamentSelector.setData(leagues);
@@ -350,10 +350,10 @@ export async function initStandingsPage() {
       players = Array.from(memberMap.values());
     }
 
-    const rawMachines = await PB_API.getTargetScores(eventId);
+    const rawMachines = await PB_API.machines.getTargets(eventId);
     const [rawScores, allTeamsData] = await Promise.all([
-      PB_API.getScores(null, Number(eventId)),
-      PB_API.getTeams()
+      PB_API.scores.get(null, Number(eventId)),
+      PB_API.teams.getAll()
     ]);
     
     const allEventScores = normalizeScores(rawScores);

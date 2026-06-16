@@ -41,8 +41,8 @@ export async function initTeamsPage() {
   const refresh = async () => {
     try {
       const [teams, players] = await Promise.all([
-        PB_API.getTeams(),
-        PB_API.getPlayers()
+        PB_API.teams.getAll(),
+        PB_API.players.getAll()
       ]);
       allTeams.length = 0;
       allTeams.push(...teams);
@@ -185,9 +185,9 @@ export async function initTeamsPage() {
 
     try {
       if (editingTeamId) {
-        await PB_API.updateTeam(editingTeamId, payload);
+        await PB_API.teams.update(editingTeamId, payload);
       } else {
-        await PB_API.createTeam(payload);
+        await PB_API.teams.create(payload);
       }
       resetForm();
       await refresh();
@@ -199,7 +199,7 @@ export async function initTeamsPage() {
   const deleteTeam = async (team) => {
     if (!await showConfirm(`Delete team "${team.name}"? This will remove all roster associations.`, 'Delete Team')) return;
     try {
-      await PB_API.deleteTeam(team.id);
+      await PB_API.teams.delete(team.id);
       await refresh();
     } catch (err) {
       showAlert(`Failed to delete team: ${err.message}`);
@@ -220,7 +220,7 @@ export async function initTeamsPage() {
 
     if (selectedId) {
       try {
-        await PB_API.addTeamMember(team.id, selectedId);
+        await PB_API.teams.addMember(team.id, selectedId);
         await refresh();
       } catch (err) {
         showAlert(`Failed to add member: ${err.message}`);
@@ -231,7 +231,7 @@ export async function initTeamsPage() {
   const removeMemberFromTeam = async (teamId, playerId, playerName) => {
     if (!await showConfirm(`Remove ${playerName} from this team?`, 'Remove Member')) return;
     try {
-      await PB_API.removeTeamMember(teamId, playerId);
+      await PB_API.teams.removeMember(teamId, playerId);
       await refresh();
     } catch (err) {
       showAlert(`Failed to remove member: ${err.message}`);

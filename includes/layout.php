@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><?php echo isset($pageTitle) ? "Pinball And Stuff - Don't say \"and stuff\"" : "Pinball And Stuff"; ?></title>
   <link rel="stylesheet" id="theme-stylesheet" href="<?php echo versionedAsset($baseUrl . '/styles/styles.css'); ?>" />
-  <link rel="icon" type="image/png" href="<?php echo versionedAsset($baseUrl . '/images/logo.png'); ?>" />
+  <link rel="icon" type="image/png" href="<?php echo versionedAsset($baseUrl . '/images/' . $active['logo']); ?>" />
   <script>
     // Bridge PHP calculated base path to JavaScript
     window.APP_BASE = "<?php echo $baseUrl; ?>";

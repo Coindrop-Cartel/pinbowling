@@ -7,13 +7,17 @@ import { showConfirm, showPrompt, showChoiceDialog, showAlert } from '@ui/dialog
 
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    getPlayers: vi.fn(),
-    createPlayer: vi.fn(),
-    updatePlayer: vi.fn(),
-    deletePlayer: vi.fn(),
-    getCurrentUser: vi.fn(),
-    updateUserPassword: vi.fn(),
-    updateUserRole: vi.fn(),
+    auth: {
+      me: vi.fn(),
+    },
+    players: {
+      getAll: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      updatePassword: vi.fn(),
+      updateRole: vi.fn(),
+    },
   },
 }));
 
@@ -95,11 +99,11 @@ describe('Player Management Page (playersPage.js)', () => {
     `;
 
     vi.clearAllMocks();
-    PB_API.getPlayers.mockResolvedValue([
-      { id: 10, playerName: 'Alice', ifpaId: '123', userId: 100, userRole: 'player' },
-      { id: 11, playerName: 'Bob', matchplayId: '456' },
+    PB_API.players.getAll.mockResolvedValue([
+      { id: 10, playerName: 'Alice', ifpaId: '123', userId: 100, userRole: 'player', player_id: 10 },
+      { id: 11, playerName: 'Bob', matchplayId: '456', player_id: 11 },
     ]);
-    PB_API.getCurrentUser.mockResolvedValue({ id: 1, role: 'admin', player_id: 10, player_name: 'Admin User' });
+    PB_API.auth.me.mockResolvedValue({ id: 1, role: 'admin', player_id: 10, player_name: 'Admin User' });
     requireAdmin.mockResolvedValue(true);
     showConfirm.mockResolvedValue(true);
   });
@@ -111,14 +115,14 @@ describe('Player Management Page (playersPage.js)', () => {
 
   describe('Initialization', () => {
     it('should load and render players', async () => {
-      await initPlayersPage();
+      await initPlayersPage(); // Ensure init is awaited
       const list = document.getElementById('player-list');
       expect(list.innerHTML).toContain('Alice');
       expect(list.innerHTML).toContain('IFPA ID:</strong> 123');
     });
 
     it('should show empty notice when no players exist', async () => {
-      PB_API.getPlayers.mockResolvedValue([]);
+      PB_API.players.getAll.mockResolvedValue([]);
       await initPlayersPage();
       const list = document.getElementById('player-list');
       expect(list.innerHTML).toContain('No players registered yet');
@@ -131,14 +135,14 @@ describe('Player Management Page (playersPage.js)', () => {
     });
 
     it('should hide form card for non-privileged users', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'player', player_id: 99 });
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'player', player_id: 99 });
       await initPlayersPage();
       const card = document.querySelector('.card');
       expect(card.classList.contains('hidden')).toBe(true);
     });
 
     it('should hide create toggle for non-privileged users', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'player', player_id: 99 });
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'player', player_id: 99 });
       await initPlayersPage();
       const toggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Create New Player'));
           await vi.waitFor(() => {
@@ -148,8 +152,8 @@ describe('Player Management Page (playersPage.js)', () => {
 
     it('should handle API errors gracefully', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      PB_API.getPlayers.mockRejectedValue(new Error('Network Error'));
-      PB_API.getCurrentUser.mockRejectedValue(new Error('Network Error'));
+      PB_API.players.getAll.mockRejectedValue(new Error('Network Error'));
+      PB_API.auth.me.mockRejectedValue(new Error('Network Error'));
       await initPlayersPage();
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
@@ -157,12 +161,12 @@ describe('Player Management Page (playersPage.js)', () => {
 
     it('should render player with MatchPlay ID', async () => {
       await initPlayersPage();
-      const list = document.getElementById('player-list');
+      const list = document.getElementById('player-list'); // Ensure init is awaited
       expect(list.innerHTML).toContain('MatchPlay ID:</strong> 456');
     });
 
     it('should render "No external IDs linked" for players without IDs', async () => {
-      PB_API.getPlayers.mockResolvedValue([{ id: 12, playerName: 'Charlie' }]);
+      PB_API.players.getAll.mockResolvedValue([{ id: 12, playerName: 'Charlie' }]);
       await initPlayersPage();
       const list = document.getElementById('player-list');
       expect(list.innerHTML).toContain('No external IDs linked');
@@ -258,7 +262,7 @@ describe('Player Management Page (playersPage.js)', () => {
     });
 
     it('should show Reset Password and Change Role buttons for users with accounts', async () => {
-      await initPlayersPage();
+      await initPlayersPage(); // Ensure init is awaited
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
       const resetBtn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Reset Password'));
@@ -268,7 +272,7 @@ describe('Player Management Page (playersPage.js)', () => {
     });
 
     it('should hide Reset Password and Change Role for players without accounts', async () => {
-      PB_API.getPlayers.mockResolvedValue([{ id: 11, playerName: 'Bob' }]);
+      PB_API.players.getAll.mockResolvedValue([{ id: 11, playerName: 'Bob' }]);
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
@@ -279,7 +283,7 @@ describe('Player Management Page (playersPage.js)', () => {
     });
 
     it('should allow self-edit for non-admin users', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'player', player_id: 10 });
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'player', player_id: 10 });
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       expect(editBtn).not.toBeNull();
@@ -288,8 +292,8 @@ describe('Player Management Page (playersPage.js)', () => {
     });
 
     it('should not allow non-admin to edit other players', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'player', player_id: 99 });
-      PB_API.getPlayers.mockResolvedValue([
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'player', player_id: 99 });
+      PB_API.players.getAll.mockResolvedValue([
         { id: 10, playerName: 'Alice', ifpaId: '123', userId: 100, userRole: 'player' },
         { id: 11, playerName: 'Bob' },
       ]);
@@ -300,7 +304,7 @@ describe('Player Management Page (playersPage.js)', () => {
     });
 
     it('should lock name field for non-privileged self-edit', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'player', player_id: 10 });
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'player', player_id: 10 });
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click(); // This will trigger editPlayer
@@ -310,7 +314,7 @@ describe('Player Management Page (playersPage.js)', () => {
     });
 
     it('should not lock name field for admin self-edit', async () => {
-      await initPlayersPage();
+      await initPlayersPage(); // Ensure init is awaited
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
       expect(document.getElementById('player-name').disabled).toBe(false);
@@ -324,8 +328,8 @@ describe('Player Management Page (playersPage.js)', () => {
       toggle.click();
       document.getElementById('player-name').value = 'New Player';
       document.getElementById('ifpa-id').value = '789';
-      await document.getElementById('player-form').dispatchEvent(new Event('submit'));
-      expect(PB_API.createPlayer).toHaveBeenCalledWith(expect.objectContaining({
+      await document.getElementById('player-form').dispatchEvent(new Event('submit')); // Ensure await
+      expect(PB_API.players.create).toHaveBeenCalledWith(expect.objectContaining({
         playerName: 'New Player',
         ifpaId: '789',
       }));
@@ -337,14 +341,14 @@ describe('Player Management Page (playersPage.js)', () => {
       toggle.click();
       document.getElementById('player-name').value = '';
       await document.getElementById('player-form').dispatchEvent(new Event('submit'));
-      expect(PB_API.createPlayer).not.toHaveBeenCalled();
+      expect(PB_API.players.create).not.toHaveBeenCalled();
     });
 
     it('should require admin password for non-authorized create', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'player', player_id: 99 });
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'player', player_id: 99 });
       // Need to make the form visible for non-admin
-      PB_API.getPlayers.mockResolvedValue([
-        { id: 10, playerName: 'Alice', ifpaId: '123', userId: 100, userRole: 'player' },
+      PB_API.players.getAll.mockResolvedValue([
+        { id: 10, playerName: 'Alice', ifpaId: '123', userId: 100, userRole: 'player', player_id: 10 },
       ]);
       await initPlayersPage();
       // Force form visible for test
@@ -361,7 +365,7 @@ describe('Player Management Page (playersPage.js)', () => {
 
     it('should not create if admin password is rejected', async () => {
       requireAdmin.mockResolvedValue(false);
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'player', player_id: 99 });
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'player', player_id: 99 });
       await initPlayersPage();
       document.querySelector('.card').classList.remove('hidden');
       const toggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Create New Player'));
@@ -370,12 +374,12 @@ describe('Player Management Page (playersPage.js)', () => {
         toggle.click();
         document.getElementById('player-name').value = 'New Player';
         await document.getElementById('player-form').dispatchEvent(new Event('submit'));
-        expect(PB_API.createPlayer).not.toHaveBeenCalled();
+        expect(PB_API.players.create).not.toHaveBeenCalled();
       }
     });
 
     it('should handle API error on create', async () => {
-      PB_API.createPlayer.mockRejectedValue(new Error('Create failed'));
+      PB_API.players.create.mockRejectedValue(new Error('Create failed'));
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       await initPlayersPage();
       const toggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Create New Player'));
@@ -395,54 +399,54 @@ describe('Player Management Page (playersPage.js)', () => {
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
       document.getElementById('player-name').value = 'Alice Updated';
-      await document.getElementById('player-form').dispatchEvent(new Event('submit'));
-      expect(PB_API.updatePlayer).toHaveBeenCalledWith(10, expect.objectContaining({
+      await document.getElementById('player-form').dispatchEvent(new Event('submit')); // Ensure await
+      expect(PB_API.players.update).toHaveBeenCalledWith(10, expect.objectContaining({
         playerName: 'Alice Updated',
       }));
     });
 
     it('should not require admin for self-update without name change', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'player', player_id: 10 });
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'player', player_id: 10 });
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
       // Change IFPA ID only (not name)
       document.getElementById('ifpa-id').value = '999';
       await document.getElementById('player-form').dispatchEvent(new Event('submit'));
-      expect(requireAdmin).not.toHaveBeenCalled();
+      expect(requireAdmin).not.toHaveBeenCalled(); // requireAdmin should not be called
     });
 
     it('should require admin for name change on self-update', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'player', player_id: 10 }); // Changed role to 'player'
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'player', player_id: 10 }); // Changed role to 'player'
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
       document.getElementById('player-name').value = 'Alice New Name';
       document.getElementById('player-name').disabled = false;
       await document.getElementById('player-form').dispatchEvent(new Event('submit'));
-      expect(requireAdmin).toHaveBeenCalled();
+      expect(requireAdmin).toHaveBeenCalled(); // requireAdmin should be called
     });
 
     it('should not update if admin password rejected for name change', async () => {
       requireAdmin.mockResolvedValue(false); // Keep this
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'player', player_id: 10 }); // Changed role to 'player'
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'player', player_id: 10 }); // Changed role to 'player'
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
       document.getElementById('player-name').value = 'Alice New Name';
       document.getElementById('player-name').disabled = false;
       await document.getElementById('player-form').dispatchEvent(new Event('submit'));
-      expect(PB_API.updatePlayer).not.toHaveBeenCalled();
+      expect(PB_API.players.update).not.toHaveBeenCalled(); // PB_API.players.update should not be called
     });
 
     it('should handle API error on update', async () => {
-      PB_API.updatePlayer.mockRejectedValue(new Error('Update failed'));
+      PB_API.players.update.mockRejectedValue(new Error('Update failed'));
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
       document.getElementById('player-name').value = 'Alice Updated';
-      await document.getElementById('player-form').dispatchEvent(new Event('submit'));
+      await document.getElementById('player-form').dispatchEvent(new Event('submit')); // Ensure await
       await vi.waitFor(() => {
         expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Error saving player'));
       });
@@ -468,8 +472,8 @@ describe('Player Management Page (playersPage.js)', () => {
       const deleteBtn = document.querySelector('.delete-player-btn-inline');
       if (deleteBtn) {
         deleteBtn.click();
-        await vi.waitFor(() => {
-          expect(PB_API.deletePlayer).toHaveBeenCalledWith(10);
+        await vi.waitFor(() => { // Ensure await
+          expect(PB_API.players.delete).toHaveBeenCalledWith(10);
         });
       }
     });
@@ -491,8 +495,8 @@ describe('Player Management Page (playersPage.js)', () => {
       const deleteBtn = document.querySelector('.delete-player-btn-inline');
       if (deleteBtn) {
         deleteBtn.click();
-        await vi.waitFor(() => {
-          expect(PB_API.deletePlayer).not.toHaveBeenCalled();
+        await vi.waitFor(() => { // Ensure await
+          expect(PB_API.players.delete).not.toHaveBeenCalled();
         });
       }
     });
@@ -500,17 +504,17 @@ describe('Player Management Page (playersPage.js)', () => {
     it('should not delete if admin password rejected', async () => {
       requireAdmin.mockResolvedValue(false);
       await initPlayersPage();
-      const deleteBtn = document.querySelector('.delete-player-btn-inline');
+      const deleteBtn = document.querySelector('.delete-player-btn-inline'); // Ensure deleteBtn is found
       if (deleteBtn) {
         deleteBtn.click();
-        await vi.waitFor(() => {
-          expect(PB_API.deletePlayer).not.toHaveBeenCalled();
+        await vi.waitFor(() => { // Ensure await
+          expect(PB_API.players.delete).not.toHaveBeenCalled();
         });
       }
     });
 
     it('should handle API error on delete', async () => {
-      PB_API.deletePlayer.mockRejectedValue(new Error('Delete failed'));
+      PB_API.players.delete.mockRejectedValue(new Error('Delete failed'));
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       await initPlayersPage();
       const deleteBtn = document.querySelector('.delete-player-btn-inline');
@@ -524,7 +528,7 @@ describe('Player Management Page (playersPage.js)', () => {
     });
 
     it('should only show delete button for admin users', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'td', player_id: 99 });
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'td', player_id: 99 });
       await initPlayersPage();
       const deleteBtn = document.querySelector('.delete-player-btn-inline');
       expect(deleteBtn).toBeNull();
@@ -534,7 +538,7 @@ describe('Player Management Page (playersPage.js)', () => {
   describe('Reset Password', () => {
     it('should prompt for new password when Reset Password is clicked', async () => {
       showPrompt.mockResolvedValue('newpass123');
-      PB_API.updateUserPassword.mockResolvedValue({});
+      PB_API.players.updatePassword.mockResolvedValue({});
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
@@ -551,20 +555,20 @@ describe('Player Management Page (playersPage.js)', () => {
 
     it('should call updateUserPassword with new password', async () => {
       showPrompt.mockResolvedValue('newpass123');
-      PB_API.updateUserPassword.mockResolvedValue({});
+      PB_API.players.updatePassword.mockResolvedValue({});
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
       const resetBtn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Reset Password'));
       resetBtn.click();
       await vi.waitFor(() => {
-        expect(PB_API.updateUserPassword).toHaveBeenCalledWith(100, 'newpass123');
+        expect(PB_API.players.updatePassword).toHaveBeenCalledWith(100, 'newpass123');
       });
     });
 
     it('should show success alert after password reset', async () => {
       showPrompt.mockResolvedValue('newpass123');
-      PB_API.updateUserPassword.mockResolvedValue({});
+      PB_API.players.updatePassword.mockResolvedValue({});
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
@@ -585,14 +589,14 @@ describe('Player Management Page (playersPage.js)', () => {
       editBtn.click();
       const resetBtn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Reset Password'));
       resetBtn.click();
-      await vi.waitFor(() => {
-        expect(PB_API.updateUserPassword).not.toHaveBeenCalled();
+      await vi.waitFor(() => { // Ensure await
+        expect(PB_API.players.updatePassword).not.toHaveBeenCalled();
       });
     });
 
     it('should show error alert on password reset failure', async () => {
       showPrompt.mockResolvedValue('newpass123');
-      PB_API.updateUserPassword.mockRejectedValue(new Error('Reset failed'));
+      PB_API.players.updatePassword.mockRejectedValue(new Error('Reset failed'));
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
@@ -609,7 +613,7 @@ describe('Player Management Page (playersPage.js)', () => {
 
   describe('Change Role', () => {
     it('should show role choice dialog when Change Role is clicked', async () => {
-      showChoiceDialog.mockResolvedValue(null);
+      showChoiceDialog.mockResolvedValue(null); // Ensure mock is resolved
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
@@ -626,7 +630,7 @@ describe('Player Management Page (playersPage.js)', () => {
     });
 
     it('should include Admin option for admin users', async () => {
-      showChoiceDialog.mockResolvedValue(null);
+      showChoiceDialog.mockResolvedValue(null); // Ensure mock is resolved
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
@@ -641,7 +645,7 @@ describe('Player Management Page (playersPage.js)', () => {
     });
 
     it('should not include Admin option for TD users', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'td', player_id: 10 });
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'td', player_id: 10 });
       showChoiceDialog.mockResolvedValue(null);
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
@@ -660,14 +664,14 @@ describe('Player Management Page (playersPage.js)', () => {
 
     it('should call updateUserRole when new role is selected', async () => {
       showChoiceDialog.mockResolvedValue('td');
-      PB_API.updateUserRole.mockResolvedValue({});
+      PB_API.players.updateRole.mockResolvedValue({});
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
       const roleBtn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Change Role'));
       roleBtn.click();
       await vi.waitFor(() => {
-        expect(PB_API.updateUserRole).toHaveBeenCalledWith(100, 'td');
+        expect(PB_API.players.updateRole).toHaveBeenCalledWith(100, 'td');
       });
     });
 
@@ -678,8 +682,8 @@ describe('Player Management Page (playersPage.js)', () => {
       editBtn.click();
       const roleBtn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Change Role'));
       roleBtn.click();
-      await vi.waitFor(() => {
-        expect(PB_API.updateUserRole).not.toHaveBeenCalled();
+      await vi.waitFor(() => { // Ensure await
+        expect(PB_API.players.updateRole).not.toHaveBeenCalled();
       });
     });
 
@@ -690,14 +694,14 @@ describe('Player Management Page (playersPage.js)', () => {
       editBtn.click();
       const roleBtn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Change Role'));
       roleBtn.click();
-      await vi.waitFor(() => {
-        expect(PB_API.updateUserRole).not.toHaveBeenCalled();
+      await vi.waitFor(() => { // Ensure await
+        expect(PB_API.players.updateRole).not.toHaveBeenCalled();
       });
     });
 
     it('should show error alert on role update failure', async () => {
       showChoiceDialog.mockResolvedValue('td');
-      PB_API.updateUserRole.mockRejectedValue(new Error('Role update failed'));
+      PB_API.players.updateRole.mockRejectedValue(new Error('Role update failed'));
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
@@ -717,7 +721,7 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const nameInput = document.getElementById('player-name');
       nameInput.value = 'Alice';
-      nameInput.dispatchEvent(new Event('input'));
+      nameInput.dispatchEvent(new Event('input')); // Ensure event is dispatched
       await vi.waitFor(() => {
         expect(document.getElementById('save-player-button').disabled).toBe(true);
       });
@@ -727,7 +731,7 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
-      await vi.waitFor(() => {
+      await vi.waitFor(() => { // Ensure await
         // Name is already "Alice" which matches, but we're editing it
         expect(document.getElementById('save-player-button').disabled).toBe(false);
       });
@@ -737,7 +741,7 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const nameInput = document.getElementById('player-name');
       nameInput.value = 'Alice';
-      nameInput.dispatchEvent(new Event('input'));
+      nameInput.dispatchEvent(new Event('input')); // Ensure event is dispatched
       await vi.waitFor(() => {
         expect(document.getElementById('save-player-button').title).toContain('already exists');
       });
@@ -747,7 +751,7 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const nameInput = document.getElementById('player-name');
       nameInput.value = 'Alice';
-      nameInput.dispatchEvent(new Event('input'));
+      nameInput.dispatchEvent(new Event('input')); // Ensure event is dispatched
       await vi.waitFor(() => {
         const toggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Create New Player'));
         expect(toggle.classList.contains('hidden')).toBe(true);
@@ -760,7 +764,7 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
-      document.getElementById('cancel-edit-button').click();
+      document.getElementById('cancel-edit-button').click(); // Ensure click is simulated
       expect(document.getElementById('editing-player-id').value).toBe('');
       expect(document.getElementById('player-name').value).toBe('');
       expect(document.getElementById('player-form-title').textContent).toBe('Add New Player');
@@ -770,7 +774,7 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
-      document.getElementById('cancel-edit-button').click();
+      document.getElementById('cancel-edit-button').click(); // Ensure click is simulated
       expect(document.getElementById('cancel-edit-button').classList.contains('hidden')).toBe(true);
     });
 
@@ -778,7 +782,7 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
-      document.getElementById('cancel-edit-button').click();
+      document.getElementById('cancel-edit-button').click(); // Ensure click is simulated
       expect(document.getElementById('player-ifpa-row').classList.contains('hidden')).toBe(true);
       expect(document.getElementById('player-matchplay-row').classList.contains('hidden')).toBe(true);
     });
@@ -789,7 +793,7 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const nameInput = document.getElementById('player-name');
       nameInput.value = 'Bob';
-      nameInput.dispatchEvent(new Event('input'));
+      nameInput.dispatchEvent(new Event('input')); // Ensure event is dispatched
       const items = document.querySelectorAll('.player-item-row');
       expect(items.length).toBe(1);
       expect(items[0].innerHTML).toContain('Bob');
@@ -799,7 +803,7 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const nameInput = document.getElementById('player-name');
       nameInput.value = 'Nonexistent';
-      nameInput.dispatchEvent(new Event('input'));
+      nameInput.dispatchEvent(new Event('input')); // Ensure event is dispatched
       const list = document.getElementById('player-list');
       expect(list.innerHTML).toContain('No matching players found');
     });
@@ -807,8 +811,8 @@ describe('Player Management Page (playersPage.js)', () => {
 
   describe('TD Role Handling', () => {
     it('should show edit buttons for TD users', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'td', player_id: 99 });
-      PB_API.getPlayers.mockResolvedValue([
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'td', player_id: 99 });
+      PB_API.players.getAll.mockResolvedValue([
         { id: 10, playerName: 'Alice', ifpaId: '123', userId: 100, userRole: 'player' },
       ]);
       await initPlayersPage();
@@ -817,8 +821,8 @@ describe('Player Management Page (playersPage.js)', () => {
     });
 
     it('should not show delete buttons for TD users', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'td', player_id: 99 });
-      PB_API.getPlayers.mockResolvedValue([
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'td', player_id: 99 });
+      PB_API.players.getAll.mockResolvedValue([
         { id: 10, playerName: 'Alice', ifpaId: '123', userId: 100, userRole: 'player' },
       ]);
       await initPlayersPage();
@@ -827,7 +831,7 @@ describe('Player Management Page (playersPage.js)', () => {
     });
 
     it('should show Reset Password and Change Role for TD users on players with accounts', async () => {
-      PB_API.getCurrentUser.mockResolvedValue({ id: 2, role: 'td', player_id: 10 });
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'td', player_id: 10 });
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();

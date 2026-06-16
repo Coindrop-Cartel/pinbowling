@@ -21,7 +21,10 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 
 // Pass server-side metadata to global JS variables
-echo "window.PB_UI_VERSION = " . json_encode($uiVersion) . ";";
+echo "window.PB_UI_VERSION = " . json_encode($uiVersion) . ";\n";
+
+// Expose CSRF token for API requests
+echo "window.PB_CSRF_TOKEN = " . json_encode($_SESSION['csrf_token'] ?? '') . ";";
 
 // Log the version to console if the user has debug mode enabled in their browser
 echo "\nif (localStorage.getItem('pb_debug') === 'true') {";

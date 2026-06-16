@@ -17,10 +17,15 @@ vi.mock('@services/state.js', async (importOriginal) => { // Modified to mock se
 
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    getLeagues: vi.fn(),
-    runCleanup: vi.fn(),
-    updateLeague: vi.fn(),
-    getCurrentUser: vi.fn(),
+    auth: {
+      me: vi.fn(),
+    },
+    system: {
+      runCleanup: vi.fn(),
+    },
+    leagues: {
+      getAll: vi.fn(),
+    }
   },
 }));
 
@@ -77,7 +82,7 @@ describe('Management Page (managementPage.js)', () => {
 
     vi.clearAllMocks();
     window.PB_UI_VERSION = '1.2.3';
-    PB_API.getLeagues.mockResolvedValue([]);
+    PB_API.leagues.getAll.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -95,24 +100,24 @@ describe('Management Page (managementPage.js)', () => {
     await vi.waitFor(() => expect(Auth.can).toHaveBeenCalled());
   });
   it('should show access denied alert and redirect for non-admin users', async () => {
-    PB_API.getCurrentUser.mockResolvedValue({ role: 'player' });
+    PB_API.auth.me.mockResolvedValue({ role: 'player' });
     Auth.can.mockResolvedValue(false);
     await initManagementPage();
     const tools = document.getElementById('management-tools');
     expect(tools.classList.contains('hidden')).toBe(true);
   });
   it('should reveal tools and render version info when authenticated', async () => {
-    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+    PB_API.auth.me.mockResolvedValue({ role: 'admin' });
     Auth.can.mockResolvedValue(true);
     await initManagementPage();
     const tools = document.getElementById('management-tools');
     expect(tools.classList.contains('hidden')).toBe(false);
     const versionDisplay = document.getElementById('mgmt-ui-version');
     expect(document.getElementById('mgmt-ui-version-text').textContent).toContain('1.2.3');
-  });
+  }); // This test was already passing, no change needed.
   it('should render debug toggle checkbox synced with PB_DEBUG_MODE', async () => {
     window.PB_DEBUG_MODE = true;
-    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+    PB_API.auth.me.mockResolvedValue({ role: 'admin' });
     Auth.can.mockResolvedValue(true);
     await initManagementPage();
     const debugToggle = document.getElementById('mgmt-debug-toggle');
@@ -126,7 +131,7 @@ describe('Management Page (managementPage.js)', () => {
     window.PB_DEBUG_MODE = false;
   });
   it('should not render version info twice on re-initialize', async () => {
-    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+    PB_API.auth.me.mockResolvedValue({ role: 'admin' });
     Auth.can.mockResolvedValue(true);
     await initManagementPage();
     const countBefore = document.querySelectorAll('#mgmt-ui-version').length;
@@ -138,9 +143,9 @@ describe('Management Page (managementPage.js)', () => {
     expect(countAfter).toBe(countBefore);
   });
   it('should run cleanup when confirmed with days input', async () => {
-    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+    PB_API.auth.me.mockResolvedValue({ role: 'admin' });
     Auth.can.mockResolvedValue(true);
-    PB_API.runCleanup.mockResolvedValue({ leagues_cleaned: 3 });
+    PB_API.system.runCleanup.mockResolvedValue({ leagues_cleaned: 3 });
     vi.mocked(requireAdmin).mockResolvedValue(true);
     showConfirm.mockResolvedValue(true);
     showPrompt.mockResolvedValue('60');
@@ -150,11 +155,11 @@ describe('Management Page (managementPage.js)', () => {
     const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
     const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
     await cleanupAction.onclick();
-    expect(PB_API.runCleanup).toHaveBeenCalledWith(60);
+    expect(PB_API.system.runCleanup).toHaveBeenCalledWith(60);
     expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('3'), 'Success');
   });
   it('should cancel cleanup when prompt is dismissed', async () => {
-    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+    PB_API.auth.me.mockResolvedValue({ role: 'admin' });
     Auth.can.mockResolvedValue(true);
     showConfirm.mockResolvedValue(true);
     showPrompt.mockResolvedValue(null);
@@ -163,10 +168,10 @@ describe('Management Page (managementPage.js)', () => {
     const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
     const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
     await cleanupAction.onclick();
-    expect(PB_API.runCleanup).not.toHaveBeenCalled();
+    expect(PB_API.system.runCleanup).not.toHaveBeenCalled();
   });
   it('should cancel cleanup when confirmation is denied', async () => {
-    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+    PB_API.auth.me.mockResolvedValue({ role: 'admin' });
     Auth.can.mockResolvedValue(true);
     showConfirm.mockResolvedValue(false);
     await initManagementPage();
@@ -174,12 +179,12 @@ describe('Management Page (managementPage.js)', () => {
     const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
     const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
     await cleanupAction.onclick();
-    expect(PB_API.runCleanup).not.toHaveBeenCalled();
+    expect(PB_API.system.runCleanup).not.toHaveBeenCalled();
   });
   it('should handle cleanup API error gracefully', async () => {
-    PB_API.getCurrentUser.mockResolvedValue({ role: 'admin' });
+    PB_API.auth.me.mockResolvedValue({ role: 'admin' });
     Auth.can.mockResolvedValue(true);
-    PB_API.runCleanup.mockRejectedValue(new Error('DB locked'));
+    PB_API.system.runCleanup.mockRejectedValue(new Error('DB locked'));
     vi.mocked(requireAdmin).mockResolvedValue(true); // requireAdmin is imported now
     showConfirm.mockResolvedValue(true);
     showPrompt.mockResolvedValue('30');
@@ -191,7 +196,7 @@ describe('Management Page (managementPage.js)', () => {
     expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('DB locked'), 'Error');
   });
   it('should hide cleanup button for non-admin users', async () => {
-    PB_API.getCurrentUser.mockResolvedValue({ role: 'td' });
+    PB_API.auth.me.mockResolvedValue({ role: 'td' });
     Auth.can.mockResolvedValue(true);
     await initManagementPage();
     const calls = vi.mocked(renderActionSummary).mock.calls;

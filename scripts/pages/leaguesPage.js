@@ -23,7 +23,7 @@ export async function initLeaguesPage() {
   try {
     [isAuthorized, leaguesData] = await Promise.all([
       isManagementAuthorized(),
-      PB_API.getLeagues({ type: 'standard' })
+      PB_API.leagues.getAll({ type: 'standard' })
     ]);
   } catch (err) { console.error('Initialization failed:', err); }
 
@@ -276,14 +276,14 @@ export async function initLeaguesPage() {
   const refresh = async (data = null) => {
     try {
       // Fetch standard leagues only for management (one-off sessions are handled by cleanup)
-      const rawData = Array.isArray(data) ? data : await PB_API.getLeagues({ type: 'standard' });
+      const rawData = Array.isArray(data) ? data : await PB_API.leagues.getAll({ type: 'standard' });
       const safeData = Array.isArray(rawData) ? rawData : [];
 
       allLeagues.length = 0;
       allLeagues.push(...safeData);
 
       // Also refresh the global player cache for selection dialogs
-      allPlayersCache = await PB_API.getPlayers();
+      allPlayersCache = await PB_API.players.getAll();
       
       filterInstance.setData(allLeagues);
       filterInstance.performFilter();
@@ -306,9 +306,9 @@ export async function initLeaguesPage() {
     try {
       const payload = { name, startDate: date, scoringFormat, participants, seasonScoring, dropLowestWeeks };
       if (editingLeagueId) {
-        await PB_API.updateLeague(editingLeagueId, payload);
+        await PB_API.leagues.update(editingLeagueId, payload);
       } else {
-        await PB_API.createLeague(payload);
+        await PB_API.leagues.create(payload);
       }
       resetForm();
       await refresh();
@@ -390,7 +390,7 @@ export async function initLeaguesPage() {
     if (!league) return;
     
     const teamsInLeague = new Set((league.teams || []).map(t => t.id));
-    const allTeams = await PB_API.getTeams();
+    const allTeams = await PB_API.teams.getAll();
     const availableTeams = allTeams.filter(t => !teamsInLeague.has(t.id));
 
     if (availableTeams.length === 0) {
@@ -407,7 +407,7 @@ export async function initLeaguesPage() {
     );
 
     if (selectedTeamId) {
-        await PB_API.addLeagueTeam(leagueId, Number(selectedTeamId));
+        await PB_API.teams.addToLeague(leagueId, Number(selectedTeamId));
         const team = allTeams.find(t => t.id === Number(selectedTeamId));
         if (team) {
             if (!league.teams) league.teams = [];
@@ -421,7 +421,7 @@ export async function initLeaguesPage() {
   async function removeTeamFromLeague(leagueId, teamId, teamName) {
     if (!await showConfirm(`Remove "${teamName}" from this league?`, 'Remove Team')) return;
     await runAuthorizedLeagueAction(leagueId, async () => {
-      await PB_API.removeLeagueTeam(leagueId, teamId);
+      await PB_API.teams.removeFromLeague(leagueId, teamId);
       const league = allLeagues.find(l => l.id === leagueId);
       if (league && league.teams) {
           league.teams = league.teams.filter(t => t.id !== teamId);
@@ -502,7 +502,7 @@ export async function initLeaguesPage() {
     );
 
     if (selectedPlayerId) {
-        await PB_API.addLeaguePlayer(leagueId, Number(selectedPlayerId));
+        await PB_API.leagues.addPlayer(leagueId, Number(selectedPlayerId));
 
         // Update local data and UI without a full refresh
         const player = allPlayersCache.find(p => p.id === Number(selectedPlayerId));
@@ -520,7 +520,7 @@ export async function initLeaguesPage() {
     if (!await showConfirm(`Remove ${playerName} from this league? Their scores will remain, but they will no longer be associated with this league's roster.`, 'Remove Player')) return;
 
     await runAuthorizedLeagueAction(leagueId, async () => {
-      await PB_API.removeLeaguePlayer(leagueId, playerId);
+      await PB_API.leagues.removePlayer(leagueId, playerId);
 
       // Update local data and UI without a full refresh
       const league = allLeagues.find(l => l.id === leagueId);
@@ -536,7 +536,7 @@ export async function initLeaguesPage() {
     if (!await showConfirm(`Are you sure you want to delete the entire league "${name}"? This will delete all associated events and target scores.`, 'Delete League')) return;
 
     await runAuthorizedLeagueAction(id, async () => {
-      await PB_API.deleteLeague(id);
+      await PB_API.leagues.delete(id);
       await refresh();
     });
   }
@@ -545,7 +545,7 @@ export async function initLeaguesPage() {
     if (!await showConfirm(`Delete this event from ${leagueName}?`, 'Delete Event')) return;
     
     await runAuthorizedLeagueAction(leagueId, async () => {
-      await PB_API.deleteEvent(id, leagueId);
+      await PB_API.events.delete(id, leagueId);
 
       // Update local data and UI without a full refresh
       const league = allLeagues.find(l => l.id === leagueId);
@@ -578,7 +578,7 @@ export async function initLeaguesPage() {
 
     // Populate location dropdown
     const locationSelect = document.getElementById('event-location');
-    const locations = await PB_API.getLocations();
+    const locations = await PB_API.locations.getAll();
     locationSelect.innerHTML = '<option value="">Select Location (Optional)</option>';
     locations.forEach(loc => {
       const opt = document.createElement('option');
@@ -618,9 +618,9 @@ export async function initLeaguesPage() {
     try {
       let result;
       if (eventId) {
-        result = await PB_API.updateEvent(eventId, payload);
+        result = await PB_API.events.update(eventId, payload);
       } else {
-        result = await PB_API.createEvent(payload);
+        result = await PB_API.events.create(payload);
       }
 
       eventFormCard.classList.add('hidden');

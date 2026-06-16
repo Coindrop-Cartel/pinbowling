@@ -31,9 +31,18 @@ $route = trim(substr($path, strlen($baseDir)), '/');
 // we strip the version segment to find the real file.
 if (preg_match('/^v[0-9.]+\/(.*)$/', $route, $matches)) {
     $realPath = $matches[1];
-    $fullPath = __DIR__ . '/' . $realPath;
+    $fullPath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, __DIR__ . '/' . $realPath);
 
     $ext = pathinfo($fullPath, PATHINFO_EXTENSION);
+    
+    // If the file is missing but has a static asset extension, don't fall through to routing.
+    // This prevents serving an HTML page for a missing image/script/style, which
+    // causes "Blocked because of disallowed MIME type" and console errors.
+    $staticExts = ['css', 'js', 'png', 'jpg', 'jpeg', 'svg', 'ico', 'webp', 'map'];
+    if (!file_exists($fullPath) && in_array(strtolower($ext), $staticExts)) {
+        http_response_code(404);
+        exit;
+    }
 
     if (file_exists($fullPath) && !is_dir($fullPath)) {
         if ($ext !== 'php') {

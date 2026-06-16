@@ -156,7 +156,7 @@ export async function initLocationsPage() {
    */
   const renderLocations = async () => {
     try {
-      allLocations = await PB_API.getLocations();
+      allLocations = await PB_API.locations.getAll();
       onFilterUpdate();
       resetForm();
     } catch (err) {
@@ -225,7 +225,7 @@ export async function initLocationsPage() {
     inner.innerHTML = '';
 
     if (machines === null) {
-      const all = await PB_API.getLocations();
+      const all = await PB_API.locations.getAll();
       const loc = all.find(l => l.id === locationId);
       machines = loc.machines || [];
       locationName = loc?.name || 'Venue';
@@ -255,7 +255,7 @@ export async function initLocationsPage() {
       item.querySelector('.edit-mach-btn').onclick = () => showMachineForm(locationId, locationName, m);
       item.querySelector('.remove-mach-btn').onclick = async () => {
         if (await showConfirm(`Remove ${m.machineName} from this location?`, 'Remove Machine')) {
-          await PB_API.removeLocationMachine(locationId, m.machineId);
+          await PB_API.locations.removeMachine(locationId, m.machineId);
           renderLocations();
         }
       };
@@ -281,7 +281,7 @@ export async function initLocationsPage() {
     const highScoreLabel = engine.getValue1Label();
     const defaults = engine.getInitialValues();
 
-    const allMachines = await PB_API.getMachines();
+    const allMachines = await PB_API.machines.getAll();
     machineFormCard.innerHTML = `
       <h2>${existing ? 'Edit' : 'Add'} Machine for ${locationName}</h2>
       <div class="form-row">
@@ -333,7 +333,7 @@ export async function initLocationsPage() {
       };
 
       try {
-        await PB_API.addLocationMachine(locationId, machineId, extra);
+        await PB_API.locations.addMachine(locationId, machineId, extra);
         machineFormCard.classList.add('hidden');
         renderLocations();
       } catch (err) {
@@ -360,9 +360,9 @@ export async function initLocationsPage() {
 
     try {
       if (id) {
-        await PB_API.updateLocation(id, payload);
+        await PB_API.locations.update(id, payload);
       } else {
-        await PB_API.createLocation(payload);
+        await PB_API.locations.create(payload);
       }
       renderLocations();
     } catch (err) {
@@ -381,7 +381,7 @@ export async function initLocationsPage() {
     if (!await requireAdmin('Enter Admin Password to confirm location deletion:')) return;
 
     try {
-      await PB_API.deleteLocation(id);
+      await PB_API.locations.delete(id);
       renderLocations();
     } catch (err) {
       alert(`Failed to delete location: ${err.message}`);

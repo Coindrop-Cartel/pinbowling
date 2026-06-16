@@ -35,6 +35,39 @@ Write operations are protected by an `X-PB-SECRET` header.
    - Use the same hostname exactly as shown under MySQL Databases.
    - If you upload a `.env` file with these values, `config.php` will also read it automatically.
 4. Make sure config.php and the contents of the /service directory are on the server.
+
+## Server Configuration (Apache .htaccess / Nginx)
+
+The application uses versioned URLs for static assets (e.g., `/v1.2.6/scripts/main.js`) to ensure proper cache-busting. Your web server must be configured to strip this version prefix before attempting to serve the file from the filesystem.
+
+### Apache (`.htaccess`)
+
+Ensure your `.htaccess` file (located in the project root) contains the following rewrite rule *before* any rules that route requests to `index.php`:
+
+```apache
+# Strip version prefix for static assets (CSS, JS, images, etc.)
+# This allows for cache-busting while serving the actual file from its original path.
+RewriteRule ^(.*)v[0-9\.]+/+(.*)$ $1$2 [L]
+```
+
+This rule will internally rewrite a request for `/v1.2.6/scripts/main.js` to `/scripts/main.js`, allowing Apache to find the correct file.
+
+### Nginx
+
+If you are using Nginx, you will need a similar `rewrite` directive in your server block. This example assumes your application is served from the root (`/`):
+
+```nginx
+server {
+    # ... other configurations ...
+
+    location ~ ^/v[0-9\.]+(/.*)$ {
+        rewrite ^/v[0-9\.]+(/.*)$ $1 break;
+        try_files $uri $uri/ =404;
+    }
+
+    # ... other location blocks, e.g., for index.php fallback ...
+}
+```
 5. Use `db-test.php` in the browser to verify the PHP-to-MySQL connection.
 
 ## PHP Backend Configuration

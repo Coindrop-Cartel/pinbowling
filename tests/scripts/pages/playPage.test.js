@@ -4,13 +4,14 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 // Mock dependencies
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    getLeagues: vi.fn(),
-    getPlayers: vi.fn(),
-    getLocations: vi.fn(),
-    createLeague: vi.fn(),
-    createEvent: vi.fn(),
-    saveTargetScore: vi.fn(),
-    getCurrentUser: vi.fn()
+    leagues: { getAll: vi.fn(), create: vi.fn(), addPlayer: vi.fn() },
+    players: { getAll: vi.fn() },
+    locations: { getAll: vi.fn() },
+    events: { create: vi.fn() },
+    machines: { saveTarget: vi.fn() },
+    auth: {
+      me: vi.fn(),
+    }
   }
 }));
 
@@ -106,14 +107,14 @@ describe('Play Page (playPage.js)', () => {
   });
 
   it('should load and render existing session leagues', async () => {
-    PB_API.getLeagues.mockResolvedValue([{ 
+    PB_API.leagues.getAll.mockResolvedValue([{ 
       id: 1, type: 'session', events: [{ id: 101, eventName: 'Nightly', eventDate: new Date().toISOString().split('T')[0] }] 
     }]);
-    PB_API.getLocations.mockResolvedValue([]);
+    PB_API.locations.getAll.mockResolvedValue([]);
 
     await initPlayPage();
 
-    expect(document.getElementById('qp-sessions-list').children.length).toBe(1);
+    expect(document.getElementById('qp-sessions-list').children.length).toBe(1); // Ensure init is awaited
     expect(document.getElementById('qp-sessions-list').innerHTML).toContain('Nightly');
   });
 
@@ -122,8 +123,8 @@ describe('Play Page (playPage.js)', () => {
       { machineId: 10, machineName: 'M1', targetMed: 1000 },
       { machineId: 11, machineName: 'M2', targetMed: 2000 }
     ]};
-    PB_API.getLocations.mockResolvedValue([mockLocation]);
-    PB_API.getLeagues.mockResolvedValue([]);
+    PB_API.locations.getAll.mockResolvedValue([mockLocation]);
+    PB_API.leagues.getAll.mockResolvedValue([]);
     
     await initPlayPage();
     
@@ -138,10 +139,10 @@ describe('Play Page (playPage.js)', () => {
   });
 
   it('should create league, event, and targets on finalize', async () => {
-    PB_API.getLocations.mockResolvedValue([{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1' }] }]);
-    PB_API.getLeagues.mockResolvedValue([]);
-    PB_API.createLeague.mockResolvedValue({ id: 50 });
-    PB_API.createEvent.mockResolvedValue({ id: 500 });
+    PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1' }] }]);
+    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.leagues.create.mockResolvedValue({ id: 50 });
+    PB_API.events.create.mockResolvedValue({ id: 500 });
 
     await initPlayPage();
     document.getElementById('qp-location').value = '1';
@@ -149,7 +150,7 @@ describe('Play Page (playPage.js)', () => {
 
     await document.getElementById('finalize-qp-btn').onclick();
 
-    expect(PB_API.createLeague).toHaveBeenCalled();
-    expect(PB_API.saveTargetScore).toHaveBeenCalled();
+    expect(PB_API.leagues.create).toHaveBeenCalled();
+    expect(PB_API.machines.saveTarget).toHaveBeenCalled();
   });
 });
