@@ -83,6 +83,11 @@ if (in_array($checkRoute, $managementRoutes)) {
     }
 }
 
+// Route /tv to the standings template (Phase 4 Cleanup)
+if ($route === 'tv') {
+    $route = 'standings';
+}
+
 $targetFile = __DIR__ . '/includes/pages/home.php'; // Default content
 
 if ($route !== '') {

@@ -27,6 +27,12 @@ export async function initStandingsPage() {
   const tvTitle = document.getElementById('tv-title');
   const playerFilterContainer = document.getElementById('player-filter-container');
 
+  // Detect if we are on the dedicated /tv route to apply remote-friendly UI
+  const isTvRoute = window.location.pathname.includes('/tv');
+  if (isTvRoute) {
+    document.body.classList.add('tv-ui-large');
+  }
+
   let tournamentSelector = null;
   let isTvMode = false;
   let refreshInterval = null;
@@ -36,6 +42,17 @@ export async function initStandingsPage() {
   let lastScoreState = new Map(); // Tracks playerId-orderNumber -> ballString for change detection
 
   let Engine = getScoringEngine('bowling');
+
+  /**
+   * Helper to stop all auto-scroll activity (animation frames or intervals).
+   */
+  const stopAutoScroll = () => {
+    if (scrollInterval) {
+      cancelAnimationFrame(scrollInterval);
+      clearInterval(scrollInterval);
+      scrollInterval = null;
+    }
+  };
 
   // Fetch initial data to check context
   const allLeagues = await PB_API.leagues.getAll(); // Use a more descriptive name
@@ -60,7 +77,12 @@ export async function initStandingsPage() {
     tvBtn.addEventListener('click', toggleTvMode);
   }
 
-  async function toggleTvMode() {
+  /**
+   * Toggles TV mode visuals, auto-refresh, and auto-scrolling.
+   * @param {Event|null} e - The click event if triggered by user.
+   * @param {boolean} skipFullscreen - If true, ignores the fullscreen request (prevents browser security errors).
+   */
+  async function toggleTvMode(e, skipFullscreen = false) {
     if (!getActiveEventId()) return; // Cannot enter TV Mode without a selection
 
     isTvMode = !isTvMode;
@@ -72,9 +94,11 @@ export async function initStandingsPage() {
       // Update scores every 15 seconds
       refreshInterval = setInterval(refresh, 15000);
       startAutoScroll();
-      // Enter browser fullscreen if possible
-      if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen();
+      // Enter browser fullscreen if allowed by user gesture
+      if (document.documentElement.requestFullscreen && !skipFullscreen) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.warn('[TV Mode] Fullscreen request deferred or denied:', err.message);
+        });
       }
 
       // Request Screen Wake Lock to prevent the display from sleeping
@@ -88,7 +112,7 @@ export async function initStandingsPage() {
     } else {
       tvBtn.textContent = 'TV Mode';
       clearInterval(refreshInterval);
-      clearInterval(scrollInterval);
+      stopAutoScroll();
       window.scrollTo(0, 0);
       if (document.fullscreenElement) document.exitFullscreen();
 
@@ -127,58 +151,100 @@ export async function initStandingsPage() {
   document.addEventListener('pb:pageChanged', cleanup, { once: true });
 
   function startAutoScroll() {
-    clearInterval(scrollInterval);
-    scrollInterval = setInterval(() => {
+    stopAutoScroll();
+
+    const pixelsPerSecond = 10; // Comfortable, readable, and smooth speed for TV
+    let lastTimestamp = null;
+    // Track fractional position to allow sub-pixel movement for high-refresh screens
+    let scrollAccumulator = window.scrollY;
+
+    function step(timestamp) {
       if (!isTvMode) return;
       
-      const scrollSpeed = 1; // Pixels per tick
-      window.scrollBy(0, scrollSpeed);
+      if (!lastTimestamp) {
+        lastTimestamp = timestamp;
+        scrollInterval = requestAnimationFrame(step);
+        return;
+      }
+
+      const elapsed = timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
+
+      // Increment position based on time delta (ensures consistent speed across different monitors)
+      scrollAccumulator += (pixelsPerSecond * elapsed) / 1000;
+      window.scrollTo(0, Math.floor(scrollAccumulator));
 
       // Check if we reached the bottom
       if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 2) {
-        // Stay at bottom for 5 seconds then reset to top
-        clearInterval(scrollInterval);
+        stopAutoScroll();
         setTimeout(() => {
           window.scrollTo({ top: 0, behavior: 'smooth' });
           setTimeout(startAutoScroll, 2000);
         }, 5000);
+      } else {
+        scrollInterval = requestAnimationFrame(step);
       }
-    }, 50); // ~20fps scroll
+    }
+    scrollInterval = requestAnimationFrame(step);
   }
 
   /**
    * Shows a multi-select dialog to filter which players are visible.
    */
   async function openPlayerFilterDialog(players) {
-    const content = document.createElement('div');
-    content.className = 'player-filter-grid';
+    const container = document.createElement('div');
+
+    // Inline controls for Select/Clear All (Doesn't close the modal)
+    const controls = document.createElement('div');
+    controls.className = 'modal-controls-inline';
+
+    const selectAllBtn = document.createElement('button');
+    selectAllBtn.textContent = 'Select All';
+    selectAllBtn.className = 'btn-standard secondary';
+    selectAllBtn.type = 'button';
+    selectAllBtn.onclick = () => {
+      container.querySelectorAll('input[type="checkbox"]').forEach(i => i.checked = true);
+    };
+
+    const clearAllBtn = document.createElement('button');
+    clearAllBtn.textContent = 'Clear All';
+    clearAllBtn.className = 'btn-standard secondary';
+    clearAllBtn.type = 'button';
+    clearAllBtn.onclick = () => {
+      container.querySelectorAll('input[type="checkbox"]').forEach(i => i.checked = false);
+    };
+
+    controls.append(selectAllBtn, clearAllBtn);
+    container.appendChild(controls);
+
+    const grid = document.createElement('div');
+    grid.className = 'player-filter-grid';
     
     players.sort((a,b) => a.playerName.localeCompare(b.playerName)).forEach(p => {
         const label = document.createElement('label');
       label.className = 'player-filter-label';
-      const isChecked = selectedPlayerIds.length === 0 || selectedPlayerIds.includes(String(p.id));
+      // Default to unselected. If no filter is active, we start with a clean slate 
+      // for the user to pick just the players they want.
+      const isChecked = selectedPlayerIds.includes(String(p.id));
       label.innerHTML = `<input type="checkbox" value="${p.id}" ${isChecked ? 'checked' : ''} class="checkbox-lg">
         <span class="ellipsis flex-1">${p.playerName}</span>`;
-      content.appendChild(label);
+      grid.appendChild(label);
       });
+    container.appendChild(grid);
 
     const result = await showDialog({
       title: 'Select Players to Show',
-      message: 'Choose players for your scoreboard view. Uncheck players to hide them.',
+      message: 'Choose players for your scoreboard view. Applying with none selected will show everyone.',
       confirmText: 'Apply Filter',
-      cancelText: 'Reset to All',
-      customElement: content
+      cancelText: 'Cancel',
+      customElement: container
     });
 
-    if (result === null) return; // Escape/Cancel
+    if (result !== true) return; // Escape or Cancel
 
-    if (result === false) {
-      selectedPlayerIds = [];
-    } else {
-      const checked = Array.from(content.querySelectorAll('input:checked')).map(i => i.value);
-      // If everyone is checked, just clear the filter
-      selectedPlayerIds = checked.length === players.length ? [] : checked;
-    }
+    const checked = Array.from(container.querySelectorAll('input:checked')).map(i => i.value);
+    // Optimization: If everyone is checked, or if nothing is checked, we treat it as "Show Everyone"
+    selectedPlayerIds = checked.length === players.length ? [] : checked;
     refresh();
   }
 
@@ -300,7 +366,11 @@ export async function initStandingsPage() {
       return;
     }
 
-    if (tvBtn) tvBtn.classList.remove('hidden');
+    if (tvBtn) {
+      // Hide the manual toggle on the /tv route as it auto-activates upon selection
+      tvBtn.classList.toggle('hidden', isTvRoute);
+      if (isTvRoute && !isTvMode) toggleTvMode(null, true);
+    }
     if (standingsEmpty) standingsEmpty.classList.add('hidden');
 
     // If the event changed, reset player filters to ensure the full scoreboard 
