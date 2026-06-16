@@ -24,11 +24,6 @@ export async function initLeaguesPage() {
   const emptyNotice = document.getElementById('leagues-list-empty');
   const eventFormCard = document.getElementById('event-form-card');
 
-  // Immediate visibility reset to prevent FOUC while checking permissions.
-  if (leagueForm) leagueForm.closest('.card')?.classList.add('hidden');
-  if (createToggle) createToggle.classList.add('hidden');
-  if (eventFormCard) eventFormCard.classList.add('hidden');
-
   let isAuthorized = false;
   let leaguesData = [];
   try {
@@ -89,13 +84,13 @@ export async function initLeaguesPage() {
   if (dropLowestRow) dropLowestRow.classList.add('hidden');
   if (actionsRow) actionsRow.classList.add('hidden');
 
-  // Reveal the league creation card only if authorized
+  // REVEAL-ONLY: Only show the management card if authorized.
+  // Standard: Card should be hidden in PHP via class="card hidden".
   if (isAuthorized && leagueForm) {
     leagueForm.closest('.card').classList.remove('hidden');
   }
 
   if (createToggle && isAuthorized) {
-    createToggle.classList.remove('hidden');
     createToggle.onclick = () => {
       const isHidden = dateRow.classList.contains('hidden');
       if (!isHidden || editingLeagueId) {
@@ -113,6 +108,8 @@ export async function initLeaguesPage() {
         if (leagueFormatInput) applyPreferredTheme(leagueFormatInput.value);
       }
     };
+    // Only reveal toggle after logic is bound
+    createToggle.classList.remove('hidden');
   }
 
   function resetForm() {

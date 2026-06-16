@@ -245,12 +245,14 @@ describe('Player Management Page (playersPage.js)', () => {
       expect(document.getElementById('player-form-actions').classList.contains('hidden')).toBe(false);
     });
 
-    it('should show cancel button when editing', async () => {
+    it('should use createToggle as cancel button when editing', async () => {
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
       await vi.waitFor(() => {
-        expect(document.getElementById('cancel-edit-button').classList.contains('hidden')).toBe(false);
+        const createToggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Cancel'));
+        expect(createToggle).not.toBeNull();
+        expect(createToggle.classList.contains('hidden')).toBe(false); // The createToggle should be visible as "Cancel"
       });
     });
 

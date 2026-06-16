@@ -34,10 +34,6 @@ export async function initScoresPage() {
   const playerSelectorUI = document.getElementById('player-selector-ui');
   const playerSummary = document.getElementById('player-summary');
   
-  // Immediate visibility reset to prevent FOUC while loading data.
-  [playerSelectionCard, scoringCard, resultsCard, tournamentSummary, playerSummary, warning].forEach(el => el?.classList.add('hidden'));
-  if (playerSelect) playerSelect.disabled = true;
-
   let allLeaguesCache = []; // Module-level cache for leagues
   let tournamentSelector = null;
   // Fetch leagues and current user once at the start. 
@@ -320,6 +316,7 @@ export async function initScoresPage() {
       if (playerSearchInstance) {
         playerSearchInstance.setData(selectablePlayers);
       }
+      // Only enable selection once data is actually filtered and bound
       if (playerSelect) playerSelect.disabled = false;
 
       if (currentPlayerId) {

@@ -38,7 +38,6 @@ export async function initPlayersPage() {
   const ifpaIdInput = document.getElementById('ifpa-id');
   const matchplayIdInput = document.getElementById('matchplay-id');
   const savePlayerButton = document.getElementById('save-player-button');
-  const cancelEditButton = document.getElementById('cancel-edit-button');
 
   const playerList = document.getElementById('player-list');
 
@@ -72,7 +71,10 @@ export async function initPlayersPage() {
   createToggle.textContent = 'Create New Player';
   playerNameInput.after(createToggle);
 
-  if (savePlayerButton) savePlayerButton.classList.add('btn-mgmt');
+  // Standardize the primary form action button
+  if (savePlayerButton) {
+    savePlayerButton.classList.add('secondary', 'btn-mgmt');
+  }
 
   if (!hasElevatedPrivileges) {
     createToggle.classList.add('hidden');
@@ -105,12 +107,14 @@ export async function initPlayersPage() {
       filtered.forEach(p => {
         const isSelf = currentUser && String(p.id) === String(currentUser.player_id);
         const canEdit = hasElevatedPrivileges || isSelf;
+        // Robust role detection: check userRole (standardized), role (fallback), or infer from userId presence
+        const displayRole = p.userRole || p.role || (p.userId ? 'player' : '');
 
         const headerHtml = `
           <div class="header-bar">
             <div class="name-with-badge">
               <strong>${escapeHTML(p.playerName)}</strong>
-              ${p.userRole ? `<span class="badge">${escapeHTML(p.userRole)}</span>` : ''}
+              ${displayRole ? `<span class="badge">${escapeHTML(displayRole)}</span>` : ''}
             </div>
             <div class="action-buttons">
               ${canEdit ? `<button type="button" class="edit-player-btn secondary btn-row">Edit</button>` : ''}
@@ -196,7 +200,6 @@ export async function initPlayersPage() {
     
     resetPassBtn.classList.add('hidden');
     changeRoleBtn.classList.add('hidden');
-    if (cancelEditButton) cancelEditButton.classList.add('hidden');
 
     // Collapse creation fields
     if (ifpaRow) ifpaRow.classList.add('hidden');
@@ -230,7 +233,6 @@ export async function initPlayersPage() {
     editingPlayerIdInput.value = player.id;
     playerNameInput.value = player.playerName;
     
-    // Lock name for non-privileged users UNLESS it is their own profile
     // If not elevated, name is always disabled. Admins/TDs can edit names.
     playerNameInput.disabled = !hasElevatedPrivileges;
     
@@ -238,17 +240,12 @@ export async function initPlayersPage() {
     matchplayIdInput.value = player.matchplayId || '';
     if (playerFormTitle) playerFormTitle.textContent = `Edit Player: ${player.playerName}`;
     savePlayerButton.textContent = 'Update Player';
-    if (cancelEditButton) cancelEditButton.classList.remove('hidden');
-    // Expand fields for editing
     if (ifpaRow) ifpaRow.classList.remove('hidden');
     if (matchplayRow) matchplayRow.classList.remove('hidden');
     if (actionsRow) actionsRow.classList.remove('hidden');
     createToggle.textContent = 'Cancel';
-    createToggle.classList.replace('mt-0', 'mt-10');
+    createToggle.classList.replace('mt-10', 'mt-0');
     actionsRow.appendChild(createToggle);
-
-    // Show management tools if the player has an account
-    // ... (existing code for resetPassBtn and changeRoleBtn)
 
     const hasAccount = !!player.userId;
     resetPassBtn.classList.toggle('hidden', !hasAccount || !hasElevatedPrivileges);
@@ -274,8 +271,10 @@ export async function initPlayersPage() {
         ];
         if (isAdmin) choices.push({ value: 'admin', label: 'Admin' });
 
-        const newRole = await showChoiceDialog('Change User Role', `Assign a new role for ${player.playerName}:`, choices, player.userRole);
-        if (newRole && newRole !== player.userRole) {
+        const currentRole = player.userRole || player.role;
+        // Ensure the current role is passed to highlight the correct button in the dialog
+        const newRole = await showChoiceDialog('Change User Role', `Assign a new role for ${player.playerName}:`, choices, currentRole);
+        if (newRole && newRole !== currentRole) {
           try {
             await PB_API.players.updateRole(player.userId, newRole);
             await refresh();
@@ -295,9 +294,6 @@ export async function initPlayersPage() {
     // This is a common workaround for synchronous DOM reads in test environments.
     setTimeout(() => filterInstance.performFilter(), 0);
   }
-
-  // Centralize cancel logic to the resetForm helper
-  if (cancelEditButton) cancelEditButton.addEventListener('click', resetForm);
 
   playerForm.addEventListener('submit', async (e) => {
     e.preventDefault();

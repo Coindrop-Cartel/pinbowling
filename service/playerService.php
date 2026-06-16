@@ -25,14 +25,14 @@ try {
         if ($user && $user['role'] === 'player') {
             // Requirement: Players only see their own info
             $stmt = $pdo->prepare('
-                SELECT p.*, u.role as user_role, u.id as user_id 
+                SELECT p.*, u.role, u.id as user_id 
                 FROM players p 
                 LEFT JOIN users u ON p.id = u.player_id 
                 WHERE p.id = ?');
             $stmt->execute([$user['player_id']]);
         } else {
             $stmt = $pdo->query('
-                SELECT p.*, u.role as user_role, u.id as user_id 
+                SELECT p.*, u.role, u.id as user_id 
                 FROM players p 
                 LEFT JOIN users u ON p.id = u.player_id 
                 ORDER BY p.player_name ASC');
@@ -58,14 +58,14 @@ try {
         } catch (PDOException $error) {
             // Handle duplicate names gracefully by returning the existing record
             if ($error->errorInfo[1] === 1062) {
-                $stmt = $pdo->prepare('SELECT * FROM players WHERE player_name = ?');
+                $stmt = $pdo->prepare('SELECT p.*, u.id as user_id, u.role FROM players p LEFT JOIN users u ON p.id = u.player_id WHERE p.player_name = ?');
                 $stmt->execute([$input['playerName']]);
                 sendJson(serializePlayer($stmt->fetch()), 409); // Conflict: Player name already exists
             }
             throw $error; // Re-throw other DB errors to global handler
         }
 
-        $stmt = $pdo->prepare('SELECT * FROM players WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT p.*, u.id as user_id, u.role FROM players p LEFT JOIN users u ON p.id = u.player_id WHERE p.id = ?');
         $stmt->execute([$id]);
         $row = $stmt->fetch();
         if (!$row) {
@@ -135,7 +135,7 @@ try {
             throw $error;
         }
 
-        $stmt = $pdo->prepare('SELECT * FROM players WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT p.*, u.id as user_id, u.role FROM players p LEFT JOIN users u ON p.id = u.player_id WHERE p.id = ?');
         $stmt->execute([$id]);
         $row = $stmt->fetch();
         if (!$row) {
@@ -153,7 +153,7 @@ try {
             sendJson(['error' => 'id query parameter is required'], 400);
         }
 
-        $stmt = $pdo->prepare('SELECT * FROM players WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT p.*, u.id as user_id, u.role FROM players p LEFT JOIN users u ON p.id = u.player_id WHERE p.id = ?');
         $stmt->execute([$id]);
         $player = $stmt->fetch();
         if (!$player) {

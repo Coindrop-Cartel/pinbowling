@@ -59,8 +59,9 @@ body {
   text-transform: uppercase;
   font-size: 1.5rem;
   letter-spacing: -1px;
-  white-space: nowrap;  /* Fixed min-width ensures adjacent nav links don't move when brand text changes. */
-  min-width: 260px;
+  white-space: nowrap;
+  /* Fixed min-width ensures adjacent nav links don't move when brand text changes. */
+  min-width: 280px;
   display: flex;
 }
 
@@ -136,7 +137,8 @@ body {
 
 /* Stabilize the right side of the navbar to prevent shifts during login/logout/navigation. */
 .auth-header {
-  min-width: 220px;
+  /* Fixed min-width ensures the user greeting doesn't push the navigation menu. */
+  min-width: 280px;
   display: flex;
   justify-content: flex-end;
 }
@@ -514,6 +516,27 @@ td {
 .modal-actions { margin-top: 30px; display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
 .modal-input { font-size: 1.1rem; padding: 12px; }
 .choice-btn { flex: 1; min-width: 100px; transition: all 0.2s; border: 2px solid #000; padding: 10px; }
+
+/* Default style for choice buttons (unselected state) */
+.choice-btn {
+  background-color: var(--pb-white) !important;
+  color: var(--pb-black) !important;
+  border: 3px solid var(--pb-primary) !important;
+}
+
+.choice-btn:hover {
+  background-color: var(--pb-gray) !important;
+}
+
+.choice-btn.is-selected {
+  background-color: var(--pb-primary) !important;
+  color: var(--pb-white) !important;
+  border-color: var(--pb-primary) !important; /* Ensure border also matches primary */
+}
+
+.choice-btn.is-selected:hover {
+  background-color: var(--pb-primary-hover) !important;
+}
 
 /* Print helpers used by printing.js */
 .print-extra-targets { margin-top: 40px; font-size: 2.2rem; font-weight: bold; border-top: 4px dashed #000; padding-top: 20px; width: 100%; }

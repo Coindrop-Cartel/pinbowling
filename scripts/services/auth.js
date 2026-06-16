@@ -142,6 +142,41 @@ export async function can(permission) {
 }
 
 /**
+ * Attaches delegated event listeners to the auth container.
+ * This ensures PHP-rendered buttons work immediately without re-rendering the DOM.
+ */
+function attachAuthListeners() {
+  const container = document.getElementById('auth-header-container');
+  if (!container || container.dataset.listenersBound) return;
+
+  container.addEventListener('click', async (e) => {
+    const logoutBtn = e.target.closest('#header-logout-btn');
+    const loginBtn = e.target.closest('#header-login-btn');
+
+    if (logoutBtn) {
+      try {
+        await PB_API.auth.logout();
+        resetAuthCache();
+        // Refresh the entire page on logout to clear session data and reset permissions
+        window.location.reload();
+      } catch (err) {
+        console.error('[Auth] Logout failed:', err);
+      }
+    }
+
+    if (loginBtn) {
+      const success = await showAuthDialog();
+      if (success) {
+        // Refresh the entire page to ensure all permission-gated elements re-render correctly
+        window.location.reload();
+      }
+    }
+  });
+
+  container.dataset.listenersBound = 'true';
+}
+
+/**
  * Updates the UI elements based on the provided user state.
  * This handles the header buttons and the global Admin/TD navigation visibility.
  */
@@ -149,21 +184,12 @@ function updateAuthUI(user) {
   const container = document.getElementById('auth-header-container');
   const adminNav = document.getElementById('admin-nav-item');
   const role = user?.role || 'unregistered';
-  const userId = user ? String(user.id) : 'guest';
-
-  // Localized Update Optimization:
-  // Only re-render the auth container if the authentication state or the user has changed.
-  const currentState = container?.getAttribute('data-auth-state');
-  const shouldUpdateHeader = currentState !== userId;
-
-  if (container) {
-    container.setAttribute('data-auth-state', userId);
-  }
-
-  // If the user identity hasn't changed, skip all DOM manipulations to prevent flickering.
-  if (!container || !shouldUpdateHeader) return;
+  // Stable ID for state-checking; ensures guests and users are uniquely identified
+  const userId = user ? `user-${user.id || 'auth'}` : 'guest';
 
   // Handle global restricted navigation items
+  // Note: This runs regardless of the state guard to ensure sub-item visibility 
+  // (e.g. Maintenance) is correctly synced even if the parent menu was visible in PHP.
   if (adminNav) {
     let visibleChildren = 0;
 
@@ -182,6 +208,14 @@ function updateAuthUI(user) {
     adminNav.classList.toggle('hidden', visibleChildren === 0 || !user);
   }
 
+  // State-Keyed Rendering Guard:
+  // Only re-render the auth container if the identity has actually changed.
+  const currentState = container?.getAttribute('data-auth-state');
+  if (!container || (currentState === userId && container.innerHTML.trim() !== '')) return;
+
+  // Identity has changed; update the state-key and proceed with DOM updates
+  container.setAttribute('data-auth-state', userId);
+
   if (user) {
     container.innerHTML = `
       <div class="auth-header-wrapper">
@@ -189,25 +223,8 @@ function updateAuthUI(user) {
         <button id="header-logout-btn">Log Out</button>
       </div>
     `;
-    container.querySelector('#header-logout-btn').onclick = async () => {
-      try {
-        await PB_API.auth.logout();
-        resetAuthCache();
-        // Refresh the entire page on logout to clear session data and reset permissions
-        window.location.reload();
-      } catch (err) {
-        console.error('[Auth] Logout failed:', err);
-      }
-    };
   } else {
     container.innerHTML = `<button id="header-login-btn">Login</button>`;
-    container.querySelector('#header-login-btn').onclick = async () => {
-      const success = await showAuthDialog();
-      if (success) {
-        // Refresh the entire page to ensure all permission-gated elements re-render correctly
-        window.location.reload();
-      }
-    };
   }
 }
 
@@ -218,6 +235,8 @@ function updateAuthUI(user) {
  * @returns {Promise<void>}
  */
 export async function initAuthHeader() {
+  attachAuthListeners();
+
   // If we've already fetched the user in this session, use the cached state 
   // to update the UI immediately without waiting for a network request.
   if (_isInitialized) {

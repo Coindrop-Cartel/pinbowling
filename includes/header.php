@@ -1,3 +1,15 @@
+<?php
+/**
+ * Pre-render Auth State: To prevent FOUC (Flash of Unauthenticated Content),
+ * we check the session immediately and render the logged-in UI on the server.
+ */
+$user = function_exists('getCurrentUser') ? getCurrentUser() : null;
+$role = $user['role'] ?? 'unregistered';
+$isManagement = in_array($role, ['admin', 'td']);
+$userId = $user ? "user-" . ($user['id'] ?? 'auth') : 'guest';
+$displayName = htmlspecialchars($user['player_name'] ?? ($user['username'] ?? 'User'));
+?>
+
 <nav class="navbar">
   <div class="nav-container">
     <a href="<?php echo rtrim($baseUrl, '/') . '/'; ?>" class="nav-logo" data-route="HOME">
@@ -14,7 +26,7 @@
           <a href="<?php echo $baseUrl; ?>/standings" class="nav-link" data-route="STANDINGS">Scoreboard</a>
         </div>
       </li>
-      <li id="admin-nav-item" class="nav-item dropdown hidden">
+      <li id="admin-nav-item" class="nav-item dropdown <?php echo $isManagement ? '' : 'hidden'; ?>">
         <a href="javascript:void(0)" class="nav-link dropbtn">Admin</a>
         <div class="dropdown-content">
           <a href="<?php echo $baseUrl; ?>/machines" class="nav-link" data-route="MACHINES">Machines</a>
@@ -25,6 +37,15 @@
         </div>
       </li>
     </ul>
-    <div id="auth-header-container" class="auth-header"></div>
+    <div id="auth-header-container" class="auth-header" data-auth-state="<?php echo $userId; ?>">
+      <?php if ($user): ?>
+        <div class="auth-header-wrapper">
+          <span class="auth-user-greeting">Hi, <?php echo $displayName; ?></span>
+          <button id="header-logout-btn">Log Out</button>
+        </div>
+      <?php else: ?>
+        <button id="header-login-btn">Login</button>
+      <?php endif; ?>
+    </div>
   </div>
 </nav>
