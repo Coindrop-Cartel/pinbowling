@@ -173,22 +173,44 @@ try {
             if (empty($input['leagueId']) || empty($input['playerId'])) {
                 sendJson(['error' => 'leagueId and playerId are required'], 400);
             }
-            
-            // Check if the player being added is an unregistered guest.
-            // Unregistered guests can be added to sessions without TD/Admin access.
-            // A player is "registered" if they have an associated entry in the 'users' table.
-            $stmtPlayer = $pdo->prepare('SELECT u.id FROM players p JOIN users u ON p.id = u.player_id WHERE p.id = ?');
-            $stmtPlayer->execute([(int)$input['playerId']]);
-            $playerUserId = $stmtPlayer->fetchColumn();
 
-            // If playerUserId is null, the player is unregistered. Allow adding them.
-            // Otherwise, require TD access to add a registered player.
-            if ($playerUserId !== false && $playerUserId !== null) {
-                validateTDAccess();
+            $leagueId = (int)$input['leagueId'];
+            $playerId = (int)$input['playerId'];
+
+            // Check the league type to determine access requirements.
+            // Sessions are open — any user (or guest) can join.
+            // Standard leagues require TD/Admin to add registered players.
+            $stmtLeague = $pdo->prepare('SELECT type FROM leagues WHERE id = ?');
+            $stmtLeague->execute([$leagueId]);
+            $leagueType = $stmtLeague->fetchColumn();
+
+            if ($leagueType === 'session') {
+                // Sessions are open — any user (or guest) can join as an unregistered player.
+                // However, adding a registered player (linked to a user account) requires a session.
+                $stmtPlayer = $pdo->prepare('SELECT u.id FROM players p JOIN users u ON p.id = u.player_id WHERE p.id = ?');
+                $stmtPlayer->execute([$playerId]);
+                $playerUserId = $stmtPlayer->fetchColumn();
+
+                if ($playerUserId !== false && $playerUserId !== null) {
+                    validateSessionOrSecret();
+                }
+            } else {
+                // For standard leagues, check if the player being added is an unregistered guest.
+                // Unregistered guests can be added without TD/Admin access.
+                // A player is "registered" if they have an associated entry in the 'users' table.
+                $stmtPlayer = $pdo->prepare('SELECT u.id FROM players p JOIN users u ON p.id = u.player_id WHERE p.id = ?');
+                $stmtPlayer->execute([$playerId]);
+                $playerUserId = $stmtPlayer->fetchColumn();
+
+                // If playerUserId is null/false, the player is unregistered. Allow adding them.
+                // Otherwise, require TD access to add a registered player to a league.
+                if ($playerUserId !== false && $playerUserId !== null) {
+                    validateTDAccess();
+                }
             }
 
             $stmt = $pdo->prepare('INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)');
-            $stmt->execute([(int)$input['leagueId'], (int)$input['playerId']]);
+            $stmt->execute([$leagueId, $playerId]);
             sendJson(['success' => true]);
         } else if ($task === 'fixture') {
             validateTDAccess();
@@ -299,11 +321,21 @@ try {
     // DELETE: Remove League or Event (Protected by API Secret and Role)
     if ($method === 'DELETE') {
         if ($task === 'member') {
-            // Removing players from a roster requires TD access
-            validateTDAccess();
-
             $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
             $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
+
+            // Check the league type — sessions allow self-removal, leagues require TD access
+            $stmtLeague = $pdo->prepare('SELECT type FROM leagues WHERE id = ?');
+            $stmtLeague->execute([$leagueId]);
+            $leagueType = $stmtLeague->fetchColumn();
+
+            if ($leagueType === 'session') {
+                // For sessions, allow any authenticated user to remove a member
+                validateSessionOrSecret();
+            } else {
+                // Removing players from a standard league roster requires TD access
+                validateTDAccess();
+            }
 
             // Remove player scores for all events within this specific league
             $pdo->prepare("DELETE FROM scores WHERE player_id = ? AND event_id IN (SELECT id FROM events WHERE league_id = ?)")

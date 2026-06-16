@@ -161,8 +161,9 @@ export async function initScoresPage() {
    */
   async function buildRoundRow(round, turnValues, isLastRound = false, targetPlayer = null) {
     const row = document.createElement('div'); // Centralized Security Logic
-    const { access: accessLevel, reason: msg } = await getScoreAccessLevel(currentUser, targetPlayer, turnValues);
+    const { access: accessLevel, reason: msg, lockedBalls = {} } = await getScoreAccessLevel(currentUser, targetPlayer, turnValues, activeLeague?.type);
     const isAccessDenied = accessLevel === 'denied';
+    const hasLockedBalls = Object.keys(lockedBalls).length > 0;
 
     row.className = 'round-row';
     row.dataset.orderNumber = round.orderNumber;
@@ -179,13 +180,16 @@ export async function initScoresPage() {
           ${renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2)}
         </div>
       </div>
-      <div class="round-inputs-container ${isAccessDenied ? 'round-inputs-disabled' : ''}"></div>
-      <button class="save-round-button btn-mgmt" ${isAccessDenied ? 'hidden' : ''} disabled>Save</button>
+      <div class="round-actions">
+        <div class="round-inputs-container ${isAccessDenied ? 'round-inputs-disabled' : ''}"></div>
+        <button class="save-round-button btn-mgmt" ${isAccessDenied ? 'hidden' : ''} disabled>Save</button>
+      </div>
+      ${isAccessDenied ? `
+        <div class="round-status-bar">
+          <span class="round-msg">${escapeHTML(msg)}</span>
+        </div>
+      ` : ''}
     `;
-
-    if (isAccessDenied) {
-      row.querySelector('.round-inputs-container').insertAdjacentHTML('afterend', `<span class="round-msg">${escapeHTML(msg)}</span>`);
-    }
 
     const inputsContainer = row.querySelector('.round-inputs-container');
     const saveBtn = row.querySelector('.save-round-button');
@@ -198,11 +202,25 @@ export async function initScoresPage() {
     for (let ball = 1; ball <= 3; ball += 1) {
       const value = turnValues?.[`ball${ball}`] ?? '';
       const placeholder = `Ball ${ball} cumulative`;
+      const isBallLocked = !!lockedBalls[`ball${ball}`];
       
       // Use round.machineId (master list ID) instead of round.id (Target_Scores row ID)
       // to ensure database foreign key constraints pass.
       const input = createRollInput(round.orderNumber, ball, round.machineId, value, placeholder);
       
+      // Per-ball locking: lock individual inputs that already have saved values.
+      // Uses readOnly + aria-disabled so the value remains visible and is still
+      // read by the save handler, but the field cannot be edited by the user.
+      // A data-saved-value attribute stores the original saved score so the
+      // save handler can enforce the lock even if the DOM is tampered.
+      if (isBallLocked) {
+        input.readOnly = true;
+        input.classList.add('ball-locked');
+        input.setAttribute('aria-disabled', 'true');
+        input.setAttribute('tabindex', '-1');
+        input.dataset.savedValue = value;
+      }
+
       input.addEventListener('input', () => {
         saveBtn.disabled = false;
         saveBtn.classList.add('is-dirty');
@@ -215,9 +233,19 @@ export async function initScoresPage() {
       const currentPlayerId = getCurrentPlayerId();
       if (!currentPlayerId) return;
 
-      const ball1 = Number(row.querySelector('[data-ball="1"]').value.replace(/\D/g, '')) || 0;
-      const ball2 = Number(row.querySelector('[data-ball="2"]').value.replace(/\D/g, '')) || 0;
-      const ball3 = Number(row.querySelector('[data-ball="3"]').value.replace(/\D/g, '')) || 0;
+      // Enforce per-ball locking: for locked balls, always use the original
+      // saved value from data-saved-value, ignoring any DOM tampering.
+      const getBallValue = (ballNum) => {
+        const input = row.querySelector(`[data-ball="${ballNum}"]`);
+        if (input && input.dataset.savedValue !== undefined) {
+          return Number(String(input.dataset.savedValue).replace(/\D/g, '')) || 0;
+        }
+        return Number(input?.value.replace(/\D/g, '')) || 0;
+      };
+
+      const ball1 = getBallValue(1);
+      const ball2 = getBallValue(2);
+      const ball3 = getBallValue(3);
 
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';

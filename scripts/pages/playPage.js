@@ -155,11 +155,22 @@ export async function initPlayPage() {
         }
 
         if (selectedId) {
-          // If the selected player isn't in the league yet, join them automatically
-          if (!joinedIds.has(Number(selectedId))) {
-            await PB_API.leagues.addPlayer(event.leagueId, Number(selectedId));
+          try {
+            // If the selected player isn't in the league yet, join them automatically
+            if (!joinedIds.has(Number(selectedId))) {
+              const result = await PB_API.leagues.addPlayer(event.leagueId, Number(selectedId));
+              if (result.error) throw new Error(result.error);
+            }
+            loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`);
+          } catch (err) {
+            console.error('[Play] Failed to join session:', err);
+            const message = err?.message || String(err);
+            if (message.includes('Unauthorized') || message.includes('401')) {
+              showPlayerSelectionDialog('Access Denied', 'Guests can only join as unregistered players. Please select a guest profile or log in.', [], 'Close');
+            } else {
+              alert('Failed to join session: ' + message);
+            }
           }
-          loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`);
         }
       };
     });

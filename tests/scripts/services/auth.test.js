@@ -368,23 +368,41 @@ describe('Auth Service (auth.js)', () => {
       PB_API.auth.me.mockResolvedValue({ role: 'player', player_id: 5 });
       const targetPlayer = { id: 5, userId: 10 };
       const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, {});
-      expect(result).toEqual({ access: 'allowed' });
+      expect(result).toEqual({ access: 'allowed', lockedBalls: {} });
+    });
+
+    it('should deny self-update for authenticated user in standard league with all balls filled', async () => {
+      PB_API.auth.me.mockResolvedValue({ role: 'player', player_id: 5 });
+      const targetPlayer = { id: 5, userId: 10 };
+      const turnValues = { ball1: '1000', ball2: '2000', ball3: '3000' };
+      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, 'standard');
+      expect(result.access).toBe('denied');
+      expect(result.reason).toContain('locked');
+      expect(result.lockedBalls).toEqual({ ball1: true, ball2: true, ball3: true });
+    });
+
+    it('should lock already-saved balls but allow adding new ones for self in session league', async () => {
+      PB_API.auth.me.mockResolvedValue({ role: 'player', player_id: 5 });
+      const targetPlayer = { id: 5, userId: 10 };
+      const turnValues = { ball1: '1000' };
+      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, 'session');
+      expect(result).toEqual({ access: 'allowed', lockedBalls: { ball1: true } });
     });
 
     it('should allow access for authenticated user scoring an unregistered player', async () => {
       const targetPlayer = { id: 99, userId: null };
       const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, {});
-      expect(result).toEqual({ access: 'allowed' });
+      expect(result).toEqual({ access: 'allowed', lockedBalls: {} });
     });
 
-    it('should deny access for authenticated user scoring another registered player without UPDATE_ANY_SCORE', async () => {
+    it('should deny access for authenticated user scoring another registered player', async () => {
       PB_API.auth.me.mockResolvedValue({ role: 'player' });
       const targetPlayer = { id: 99, userId: 20 };
       const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, {});
-      expect(result).toEqual({ access: 'denied', reason: 'Cannot update other registered players scores.' });
+      expect(result.access).toBe('denied');
     });
 
-    it('should deny update access without UPDATE_ANY_SCORE permission', async () => {
+    it('should deny update access for others without UPDATE_ANY_SCORE permission', async () => {
       PB_API.auth.me.mockResolvedValue({ role: 'player' });
       const targetPlayer = { id: 99, userId: 10 }; // Different ID than currentUser.player_id
       const turnValues = { ball1: '5' };
@@ -396,20 +414,52 @@ describe('Auth Service (auth.js)', () => {
       PB_API.auth.me.mockResolvedValue({ role: 'admin' });
       const targetPlayer = { id: 99, userId: 20 };
       const result = await getScoreAccessLevel({ role: 'admin' }, targetPlayer, { ball1: '5' });
-      expect(result).toEqual({ access: 'allowed' });
+      expect(result).toEqual({ access: 'allowed', lockedBalls: {} });
     });
 
     it('should allow null user to score unregistered player', async () => {
       const targetPlayer = { id: 99, userId: null };
       const result = await getScoreAccessLevel(null, targetPlayer, {});
-      expect(result).toEqual({ access: 'allowed' });
+      expect(result).toEqual({ access: 'allowed', lockedBalls: {} });
     });
 
     it('should deny null user from scoring registered player', async () => {
       PB_API.auth.me.mockResolvedValue(null);
       const targetPlayer = { id: 99, userId: 20 };
       const result = await getScoreAccessLevel(null, targetPlayer, {});
-      expect(result).toEqual({ access: 'denied', reason: 'Login required to update registered players scores.' });
+      expect(result.access).toBe('denied');
+      expect(result.reason).toContain('Score locked. Contact TD to correct errors.');
+    });
+
+    it('should return lockedBalls for individual balls that have values in standard league', async () => {
+      PB_API.auth.me.mockResolvedValue({ role: 'player', player_id: 5 });
+      const targetPlayer = { id: 5, userId: 10 };
+      // Only ball1 has a value — ball2 and ball3 are empty
+      const turnValues = { ball1: '500' };
+      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, 'standard');
+      // Round should be 'allowed' (not all balls filled), but ball1 should be locked
+      expect(result.access).toBe('allowed');
+      expect(result.lockedBalls).toEqual({ ball1: true });
+    });
+
+    it('should lock only filled balls when some balls are empty in standard league', async () => {
+      PB_API.auth.me.mockResolvedValue({ role: 'player', player_id: 5 });
+      const targetPlayer = { id: 5, userId: 10 };
+      // ball1 and ball2 have values, ball3 is empty
+      const turnValues = { ball1: '500', ball2: '600' };
+      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, 'standard');
+      expect(result.access).toBe('allowed');
+      expect(result.lockedBalls).toEqual({ ball1: true, ball2: true });
+    });
+
+    it('should deny round only when all balls are filled in standard league', async () => {
+      PB_API.auth.me.mockResolvedValue({ role: 'player', player_id: 5 });
+      const targetPlayer = { id: 5, userId: 10 };
+      const turnValues = { ball1: '500', ball2: '600', ball3: '700' };
+      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, 'standard');
+      expect(result.access).toBe('denied');
+      expect(result.reason).toContain('locked');
+      expect(result.lockedBalls).toEqual({ ball1: true, ball2: true, ball3: true });
     });
   });
 

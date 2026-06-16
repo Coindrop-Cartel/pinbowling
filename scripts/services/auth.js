@@ -36,7 +36,7 @@ const ROLE_PERMISSIONS = {
   'admin': ['*'],
   'td': [PERMISSIONS.CREATE_SESSION, PERMISSIONS.JOIN_SESSION, PERMISSIONS.ADD_ANY_SCORE, PERMISSIONS.UPDATE_ANY_SCORE, PERMISSIONS.MANAGE_LEAGUES, PERMISSIONS.MANAGE_TEAMS, PERMISSIONS.MANAGE_MACHINES, PERMISSIONS.MANAGE_PLAYERS, PERMISSIONS.ADD_LOCATION_MACHINE],
   'player': [PERMISSIONS.CREATE_SESSION, PERMISSIONS.JOIN_SESSION, PERMISSIONS.ADD_LOCATION_MACHINE, PERMISSIONS.UPDATE_SELF],
-  'unregistered': [PERMISSIONS.JOIN_SESSION, PERMISSIONS.ADD_ANY_SCORE, PERMISSIONS.UPDATE_ANY_SCORE]
+  'unregistered': [PERMISSIONS.JOIN_SESSION]
 };
 
 /**
@@ -264,51 +264,138 @@ export async function isManagementAuthorized() {
  * Determines the access level for scoring a specific player's round.
  * Centralizes authorization logic so pages don't duplicate permission checks.
  *
+ * Returns both a round-level access decision and per-ball lock status.
+ * Balls that already have saved values are individually locked for non-management users.
+ * The round-level `access` is 'denied' only when ALL balls have values and the user
+ * lacks update permission — this controls the "Score locked" message display.
+ *
  * @param {Object|null} currentUser - The currently authenticated user (from PB_API.getCurrentUser()).
  * @param {Object|null} targetPlayer - The player whose score is being entered.
  * @param {Object|null} turnValues - Existing score values for the round (ball1, ball2, ball3).
- * @returns {Promise<{access: 'allowed'|'denied', reason?: string}>}
- *   - { access: 'allowed' } — the current user may enter/modify this score
- *   - { access: 'denied', reason: 'Updates locked' } — non-TD/Admin tried to update an existing score
- *   - { access: 'denied', reason: 'Guest Only' } — non-TD/Admin tried to score another registered player
+ * @param {string} [leagueType='standard'] - The type of league ('standard' or 'session').
+ * @returns {Promise<{access: 'allowed'|'denied', reason?: string, lockedBalls: Object<string, boolean>}>}
  */
-export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues) {
+export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues, leagueType = 'standard') {
   const canUpdateAny = await can(PERMISSIONS.UPDATE_ANY_SCORE);
   const canUpdateSelf = await can(PERMISSIONS.UPDATE_SELF);
   const canAddAny = await can(PERMISSIONS.ADD_ANY_SCORE);
-  const isUpdate = !!(turnValues?.ball1 || turnValues?.ball2 || turnValues?.ball3);
   const isSelf = currentUser && String(targetPlayer?.id) === String(currentUser.player_id);
   const isTargetUnregistered = !targetPlayer?.userId;
 
+  // Determine which balls already have saved values
+  const hasBall1 = !!(turnValues?.ball1);
+  const hasBall2 = !!(turnValues?.ball2);
+  const hasBall3 = !!(turnValues?.ball3);
+  const allBallsFilled = hasBall1 && hasBall2 && hasBall3;
+  const anyBallFilled = hasBall1 || hasBall2 || hasBall3;
+
+  // 1. Management Override: TD/Admin can always score/update anything.
+  if (canUpdateAny) return { access: 'allowed', lockedBalls: {} };
+
+  // 2. Determine if the user has permission to update existing scores
+  //    This varies by league type and user role.
+  // 2. Standard League Specific Logic
+  if (leagueType === 'standard') {
+    const lockedBalls = {};
+    const reasonForDenial = 'Score locked. Contact TD to correct errors.';
+    const isCurrentUserRegistered = !!currentUser; // Determine registration status once
+
+    // Determine individual ball lock status:
+    // Any ball with an existing value is locked for non-TD/Admins.
+    if (hasBall1) lockedBalls.ball1 = true;
+    if (hasBall2) lockedBalls.ball2 = true;
+    if (hasBall3) lockedBalls.ball3 = true;
+
+    // If all balls are filled, the entire round is denied for non-TD/Admins.
+    if (allBallsFilled) {
+      return { access: 'denied', reason: reasonForDenial, lockedBalls };
+    }
+
+    // Check if the current user can add scores to any *empty* balls for the target player.
+    // This is for scenarios where not all balls are filled.
+    let canUserAddScore = false;
+    if (!isCurrentUserRegistered) {
+      // Unregistered user can only score other unregistered players.
+      canUserAddScore = isTargetUnregistered;
+    } else {
+      // Registered user can score themselves or unregistered players.
+      canUserAddScore = (isSelf && canUpdateSelf) || isTargetUnregistered;
+    }
+
+    if (!canUserAddScore) {
+      // If the user cannot add any scores at all (e.g., registered user trying to score another *registered* player).
+      const specificReason = isCurrentUserRegistered && !isSelf && !isTargetUnregistered
+          ? 'You do not have permission to score this registered player.'
+          : reasonForDenial; // Generic denial if user can't add, but not specifically another registered player.
+      return { access: 'denied', reason: specificReason, lockedBalls };
+    }
+
+    // If we reach here, it means:
+    // 1. Not all balls are filled.
+    // 2. The user has permission to add scores to empty balls.
+    // 3. Some individual balls might be locked, but the round itself is not fully denied.
+    return { access: 'allowed', lockedBalls };
+  }
+
+  // 3. Session League Logic (Remaining logic is for session leagues)
+  //    Determine if the user has permission to update existing scores in session leagues.
+  //    Only TD/Admin (canUpdateAny) can modify already-saved ball values.
+  //    Self-scoring permission (canUpdateSelf) allows entering NEW scores only.
+  let canUpdateSession = canUpdateAny;
+  let canAddSessionScore = false;
+  if (currentUser) {
+    canAddSessionScore = isSelf && canUpdateSelf;
+  } else {
+    canAddSessionScore = isTargetUnregistered;
+  }
+
+  // Build per-ball lock status for session leagues
+  // Any ball with an existing saved value is locked unless the user has UPDATE_ANY_SCORE.
+  const lockedBallsSession = {};
+  if (!canUpdateSession) {
+    if (hasBall1) lockedBallsSession.ball1 = true;
+    if (hasBall2) lockedBallsSession.ball2 = true;
+    if (hasBall3) lockedBallsSession.ball3 = true;
+  }
+
+  // 4. If all balls are filled and user can't update, deny the entire round
+  //    (this shows the "Score locked" message and hides the Save button)
+  if (allBallsFilled && !canUpdateSession) {
+    const reason = currentUser
+        ? 'Score locked. Contact TD to correct errors.'
+        : 'Login required to update registered players.';
+    return { access: 'denied', reason, lockedBalls: lockedBallsSession };
+  }
+
+  // 5. If some balls are filled but not all, check if user can at least add new scores
+  if (anyBallFilled && !canUpdateSession) {
+    // User can't update existing values, but might be able to fill empty balls.
+    // Check if they have permission to score this player at all.
+    if (!currentUser) {
+      if (isTargetUnregistered) return { access: 'allowed', lockedBalls: lockedBallsSession };
+      return { access: 'denied', reason: 'Login required to score registered players.', lockedBalls: lockedBallsSession };
+    }
+    if (canAddSessionScore) return { access: 'allowed', lockedBalls: lockedBallsSession };
+    if (isTargetUnregistered) return { access: 'allowed', lockedBalls: lockedBallsSession };
+    if (canAddAny) return { access: 'allowed', lockedBalls: lockedBallsSession };
+    return { access: 'denied', reason: 'You do not have permission to score this player.', lockedBalls: lockedBallsSession };
+  }
+
+  // 6. Handle New Scores (no existing values)
   if (!currentUser) {
-    // Unregistered users can only update scores for unregistered players.
-    if (isTargetUnregistered) return { access: 'allowed' };
-    return { access: 'denied', reason: 'Login required to update registered players scores.' };
+    if (isTargetUnregistered) return { access: 'allowed', lockedBalls: lockedBallsSession };
+    return { access: 'denied', reason: 'Login required to score registered players.', lockedBalls: lockedBallsSession };
   }
 
-  // A registered user cannot update scores of another registered user unless they have management permissions.
-  if (!canUpdateAny && !isTargetUnregistered && !(isSelf && canUpdateSelf)) {
-    return { access: 'denied', reason: 'Cannot update other registered players scores.' };
-  }
+  // Registered user adding score: Allow self (with permission) or unregistered players.
+  if (canAddSessionScore) return { access: 'allowed', lockedBalls: lockedBallsSession };
+  if (isTargetUnregistered) return { access: 'allowed', lockedBalls: lockedBallsSession };
+  
+  // If user has 'ADD_ANY_SCORE' (assigned to TD/Admin), they can score others.
+  if (canAddAny) return { access: 'allowed', lockedBalls: lockedBallsSession };
 
-  // Any logged-in user can update an unregistered player's score.
-  if (!canUpdateAny && isTargetUnregistered) {
-    return { access: 'allowed' };
-  }
-
-  // If it's an update, ensure user has either global or self-update permissions.
-  if (isUpdate && !canUpdateAny && !(isSelf && canUpdateSelf)) {
-    return { access: 'denied', reason: 'Updates locked to self or TD/Admin.' };
-  }
-
-  // Allow adding new scores for self (with permission) or unregistered players.
-  if (!isUpdate && !canAddAny && !isTargetUnregistered && !(isSelf && canUpdateSelf)) {
-    return { access: 'denied', reason: 'Cannot add scores for other registered players.' };
-  }
-
-  return { access: 'allowed' };
+  return { access: 'denied', reason: 'You do not have permission to score this player.', lockedBalls: lockedBallsSession };
 }
-
 /**
  * Filters leagues to only those visible to the given user.
  * Unregistered (null) users can only see leagues that have at least one guest player.

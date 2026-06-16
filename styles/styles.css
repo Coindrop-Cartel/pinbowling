@@ -462,8 +462,21 @@ td {
 .round-number { font-weight: 700; min-width: 30px; text-align: center; display: inline-block; }
 .score-input { flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px; }
 .round-inputs-container { display: flex; gap: 0.5rem; align-items: center; }
+.round-actions { display: flex; align-items: center; gap: 1rem; }
 .round-inputs-disabled { opacity: 0.5; pointer-events: none; }
-.round-msg { font-size: 0.7rem; color: #888; text-transform: uppercase; }
+.ball-locked { opacity: 0.6; background-color: #f0f0f0; border-color: #ccc; cursor: not-allowed; }
+.ball-locked:focus { outline: none; box-shadow: none; }
+
+.round-status-bar {
+  flex-basis: 100%;
+  border-top: 1px dashed rgba(0,0,0,0.05);
+  padding-top: 8px;
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.round-msg { font-size: 0.75rem; color: #d9534f; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 
 .target-details { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--pb-primary); opacity: 0.8; }
 
