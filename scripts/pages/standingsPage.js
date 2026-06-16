@@ -3,7 +3,7 @@ import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventI
 import { getScoringEngine } from '@core/engine.js';
 import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { showDialog } from '@ui/dialogs.js';
-import { renderActionSummary, initTournamentSelector } from '@ui/selectors.js';
+import { renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { filterLeaguesForUser } from '@services/auth.js'; // Import for filtering
 import { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer, groupScoresByPlayer, buildScoreMapFromRows } from '@services/normalizer.js';
 import { calculateSeasonSummary } from '@services/seasonCalculator.js';
@@ -115,6 +115,17 @@ export async function initStandingsPage() {
     }
   });
 
+  // WORLD-CLASS PERFORMANCE: Cleanup Intervals and WakeLock (Section 3)
+  const cleanup = () => {
+    if (window.PB_DEBUG_MODE) console.log('[Standings] Cleaning up intervals and body classes');
+    if (refreshInterval) clearInterval(refreshInterval);
+    if (scrollInterval) clearInterval(scrollInterval);
+    if (wakeLock) wakeLock.release().catch(() => {});
+    document.body.classList.remove('tv-mode-active');
+  };
+  // SPA router fires pb:pageChanged when leaving the current context
+  document.addEventListener('pb:pageChanged', cleanup, { once: true });
+
   function startAutoScroll() {
     clearInterval(scrollInterval);
     scrollInterval = setInterval(() => {
@@ -202,6 +213,7 @@ export async function initStandingsPage() {
     const isTeamLeague = league?.participants === 'team';
 
     applyPreferredTheme(format);
+    const loader = createSkeletonLoader(standingsBody, { type: 'table', count: 10 });
     
     let players = league?.players || [];
     if (league?.participants === 'team') {
@@ -223,48 +235,52 @@ export async function initStandingsPage() {
     const targetsByEvent = groupTargetsByEvent(normalizedLeagueTargets);
     const normalizedScores = normalizeScores(rawScores);
     const scoresByEventAndPlayer = groupScoresByEventAndPlayer(normalizedScores);
-
-    const result = calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, engine, selectedPlayerIds });
-    const rows = result.rows;
-
-    if (!isTeamLeague) renderFilterUI(players);
-
-    if (tvTitle) {
-      const league = leagues.find(l => String(l.id) === String(leagueId));
-      tvTitle.textContent = `${league?.name || 'League'} - Season Summary`;
-    }
-
-    const playerLabel = isTeamLeague ? 'Team' : 'Player';
-
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${events.map((e, i) => `<th class="text-center">${i + 1}</th>`).join('')}<th class="text-center">Total</th></tr>`;
     
-    if (standingsBody) {
-      standingsBody.innerHTML = rows.map((res, idx) => {
-        const entityName = isTeamLeague ? escapeHTML(res.entity.name) : escapeHTML(res.entity.playerName);
-        
-        const eventsHtml = events.map(e => {
-          const eventData = res.eventTotals[e.id];
-          if (!eventData || eventData.displayValue === undefined) return `<td class="standings-round">-</td>`;
-          const spanClass = eventData.isDropped ? ' class="dropped-score"' : '';
-          return `<td class="standings-round"><span${spanClass}>${eventData.displayValue}</span></td>`;
+    try {
+      const result = calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, engine, selectedPlayerIds });
+      const rows = result.rows;
+
+      if (!isTeamLeague) renderFilterUI(players);
+
+      if (tvTitle) {
+        const league = leagues.find(l => String(l.id) === String(leagueId));
+        tvTitle.textContent = `${league?.name || 'League'} - Season Summary`;
+      }
+
+      const playerLabel = isTeamLeague ? 'Team' : 'Player';
+
+      if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${events.map((e, i) => `<th class="text-center">${i + 1}</th>`).join('')}<th class="text-center">Total</th></tr>`;
+      
+      if (standingsBody) {
+        standingsBody.innerHTML = rows.map((res, idx) => {
+          const entityName = isTeamLeague ? escapeHTML(res.entity.name) : escapeHTML(res.entity.playerName);
+          
+          const eventsHtml = events.map(e => {
+            const eventData = res.eventTotals[e.id];
+            if (!eventData || eventData.displayValue === undefined) return `<td class="standings-round">-</td>`;
+            const spanClass = eventData.isDropped ? ' class="dropped-score"' : '';
+            return `<td class="standings-round"><span${spanClass}>${eventData.displayValue}</span></td>`;
+          }).join('');
+
+          const totalDisplay = league?.seasonScoring === 'weekly' 
+            ? `${res.totalSeasonPoints} pts` 
+            : Engine.formatTotalScore(res.totalSeasonPoints);
+
+          return `
+            <tr>
+              <td>${idx + 1}</td>
+              <td class="player-name-cell">${entityName}</td>
+              ${eventsHtml}
+              <td class="standings-total">${totalDisplay}</td>
+            </tr>`;
         }).join('');
+      }
 
-        const totalDisplay = league?.seasonScoring === 'weekly' 
-          ? `${res.totalSeasonPoints} pts` 
-          : Engine.formatTotalScore(res.totalSeasonPoints);
-
-        return `
-          <tr>
-            <td>${idx + 1}</td>
-            <td class="player-name-cell">${entityName}</td>
-            ${eventsHtml}
-            <td class="standings-total">${totalDisplay}</td>
-          </tr>`;
-      }).join('');
+      if (standingsEmpty) standingsEmpty.classList.add('hidden');
+      if (standingsWrapper) standingsWrapper.classList.remove('hidden');
+    } finally {
+      loader.remove();
     }
-
-    if (standingsEmpty) standingsEmpty.classList.add('hidden');
-    if (standingsWrapper) standingsWrapper.classList.remove('hidden');
   };
 
   // Selection UI Toggles (matching the scores page behavior)

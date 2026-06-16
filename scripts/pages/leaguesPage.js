@@ -307,6 +307,9 @@ export async function initLeaguesPage() {
 
     if (!isAuthorized) return;
 
+    createBtn.disabled = true;
+    createBtn.textContent = 'Saving...';
+
     try {
       const payload = { name, startDate: date, scoringFormat, participants, seasonScoring, dropLowestWeeks };
       if (editingLeagueId) {
@@ -319,6 +322,9 @@ export async function initLeaguesPage() {
     } catch (err) {
       console.error('League creation failed:', err);
       alert(`Failed to create league: ${err.message}`);
+    } finally {
+      createBtn.disabled = false;
+      createBtn.textContent = editingLeagueId ? 'Update League' : 'Save League';
     }
   });
 

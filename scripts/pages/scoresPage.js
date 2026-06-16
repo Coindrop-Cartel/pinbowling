@@ -3,7 +3,7 @@ import { filterPlayersForUser, getScoreAccessLevel, can } from '@services/auth.j
 import { showAlert } from '@ui/dialogs.js';
 import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, formatNumber, applyScoreFormatting, renderThresholdGrid, setCurrentPlayerId, getCurrentPlayerId, escapeHTML } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
-import { createSearchableSelect, renderActionSummary, initTournamentSelector } from '@ui/selectors.js';
+import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { normalizeScores, normalizeTargets, buildScoreMapFromDOM, buildScoreMapFromRows } from '@services/normalizer.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
@@ -414,20 +414,25 @@ export async function initScoresPage() {
     const player = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
     playerSelectorUI?.classList.add('hidden');
 
-    const scores = await PB_API.scores.get(Number(activePlayerId), Number(getActiveEventId()));
-    await loadScoresIntoForm(scores, player);
+    const loader = createSkeletonLoader(roundsInput, { count: 5 });
+    try {
+      const scores = await PB_API.scores.get(Number(activePlayerId), Number(getActiveEventId()));
+      await loadScoresIntoForm(scores, player);
 
-    // Reveal UI only after data is loaded and DOM is prepared
-    warning.classList.add('hidden');
-    scoringCard.classList.remove('hidden');
-    resultsCard.classList.remove('hidden');
-    playerSummary?.classList.remove('hidden');
-    renderActionSummary(playerSummary, `Player: ${player?.playerName || 'Selected'}`, [
-      { text: 'Change', onclick: handlePlayerChange }
-    ]);
-    roundsInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
+      // Reveal UI only after data is loaded and DOM is prepared
+      warning.classList.add('hidden');
+      scoringCard.classList.remove('hidden');
+      resultsCard.classList.remove('hidden');
+      playerSummary?.classList.remove('hidden');
+      renderActionSummary(playerSummary, `Player: ${player?.playerName || 'Selected'}`, [
+        { text: 'Change', onclick: handlePlayerChange }
+      ]);
+      roundsInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
 
-    renderCurrentResults();
+      renderCurrentResults();
+    } finally {
+      loader.remove();
+    }
   }
 
   /**

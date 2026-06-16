@@ -534,6 +534,9 @@ export async function initEventSetupPage() {
       values 
     };
 
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+
     try {
       await PB_API.machines.saveTarget(payload);
       await refresh();
@@ -541,6 +544,8 @@ export async function initEventSetupPage() {
     } catch (err) {
       console.error('Save failed:', err);
       alert(`Failed to save: ${err.message}`);
+    } finally {
+      submitBtn.textContent = 'Save';
     }
   });
 

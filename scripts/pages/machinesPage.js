@@ -231,6 +231,9 @@ export async function initMachinesPage() {
       manufacturer: mfgInput.value.trim() || null
     };
 
+    saveMachineButton.disabled = true;
+    saveMachineButton.textContent = 'Saving...';
+
     try {
       if (id) {
         await PB_API.machines.update(id, payload); 
@@ -240,6 +243,9 @@ export async function initMachinesPage() {
       await refresh();
     } catch (err) {
       showAlert('Failed to save machine: ' + err.message);
+    } finally {
+      saveMachineButton.disabled = false;
+      saveMachineButton.textContent = id ? 'Update Machine' : 'Save Machine';
     }
   });
 

@@ -340,3 +340,36 @@ export function setupSortableList(container, { itemSelector, onReorder }) {
     }
   });
 }
+
+/**
+ * Creates and appends a skeleton loader to a container.
+ * @param {HTMLElement} container - The DOM element to host the loader.
+ * @param {Object} options - Configuration for the loader.
+ * @param {string} [options.type='list'] - 'list' or 'table'.
+ * @param {number} [options.count=3] - Number of items to render.
+ * @returns {Object} A handle with a .remove() method.
+ */
+export function createSkeletonLoader(container, { type = 'list', count = 3 } = {}) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'skeleton-wrapper';
+  
+  let html = '';
+  for (let i = 0; i < count; i++) {
+    if (type === 'list') {
+      html += `
+        <div class="skeleton-row">
+          <div class="skeleton skeleton-circle"></div>
+          <div class="flex-1">
+            <div class="skeleton skeleton-title"></div>
+            <div class="skeleton skeleton-text"></div>
+          </div>
+        </div>`;
+    } else {
+      html += `<div class="skeleton" style="height: 45px; margin-bottom: 8px; width: 100%;"></div>`;
+    }
+  }
+  
+  wrapper.innerHTML = html;
+  container.appendChild(wrapper);
+  return { remove: () => wrapper.remove() };
+}

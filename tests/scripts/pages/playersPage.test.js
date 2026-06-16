@@ -48,6 +48,9 @@ const uiMocks = vi.hoisted(() => ({
     container.appendChild(row);
     return row;
   }),
+  createSkeletonLoader: vi.fn(() => ({
+    remove: vi.fn()
+  })),
 }));
 
 vi.mock('@ui/selectors.js', () => uiMocks);
@@ -70,6 +73,7 @@ describe('Player Management Page (playersPage.js)', () => {
 
   beforeEach(() => {
     vi.stubGlobal('scrollTo', vi.fn());
+    vi.stubGlobal('alert', vi.fn());
     Element.prototype.scrollIntoView = vi.fn();
 
     originalLocation = window.location;
@@ -82,7 +86,7 @@ describe('Player Management Page (playersPage.js)', () => {
     window.location = mockLocation;
 
     document.body.innerHTML = `
-      <section class="card">
+      <section id="player-form-card" class="card hidden">
         <h2 id="player-form-title">Add New Player</h2>
         <form id="player-form">
           <input id="editing-player-id" />
@@ -91,7 +95,6 @@ describe('Player Management Page (playersPage.js)', () => {
           <div id="player-matchplay-row" class="form-row hidden"><input id="matchplay-id" /></div>
           <div id="player-form-actions" class="form-actions hidden">
             <button id="save-player-button">Save Player</button>
-            <button id="cancel-edit-button" class="hidden">Cancel</button>
           </div>
         </form>
       </section>
@@ -137,7 +140,7 @@ describe('Player Management Page (playersPage.js)', () => {
     it('should hide form card for non-privileged users', async () => {
       PB_API.auth.me.mockResolvedValue({ id: 2, role: 'player', player_id: 99 });
       await initPlayersPage();
-      const card = document.querySelector('.card');
+      const card = document.getElementById('player-form-card');
       expect(card.classList.contains('hidden')).toBe(true);
     });
 
@@ -201,7 +204,7 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const toggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Create New Player'));
       toggle.click();
-      const cancelToggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Cancel'));
+      const cancelToggle = [...document.querySelectorAll('button')].find(b => b.textContent === 'Cancel');
       cancelToggle.click();
       expect(document.getElementById('player-ifpa-row').classList.contains('hidden')).toBe(true);
       expect(document.getElementById('player-matchplay-row').classList.contains('hidden')).toBe(true);
@@ -211,7 +214,7 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
-      const cancelToggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Cancel'));
+      const cancelToggle = [...document.querySelectorAll('button')].find(b => b.textContent === 'Cancel');
       cancelToggle.click();
       expect(document.getElementById('editing-player-id').value).toBe('');
       expect(document.getElementById('player-form-title').textContent).toBe('Add New Player');
@@ -250,7 +253,7 @@ describe('Player Management Page (playersPage.js)', () => {
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
       await vi.waitFor(() => {
-        const createToggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Cancel'));
+        const createToggle = [...document.querySelectorAll('button')].find(b => b.textContent === 'Cancel');
         expect(createToggle).not.toBeNull();
         expect(createToggle.classList.contains('hidden')).toBe(false); // The createToggle should be visible as "Cancel"
       });
@@ -766,7 +769,8 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
-      document.getElementById('cancel-edit-button').click(); // Ensure click is simulated
+      const cancelBtn = [...document.querySelectorAll('button')].find(b => b.textContent === 'Cancel');
+      cancelBtn.click();
       expect(document.getElementById('editing-player-id').value).toBe('');
       expect(document.getElementById('player-name').value).toBe('');
       expect(document.getElementById('player-form-title').textContent).toBe('Add New Player');
@@ -776,15 +780,17 @@ describe('Player Management Page (playersPage.js)', () => {
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
-      document.getElementById('cancel-edit-button').click(); // Ensure click is simulated
-      expect(document.getElementById('cancel-edit-button').classList.contains('hidden')).toBe(true);
+      const cancelBtn = [...document.querySelectorAll('button')].find(b => b.textContent === 'Cancel');
+      cancelBtn.click();
+      expect(cancelBtn.textContent).toBe('Create New Player');
     });
 
     it('should collapse form fields after cancel', async () => {
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
-      document.getElementById('cancel-edit-button').click(); // Ensure click is simulated
+      const cancelBtn = [...document.querySelectorAll('button')].find(b => b.textContent === 'Cancel');
+      cancelBtn.click();
       expect(document.getElementById('player-ifpa-row').classList.contains('hidden')).toBe(true);
       expect(document.getElementById('player-matchplay-row').classList.contains('hidden')).toBe(true);
     });

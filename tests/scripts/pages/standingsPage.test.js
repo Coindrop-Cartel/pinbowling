@@ -54,6 +54,9 @@ const uiMocks = vi.hoisted(() => ({
     if (container) container.classList.remove('hidden');
   }),
   showDialog: vi.fn(),
+  createSkeletonLoader: vi.fn(() => ({
+    remove: vi.fn()
+  })),
 }));
 
 vi.mock('@ui/selectors.js', () => uiMocks);

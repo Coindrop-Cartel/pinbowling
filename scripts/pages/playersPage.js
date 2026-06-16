@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { requireAdmin, can, PERMISSIONS } from '@services/auth.js';
 import { showAlert, showPrompt, showChoiceDialog, showConfirm } from '@ui/dialogs.js';
-import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
+import { createExpandableRow, setupLiveFilter, createSkeletonLoader } from '@ui/selectors.js';
 import { escapeHTML } from '@scripts/utils.js';
 
 /**
@@ -17,6 +17,7 @@ import { escapeHTML } from '@scripts/utils.js';
 export async function initPlayersPage() {
   let currentUser;
   let playersData;
+  const loader = createSkeletonLoader(document.getElementById('player-list'), { count: 5 });
   try {
     // Batch initial user check and data fetch
     [currentUser, playersData] = await Promise.all([
@@ -26,6 +27,8 @@ export async function initPlayersPage() {
   } catch (error) {
     console.error('Error initializing Players page:', error);
     return; // Stop initialization if initial data fetch fails
+  } finally {
+    loader.remove();
   }
   const isAdmin = currentUser && currentUser.role === 'admin';
   const isTD = currentUser && currentUser.role === 'td';
@@ -33,6 +36,7 @@ export async function initPlayersPage() {
 
   const playerFormTitle = document.getElementById('player-form-title');
   const playerForm = document.getElementById('player-form');
+  const playerFormCard = document.getElementById('player-form-card');
   const editingPlayerIdInput = document.getElementById('editing-player-id');
   const playerNameInput = document.getElementById('player-name');
   const ifpaIdInput = document.getElementById('ifpa-id');
@@ -67,7 +71,7 @@ export async function initPlayersPage() {
 
   const createToggle = document.createElement('button');
   createToggle.type = 'button';
-  createToggle.className = 'secondary btn-mgmt mt-10';
+  createToggle.className = 'secondary btn-mgmt mt-10 hidden';
   createToggle.textContent = 'Create New Player';
   playerNameInput.after(createToggle);
 
@@ -76,9 +80,10 @@ export async function initPlayersPage() {
     savePlayerButton.classList.add('secondary', 'btn-mgmt');
   }
 
-  if (!hasElevatedPrivileges) {
-    createToggle.classList.add('hidden');
-    playerForm.closest('.card').classList.add('hidden');
+  // REVEAL-ONLY: Management tools should be hidden in PHP/CSS by default.
+  if (hasElevatedPrivileges) {
+    createToggle.classList.remove('hidden');
+    playerFormCard?.classList.remove('hidden');
   }
 
   createToggle.onclick = () => {
@@ -210,9 +215,8 @@ export async function initPlayersPage() {
     playerNameInput.after(createToggle);
     
     playerNameInput.disabled = false;
-    if (!hasElevatedPrivileges) {
-      playerForm.closest('.card').classList.add('hidden');
-    }
+    // Ensure card is hidden for non-privileged users if we aren't editing self
+    playerFormCard?.classList.toggle('hidden', !hasElevatedPrivileges);
 
     if (filterInstance) filterInstance.performFilter();
   }
@@ -228,7 +232,7 @@ export async function initPlayersPage() {
     const isSelf = currentUser && String(player.id) === String(currentUser.player_id);
     if (!hasElevatedPrivileges && !isSelf) return;
 
-    playerForm.closest('.card').classList.remove('hidden');
+    playerFormCard?.classList.remove('hidden');
 
     editingPlayerIdInput.value = player.id;
     playerNameInput.value = player.playerName;
@@ -319,6 +323,9 @@ export async function initPlayersPage() {
       matchplayId: matchplayId
     };
 
+    savePlayerButton.disabled = true;
+    savePlayerButton.textContent = 'Saving...';
+
     try {
       if (id) {
         await PB_API.players.update(id, payload);
@@ -329,6 +336,9 @@ export async function initPlayersPage() {
       resetForm();
     } catch (error) {
       alert(`Error saving player: ${error.message}`);
+    } finally {
+      savePlayerButton.disabled = false;
+      savePlayerButton.textContent = id ? 'Update Player' : 'Save Player';
     }
   });
 
