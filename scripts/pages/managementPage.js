@@ -76,7 +76,6 @@ export async function initManagementPage() {
   };
 
   if (loginBtn) {
-    loginBtn.classList.add('btn-mgmt');
     // Use addEventListener for better reliability and wrap the call 
     // to ensure the MouseEvent isn't passed as the prompt message.
     loginBtn.addEventListener('click', async () => {

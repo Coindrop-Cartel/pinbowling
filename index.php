@@ -83,7 +83,7 @@ if (in_array($checkRoute, $managementRoutes)) {
     }
 }
 
-$targetFile = __DIR__ . '/pages/home.php'; // Default content
+$targetFile = __DIR__ . '/includes/pages/home.php'; // Default content
 
 if ($route !== '') {
     // If the route is explicitly "index" or "index.php", redirect to the clean base URL
@@ -93,13 +93,13 @@ if ($route !== '') {
     }
 
     // Map the route to the /pages directory
-    $pageName = (strpos($route, '.php') === false) ? $route . '.php' : $route;
+    $pageName = (strpos($route, '.php') === false) ? $route . '.php' : $route; // e.g., 'home.php'
     
-    // Look for the file in /pages, /service, or the root, preserving subdirectories
-    $pagesFile = __DIR__ . '/pages/' . $pageName;
+    // Look for the file in /includes/pages, /service, or the root, preserving subdirectories
+    $pagesFile = __DIR__ . '/includes/pages/' . $pageName;
     $serviceFile = __DIR__ . '/' . $pageName; // Handles service/authService.php etc.
     $rootFile = __DIR__ . '/' . basename($pageName);
-
+    
     if (file_exists($pagesFile)) {
         $targetFile = $pagesFile;
     } elseif (file_exists($serviceFile)) {
