@@ -34,7 +34,7 @@ vi.mock('@core/engine.js', () => ({
 // We will mock initNavigation *selectively* for tests that call it.
 import * as Utils from '@scripts/utils.js';
 
-// Mock the ROUTES to ensure test stability and correct indices
+// Mock ROUTE_PATHS to ensure test stability
 vi.mock('@scripts/routes.js', () => ({
   ROUTE_PATHS: { HOME: () => '/', LEAGUES: (id) => `/leagues?id=${id}` }
 }));

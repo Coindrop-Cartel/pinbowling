@@ -125,14 +125,6 @@ export function applyScoreFormatting(input) {
 }
 
 /**
- * Navigates to a specific internal route.
- * @param {string} url - The destination path (typically generated via ROUTES).
- */
-export const navigateTo = (url) => {
-  if (url) window.location.href = url;
-};
-
-/**
  * Fetches and injects page content into the main container without a full reload.
  * @param {string} url - The destination URL.
  * @param {boolean} [pushState=true] - Whether to update the browser history.

@@ -21,11 +21,8 @@ vi.mock('@services/auth.js', () => ({
 }));
 
 vi.mock('@scripts/utils.js', () => ({
-  navigateTo: vi.fn(), // Keep existing mock
-  escapeHTML: vi.fn(str => str), // Add escapeHTML mock
-  // If there are other utils functions used in machinesPage.js that are not mocked,
-  // they should be added here or the mock should use the partial mock pattern.
-  // For now, assuming only navigateTo and escapeHTML are relevant.
+  loadPage: vi.fn(),
+  escapeHTML: vi.fn(str => str),
 }));
 
 const uiMocks = vi.hoisted(() => ({

@@ -19,7 +19,6 @@ vi.mock('@ui/dialogs.js', () => ({
 }));
 
 vi.mock('@scripts/utils.js', () => ({
-  navigateTo: vi.fn(),
   loadPage: vi.fn(),
 }));
 
