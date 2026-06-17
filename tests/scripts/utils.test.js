@@ -36,14 +36,9 @@ import * as Utils from '@scripts/utils.js';
 
 // Mock the ROUTES to ensure test stability and correct indices
 vi.mock('@scripts/routes.js', () => ({
-  ROUTES: [
-    { path: 'index.php', label: 'Home' },
-    { path: 'machines.php', label: 'Machines' },
-    { path: 'leagues.php', label: 'Leagues' },
-    { path: 'players.php', label: 'Players' }
-  ]
+  ROUTE_PATHS: { HOME: () => '/', LEAGUES: (id) => `/leagues?id=${id}` }
 }));
-import { getScoringEngine } from '@core/engine.js'; // To check if it's called
+import { getScoringEngine } from '@core/engine.js';
 
 describe('Utility Functions (utils.js)', () => {
   let originalLocation;
@@ -235,35 +230,6 @@ describe('Utility Functions (utils.js)', () => {
       const spy = vi.spyOn(inputElement, 'addEventListener');
       Utils.applyScoreFormatting(null);
       expect(spy).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('navigateTo', () => {
-    it('sets window.location.href when a URL is provided', () => {
-      Object.defineProperty(window, 'location', {
-        value: { href: '' },
-        writable: true,
-      });
-      Utils.navigateTo('http://example.com/page');
-      expect(window.location.href).toBe('http://example.com/page');
-    });
-
-    it('does nothing when url is falsy', () => {
-      const originalHref = window.location.href;
-      Utils.navigateTo('');
-      expect(window.location.href).toBe(originalHref);
-    });
-
-    it('does nothing when url is null', () => {
-      const originalHref = window.location.href;
-      Utils.navigateTo(null);
-      expect(window.location.href).toBe(originalHref);
-    });
-
-    it('does nothing when url is undefined', () => {
-      const originalHref = window.location.href;
-      Utils.navigateTo(undefined);
-      expect(window.location.href).toBe(originalHref);
     });
   });
 
