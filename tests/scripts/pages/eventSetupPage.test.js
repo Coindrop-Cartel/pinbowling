@@ -4,7 +4,7 @@ import { initEventSetupPage } from '@pages/eventSetupPage.js';
 import { PB_API } from '@services/api.js';
 import * as Utils from '@scripts/utils.js';
 import * as Auth from '@services/auth.js';
-import { ROUTES } from '@scripts/routes.js';
+import { ROUTE_PATHS } from '@scripts/routes.js';
 import { printMachineScores } from '@ui/printing.js';
 
 vi.mock('@services/api.js', () => ({
@@ -32,16 +32,11 @@ vi.mock('@scripts/utils.js', () => ({
   escapeHTML: vi.fn(str => str),
   applyScoreFormatting: vi.fn(),
   formatNumber: (n) => String(n),
-  navigateTo: vi.fn(),
+  loadPage: vi.fn(), // Changed from navigateTo
   getCookie: vi.fn(() => 'bowling'),
 }));
 
 vi.mock('@scripts/routes.js', () => ({
-  ROUTES: {
-    HOME: () => '/',
-    LEAGUES: (id) => `/leagues?id=${id}`,
-    LEAGUE_SETUP: (o) => `/setup?l=${o.leagueId}&e=${o.eventId}`
-  },
   ROUTE_PATHS: {
     HOME: () => '/',
     LEAGUES: (id) => `/leagues?id=${id}`,
@@ -173,7 +168,7 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
     Auth.isManagementAuthorized.mockResolvedValue(false);
     await initEventSetupPage();
     expect(uiMocks.showAlert).toHaveBeenCalledWith(expect.stringContaining('Unauthorized'), 'Access Denied');
-    expect(Utils.navigateTo).toHaveBeenCalledWith('/');
+    expect(Utils.loadPage).toHaveBeenCalledWith(ROUTE_PATHS.HOME()); // Changed assertion
   });
 
   it('should load machine suggestions and targets on init', async () => {
@@ -285,6 +280,6 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
   it('should navigate back to leagues when "Done" is clicked', async () => {
     await initEventSetupPage();
     document.getElementById('done-setup-btn').click();
-    expect(Utils.navigateTo).toHaveBeenCalled();
+    expect(Utils.loadPage).toHaveBeenCalledWith(ROUTE_PATHS.LEAGUES(Utils.getActiveLeagueId())); // Changed assertion
   });
 });

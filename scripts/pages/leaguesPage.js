@@ -1,10 +1,10 @@
 import { PB_API } from '@services/api.js';
 import { isManagementAuthorized, runAuthorizedLeagueAction } from '@services/auth.js';
-import { getCookie, getActiveLeagueId, setActiveLeagueId, setActiveEventId, navigateTo, escapeHTML } from '@scripts/utils.js';
+import { getCookie, getActiveLeagueId, setActiveLeagueId, setActiveEventId, loadPage, escapeHTML } from '@scripts/utils.js';
 import { SCORING_FORMATS } from '@core/engine.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
-import { ROUTES } from '@scripts/routes.js';
+import { ROUTE_PATHS } from '@scripts/routes.js';
 import { showPlayerSelectionDialog, showConfirm } from '@ui/dialogs.js';
 
 /**
@@ -351,7 +351,7 @@ export async function initLeaguesPage() {
         const eventId = Number(btn.dataset.eventId);
         setActiveLeagueId(leagueId);
         setActiveEventId(eventId);
-        navigateTo(ROUTES.LEAGUE_SETUP({ leagueId, eventId }));
+        loadPage(ROUTE_PATHS.LEAGUE_SETUP({ leagueId, eventId }));
       };
     });
     eventsListEl.querySelectorAll('.edit-event-btn').forEach(btn => {

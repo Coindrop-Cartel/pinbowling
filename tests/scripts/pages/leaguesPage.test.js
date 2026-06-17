@@ -47,13 +47,8 @@ vi.mock('@scripts/utils.js', async (importOriginal) => {
     setActiveLeagueId: vi.fn((id) => { mockLeagueState.activeId = id; }),
     setActiveEventId: vi.fn(),
     getActiveLeagueId: vi.fn(() => mockLeagueState.activeId),
-    navigateTo: vi.fn(),
+    loadPage: vi.fn(),
     getCookie: vi.fn(() => 'bowling'), // Mock getCookie to return a default value for tests
-    ROUTES: {
-      HOME: '/',
-      LEAGUE_SETUP: (o) => `/setup?l=${o.leagueId}&e=${o.eventId}`,
-      LEAGUES: (id) => `/leagues?id=${id}`
-    }
   };
 });
 
@@ -107,11 +102,11 @@ vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn()
 }));
 vi.mock('@scripts/routes.js', () => ({
-  ROUTES: {
-    HOME: '/',
-    LEAGUE_SETUP: (o) => `/eventSetup?leagueId=${o.leagueId}&eventId=${o.eventId}`,
+  ROUTE_PATHS: {
+    HOME: () => '/',
+    LEAGUE_SETUP: (o) => `/setup?leagueId=${o.leagueId}&eventId=${o.eventId}`,
     LEAGUES: (id) => `/leagues?id=${id}`
-  }
+  },
 }));
 
 vi.mock('@ui/selectors.js', () => uiMocks);
@@ -121,6 +116,7 @@ vi.mock('@ui/branding.js', () => uiMocks);
 import { initLeaguesPage } from '@scripts/pages/leaguesPage.js';
 import { PB_API } from '@services/api.js';
 import { isManagementAuthorized } from '@services/auth.js';
+import { ROUTE_PATHS } from '@scripts/routes.js';
 import { showConfirm, showPlayerSelectionDialog } from '@ui/dialogs.js';
 
 describe('Leagues Page (leaguesPage.js)', () => {
@@ -657,10 +653,10 @@ describe('Leagues Page (leaguesPage.js)', () => {
     const setupBtn = document.querySelector('.setup-event-btn');
     setupBtn.click();
 
-    const { setActiveLeagueId, setActiveEventId, navigateTo } = await import('@scripts/utils.js');
+    const { setActiveLeagueId, setActiveEventId, loadPage } = await import('@scripts/utils.js'); // Changed navigateTo to loadPage
     expect(setActiveLeagueId).toHaveBeenCalledWith(1);
     expect(setActiveEventId).toHaveBeenCalledWith(50);
-    expect(navigateTo).toHaveBeenCalled();
+    expect(loadPage).toHaveBeenCalledWith(ROUTE_PATHS.LEAGUE_SETUP({ leagueId: 1, eventId: 50 })); // Changed assertion
   });
 
   it('should update league header stats for team leagues', async () => {

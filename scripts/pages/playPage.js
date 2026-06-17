@@ -5,6 +5,7 @@ import { getCookie, formatNumber, applyScoreFormatting, loadPage, renderThreshol
 import { applyPreferredTheme } from '@ui/branding.js';
 import { createExpandableRow, setupSortableList, createSearchableSelect } from '@ui/selectors.js';
 import { showPlayerSelectionDialog } from '@ui/dialogs.js';
+import { ROUTE_PATHS } from '@scripts/routes.js';
 import { generatePars, generateSessionName, selectRandomMachines, getTargetScoreForDifficulty } from '@services/sessionGenerator.js';
 
 /**
@@ -123,12 +124,12 @@ export async function initPlayPage() {
           </div>
         `,
         contentHtml: '',
-        onHeaderClick: () => loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}`)
+        onHeaderClick: () => loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, leagueId: event.leagueId }))
       });
 
       row.querySelector('.scoreboard-btn').onclick = (e) => {
         e.stopPropagation();
-        loadPage(`standings?eventId=${event.id}&leagueId=${event.leagueId}`);
+        loadPage(ROUTE_PATHS.STANDINGS({ eventId: event.id, leagueId: event.leagueId }));
       };
 
       row.querySelector('.play-btn').onclick = async (e) => {
@@ -161,7 +162,7 @@ export async function initPlayPage() {
               const result = await PB_API.leagues.addPlayer(event.leagueId, Number(selectedId));
               if (result.error) throw new Error(result.error);
             }
-            loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`);
+            loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, leagueId: event.leagueId, playerId: selectedId }));
           } catch (err) {
             console.error('[Play] Failed to join session:', err);
             const message = err?.message || String(err);
@@ -550,14 +551,11 @@ export async function initPlayPage() {
       // Redirect to the scoring page for the new session.
       // If the user has a player profile, auto-join them and pre-select them.
       const currentUser = await PB_API.auth.me();
-      let redirectUrl = `scores?eventId=${event.id}&leagueId=${qpLeague.id}`;
-      
       if (currentUser?.player_id) {
         await PB_API.leagues.addPlayer(qpLeague.id, currentUser.player_id);
-        redirectUrl += `&playerId=${currentUser.player_id}`;
       }
 
-      loadPage(redirectUrl);
+      loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, leagueId: qpLeague.id, playerId: currentUser?.player_id }));
 
     } catch (err) {
       console.error(err);

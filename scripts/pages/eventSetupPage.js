@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { isManagementAuthorized, requireAdmin } from '@services/auth.js';
 import { showAlert } from '@ui/dialogs.js';
-import { navigateTo, getActiveEventId, getActiveLeagueId, renderPreview, formatNumber, applyScoreFormatting, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
+import { loadPage, getActiveEventId, getActiveLeagueId, renderPreview, formatNumber, applyScoreFormatting, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
 import { applyPreferredTheme } from '@ui/branding.js'; // Import for filtering
 import { ROUTE_PATHS } from '@scripts/routes.js';
 import { getScoringEngine } from '@core/engine.js';
@@ -28,7 +28,7 @@ export async function initEventSetupPage() {
 
   if (!authorized) {
     showAlert('Unauthorized: Management access is required to view the setup page.', 'Access Denied');
-    navigateTo(ROUTE_PATHS.HOME());
+    loadPage(ROUTE_PATHS.HOME());
     return;
   }
 
@@ -89,7 +89,7 @@ export async function initEventSetupPage() {
   const doneBtn = document.getElementById('done-setup-btn');
   if (doneBtn) {
     doneBtn.addEventListener('click', () => {
-      navigateTo(ROUTE_PATHS.LEAGUES(getActiveLeagueId()));
+      loadPage(ROUTE_PATHS.LEAGUES(getActiveLeagueId()));
     });
   }
 

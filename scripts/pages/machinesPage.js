@@ -2,7 +2,6 @@ import { PB_API } from '@services/api.js';
 import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
 import { showConfirm, showAlert } from '@ui/dialogs.js';
 import { requireAdmin } from '@services/auth.js';
-import { ROUTES } from '@scripts/routes.js';
 import { escapeHTML } from '@scripts/utils.js';
 
 /**

@@ -1,8 +1,8 @@
 import { PB_API } from '@services/api.js';
 import { can, PERMISSIONS } from '@services/auth.js';
 import { showAlert, showAuthDialog, showConfirm, showPrompt } from '@ui/dialogs.js';
-import { ROUTES, ROUTE_PATHS } from '@scripts/routes.js';
-import { navigateTo, escapeHTML } from '@scripts/utils.js';
+import { ROUTE_PATHS } from '@scripts/routes.js';
+import { loadPage, escapeHTML } from '@scripts/utils.js';
 import { renderActionSummary } from '@ui/selectors.js';
 import { setDebugEnabled } from '@services/state.js';
 
@@ -35,7 +35,7 @@ export async function initManagementPage() {
     } else if (user) {
       // Logged in but not an admin? Shoo!
       showAlert('Administrator access is required for system maintenance.', 'Access Denied');
-      navigateTo(ROUTE_PATHS.HOME());
+      loadPage(ROUTE_PATHS.HOME());
       return;
     }
     renderVersionInfo();
