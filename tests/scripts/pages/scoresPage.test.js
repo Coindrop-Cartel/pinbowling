@@ -27,6 +27,7 @@ vi.mock('@scripts/utils.js', () => ({
   formatNumber: (n) => String(n),
   applyScoreFormatting: vi.fn(),
   renderThresholdGrid: vi.fn(() => 'Grid'),
+  loadPage: vi.fn(), // Added mock for loadPage
   escapeHTML: vi.fn(str => str), // Mock escapeHTML
 }));
 

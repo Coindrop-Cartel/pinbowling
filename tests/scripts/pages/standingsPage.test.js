@@ -37,6 +37,7 @@ vi.mock('@scripts/utils.js', () => ({
   getActiveEventId: vi.fn(),
   getActiveLeagueId: vi.fn(),
   setActiveEventId: vi.fn(),
+  loadPage: vi.fn(), // Added mock for loadPage
   formatNumber: vi.fn(n => n?.toLocaleString() || '0'),
   escapeHTML: vi.fn(str => str), // Mock escapeHTML
 }));
