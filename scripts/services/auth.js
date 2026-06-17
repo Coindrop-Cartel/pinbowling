@@ -311,16 +311,10 @@ export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues,
       return { access: 'denied', reason: reasonForDenial, lockedBalls };
     }
 
-    // Check if the current user can add scores to any *empty* balls for the target player.
-    // This is for scenarios where not all balls are filled.
-    let canUserAddScore = false;
-    if (!isCurrentUserRegistered) {
-      // Unregistered user can only score other unregistered players.
-      canUserAddScore = isTargetUnregistered;
-    } else {
-      // Registered user can score themselves or unregistered players.
-      canUserAddScore = (isSelf && canUpdateSelf) || isTargetUnregistered;
-    }
+    // A user can add a score if the target is an unregistered guest,
+    // or if they are scoring themselves and have the 'UPDATE_SELF' permission.
+    // This collapses the registration check as 'isSelf' is only true for registered users.
+    const canUserAddScore = isTargetUnregistered || (isSelf && canUpdateSelf);
 
     if (!canUserAddScore) {
       // If the user cannot add any scores at all (e.g., registered user trying to score another *registered* player).
