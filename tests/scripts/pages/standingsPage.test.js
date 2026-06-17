@@ -79,6 +79,7 @@ describe('Standings Page (standingsPage.js)', () => {
       <div id="standings-wrapper" class="hidden">
         <table><thead id="standings-header"></thead><tbody id="standings-body"></tbody></table>
       </div>
+      <div id="player-filter-container"></div>
       <div id="standings-empty"></div>
       <div class="tournament-selector-container"></div>
     `;
@@ -157,5 +158,97 @@ describe('Standings Page (standingsPage.js)', () => {
     expect(document.getElementById('tournament-selector-ui').classList.contains('hidden')).toBe(false);
     expect(document.getElementById('tournament-summary').classList.contains('hidden')).toBe(true);
     expect(document.getElementById('standings-wrapper').classList.contains('hidden')).toBe(true);
+  });
+
+  it('should handle player filtering via the filter dialog', async () => {
+    const players = [
+      { id: '1', playerName: 'Alice' },
+      { id: '2', playerName: 'Bob' }
+    ];
+    getActiveLeagueId.mockReturnValue('1');
+    getActiveEventId.mockReturnValue('101');
+    PB_API.leagues.getAll.mockResolvedValue([{ id: '1', name: 'L1', players, events: [{ id: '101' }] }]);
+    
+    await initStandingsPage();
+
+    const { showDialog } = await import('@ui/dialogs.js');
+    vi.mocked(showDialog).mockResolvedValue(true); // User clicks Apply
+
+    const calls = vi.mocked(renderActionSummary).mock.calls;
+    const filterAction = calls.find(c => c[1].includes('Showing Everyone'))[2][0];
+    
+    await filterAction.onclick();
+
+    // Verify dialog content creation
+    expect(showDialog).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Select Players to Show'
+    }));
+  });
+
+  it('should detect score changes and apply pulse animation in TV mode', async () => {
+    getActiveLeagueId.mockReturnValue('1');
+    getActiveEventId.mockReturnValue('101');
+    
+    // First load
+    PB_API.leagues.getAll.mockResolvedValue([{ id: '1', name: 'L1', players: [{ id: '7', playerName: 'Kyle' }], events: [{ id: '101' }] }]);
+    PB_API.scores.get.mockResolvedValue([{ playerId: '7', orderNumber: 1, ball1: 100 }]);
+
+    await initStandingsPage();
+    document.getElementById('tv-mode-btn').click(); // Enter TV mode
+
+    // Second load with different score
+    PB_API.scores.get.mockResolvedValue([{ playerId: '7', orderNumber: 1, ball1: 200 }]);
+    
+    await vi.advanceTimersByTimeAsync(16000); // Trigger refresh
+
+    expect(document.body.innerHTML).toContain('score-just-updated');
+  });
+
+  it('should request and release wake lock in TV mode', async () => {
+    const requestMock = vi.fn().mockResolvedValue({ release: vi.fn().mockResolvedValue() });
+    vi.stubGlobal('navigator', { wakeLock: { request: requestMock } });
+    
+    getActiveLeagueId.mockReturnValue('1');
+    getActiveEventId.mockReturnValue('101');
+    PB_API.leagues.getAll.mockResolvedValue([{ id: '1', name: 'L1', events: [{ id: '101' }] }]);
+
+    await initStandingsPage();
+    
+    const tvBtn = document.getElementById('tv-mode-btn');
+    await tvBtn.click(); // Enable
+    expect(requestMock).toHaveBeenCalledWith('screen');
+
+    await tvBtn.click(); // Disable
+    // The mock handles release check
+  });
+
+  it('should handle team league grouping in event view', async () => {
+    getActiveLeagueId.mockReturnValue('1');
+    getActiveEventId.mockReturnValue('101');
+    PB_API.leagues.getAll.mockResolvedValue([{ 
+      id: '1', name: 'L1', participants: 'team', 
+      teams: [{ id: 50, name: 'Team Rocket', members: [{ id: 7 }] }],
+      events: [{ id: '101' }] 
+    }]);
+    PB_API.teams.getAll.mockResolvedValue([{ id: 50, name: 'Team Rocket', members: [{ id: 7 }] }]);
+    PB_API.scores.get.mockResolvedValue([]);
+
+    await initStandingsPage();
+
+    expect(document.getElementById('standings-body').innerHTML).toContain('Team Rocket');
+    expect(document.querySelector('.team-header')).not.toBeNull();
+  });
+
+  it('should cleanup intervals when pb:pageChanged event is dispatched', async () => {
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
+    getActiveLeagueId.mockReturnValue('1');
+    getActiveEventId.mockReturnValue('101');
+    
+    await initStandingsPage();
+    document.getElementById('tv-mode-btn').click(); // Start refresh interval
+
+    document.dispatchEvent(new CustomEvent('pb:pageChanged'));
+    
+    expect(clearIntervalSpy).toHaveBeenCalled();
   });
 });

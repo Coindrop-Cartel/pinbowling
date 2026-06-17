@@ -49,7 +49,6 @@ export async function initStandingsPage() {
   const stopAutoScroll = () => {
     if (scrollInterval) {
       cancelAnimationFrame(scrollInterval);
-      clearInterval(scrollInterval);
       scrollInterval = null;
     }
   };
@@ -143,7 +142,7 @@ export async function initStandingsPage() {
   const cleanup = () => {
     if (window.PB_DEBUG_MODE) console.log('[Standings] Cleaning up intervals and body classes');
     if (refreshInterval) clearInterval(refreshInterval);
-    if (scrollInterval) clearInterval(scrollInterval);
+    stopAutoScroll();
     if (wakeLock) wakeLock.release().catch(() => {});
     document.body.classList.remove('tv-mode-active');
   };

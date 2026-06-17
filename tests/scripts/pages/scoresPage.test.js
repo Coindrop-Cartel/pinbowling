@@ -1,18 +1,21 @@
 /** @vitest-environment jsdom */
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { initScoresPage } from '@pages/scoresPage.js';
 import { PB_API } from '@services/api.js';
 import * as Utils from '@scripts/utils.js';
+import { getScoreAccessLevel } from '@services/auth.js';
+import { showAlert } from '@ui/dialogs.js';
+import { printBlankScoreSheet } from '@ui/printing.js';
 
 vi.mock('@services/api.js', () => ({
   PB_API: {
+    auth: { me: vi.fn() },
     leagues: {
       getAll: vi.fn(),
     },
     players: { getAll: vi.fn().mockResolvedValue([]) },
     machines: { getTargets: vi.fn() },
     scores: { get: vi.fn(), save: vi.fn() },
-    auth: { me: vi.fn() },
   },
 }));
 
@@ -54,13 +57,25 @@ vi.mock('@core/engine.js', () => ({
     getPrimaryTargetLabel: () => 'Strike',
     getBonusTargetHtml: () => '',
     getRowSummaryHtml: vi.fn(() => '<div>Summary</div>'),
-    getMarkFormatting: vi.fn((mark, par) => (mark === 10 ? 'golf-eagle' : '')), // Mock some formatting
+    getMarkFormatting: vi.fn((mark) => (mark === 10 ? 'golf-eagle' : '')),
     formatMark: vi.fn((turn) => turn.mark),
     filterThresholds: vi.fn(v => v),
     formatTotalScore: vi.fn((t) => String(t)),
     getLastFrameHint: vi.fn(() => ''),
   })),
 }));
+
+vi.mock('@ui/printing.js', () => ({
+  printBlankScoreSheet: vi.fn(),
+}));
+
+vi.mock('@ui/dialogs.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    showAlert: vi.fn(),
+  };
+});
 
 vi.mock('@ui/selectors.js', async (importOriginal) => {
   const actual = await importOriginal();

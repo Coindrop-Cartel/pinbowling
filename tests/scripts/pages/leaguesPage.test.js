@@ -62,8 +62,19 @@ const uiMocks = vi.hoisted(() => ({
     let currentData = typeof data === 'function' ? data() : data;
     const filterInstance = {
       setData: vi.fn((newData) => { currentData = newData; }),
-      performFilter: () => options.onFilter(currentData, (input ? input.value || '' : '').toLowerCase())
+      performFilter: () => {
+        const query = (input ? input.value || '' : '').toLowerCase();
+        const filtered = currentData.filter(item => {
+          const label = item[options.labelKey] || '';
+          return label.toLowerCase().includes(query);
+        });
+        options.onFilter(filtered, query);
+      }
     };
+    // Add input event listener to trigger filtering on input changes
+    if (input) {
+      input.addEventListener('input', () => filterInstance.performFilter());
+    }
     return filterInstance;
   }),
   showConfirm: vi.fn(),
@@ -95,6 +106,14 @@ vi.mock('@core/engine.js', () => ({
   ],
   getScoringEngine: vi.fn()
 }));
+vi.mock('@scripts/routes.js', () => ({
+  ROUTES: {
+    HOME: '/',
+    LEAGUE_SETUP: (o) => `/eventSetup?leagueId=${o.leagueId}&eventId=${o.eventId}`,
+    LEAGUES: (id) => `/leagues?id=${id}`
+  }
+}));
+
 vi.mock('@ui/selectors.js', () => uiMocks);
 vi.mock('@ui/dialogs.js', () => uiMocks);
 vi.mock('@ui/branding.js', () => uiMocks);
@@ -109,6 +128,8 @@ describe('Leagues Page (leaguesPage.js)', () => {
     // Mock layout methods not implemented in JSDOM
     vi.stubGlobal('alert', vi.fn());
     vi.stubGlobal('scrollTo', vi.fn());
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
     Element.prototype.scrollIntoView = vi.fn();
     vi.useFakeTimers();
 
@@ -159,6 +180,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('should handle unauthorized access by hiding management tools', async () => {
@@ -256,5 +278,414 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
     expect(showConfirm).toHaveBeenCalled();
     await vi.waitFor(() => expect(PB_API.leagues.removePlayer).toHaveBeenCalledWith(1, 10));
+  });
+
+  it('should populate form fields when editing a league', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const mockLeague = { id: 5, name: 'EditMe', startDate: '2024-06-01', scoringFormat: 'golf', participants: 'team', seasonScoring: 'cumulative', dropLowestWeeks: 2, players: [], events: [] };
+    PB_API.leagues.getAll.mockResolvedValue([mockLeague]);
+    PB_API.players.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+
+    const editBtn = document.querySelector('.edit-league-btn');
+    editBtn.click();
+
+    expect(document.getElementById('league-name').value).toBe('EditMe');
+    expect(document.getElementById('league-start-date').value).toBe('2024-06-01');
+    expect(document.getElementById('league-form-title').textContent).toContain('Edit League');
+    expect(document.getElementById('create-league-btn').textContent).toBe('Update League');
+    expect(document.getElementById('league-date-row').classList.contains('hidden')).toBe(false);
+  });
+
+  it('should call PB_API.leagues.update when editing and submitting', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const mockLeague = { id: 5, name: 'EditMe', startDate: '2024-06-01', scoringFormat: 'bowling', participants: 'individual', seasonScoring: 'weekly', dropLowestWeeks: 0, players: [], events: [] };
+    PB_API.leagues.getAll.mockResolvedValue([mockLeague]);
+    PB_API.players.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+
+    // Click edit to populate form
+    document.querySelector('.edit-league-btn').click();
+
+    // Submit the form
+    document.getElementById('league-form').dispatchEvent(new Event('submit'));
+
+    await vi.waitFor(() => {
+      expect(PB_API.leagues.update).toHaveBeenCalledWith(5, expect.objectContaining({ name: 'EditMe' }));
+    });
+  });
+
+  it('should reset form when cancel is clicked during edit', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const mockLeague = { id: 5, name: 'EditMe', startDate: '2024-06-01', scoringFormat: 'bowling', players: [], events: [] };
+    PB_API.leagues.getAll.mockResolvedValue([mockLeague]);
+    PB_API.players.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+
+    // Click edit
+    document.querySelector('.edit-league-btn').click();
+    expect(document.getElementById('league-form-title').textContent).toContain('Edit League');
+
+    // Click cancel (toggle acts as cancel when form is open)
+    document.getElementById('create-league-toggle').click();
+
+    expect(document.getElementById('league-form-title').textContent).toBe('Create League');
+    expect(document.getElementById('create-league-btn').textContent).toBe('Save League');
+  });
+
+  it('should delete a league after confirmation', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'ToDelete', players: [], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    showConfirm.mockResolvedValue(true);
+
+    await initLeaguesPage();
+
+    const deleteBtn = document.querySelector('.delete-league-btn');
+    deleteBtn.click();
+
+    expect(showConfirm).toHaveBeenCalledWith(expect.stringContaining('ToDelete'), 'Delete League');
+    await vi.waitFor(() => expect(PB_API.leagues.delete).toHaveBeenCalledWith(1));
+  });
+
+  it('should not delete a league if confirmation is denied', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'KeepMe', players: [], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    showConfirm.mockResolvedValue(false);
+
+    await initLeaguesPage();
+
+    document.querySelector('.delete-league-btn').click();
+
+    expect(showConfirm).toHaveBeenCalled();
+    // Give a tick for any async to settle
+    await vi.waitFor(() => expect(PB_API.leagues.delete).not.toHaveBeenCalled());
+  });
+
+  it('should delete an event after confirmation and update local data', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const mockLeague = { id: 1, name: 'L1', players: [], events: [{ id: 50, eventName: 'E1', eventDate: '2024-01-01' }] };
+    PB_API.leagues.getAll.mockResolvedValue([mockLeague]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    showConfirm.mockResolvedValue(true);
+
+    await initLeaguesPage();
+    document.querySelector('.league-header').click(); // Expand
+
+    const deleteEventBtn = document.querySelector('.delete-event-btn');
+    expect(deleteEventBtn).not.toBeNull();
+    deleteEventBtn.click();
+
+    expect(showConfirm).toHaveBeenCalledWith(expect.stringContaining('L1'), 'Delete Event');
+    await vi.waitFor(() => expect(PB_API.events.delete).toHaveBeenCalledWith(50, 1));
+  });
+
+  it('should show event form in create mode', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', players: [], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    PB_API.locations.getAll.mockResolvedValue([{ id: 10, name: 'Main St' }]);
+
+    await initLeaguesPage();
+    document.querySelector('.league-header').click(); // Expand
+
+    const addEventBtn = document.querySelector('.add-event-btn');
+    addEventBtn.click();
+
+    expect(document.getElementById('event-form-card').classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('event-form-title').innerHTML).toContain('Add Event');
+    expect(document.getElementById('event-id').value).toBe('');
+  });
+
+  it('should show event form in edit mode with pre-populated fields', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const mockLeague = { id: 1, name: 'L1', players: [], events: [{ id: 50, eventName: 'MyEvent', eventDate: '2024-03-15', scoringFormat: 'golf', locationId: 10 }] };
+    PB_API.leagues.getAll.mockResolvedValue([mockLeague]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    PB_API.locations.getAll.mockResolvedValue([{ id: 10, name: 'Main St' }]);
+
+    await initLeaguesPage();
+    document.querySelector('.league-header').click(); // Expand
+
+    const editEventBtn = document.querySelector('.edit-event-btn');
+    editEventBtn.click();
+
+    expect(document.getElementById('event-form-card').classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('event-form-title').innerHTML).toContain('Edit Event');
+    expect(document.getElementById('event-name').value).toBe('MyEvent');
+    expect(document.getElementById('event-date').value).toBe('2024-03-15');
+  });
+
+  it('should cancel event edit and hide form', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', players: [], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    PB_API.locations.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+    document.querySelector('.league-header').click(); // Expand
+
+    // Show event form
+    document.querySelector('.add-event-btn').click();
+    expect(document.getElementById('event-form-card').classList.contains('hidden')).toBe(false);
+
+    // Cancel
+    document.getElementById('cancel-event-edit').click();
+    expect(document.getElementById('event-form-card').classList.contains('hidden')).toBe(true);
+  });
+
+  it('should create a new event on event form submit', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', players: [], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    PB_API.locations.getAll.mockResolvedValue([]);
+    PB_API.events.create.mockResolvedValue({ id: 99 });
+
+    await initLeaguesPage();
+    document.querySelector('.league-header').click(); // Expand
+
+    // Show event form
+    document.querySelector('.add-event-btn').click();
+
+    document.getElementById('event-name').value = 'New Event';
+    document.getElementById('event-date').value = '2024-05-01';
+    document.getElementById('event-form').dispatchEvent(new Event('submit'));
+
+    await vi.waitFor(() => {
+      expect(PB_API.events.create).toHaveBeenCalledWith(expect.objectContaining({
+        leagueId: '1',
+        eventName: 'New Event',
+        eventDate: '2024-05-01'
+      }));
+    });
+  });
+
+  it('should update an existing event on event form submit', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const mockLeague = { id: 1, name: 'L1', players: [], events: [{ id: 50, eventName: 'OldEvent', eventDate: '2024-01-01', scoringFormat: 'bowling' }] };
+    PB_API.leagues.getAll.mockResolvedValue([mockLeague]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    PB_API.locations.getAll.mockResolvedValue([]);
+    PB_API.events.update.mockResolvedValue({ id: 50 });
+
+    await initLeaguesPage();
+    document.querySelector('.league-header').click(); // Expand
+
+    // Click edit event
+    document.querySelector('.edit-event-btn').click();
+
+    document.getElementById('event-name').value = 'Updated Event';
+    document.getElementById('event-form').dispatchEvent(new Event('submit'));
+
+    await vi.waitFor(() => {
+      expect(PB_API.events.update).toHaveBeenCalledWith('50', expect.objectContaining({
+        eventName: 'Updated Event'
+      }));
+    });
+  });
+
+  it('should add a team to a league via selection dialog', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', participants: 'team', teams: [], players: [], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    PB_API.teams.getAll.mockResolvedValue([{ id: 20, name: 'TeamA', city: 'NYC' }]);
+    showPlayerSelectionDialog.mockResolvedValue('20');
+
+    await initLeaguesPage();
+    document.querySelector('.league-header').click(); // Expand
+
+    const addTeamBtn = document.querySelector('.add-team-btn');
+    addTeamBtn.click();
+
+    await vi.waitFor(() => {
+      expect(PB_API.teams.addToLeague).toHaveBeenCalledWith(1, 20);
+    });
+  });
+
+  it('should alert when all teams are already in the league', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const existingTeam = { id: 20, name: 'TeamA', city: 'NYC' };
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', participants: 'team', teams: [existingTeam], players: [], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    PB_API.teams.getAll.mockResolvedValue([existingTeam]);
+
+    await initLeaguesPage();
+    document.querySelector('.league-header').click(); // Expand
+
+    document.querySelector('.add-team-btn').click();
+
+    await vi.waitFor(() => {
+      expect(alert).toHaveBeenCalledWith(expect.stringContaining('already in this league'));
+    });
+  });
+
+  it('should remove a team from a league after confirmation', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', participants: 'team', teams: [{ id: 20, name: 'TeamA', city: 'NYC' }], players: [], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    showConfirm.mockResolvedValue(true);
+
+    await initLeaguesPage();
+    document.querySelector('.league-header').click(); // Expand
+
+    const removeTeamBtn = document.querySelector('.remove-team-btn');
+    removeTeamBtn.click();
+
+    expect(showConfirm).toHaveBeenCalled();
+    await vi.waitFor(() => expect(PB_API.teams.removeFromLeague).toHaveBeenCalledWith(1, 20));
+  });
+
+  it('should alert when all players are already in the league', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const existingPlayer = { id: 10, playerName: 'Kyle' };
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', players: [existingPlayer], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([existingPlayer]);
+
+    await initLeaguesPage();
+    document.querySelector('.league-header').click(); // Expand
+
+    document.querySelector('.add-player-btn').click();
+
+    expect(alert).toHaveBeenCalledWith(expect.stringContaining('already in this league'));
+  });
+
+  it('should hide create toggle when duplicate league name exists', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'Existing League', players: [], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+
+    // Type a name that matches an existing league
+    const nameInput = document.getElementById('league-name');
+    nameInput.value = 'Existing League';
+    nameInput.dispatchEvent(new Event('input'));
+
+    const toggle = document.getElementById('create-league-toggle');
+    expect(toggle.classList.contains('hidden')).toBe(true);
+  });
+
+  it('should show create toggle when name is unique', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'Existing League', players: [], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+
+    const nameInput = document.getElementById('league-name');
+    nameInput.value = 'New Unique Name';
+    nameInput.dispatchEvent(new Event('input'));
+
+    const toggle = document.getElementById('create-league-toggle');
+    expect(toggle.classList.contains('hidden')).toBe(false);
+  });
+
+  it('should disable create button when name matches existing league', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'Existing League', players: [], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+
+    const nameInput = document.getElementById('league-name');
+    nameInput.value = 'Existing League';
+    nameInput.dispatchEvent(new Event('input'));
+
+    const createBtn = document.getElementById('create-league-btn');
+    expect(createBtn.disabled).toBe(true);
+  });
+
+  it('should show empty notice when no leagues exist', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.players.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+
+    const emptyNotice = document.getElementById('leagues-list-empty');
+    expect(emptyNotice.classList.contains('hidden')).toBe(false);
+    expect(emptyNotice.textContent).toContain('No leagues created yet');
+  });
+
+  it('should show no matching leagues when filter has no results', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'Alpha', players: [], events: [] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+
+    const nameInput = document.getElementById('league-name');
+    nameInput.value = 'ZZZ';
+    nameInput.dispatchEvent(new Event('input'));
+
+    const emptyNotice = document.getElementById('leagues-list-empty');
+    expect(emptyNotice.classList.contains('hidden')).toBe(false);
+    expect(emptyNotice.textContent).toContain('No matching leagues found');
+  });
+
+  it('should show alert on league creation failure', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    PB_API.leagues.create.mockRejectedValue(new Error('Server error'));
+
+    await initLeaguesPage();
+
+    document.getElementById('league-name').value = 'New League';
+    document.getElementById('league-start-date').value = '2024-01-01';
+    document.getElementById('league-name').dispatchEvent(new Event('input'));
+
+    document.getElementById('league-form').dispatchEvent(new Event('submit'));
+
+    await vi.waitFor(() => {
+      expect(alert).toHaveBeenCalledWith(expect.stringContaining('Server error'));
+    });
+  });
+
+  it('should navigate to setup when Setup event button is clicked', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', players: [], events: [{ id: 50, eventName: 'E1', eventDate: '2024-01-01' }] }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+    document.querySelector('.league-header').click(); // Expand
+
+    const setupBtn = document.querySelector('.setup-event-btn');
+    setupBtn.click();
+
+    const { setActiveLeagueId, setActiveEventId, navigateTo } = await import('@scripts/utils.js');
+    expect(setActiveLeagueId).toHaveBeenCalledWith(1);
+    expect(setActiveEventId).toHaveBeenCalledWith(50);
+    expect(navigateTo).toHaveBeenCalled();
+  });
+
+  it('should update league header stats for team leagues', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', participants: 'team', teams: [{ id: 1, name: 'T1' }], players: [], events: [{ id: 1 }], seasonScoring: 'weekly', dropLowestWeeks: 2 }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+
+    const small = document.querySelector('.league-header small');
+    expect(small.textContent).toContain('Team');
+    expect(small.textContent).toContain('Teams: 1');
+    expect(small.textContent).toContain('Drop: 2');
+  });
+
+  it('should update league header stats for individual leagues', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', participants: 'individual', players: [{ id: 1, playerName: 'P1' }], teams: [], events: [], seasonScoring: 'cumulative', dropLowestWeeks: 0 }]);
+    PB_API.players.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+
+    const small = document.querySelector('.league-header small');
+    expect(small.textContent).toContain('Individual');
+    expect(small.textContent).toContain('Players: 1');
+    expect(small.textContent).toContain('Cumulative');
   });
 });
