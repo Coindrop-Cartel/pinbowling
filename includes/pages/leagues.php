@@ -3,79 +3,79 @@
     <header>
       <h1>Leagues & Events Management</h1>
     </header>
-
-    <section class="card">
-      <form id="league-form" autocomplete="off">
+ 
+    <section class="card" data-testid="league-form-card">
+      <form id="league-form" autocomplete="off" data-testid="league-form">
         <div class="form-row">
           <label for="league-name">League Name</label>
-          <input id="league-name" type="text" placeholder="e.g., Summer 2024 League" required />
-          <button id="create-league-toggle" type="button" class="secondary btn-mgmt mt-10">Create League</button>
+          <input id="league-name" data-testid="league-name-input" type="text" placeholder="e.g., Summer 2024 League" required />
+          <button id="create-league-toggle" data-testid="create-league-toggle" type="button" class="secondary btn-mgmt mt-10">Create League</button>
         </div>
-        <div id="league-date-row" class="form-row hidden">
+        <div id="league-date-row" data-testid="league-date-row" class="form-row hidden">
           <label for="league-start-date">Start Date</label>
-          <input id="league-start-date" type="date" required />
+          <input id="league-start-date" data-testid="league-start-date-input" type="date" required />
         </div>
-        <div id="league-participants-row" class="form-row hidden">
+        <div id="league-participants-row" data-testid="league-participants-row" class="form-row hidden">
           <label for="league-participants">League Type</label>
-          <select id="league-participants">
+          <select id="league-participants" data-testid="league-participants-select">
             <option value="individual" selected>Individual</option>
             <option value="team">Team</option>
           </select>
         </div>
-        <div id="league-format-row" class="form-row hidden">
+        <div id="league-format-row" data-testid="league-format-row" class="form-row hidden">
           <label for="league-scoring-format">Default Scoring Format</label>
-          <select id="league-scoring-format"></select>
+          <select id="league-scoring-format" data-testid="league-scoring-format-select"></select>
         </div>
-        <div id="league-season-scoring-row" class="form-row hidden">
+        <div id="league-season-scoring-row" data-testid="league-season-scoring-row" class="form-row hidden">
           <label for="league-season-scoring">Season Scoring</label>
-          <select id="league-season-scoring"></select>
+          <select id="league-season-scoring" data-testid="league-season-scoring-select"></select>
         </div>
-        <div id="league-drop-weeks-row" class="form-row hidden">
+        <div id="league-drop-weeks-row" data-testid="league-drop-weeks-row" class="form-row hidden">
           <label for="league-drop-weeks">Drop Lowest Weeks</label>
-          <input id="league-drop-weeks" type="number" min="0" value="0" />
+          <input id="league-drop-weeks" data-testid="league-drop-weeks-input" type="number" min="0" value="0" />
         </div>
-        <div class="form-actions hidden">
-          <button type="submit" id="create-league-btn" class="btn-mgmt" disabled>Create League</button>
+        <div class="form-actions hidden" data-testid="league-form-actions">
+          <button type="submit" id="create-league-btn" data-testid="create-league-button" class="btn-mgmt" disabled>Create League</button>
         </div>
       </form>
     </section>
-
-    <section class="card">
+ 
+    <section class="card" data-testid="leagues-list-card">
       <h2>Leagues</h2>
-      <div id="leagues-list-empty" class="notice">No leagues created yet.</div>
-      <div id="leagues-list">
+      <div id="leagues-list-empty" data-testid="leagues-list-empty-notice" class="notice">No leagues created yet.</div>
+      <div id="leagues-list" data-testid="leagues-list">
         <!-- Leagues will be rendered here -->
       </div>
     </section>
-
+ 
     <!-- Event Form (hidden by default, shown when adding/editing an event) -->
-    <section id="event-form-card" class="card hidden">
-      <h2 id="event-form-title">Add Event to League: <span id="event-form-league-name"></span></h2>
-      <form id="event-form">
-        <input type="hidden" id="event-league-id" />
-        <input type="hidden" id="event-id" />
+    <section id="event-form-card" data-testid="event-form-card" class="card hidden">
+      <h2 id="event-form-title" data-testid="event-form-title">Add Event to League: <span id="event-form-league-name" data-testid="event-form-league-name"></span></h2>
+      <form id="event-form" data-testid="event-form">
+        <input type="hidden" id="event-league-id" data-testid="event-league-id-input" />
+        <input type="hidden" id="event-id" data-testid="event-id-input" />
         <div class="form-row">
           <label for="event-name">Event Name</label>
-          <input id="event-name" type="text" placeholder="e.g., Week 1" required />
+          <input id="event-name" data-testid="event-name-input" type="text" placeholder="e.g., Week 1" required />
         </div>
         <div class="form-row">
           <label for="event-date">Event Date</label>
-          <input id="event-date" type="date" />
+          <input id="event-date" data-testid="event-date-input" type="date" />
         </div>
         <div class="form-row">
           <label for="event-location">Location</label>
-          <select id="event-location">
+          <select id="event-location" data-testid="event-location-select">
             <option value="">Select Location (Optional)</option>
             <!-- Locations will be loaded here -->
           </select>
         </div>
         <div class="form-row">
           <label for="event-scoring-format">Scoring Format</label>
-          <select id="event-scoring-format"></select>
+          <select id="event-scoring-format" data-testid="event-scoring-format-select"></select>
         </div>
-        <div class="form-actions">
-          <button type="submit" class="btn-mgmt">Save Event</button>
-          <button type="button" id="cancel-event-edit" class="secondary btn-mgmt">Cancel</button>
+        <div class="form-actions" data-testid="event-form-actions">
+          <button type="submit" id="save-event-btn" data-testid="save-event-button" class="btn-mgmt">Save Event</button>
+          <button type="button" id="cancel-event-edit" data-testid="cancel-event-edit-button" class="secondary btn-mgmt">Cancel</button>
         </div>
       </form>
     </section>
