@@ -1,4 +1,20 @@
 import { defineConfig, devices } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const AUTH_DIR = path.join(__dirname, 'playwright/.auth');
+const ADMIN_AUTH = path.join(AUTH_DIR, 'admin.json');
+const TD_AUTH = path.join(AUTH_DIR, 'td.json');
+const PLAYER_AUTH = path.join(AUTH_DIR, 'player.json');
+
+// Ensure the auth directory exists before tests run to prevent ENOENT errors during initialization
+if (!fs.existsSync(AUTH_DIR)) {
+  fs.mkdirSync(AUTH_DIR, { recursive: true });
+}
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -15,7 +31,14 @@ export default defineConfig({
     timeout: 5000,
   },
   use: {
-    baseURL: process.env.PLAYWRIGHT_URL || 'https://10.0.4.23/html/pinbowling/',
+     /* Global settings for all tests */
+    launchOptions: {
+      // Slow down actions by 500ms. 
+      // This helps prevent rate-limiting and session collisions on the server.
+      slowMo: 500, 
+    },
+    /* Ensure the baseURL always ends with a slash to support subdirectory routing */
+    baseURL: (process.env.PLAYWRIGHT_URL || 'https://10.0.4.23/html/pinbowling/').replace(/\/+$/, '') + '/',
     trace: 'on-first-retry',
     /* Record video on failure for easier debugging */
     video: 'on-first-retry',
@@ -26,13 +49,34 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
   },
   projects: [
+    // 1. Global Setups
+    { name: 'setup', testMatch: /setup\/.*\.setup\.js/ },
+
+    // 2. Admin Tests
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'chromium-admin',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+      dependencies: ['setup'],
+      testIgnore: '**/setup/**',
+      testMatch: '**/*.spec.js', // Admin runs all specs found in subdirectories
     },
+
+    // 3. TD Tests (Tournament Directors)
     {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      name: 'chromium-td',
+      use: { ...devices['Desktop Chrome'], storageState: TD_AUTH },
+      dependencies: ['setup'],
+      testIgnore: '**/setup/**',
+      testMatch: ['**/management/**/*.spec.js', '**/play/**/*.spec.js', '**/ui/**/*.spec.js'], 
+    },
+
+    // 4. Player Tests
+    {
+      name: 'chromium-player',
+      use: { ...devices['Desktop Chrome'], storageState: PLAYER_AUTH },
+      dependencies: ['setup'],
+      testIgnore: '**/setup/**',
+      testMatch: ['**/play/**/*.spec.js', '**/auth/**/*.spec.js', '**/ui/**/*.spec.js'],
     },
   ],
 });

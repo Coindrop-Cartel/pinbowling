@@ -43,7 +43,7 @@ const ROLE_PERMISSIONS = {
  * Mapping of navigation element selectors to the permissions required to see them.
  */
 const NAV_PERMISSIONS = {
-  '#nav-leagues': PERMISSIONS.MANAGE_LEAGUES,
+  '#nav-leagues': null, // Visible to all; internal actions restricted by role
   '#nav-machines': PERMISSIONS.MANAGE_MACHINES,
   '#nav-locations': null, // Visible to all
   '#nav-players': null,   // Visible to all
@@ -193,14 +193,15 @@ function updateAuthUI(user) {
   if (adminNav) {
     let visibleChildren = 0;
 
-    // Declaratively toggle visibility based on defined permissions
+    // Declaratively toggle visibility of all registered navigation items
     Object.entries(NAV_PERMISSIONS).forEach(([selector, permission]) => {
-      const el = adminNav.querySelector(selector);
+      const el = document.querySelector(selector);
       if (el) {
         const perms = ROLE_PERMISSIONS[role] || [];
         const hasAccess = !permission || perms.includes('*') || perms.includes(permission);
         el.classList.toggle('hidden', !hasAccess);
-        if (hasAccess && permission) visibleChildren++;
+        // Count visible items specifically within the Admin dropdown for its visibility toggle
+        if (hasAccess && permission && adminNav.contains(el)) visibleChildren++;
       }
     });
 

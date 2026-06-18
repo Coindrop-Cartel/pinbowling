@@ -5,7 +5,10 @@
   "description": "This app now uses a PHP backend for MySQL persistence.",
   "main": "index.js",
   "scripts": {
-    "test": "vitest"
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "vitest",
+    "test:e2e": "npx playwright test",
+    "test:ui": "npx playwright test --ui"
   },
   "repository": {
     "type": "git",
@@ -19,8 +22,6 @@
   },
   "homepage": "https://github.com/kylevoorhees/pinbowling#readme",
   "devDependencies": {
-    "@playwright/test": "^1.61.0",
-    "@types/node": "^25.9.3",
     "@vitest/coverage-v8": "^4.1.7",
     "jsdom": "^29.1.1",
     "vitest": "^4.1.7"
