@@ -4,9 +4,20 @@ test.describe('League & Event Management', () => {
 
   let createdLeagueName = null;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     // Navigating to '' resolves to the root of the baseURL (the subdirectory)
     await page.goto('');
+    // Re-login if storageState session expired
+    const loginBtn = page.locator('#header-login-btn');
+    if (await loginBtn.isVisible()) {
+      const role = testInfo.project.name.includes('admin') ? 'admin' : 'td';
+      await loginBtn.click();
+      await page.fill('#auth-username', role);
+      await page.fill('#auth-pass', role);
+      await page.click('#auth-modal-form button[type="submit"]');
+      await expect(page.locator('.auth-user-greeting')).toBeVisible();
+      await page.goto('');
+    }
   });
 
   test.afterEach(async ({ page }, testInfo) => {

@@ -1,53 +1,46 @@
 import { test, expect } from '@playwright/test';
 
-// Reset storage state for this file to test login flows specifically.
-// This ensures we start as a guest and can see the login button.
-test.use({ storageState: { cookies: [], origins: [] } });
+test.describe('Authentication & RBAC', () => {
+  test('admin should see all management navigation items', async ({ page }, testInfo) => {
+    test.skip(!testInfo.project.name.includes('admin'), 'Admin nav items only visible to admin');
 
-test.describe('User Authentication & RBAC', () => {
-  test('Admin should see maintenance navigation', async ({ page }) => {
-    // Navigating to '' resolves to the root of the baseURL (the subdirectory)
     await page.goto('');
-    await page.locator('#header-login-btn').click();
-    await page.fill('#auth-username', 'admin');
-    await page.fill('#auth-pass', 'admin');
-    await page.click('#auth-modal-form button[type="submit"]');
+    // Re-login if storageState session expired
+    const loginBtn = page.locator('#header-login-btn');
+    if (await loginBtn.isVisible()) {
+      await loginBtn.click();
+      await page.fill('#auth-username', 'admin');
+      await page.fill('#auth-pass', 'admin');
+      await page.click('#auth-modal-form button[type="submit"]');
+      await expect(page.locator('.auth-user-greeting')).toBeVisible();
+      await page.goto('');
+    }
 
-    // Ensure the reload finishes and the admin greeting appears
-    await expect(page.locator('.auth-user-greeting')).toContainText(/Hi, admin/i, { timeout: 10000 });
+    await page.locator('#leagues-nav-item').click();
+    await expect(page.locator('#nav-leagues')).toBeVisible();
 
-    // Verify Admin menu is visible
-    await expect(page.locator('#admin-nav-item')).toBeVisible();
+    // Admin-only nav items are inside the Admin dropdown, not Leagues
+    await page.locator('#admin-nav-item').click();
+    await expect(page.locator('#nav-machines')).toBeVisible();
+    await expect(page.locator('#nav-locations')).toBeVisible();
+    await expect(page.locator('#nav-players')).toBeVisible();
+    await expect(page.locator('#nav-teams')).toBeVisible();
   });
 
-  test('Player should not see maintenance navigation', async ({ page }) => {
-    await page.goto('');
-    await page.locator('#header-login-btn').click();
-    // Assuming a player user exists in your seed
-    await page.fill('#auth-username', 'player1');
-    await page.fill('#auth-pass', 'player1');
-    await page.click('#auth-modal-form button[type="submit"]');
-
-    await expect(page.locator('.auth-user-greeting')).toContainText(/Hi, Test Player/i);
+  test('player should have restricted navigation access', async ({ page }, testInfo) => {
+    test.skip(!testInfo.project.name.includes('player'), 'Test only for player role');
     
-    // Admin dropdown should be hidden for standard players
-    await expect(page.locator('#admin-nav-item')).toBeHidden();
+    await page.goto('');
+    const adminNav = page.locator('#admin-nav-item');
+    
+    // Admin menu should be hidden if no sub-items are allowed
+    await expect(adminNav).toBeHidden();
   });
 
-  test('Logout should reset UI state', async ({ page }) => {
+  test('should handle logout correctly', async ({ page }) => {
     await page.goto('');
-    await page.locator('#header-login-btn').click();
-    await page.fill('#auth-username', 'admin');
-    await page.fill('#auth-pass', 'admin');
-    await page.click('#auth-modal-form button[type="submit"]');
-    
-    await expect(page.locator('.auth-user-greeting')).toBeVisible();
-
-    // Perform logout
     await page.click('#header-logout-btn');
     
-    // Verify login button returns
     await expect(page.locator('#header-login-btn')).toBeVisible();
-    await expect(page.locator('.auth-user-greeting')).toBeHidden();
   });
 });

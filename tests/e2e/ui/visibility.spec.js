@@ -5,6 +5,19 @@ test.describe('Global Navigation Visibility', () => {
     // Navigate to the root of the subdirectory
     await page.goto('');
 
+    // Verify session is active; re-login if storageState session expired
+    const loginBtn = page.locator('#header-login-btn');
+    if (await loginBtn.isVisible()) {
+      const creds = testInfo.project.name.includes('admin') ? ['admin', 'admin']
+        : testInfo.project.name.includes('td') ? ['td', 'td']
+        : ['player1', 'player1'];
+      await loginBtn.click();
+      await page.fill('#auth-username', creds[0]);
+      await page.fill('#auth-pass', creds[1]);
+      await page.click('#auth-modal-form button[type="submit"]');
+      await expect(page.locator('.auth-user-greeting')).toBeVisible();
+    }
+
     const projectName = testInfo.project.name;
 
     // 1. Common items that everyone (Admin, TD, and Player) should see

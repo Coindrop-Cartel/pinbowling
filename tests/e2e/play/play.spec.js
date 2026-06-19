@@ -1,10 +1,23 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Quick Play Page E2E', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     // Navigating to 'play' (no leading slash) resolves correctly against a baseURL with a trailing slash
-    // The user is already logged in via global storage state!
     await page.goto('play');
+
+    // Re-login if storageState session expired
+    const loginBtn = page.locator('#header-login-btn');
+    if (await loginBtn.isVisible()) {
+      const creds = testInfo.project.name.includes('admin') ? ['admin', 'admin']
+        : testInfo.project.name.includes('td') ? ['td', 'td']
+        : ['player1', 'player1'];
+      await loginBtn.click();
+      await page.fill('#auth-username', creds[0]);
+      await page.fill('#auth-pass', creds[1]);
+      await page.click('#auth-modal-form button[type="submit"]');
+      await expect(page.locator('.auth-user-greeting')).toBeVisible();
+      await page.goto('play');
+    }
   });
 
   test('should display existing sessions for today', async ({ page }) => {

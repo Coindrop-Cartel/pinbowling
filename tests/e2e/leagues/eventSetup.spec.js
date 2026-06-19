@@ -7,6 +7,18 @@ test.describe('Event Setup Page', () => {
     test.skip(!isManagement, 'Event Setup requires management role');
 
     await page.goto('');
+    // Re-login if storageState session expired
+    const loginBtn = page.locator('#header-login-btn');
+    if (await loginBtn.isVisible()) {
+      const role = testInfo.project.name.includes('admin') ? 'admin' : 'td';
+      await loginBtn.click();
+      await page.fill('#auth-username', role);
+      await page.fill('#auth-pass', role);
+      await page.click('#auth-modal-form button[type="submit"]');
+      await expect(page.locator('.auth-user-greeting')).toBeVisible();
+      await page.goto('');
+    }
+
     await page.locator('#leagues-nav-item').click();
     await page.click('#nav-leagues');
   });

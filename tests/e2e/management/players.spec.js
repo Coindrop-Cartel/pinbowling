@@ -3,10 +3,22 @@ import { test, expect } from '@playwright/test';
 test.describe('Player Management', () => {
   let createdPlayerName = null;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     await page.goto('');
-    await page.locator('#admin-nav-item').click();
-    await page.click('#nav-players');
+    if (testInfo.project.name.includes('admin')) {
+      // Re-login if storageState session expired
+      const loginBtn = page.locator('#header-login-btn');
+      if (await loginBtn.isVisible()) {
+        await loginBtn.click();
+        await page.fill('#auth-username', 'admin');
+        await page.fill('#auth-pass', 'admin');
+        await page.click('#auth-modal-form button[type="submit"]');
+        await expect(page.locator('.auth-user-greeting')).toBeVisible();
+        await page.goto('');
+      }
+      await page.locator('#admin-nav-item').click();
+      await page.click('#nav-players');
+    }
   });
 
   test.afterEach(async ({ page }, testInfo) => {

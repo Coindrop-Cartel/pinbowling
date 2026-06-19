@@ -3,10 +3,24 @@ import { test, expect } from '@playwright/test';
 test.describe('Team Management', () => {
   let createdTeamName = null;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    const isManagement = testInfo.project.name.includes('admin') || testInfo.project.name.includes('td');
     await page.goto('');
-    await page.locator('#admin-nav-item').click();
-    await page.click('#nav-teams');
+    if (isManagement) {
+      // Re-login if storageState session expired
+      const loginBtn = page.locator('#header-login-btn');
+      if (await loginBtn.isVisible()) {
+        const creds = testInfo.project.name.includes('admin') ? ['admin', 'admin'] : ['td', 'td'];
+        await loginBtn.click();
+        await page.fill('#auth-username', creds[0]);
+        await page.fill('#auth-pass', creds[1]);
+        await page.click('#auth-modal-form button[type="submit"]');
+        await expect(page.locator('.auth-user-greeting')).toBeVisible();
+        await page.goto('');
+      }
+      await page.locator('#admin-nav-item').click(); // Teams is under the Admin dropdown
+      await page.click('#nav-teams');
+    }
   });
 
   test.afterEach(async ({ page }, testInfo) => {
