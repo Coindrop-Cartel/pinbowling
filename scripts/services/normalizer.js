@@ -125,6 +125,54 @@ export function groupScoresByPlayer(scores) {
 }
 
 /**
+ * Groups matchup rows by event ID.
+ * @param {Object[]} matchups
+ * @returns {Object<number, Object[]>}
+ */
+export function groupMatchupsByEvent(matchups) {
+  return (matchups || []).reduce((acc, matchup) => {
+    const eventId = matchup.eventId || matchup.event_id;
+    if (!acc[eventId]) acc[eventId] = [];
+    acc[eventId].push(matchup);
+    return acc;
+  }, {});
+}
+
+/**
+ * Builds a baseball score map for a player, including opponent scores.
+ * @param {number|string} playerId
+ * @param {Object<number, Object[]>} scoresByPlayer
+ * @param {Object[]} matchups
+ * @returns {Object}
+ */
+export function buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchups) {
+  const id = Number(playerId);
+  const playerScores = scoresByPlayer?.[id] || scoresByPlayer?.[String(id)] || [];
+  const scoreMap = buildScoreMapFromRows(playerScores);
+  const opponent = {};
+
+  const playerMatchups = (matchups || [])
+    .filter(m => Number(m.player1Id ?? m.player1_id) === id || Number(m.player2Id ?? m.player2_id) === id)
+    .sort((a, b) => Number(a.orderNumber ?? a.order_number) - Number(b.orderNumber ?? b.order_number));
+
+  const firstMatchup = playerMatchups[0];
+  scoreMap.isPlayer1 = firstMatchup ? Number(firstMatchup.player1Id ?? firstMatchup.player1_id) === id : true;
+
+  playerMatchups.forEach(matchup => {
+    const orderNumber = String(matchup.orderNumber ?? matchup.order_number);
+    const opponentId = Number(matchup.player1Id ?? matchup.player1_id) === id
+      ? Number(matchup.player2Id ?? matchup.player2_id)
+      : Number(matchup.player1Id ?? matchup.player1_id);
+    const opponentScores = scoresByPlayer?.[opponentId] || scoresByPlayer?.[String(opponentId)] || [];
+    const opponentRow = opponentScores.find(s => Number(s.orderNumber ?? s.order_number) === Number(orderNumber));
+    if (opponentRow) opponent[orderNumber] = buildScoreMapFromRows([opponentRow])[orderNumber];
+  });
+
+  scoreMap.opponent = opponent;
+  return scoreMap;
+}
+
+/**
  * Builds a score map from an array of score rows, keyed by order number.
  * Each entry contains ball scores as `{ ball1, ball2, ball3 }`.
  *

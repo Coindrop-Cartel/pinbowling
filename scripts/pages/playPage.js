@@ -1,12 +1,13 @@
 import { PB_API } from '@services/api.js';
+import { BaseballEngine } from '@core/engines/BaseballEngine.js';
 import { can, PERMISSIONS, filterPlayersForUser } from '@services/auth.js';
 import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
-import { getCookie, formatNumber, applyScoreFormatting, loadPage, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
+import { getCookie, formatNumber, applyScoreFormatting, parseFormattedNumber, loadPage, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { createExpandableRow, setupSortableList, createSearchableSelect } from '@ui/selectors.js';
-import { showPlayerSelectionDialog } from '@ui/dialogs.js';
+import { showDialog, showPlayerSelectionDialog } from '@ui/dialogs.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
-import { generatePars, generateSessionName, selectRandomMachines, getTargetScoreForDifficulty } from '@services/sessionGenerator.js';
+import { generatePars, generateSessionName, selectRandomMachines, getTargetScoreForDifficulty, generateMatchups } from '@services/sessionGenerator.js';
 
 /**
  * Logic for the Play page where players enter their scores for the current session.
@@ -159,6 +160,11 @@ export async function initPlayPage() {
           try {
             // If the selected player isn't in the league yet, join them automatically
             if (!joinedIds.has(Number(selectedId))) {
+              // Enforce 2-player limit for baseball sessions
+              if (event.scoringFormat === 'baseball' && joinedIds.size >= 2) {
+                showDialog({title: 'Session Full', message: 'This baseball session already has 2 players and cannot accept more.', confirmText: 'OK' , hideCancel: true });
+                return;
+              }
               const result = await PB_API.leagues.addPlayer(event.leagueId, Number(selectedId));
               if (result.error) throw new Error(result.error);
             }
@@ -321,14 +327,50 @@ export async function initPlayPage() {
             scaling: globalScaling,
             values: engine.buildRoundValues(value1, value2, globalScaling),
             orderNumber: index + 1,
+            scores: {},
             tempId: Math.random().toString(36).substr(2, 9)
         };
     });
 
     renderPreview();
+    renderMatchupPreview();
     previewSection.classList.remove('hidden');
     
     previewSection.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function renderMatchupPreview() {
+    const matchupContainer = document.getElementById('qp-matchups-preview');
+    if (!matchupContainer) return;
+
+    if (currentSessionFormat !== 'baseball') {
+      matchupContainer.classList.add('hidden');
+      return;
+    }
+
+    // Show a placeholder that explains matchups will be generated on finalize
+    // based on the players in the league roster
+    matchupContainer.classList.remove('hidden');
+    matchupContainer.innerHTML = `
+      <div class="card matchup-preview-card">
+        <h3>Head-to-Head Matchups</h3>
+        <p class="text-muted">Exactly 2 players compete head-to-head across ${generatedFrames.length} innings. Roles alternate each inning (Pitcher/Batter).</p>
+        <div class="matchup-preview-grid">
+          <div class="matchup-info">
+            <span class="matchup-label">Format:</span>
+            <span>Head-to-Head (2 players per inning)</span>
+          </div>
+          <div class="matchup-info">
+            <span class="matchup-label">Innings:</span>
+            <span>${generatedFrames.length}</span>
+          </div>
+          <div class="matchup-info">
+            <span class="matchup-label">Machines:</span>
+            <span>${generatedFrames.filter(f => f.machineId).length} selected</span>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function renderPreview() {
@@ -337,27 +379,20 @@ export async function initPlayPage() {
       const isExpanded = expandedTempId === frame.tempId;
       const engine = getScoringEngine(currentSessionFormat);
 
-      const headerHtml =  `
-        <div class="flex gap-12 w-100 wrap">
-          <div class="flex gap-12 flex-1 min-250 align-center">
-            <div class="drag-handle">☰</div>
-            <span class="round-number">${index + 1}</span>
-            <span class="machine-name-display">${escapeHTML(frame.machineName)}</span>
-          </div>
-          <div class="flex gap-12 wrap justify-end" onclick="event.stopPropagation()">
-            <div class="flex gap-6 min-140 flex-1 align-center">
-              <label class="small value-label">${engine.getValue1Label()}:</label>
-              <input type="text" class="score10-input score-input" value="${formatNumber(frame.value1)}">
-            </div>
-            <div class="flex gap-6 min-140 flex-1 align-center">
-              <label class="small value-label">${engine.getValue2Label()}:</label>
-              <input type="text" class="score1-input score-input" value="${formatNumber(frame.value2)}">
-            </div>
-          </div>
-        </div>
-      `;
+      let headerHtml = '';
+      let contentHtml = '';
 
-      const contentHtml = `
+      if (currentSessionFormat === 'baseball') {
+        headerHtml =  `
+          <div class="flex gap-12 w-100 wrap matchup-inning">
+            <div class="flex gap-12 flex-1 min-250 align-center">
+              <div class="drag-handle">☰</div>
+              <span class="round-number">Inning ${index + 1}</span>
+              <span class="machine-name-display">${escapeHTML(frame.machineName)}</span>
+            </div>
+          </div>
+        `;
+        contentHtml = `
           <div class="form-row">
             <label class="small">Change Machine</label>
             <input type="text" class="row-machine-search" placeholder="Filter machines...">
@@ -375,7 +410,61 @@ export async function initPlayPage() {
             </div>
           </div>
           <div class="preview-values-container">${renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2)}</div>
-      `;
+          <!-- Baseball specific score entry -->
+          <div class="baseball-matchup-scores">
+            <div class="player-score-baseball player-row pitcher">
+              <span class="role-label">Pitcher</span>
+              <input type="text" class="score-input-baseball pitcher-score" placeholder="Score">
+              <span class="runs-display pitcher-runs">0R</span>
+            </div>
+            <div class="player-score-baseball player-row batter">
+              <span class="role-label">Batter</span>
+              <input type="text" class="score-input-baseball batter-score" placeholder="Score">
+              <span class="runs-display batter-runs">0R</span>
+            </div>
+          </div>
+        `;
+      } else {
+        headerHtml =  `
+          <div class="flex gap-12 w-100 wrap">
+            <div class="flex gap-12 flex-1 min-250 align-center">
+              <div class="drag-handle">☰</div>
+              <span class="round-number">${index + 1}</span>
+              <span class="machine-name-display">${escapeHTML(frame.machineName)}</span>
+            </div>
+            <div class="flex gap-12 wrap justify-end" onclick="event.stopPropagation()">
+              <div class="flex gap-6 min-140 flex-1 align-center">
+                <label class="small value-label">${engine.getValue1Label()}:</label>
+                <input type="text" class="score10-input score-input" value="${formatNumber(frame.value1)}">
+              </div>
+              <div class="flex gap-6 min-140 flex-1 align-center">
+                <label class="small value-label">${engine.getValue2Label()}:</label>
+                <input type="text" class="score1-input score-input" value="${formatNumber(frame.value2)}">
+              </div>
+            </div>
+          </div>
+        `;
+
+        contentHtml = `
+            <div class="form-row">
+              <label class="small">Change Machine</label>
+              <input type="text" class="row-machine-search" placeholder="Filter machines...">
+              <select class="row-machine-select"></select>
+            </div>
+            <div class="flex-between mb-10">
+              <div class="flex gap-6">
+                 <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
+                 <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
+                 <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
+              </div>
+              <div class="flex gap-4">
+                 <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
+                 <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
+              </div>
+            </div>
+            <div class="preview-values-container">${renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2)}</div>
+        `;
+      }
 
       const row = createExpandableRow(framesList, {
         id: frame.tempId,
@@ -407,13 +496,14 @@ export async function initPlayPage() {
       });
       const s10 = row.querySelector('.score10-input');
       const s1 = row.querySelector('.score1-input');
-      applyScoreFormatting(s10);
-      applyScoreFormatting(s1);
+      if (s1) s1.dataset.allowDecimal = engine.getValue2AllowsDecimal?.() === true ? 'true' : 'false';
+      if (s10) applyScoreFormatting(s10);
+      if (s1) applyScoreFormatting(s1);
 
       // Immediate data updates as user types
       const updateValues = () => {
-        frame.value1 = Number(s10.value.replace(/\D/g, '')) || 0;
-        frame.value2 = Number(s1.value.replace(/\D/g, '')) || 0;
+        if (s10) frame.value1 = parseFormattedNumber(s10.value);
+        if (s1) frame.value2 = parseFormattedNumber(s1.value, engine.getValue2AllowsDecimal?.() === true);
         frame.values = engine.buildRoundValues(frame.value1, frame.value2, frame.scaling);
 
         // Update the visual grid without re-rendering the whole row to maintain input focus
@@ -423,8 +513,39 @@ export async function initPlayPage() {
         }
       };
 
-      s10.oninput = updateValues;
-      s1.oninput = updateValues;
+      if (s10) s10.oninput = updateValues;
+      if (s1) s1.oninput = updateValues;
+
+      // Baseball-specific: real-time run calculation when pitcher/batter scores change
+      if (currentSessionFormat === 'baseball') {
+        const pitcherInput = row.querySelector('.pitcher-score');
+        const batterInput = row.querySelector('.batter-score');
+        const pitcherRunsEl = row.querySelector('.pitcher-runs');
+        const batterRunsEl = row.querySelector('.batter-runs');
+
+        const calculateBaseballRuns = () => {
+          const pitcherScore = Number(pitcherInput?.value?.replace(/\D/g, '')) || 0;
+          const batterScore = Number(batterInput?.value?.replace(/\D/g, '')) || 0;
+
+          if (pitcherScore > 0 && batterScore > 0) {
+            const batterRuns = engine.calculateBallRuns(frame, pitcherScore, batterScore);
+            const pitcherRuns = 0;
+
+            if (pitcherRunsEl) pitcherRunsEl.textContent = `${pitcherRuns}R`;
+            if (batterRunsEl) batterRunsEl.textContent = `${batterRuns}R`;
+
+            // Store scores on the frame for later submission
+            frame.scores = { pitcher: pitcherScore, batter: batterScore, pitcherRuns, batterRuns };
+          } else {
+            if (pitcherRunsEl) pitcherRunsEl.textContent = '0R';
+            if (batterRunsEl) batterRunsEl.textContent = '0R';
+            frame.scores = {};
+          }
+        };
+
+        if (pitcherInput) pitcherInput.oninput = calculateBaseballRuns;
+        if (batterInput) batterInput.oninput = calculateBaseballRuns;
+      }
 
       // Searchable Select initialization (only if expanded)
       if (isExpanded) {
@@ -463,8 +584,8 @@ export async function initPlayPage() {
               const { value1, value2 } = engine.getInitialValues(val);
               frame.value1 = value1;
               frame.value2 = value2;
-              s10.value = formatNumber(frame.value1);
-              s1.value = formatNumber(frame.value2);
+              if (s10) s10.value = formatNumber(frame.value1);
+              if (s1) s1.value = formatNumber(frame.value2);
               updateValues();
               renderPreview();
             }
@@ -553,6 +674,50 @@ export async function initPlayPage() {
       const currentUser = await PB_API.auth.me();
       if (currentUser?.player_id) {
         await PB_API.leagues.addPlayer(qpLeague.id, currentUser.player_id);
+      }
+
+      // For baseball (head-to-head), generate matchups between players
+      if (currentSessionFormat === 'baseball') {
+        // Fetch the league's current roster (may include the just-added player)
+        const leagueData = await PB_API.leagues.get(qpLeague.id);
+        const roster = leagueData?.players || [];
+
+        // If only one player, prompt to select an opponent
+        if (roster.length < 2 && allPlayersCache.length > 0) {
+          const opponentOptions = allPlayersCache
+            .filter(p => !roster.some(r => r.id === p.id))
+            .map(p => ({ value: p.id, label: p.playerName }));
+
+          if (opponentOptions.length > 0) {
+            const opponentId = await showPlayerSelectionDialog(
+              'Select Opponent',
+              'Baseball requires at least 2 players. Choose an opponent:',
+              opponentOptions,
+              'Add & Continue'
+            );
+            if (opponentId) {
+              await PB_API.leagues.addPlayer(qpLeague.id, Number(opponentId));
+              roster.push({ id: Number(opponentId) });
+            }
+          }
+        }
+
+        // Re-fetch roster if we added an opponent
+        const updatedLeague = roster.length >= 2 ? { players: roster } : await PB_API.leagues.get(qpLeague.id);
+        const finalRoster = updatedLeague?.players || [];
+
+        if (finalRoster.length >= 2) {
+          const inningCount = generatedFrames.length;
+          const machines = generatedFrames.map(f => ({ machineId: f.machineId }));
+          const matchups = generateMatchups(finalRoster, inningCount, machines);
+
+          if (matchups.length > 0) {
+            await PB_API.matchups.save(matchups.map(m => ({
+              ...m,
+              eventId: Number(event.id)
+            })));
+          }
+        }
       }
 
       loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, leagueId: qpLeague.id, playerId: currentUser?.player_id }));

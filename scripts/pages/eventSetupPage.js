@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { isManagementAuthorized, requireAdmin } from '@services/auth.js';
 import { showAlert } from '@ui/dialogs.js';
-import { loadPage, getActiveEventId, getActiveLeagueId, renderPreview, formatNumber, applyScoreFormatting, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
+import { loadPage, getActiveEventId, getActiveLeagueId, renderPreview, formatNumber, applyScoreFormatting, parseFormattedNumber, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
 import { applyPreferredTheme } from '@ui/branding.js'; // Import for filtering
 import { ROUTE_PATHS } from '@scripts/routes.js';
 import { getScoringEngine } from '@core/engine.js';
@@ -328,12 +328,13 @@ export async function initEventSetupPage() {
 
       const s10 = row.querySelector('.score10-input');
       const s1 = row.querySelector('.score1-input');
+      if (s1) s1.dataset.allowDecimal = Engine.getValue2AllowsDecimal?.() === true ? 'true' : 'false';
       applyScoreFormatting(s10);
       applyScoreFormatting(s1);
 
       const updateValues = () => {
-        round.value1 = Number(s10.value.replace(/\D/g, '')) || 0;
-        round.value2 = Number(s1.value.replace(/\D/g, '')) || 0;
+        round.value1 = parseFormattedNumber(s10.value);
+        round.value2 = parseFormattedNumber(s1.value, Engine.getValue2AllowsDecimal?.() === true);
 
         const currentScaling = row.querySelector('.scaling-btn.btn-standard').dataset.scale;
         round.values = Engine.buildRoundValues(round.value1, round.value2, currentScaling);
@@ -443,6 +444,7 @@ export async function initEventSetupPage() {
     const format = eventMatch?.scoringFormat || league?.scoringFormat;
     Engine = getScoringEngine(format);
     applyPreferredTheme(format);
+    score1Input.dataset.allowDecimal = Engine.getValue2AllowsDecimal?.() === true ? 'true' : 'false';
 
     // Update UI labels based on the scoring engine
     if (labelHigh) labelHigh.textContent = Engine.getValue1Label();
@@ -503,8 +505,8 @@ export async function initEventSetupPage() {
     e.preventDefault();
     const orderNumber = Number(orderInput.value);
     const machineName = document.getElementById('machine-name').value.trim();
-    const score10 = Number(score10Input.value.replace(/\D/g, ''));
-    const score1 = Number(score1Input.value.replace(/\D/g, ''));
+    const score10 = parseFormattedNumber(score10Input.value);
+    const score1 = parseFormattedNumber(score1Input.value, Engine.getValue2AllowsDecimal?.() === true);
     const eventId = getActiveEventId();
 
     if (!orderNumber || !machineName || (!score10 && !score1) || !eventId) return;

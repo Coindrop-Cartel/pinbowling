@@ -31,6 +31,10 @@ vi.mock('@scripts/utils.js', () => ({
   renderThresholdGrid: vi.fn(() => '<div>Grid</div>'),
   escapeHTML: vi.fn(str => str),
   applyScoreFormatting: vi.fn(),
+  parseFormattedNumber: vi.fn((value, allowDecimal = false) => {
+    const cleaned = String(value || '').replace(allowDecimal ? /[^\d.]/g : /\D/g, '');
+    return allowDecimal ? Number.parseFloat(cleaned) || 0 : Number(cleaned) || 0;
+  }),
   formatNumber: (n) => String(n),
   loadPage: vi.fn(), // Changed from navigateTo
   getCookie: vi.fn(() => 'bowling'),

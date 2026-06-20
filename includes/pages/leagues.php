@@ -19,6 +19,7 @@
           <label for="league-participants">League Type</label>
           <select id="league-participants" data-testid="league-participants-select">
             <option value="individual" selected>Individual</option>
+            <option value="head2head">Head-to-head</option>
             <option value="team">Team</option>
           </select>
         </div>

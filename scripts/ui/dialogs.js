@@ -42,6 +42,7 @@ function _openModalBase(title, contentHtml) {
  * @param {boolean} [options.showInput=false] - Whether to show a text input field.
  * @param {boolean} [options.isPassword=true] - Whether the input field is a password field.
  * @param {string} [options.confirmText='Confirm'] - Label for the confirm button.
+ * @param {boolean} [options.hideCancel=false] - Whether to hide the cancel button. 
  * @param {string|null} [options.cancelText='Cancel'] - Label for the cancel button; null hides it.
  * @param {*} [options.cancelValue=undefined] - The value to resolve with on cancel.
  * @param {string} [options.confirmId='modal-confirm'] - HTML ID for the confirm button.
@@ -56,6 +57,7 @@ export function showDialog({
   showInput = false,
   isPassword = true,
   confirmText = 'Confirm',
+  hideCancel = false,
   cancelText = 'Cancel',
   cancelValue = undefined,
   confirmId = 'modal-confirm',
@@ -64,13 +66,14 @@ export function showDialog({
   onReady = null
 }) {
   return new Promise((resolve) => {
+    const cancelHtml = hideCancel ? '' : `<button id="modal-cancel" class="secondary">${cancelText}</button>`;
     const contentHtml = `
       <p class="small-hint mb-0">${message}</p>
       <div id="modal-custom-content"></div>
       ${showInput ? `<div class="form-row mt-20"><input type="${isPassword ? 'password' : 'text'}" id="modal-input" class="modal-input" /></div>` : ''}
       <div class="modal-actions">
         <button id="${confirmId}">${confirmText}</button>
-        ${cancelText ? `<button id="modal-cancel" class="secondary">${cancelText}</button>` : ''}
+        ${cancelHtml}
       </div>
     `;
     const { card, close } = _openModalBase(title, contentHtml);

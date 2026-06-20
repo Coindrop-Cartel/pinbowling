@@ -55,6 +55,10 @@ vi.mock('@core/engine.js', () => ({
 vi.mock('@scripts/utils.js', () => ({
   formatNumber: vi.fn(n => n?.toLocaleString() || '0'),
   applyScoreFormatting: vi.fn(),
+  parseFormattedNumber: vi.fn((value, allowDecimal = false) => {
+    const cleaned = String(value || '').replace(allowDecimal ? /[^\d.]/g : /\D/g, '');
+    return allowDecimal ? Number.parseFloat(cleaned) || 0 : Number(cleaned) || 0;
+  }),
   renderThresholdGrid: vi.fn(() => 'Grid'),
   getCookie: vi.fn(() => 'bowling'),
   loadPage: vi.fn(),

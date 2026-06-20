@@ -12,7 +12,7 @@ export function applyPreferredTheme(overrideFormat) {
   const engine = getScoringEngine(preferred);
 
   // Clear any previous theme classes and apply the current engine's theme
-  document.body.classList.remove('theme-golf', 'theme-bowling');
+  document.body.classList.remove('theme-golf', 'theme-bowling', 'theme-baseball');
   const themeClass = engine.getThemeClass();
   if (themeClass) document.body.classList.add(themeClass);
 

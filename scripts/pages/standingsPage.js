@@ -5,8 +5,8 @@ import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { showDialog } from '@ui/dialogs.js';
 import { renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { filterLeaguesForUser } from '@services/auth.js'; // Import for filtering
-import { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer, groupScoresByPlayer, buildScoreMapFromRows } from '@services/normalizer.js';
-import { calculateSeasonSummary } from '@services/seasonCalculator.js';
+import { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer, groupScoresByPlayer, groupMatchupsByEvent, buildBaseballScoreMapForPlayer, buildScoreMapFromRows } from '@services/normalizer.js';
+import { calculateSeasonSummary, calculateBaseballRecords } from '@services/seasonCalculator.js';
 
 /**
  * Logic for the Standings/Scoreboard page showing player rankings and season summaries.
@@ -291,9 +291,12 @@ export async function initStandingsPage() {
 
     const events = league?.events || [];
 
-    const [rawScores, allLeagueTargets] = await Promise.all([
+    const [rawScores, allLeagueTargets, leagueMatchupsByEvent] = await Promise.all([
       PB_API.scores.get(null, null, leagueId),
-      PB_API.machines.getTargets(null, leagueId)
+      PB_API.machines.getTargets(null, leagueId),
+      format === 'baseball'
+        ? Promise.all(events.map(e => PB_API.matchups.get(e.id).catch(() => []))).then(results => groupMatchupsByEvent(results.flat()))
+        : Promise.resolve({})
     ]);
 
     const normalizedLeagueTargets = normalizeTargets(allLeagueTargets);
@@ -302,7 +305,7 @@ export async function initStandingsPage() {
     const scoresByEventAndPlayer = groupScoresByEventAndPlayer(normalizedScores);
     
     try {
-      const result = calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, engine, selectedPlayerIds });
+      const result = calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, matchupsByEvent: leagueMatchupsByEvent, engine, selectedPlayerIds });
       const rows = result.rows;
 
       if (!isTeamLeague) renderFilterUI(players);
@@ -314,7 +317,8 @@ export async function initStandingsPage() {
 
       const playerLabel = isTeamLeague ? 'Team' : 'Player';
 
-      if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${events.map((e, i) => `<th class="text-center">${i + 1}</th>`).join('')}<th class="text-center">Total</th></tr>`;
+      const isBaseball = format === 'baseball';
+      if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${events.map((e, i) => `<th class="text-center">${i + 1}</th>`).join('')}${isBaseball ? '<th class="text-center">W-L</th>' : ''}<th class="text-center">Total</th></tr>`;
       
       if (standingsBody) {
         standingsBody.innerHTML = rows.map((res, idx) => {
@@ -331,11 +335,16 @@ export async function initStandingsPage() {
             ? `${res.totalSeasonPoints} pts` 
             : Engine.formatTotalScore(res.totalSeasonPoints);
 
+          const recordCell = isBaseball && res.displayRecord
+            ? `<td class="standings-record text-center">${res.displayRecord}</td>`
+            : (isBaseball ? '<td class="standings-record text-center">-</td>' : '');
+
           return `
             <tr>
               <td>${idx + 1}</td>
               <td class="player-name-cell">${entityName}</td>
               ${eventsHtml}
+              ${recordCell}
               <td class="standings-total">${totalDisplay}</td>
             </tr>`;
         }).join('');
@@ -436,9 +445,10 @@ export async function initStandingsPage() {
     }
 
     const rawMachines = await PB_API.machines.getTargets(eventId);
-    const [rawScores, allTeamsData] = await Promise.all([
+    const [rawScores, allTeamsData, eventMatchups] = await Promise.all([
       PB_API.scores.get(null, Number(eventId)),
-      PB_API.teams.getAll()
+      PB_API.teams.getAll(),
+      format === 'baseball' ? PB_API.matchups.get(eventId).catch(() => []) : Promise.resolve([])
     ]);
     
     const allEventScores = normalizeScores(rawScores);
@@ -463,7 +473,9 @@ export async function initStandingsPage() {
 
     const rows = filteredPlayers.map(player => {
       const scores = scoresByPlayer[player.id] || [];
-      const scoreMap = buildScoreMapFromRows(scores);
+      const scoreMap = format === 'baseball'
+        ? buildBaseballScoreMapForPlayer(player.id, scoresByPlayer, eventMatchups)
+        : buildScoreMapFromRows(scores);
       // Check all three possible balls to see if a turn has data
       const ordersWithScores = new Set(scores.filter(s => Number(s.ball1) > 0 || Number(s.ball2) > 0 || Number(s.ball3) > 0).map(s => s.orderNumber));
       
@@ -480,7 +492,8 @@ export async function initStandingsPage() {
     const isTeamLeague = league?.participants === 'team';
     const playerLabel = isTeamLeague ? 'Team' : 'Player';
 
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${machines.map(m => `<th class="text-center">${m.orderNumber}</th>`).join('')}<th class="text-center">Total</th></tr>`;
+    const isBaseball = format === 'baseball';
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${machines.map(m => `<th class="text-center">${m.orderNumber}</th>`).join('')}${isBaseball ? '<th class="text-center">W-L</th>' : ''}<th class="text-center">Total</th></tr>`;
     
     if (standingsBody) {
       if (isTeamLeague) {
@@ -509,7 +522,27 @@ export async function initStandingsPage() {
           return teamHeader + memberRows;
         }).join('');
       } else {
-        const sortedRows = rows.sort((a, b) => Engine.compareScores(a.total, b.total));
+        // For baseball single-event, calculate W-L records from matchups
+        let baseballRecordsMap = null;
+        if (isBaseball && eventMatchups.length > 0) {
+          const playersForRecords = filteredPlayers.map(p => ({ id: p.id }));
+          const matchupsByEvent = { [eventId]: eventMatchups };
+          const scoresByEvent = { [eventId]: scoresByPlayer };
+          const singleEventTargets = { [eventId]: machines };
+          baseballRecordsMap = calculateBaseballRecords(playersForRecords, [{ id: eventId }], matchupsByEvent, scoresByEvent, singleEventTargets, Engine);
+        }
+
+        const sortedRows = rows.sort((a, b) => {
+          if (isBaseball && baseballRecordsMap) {
+            const recA = baseballRecordsMap[a.player.id];
+            const recB = baseballRecordsMap[b.player.id];
+            if (recA && recB) {
+              const rateDiff = recB.winRate - recA.winRate;
+              if (Math.abs(rateDiff) > 0.001) return rateDiff;
+            }
+          }
+          return Engine.compareScores(a.total, b.total);
+        });
         standingsBody.innerHTML = sortedRows.map((res, idx) => {
           let rowHasUpdate = false;
             const turnsHtml = res.turnResults.map(t => {
@@ -519,11 +552,17 @@ export async function initStandingsPage() {
               return `<td class="standings-round ${t.played ? 'has-score' : 'no-score'} ${(isTvMode && isNew) ? 'score-just-updated' : ''}"><div class="standings-mark">${t.displayMark}</div><div class="standings-round-score">${t.displayRoundTotal}</div></td>`;
             }).join('');
 
+          const rec = baseballRecordsMap?.[res.player.id];
+          const recordCell = isBaseball
+            ? `<td class="standings-record text-center">${rec ? `${rec.wins}-${rec.losses}${rec.ties > 0 ? `-${rec.ties}` : ''}` : '-'}</td>`
+            : '';
+
           return `
           <tr>
             <td>${idx + 1}</td>
             <td class="player-name-cell">${escapeHTML(res.player.playerName)}</td>
             ${turnsHtml}
+            ${recordCell}
             <td class="standings-total ${rowHasUpdate ? 'score-just-updated' : ''}">${res.totalDisplay}</td>
           </tr>`;
         }).join('');

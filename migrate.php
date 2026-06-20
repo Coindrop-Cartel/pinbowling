@@ -14,11 +14,11 @@
  */
 
 // Prevent web access
-if (php_sapi_name() !== 'cli' && !defined('MIGRATE_WEB_ALLOWED')) {
-    http_response_code(403);
-    echo "This script must be run from the command line.\n";
-    exit(1);
-}
+//if (php_sapi_name() !== 'cli' && !defined('MIGRATE_WEB_ALLOWED')) {
+//    http_response_code(403);
+//    echo "This script must be run from the command line.\n";
+//    exit(1);
+//}
 
 require_once __DIR__ . '/includes/config.php';
 
@@ -66,7 +66,7 @@ function initializeDatabaseSchema($pdo) {
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(255) NOT NULL,
         `type` ENUM('standard', 'session') DEFAULT 'standard',
-        `participants` ENUM('individual', 'team') DEFAULT 'individual',
+        `participants` ENUM('individual', 'team', 'head2head') DEFAULT 'individual',
         `start_date` DATE DEFAULT NULL,
         `scoring_format` VARCHAR(50) DEFAULT 'bowling',
         `season_scoring` ENUM('cumulative', 'weekly') DEFAULT 'weekly',
@@ -171,7 +171,7 @@ function initializeDatabaseSchema($pdo) {
         `machine_id` INT NOT NULL,
         `order_number` INT NOT NULL,
         `value1` BIGINT DEFAULT 0,
-        `value2` BIGINT DEFAULT 0,
+        `value2` DECIMAL(12,3) DEFAULT 0,
         `score1` BIGINT DEFAULT 0, `score2` BIGINT DEFAULT 0, `score3` BIGINT DEFAULT 0, `score4` BIGINT DEFAULT 0, `score5` BIGINT DEFAULT 0,
         `score6` BIGINT DEFAULT 0, `score7` BIGINT DEFAULT 0, `score8` BIGINT DEFAULT 0, `score9` BIGINT DEFAULT 0, `score10` BIGINT DEFAULT 0,
         UNIQUE KEY `unique_event_round` (`event_id`, `order_number`),
@@ -185,7 +185,7 @@ function initializeDatabaseSchema($pdo) {
         `machine_id` INT NOT NULL,
         `note` TEXT DEFAULT NULL,
         `value1` BIGINT DEFAULT 0,
-        `value2` BIGINT DEFAULT 0,
+        `value2` DECIMAL(12,3) DEFAULT 0,
         `score1` BIGINT DEFAULT 0, `score2` BIGINT DEFAULT 0, `score3` BIGINT DEFAULT 0, `score4` BIGINT DEFAULT 0, `score5` BIGINT DEFAULT 0,
         `score6` BIGINT DEFAULT 0, `score7` BIGINT DEFAULT 0, `score8` BIGINT DEFAULT 0, `score9` BIGINT DEFAULT 0, `score10` BIGINT DEFAULT 0,
         `target_easy` BIGINT DEFAULT 0,
@@ -274,7 +274,42 @@ try {
         $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('initial_schema')")->execute();
         echo "✓ Initial schema applied successfully.\n";
     } else {
-        echo "Initial schema already applied. No pending migrations.\n";
+        echo "Initial schema already applied.\n";
+    }
+
+    // Check if matchups table migration is applied
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'create_matchups_table'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `matchups` (
+          `id` INT AUTO_INCREMENT PRIMARY KEY,
+          `event_id` INT NOT NULL,
+          `order_number` INT NOT NULL,
+          `player1_id` INT NOT NULL,
+          `player2_id` INT NOT NULL,
+          `machine_id` INT NOT NULL,
+          UNIQUE KEY `unique_matchup` (`event_id`, `order_number`, `player1_id`, `player2_id`),
+          CONSTRAINT `fk_matchup_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
+          CONSTRAINT `fk_matchup_p1` FOREIGN KEY (`player1_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+          CONSTRAINT `fk_matchup_p2` FOREIGN KEY (`player2_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+          CONSTRAINT `fk_matchup_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('create_matchups_table')")->execute();
+        echo "✓ Matchups table migration applied successfully.\n";
+    } else {
+        echo "Matchups table migration already applied.\n";
+    }
+
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'baseball_decimal_and_head2head'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("ALTER TABLE `leagues` MODIFY `participants` ENUM('individual', 'team', 'head2head') DEFAULT 'individual'");
+        $pdo->exec("ALTER TABLE `target_scores` MODIFY `value2` DECIMAL(12,3) DEFAULT 0");
+        $pdo->exec("ALTER TABLE `location_machines` MODIFY `value2` DECIMAL(12,3) DEFAULT 0");
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('baseball_decimal_and_head2head')")->execute();
+        echo "Baseball decimal/head-to-head migration applied successfully.\n";
+    } else {
+        echo "Baseball decimal/head-to-head migration already applied.\n";
     }
 } catch (PDOException $e) {
     echo "\n✗ Migration failed: " . $e->getMessage() . "\n";

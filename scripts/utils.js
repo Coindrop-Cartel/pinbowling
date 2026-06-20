@@ -111,17 +111,35 @@ export function applyScoreFormatting(input) {
     // arithmetic operations don't fail.
     const cursor = input.selectionStart ?? 0;
     const originalValue = input.value;
-    let rawValue = originalValue.replace(/\D/g, '');
+    const allowDecimal = input.dataset.allowDecimal === 'true';
+    let rawValue = allowDecimal
+      ? originalValue.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1')
+      : originalValue.replace(/\D/g, '');
     
     if (rawValue === '') {
       input.value = '';
     } else {
-      const formatted = Number(rawValue).toLocaleString();
+      const [whole, decimal] = rawValue.split('.');
+      const formattedWhole = Number(whole || 0).toLocaleString();
+      const formatted = allowDecimal && decimal !== undefined ? `${formattedWhole}.${decimal}` : formattedWhole;
       input.value = formatted;
       const diff = formatted.length - originalValue.length;
       input.setSelectionRange(cursor + diff, cursor + diff);
     }
   });
+}
+
+/**
+ * Reads a formatted numeric input, preserving decimals when requested.
+ * @param {string} value
+ * @param {boolean} [allowDecimal=false]
+ * @returns {number}
+ */
+export function parseFormattedNumber(value, allowDecimal = false) {
+  const raw = String(value || '');
+  const cleaned = allowDecimal ? raw.replace(/[^\d.]/g, '') : raw.replace(/\D/g, '');
+  const parsed = allowDecimal ? Number.parseFloat(cleaned) : Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 /**
@@ -173,8 +191,8 @@ export async function loadPage(url, pushState = true) {
  * @param {number} currentScaling - Optional scaling factor for point calculations.
  */
 export function renderPreview(highScoreInput, lowScoreInput, previewValues, Engine, isLastRound = false, currentScaling) {
-  const highScore = Number(highScoreInput.value.replace(/\D/g, ''));
-  const lowScore = Number(lowScoreInput.value.replace(/\D/g, ''));
+  const highScore = parseFormattedNumber(highScoreInput.value);
+  const lowScore = parseFormattedNumber(lowScoreInput.value, Engine.getValue2AllowsDecimal?.() === true);
   const values = Engine.buildRoundValues(highScore, lowScore, currentScaling);
 
   if (!values) {

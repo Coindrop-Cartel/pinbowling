@@ -66,3 +66,52 @@ export function getTargetScoreForDifficulty(machine, difficulty) {
     const key = 'target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
     return machine[key] || 1000000;
 }
+
+/**
+ * Generate head-to-head matchup pairings for a baseball session.
+ * Produces a round-robin schedule where each player faces every other player.
+ *
+ * Each matchup is assigned an order number corresponding to the inning it belongs to.
+ * For N players, there are N*(N-1)/2 unique pairings (single round-robin).
+ * If the number of innings exceeds the number of unique pairings, the schedule
+ * cycles through the same pairings again. Role alternation (Pitcher/Batter)
+ * is handled by the isBatter formula based on odd/even innings, so player1/player2
+ * assignments remain consistent across all innings for the same pair of players.
+ *
+ * @param {Array<{id: number, playerName?: string}>} players - Array of player objects
+ * @param {number} inningCount - Number of innings (rounds) in the session
+ * @param {Array<{machineId: number}>} machines - Array of machine objects for the session (one per inning)
+ * @returns {Array<{orderNumber: number, player1Id: number, player2Id: number, machineId: number}>}
+ *   Array of matchup objects ready to be saved via PB_API.matchups.save()
+ */
+export function generateMatchups(players, inningCount, machines) {
+    if (!players || players.length < 2 || inningCount < 1) return [];
+
+    // Build all unique pairings (round-robin)
+    const pairings = [];
+    for (let i = 0; i < players.length; i++) {
+        for (let j = i + 1; j < players.length; j++) {
+            pairings.push({ player1Id: players[i].id, player2Id: players[j].id });
+        }
+    }
+
+    // Cycle through pairings for additional innings.
+    // Role alternation (Pitcher/Batter) is handled by the isBatter formula
+    // based on odd/even innings, so player1/player2 must stay consistent
+    // across all innings for the same pair of players.
+    const allPairings = [...pairings];
+
+    const matchups = [];
+    for (let inning = 0; inning < inningCount; inning++) {
+        const pairing = allPairings[inning % allPairings.length];
+        const machine = machines[inning] || machines[machines.length - 1];
+        matchups.push({
+            orderNumber: inning + 1,
+            player1Id: pairing.player1Id,
+            player2Id: pairing.player2Id,
+            machineId: machine.machineId || machine.id
+        });
+    }
+
+    return matchups;
+}

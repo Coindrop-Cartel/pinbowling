@@ -132,7 +132,7 @@ if (php_sapi_name() !== 'cli' && !defined('PHPUNIT_RUNNING')) {
 // --- Shared Branding Metadata ---
 // Retrieve site-wide preference from cookie (shared with JS)
 $preferredFormat = $_COOKIE['pb_preferred_format'] ?? 'bowling';
-$themeClass = ($preferredFormat === 'golf') ? 'theme-golf' : '';
+$themeClass = ($preferredFormat === 'golf') ? 'theme-golf' : (($preferredFormat === 'baseball') ? 'theme-baseball' : '');
 
 // Global project text (Format Agnostic)
 $siteBrand   = 'Pinball And Stuff';
@@ -189,6 +189,26 @@ $engineMeta = [
         'logic' => "Strokes 1, 2, or 3 are awarded based on which ball reached the Target Score. If the target is not met within three balls, 
         a score of 4-10 is assigned based on the final cumulative score relative the target scores for that hole and then scored relative to the par value (-1, +2, etc).  
         If you don't know how Golf scoring works, I don't really know what to tell you, but I will say lower is better."
+    ],
+    'baseball' => [
+        'brand' => 'PinBaseball',
+        'logo'  => 'pinbaseball.png',
+        'cta'   => "Play Ball!",
+        'themeClass' => 'theme-baseball',
+        'roundLabel' => 'Inning',
+        'turnHeaderPrefix' => 'Inning',
+        'primaryTargetLabel' => 'Run Baseline',
+        'value1Label' => 'Baseline Score',
+        'value2Label' => 'Multiplier',
+        'hint'  => "Each inning, two players face off head-to-head. The pitcher and batter alternate roles each inning. 
+                    Enter the cumulative score after each ball. Runs are calculated based on how many threshold tiers the batter's score exceeds the pitcher's.",
+        'lastFrameHint' => "",
+        'thresholdStart' => 1, // Display ranks from 1 (1 run) up to 10
+        'thresholdEnd' => 10,
+        'logic' => "Each inning pairs two players head-to-head. The batter scores runs by exceeding the pitcher's score across threshold tiers. 
+        Odd innings: Player 1 is the pitcher, Player 2 is the batter. Even innings: roles swap. 
+        The batter's runs per ball are determined by how many exponential tiers their score surpasses. Total runs = sum of best runs across 3 balls. 
+        If you don't know how Baseball scoring works, just know that more runs is better."
     ]
 ];
 

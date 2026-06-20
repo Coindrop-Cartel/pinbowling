@@ -4,7 +4,7 @@ import { showAlert } from '@ui/dialogs.js';
 import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, formatNumber, applyScoreFormatting, renderThresholdGrid, setCurrentPlayerId, getCurrentPlayerId, escapeHTML } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
-import { normalizeScores, normalizeTargets, buildScoreMapFromDOM, buildScoreMapFromRows } from '@services/normalizer.js';
+import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildBaseballScoreMapForPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
 
@@ -83,6 +83,9 @@ export async function initScoresPage() {
   let activeLeague = null;
   let allPlayersCache = [];
   let machines = [];
+  let activeFormat = 'bowling';
+  let eventMatchups = [];
+  let allEventScores = [];
 
   const handleTournamentChange = () => {
     tournamentSelectorUI.classList.remove('hidden');
@@ -169,10 +172,24 @@ export async function initScoresPage() {
     row.dataset.orderNumber = round.orderNumber;
 
     const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
+    const currentPlayerId = Number(getCurrentPlayerId());
+    const matchup = activeFormat === 'baseball'
+      ? eventMatchups.find(m => Number(m.orderNumber) === Number(round.orderNumber) && (Number(m.player1Id) === currentPlayerId || Number(m.player2Id) === currentPlayerId))
+      : null;
+    const isPlayer1 = matchup ? Number(matchup.player1Id) === currentPlayerId : true;
+    const isBatter = matchup ? (Number(round.orderNumber) % 2 !== 0 ? !isPlayer1 : isPlayer1) : false;
+    const opponentName = matchup ? (isPlayer1 ? matchup.player2Name : matchup.player1Name) : '';
+    const roleHtml = matchup ? `
+        <div class="baseball-role-row">
+          <span class="role-label ${isBatter ? 'batter' : 'pitcher'}">${isBatter ? 'Batter' : 'Pitcher'}</span>
+          <span class="meta-muted">vs ${escapeHTML(opponentName)}</span>
+        </div>
+      ` : '';
 
     row.innerHTML = `
       <div class="round-info">
         <div class="round-label"><b>${escapeHTML(Engine.getRoundLabel())} ${round.orderNumber}:</b> ${escapeHTML(round.machineName)}</div>
+        ${roleHtml}
         ${Engine.getRowSummaryHtml(round, formatNumber)}
         ${bonusHtml}
         <div class="target-details hidden">
@@ -468,7 +485,15 @@ export async function initScoresPage() {
    * @returns {Object} Map of order_number to ball scores.
    */
   function getScoreMapFromInputs() {
-    return buildScoreMapFromDOM(roundsInput);
+    const scoreMap = buildScoreMapFromDOM(roundsInput);
+    if (activeFormat === 'baseball') {
+      const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
+      const selectedPlayerId = getCurrentPlayerId();
+      const opponentMap = buildBaseballScoreMapForPlayer(selectedPlayerId, scoresByPlayer, eventMatchups);
+      scoreMap.opponent = opponentMap.opponent || {};
+      scoreMap.isPlayer1 = opponentMap.isPlayer1;
+    }
+    return scoreMap;
   }
 
   /**
@@ -479,18 +504,64 @@ export async function initScoresPage() {
     const scoreMap = getScoreMapFromInputs();
     const { turnResults, totalDisplay } = Engine.calculateTurnResults(machines, scoreMap);
 
-    resultsBody.innerHTML = turnResults
-      .map(result => `
+    if (activeFormat === 'baseball' && eventMatchups.length > 0) {
+      const currentPlayerId = Number(getCurrentPlayerId());
+      // Find all matchups involving this player
+      const myMatchups = eventMatchups.filter(m => Number(m.player1Id) === currentPlayerId || Number(m.player2Id) === currentPlayerId);
+      const opponentIds = [...new Set(myMatchups.map(m => Number(m.player1Id) === currentPlayerId ? Number(m.player2Id) : Number(m.player1Id)))];
+      
+      // Build opponent score maps and calculate their totals
+      const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
+      const opponentResults = opponentIds.map(oppId => {
+        const oppScoreMap = buildBaseballScoreMapForPlayer(oppId, scoresByPlayer, eventMatchups);
+        const { turnResults: oppTurnResults, totalDisplay: oppTotalDisplay, total: oppTotal } = Engine.calculateTurnResults(machines, oppScoreMap);
+        const oppPlayer = allPlayersCache.find(p => p.id === oppId);
+        return { id: oppId, name: oppPlayer?.playerName || `Player ${oppId}`, turnResults: oppTurnResults, totalDisplay: oppTotalDisplay, total: oppTotal };
+      });
+
+      // Render combined results table with matchup context
+      resultsBody.innerHTML = turnResults.map(result => {
+        const matchup = myMatchups.find(m => Number(m.orderNumber) === Number(result.orderNumber));
+        const isPlayer1 = matchup ? Number(matchup.player1Id) === currentPlayerId : true;
+        const isBatter = matchup ? (Number(result.orderNumber) % 2 !== 0 ? !isPlayer1 : isPlayer1) : false;
+        const roleLabel = isBatter ? 'Batter' : 'Pitcher';
+        const oppRoleLabel = isBatter ? 'Pitcher' : 'Batter';
+        
+        // Find opponent's result for this same inning
+        const oppResult = opponentResults.length > 0 ? opponentResults[0].turnResults.find(t => Number(t.orderNumber) === Number(result.orderNumber)) : null;
+
+        return `
           <tr>
             <td>${result.orderNumber}</td>
             <td>${result.machineName}</td>
+            <td><span class="role-label ${isBatter ? 'batter' : 'pitcher'}">${roleLabel}</span></td>
             <td>${result.displayMark}</td>
             <td>${result.displayRunningTotal}</td>
+            ${oppResult ? `<td class="meta-muted"><span class="role-label ${isBatter ? 'pitcher' : 'batter'}">${oppRoleLabel}</span> ${oppResult.displayMark}</td>` : '<td>-</td>'}
           </tr>
-      `)
-      .join('');
+        `;
+      }).join('');
 
-    totalScore.textContent = totalDisplay;
+      // Show matchup summary below the table
+      const myTotal = totalDisplay;
+      const oppTotalDisplay = opponentResults.length > 0 ? opponentResults[0].totalDisplay : '-';
+      const oppName = opponentResults.length > 0 ? opponentResults[0].name : '';
+      totalScore.innerHTML = `${myTotal} <span class="meta-muted">vs ${escapeHTML(oppName)}: ${oppTotalDisplay}</span>`;
+    } else {
+      resultsBody.innerHTML = turnResults
+        .map(result => `
+            <tr>
+              <td>${result.orderNumber}</td>
+              <td>${result.machineName}</td>
+              <td>${result.displayMark}</td>
+              <td>${result.displayRunningTotal}</td>
+            </tr>
+        `)
+        .join('');
+
+      totalScore.textContent = totalDisplay;
+    }
+
     resultsEmpty.classList.add('hidden');
     resultsPanel.classList.remove('hidden');
   }
@@ -554,6 +625,18 @@ export async function initScoresPage() {
     const event = league?.events?.find(e => String(e.id) === String(eventId));
 
     const format = event?.scoringFormat || league?.scoringFormat || 'bowling';
+    activeFormat = format;
+    if (format === 'baseball') {
+      const [matchupsForEvent, scoresForEvent] = await Promise.all([
+        PB_API.matchups.get(eventId).catch(() => []),
+        PB_API.scores.get(null, Number(eventId)).catch(() => [])
+      ]);
+      eventMatchups = matchupsForEvent || [];
+      allEventScores = scoresForEvent || [];
+    } else {
+      eventMatchups = [];
+      allEventScores = [];
+    }
     const isSession = league?.type === 'session';
     const leagueTitle = isSession ? '' : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;
     const eventTitle = `<div class="meta-muted">Event: ${escapeHTML(event?.eventName || 'Event')}</div>`;
@@ -601,6 +684,20 @@ export async function initScoresPage() {
       const roundHeader = resultsTableHeader.querySelector('th:first-child');
       if (roundHeader) {
         roundHeader.textContent = Engine.getRoundLabel();
+      }
+      // For baseball, add Role and Opponent columns to the header
+      if (activeFormat === 'baseball' && eventMatchups.length > 0) {
+        const existingHeaders = resultsTableHeader.querySelectorAll('th');
+        // Standard headers: Round, Machine, Mark, Running Total
+        // Add Role after Machine, and Opponent after Running Total
+        if (existingHeaders.length >= 4) {
+          const roleTh = document.createElement('th');
+          roleTh.textContent = 'Role';
+          existingHeaders[1].after(roleTh);
+          const oppTh = document.createElement('th');
+          oppTh.textContent = 'Opponent';
+          resultsTableHeader.appendChild(oppTh);
+        }
       }
     }
   };

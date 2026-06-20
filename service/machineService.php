@@ -144,7 +144,7 @@ try {
                         $shiftedOldOrder = (int)$stmtOrig->fetchColumn();
 
                         $sql = 'UPDATE target_scores SET machine_id = ?, order_number = ?, value1 = ?, value2 = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
-                        $params = [(int)$item['machineId'], (int)$item['orderNumber'], (int)($item['value1'] ?? 0), (int)($item['value2'] ?? 0)];
+                        $params = [(int)$item['machineId'], (int)$item['orderNumber'], (int)($item['value1'] ?? 0), (float)($item['value2'] ?? 0)];
                         for ($i = 1; $i <= 10; $i++) $params[] = (int)($item['values'][$i] ?? 0);
                         $params[] = $id;
 
@@ -153,7 +153,7 @@ try {
                         $stmtScores->execute([(int)$item['orderNumber'], (int)$item['eventId'], $shiftedOldOrder]);
                     } else {
                         $sql = 'INSERT INTO target_scores (event_id, machine_id, order_number, value1, value2, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), value1=VALUES(value1), value2=VALUES(value2), score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5), score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
-                        $params = [(int)$item['eventId'], (int)$item['machineId'], (int)$item['orderNumber'], (int)($item['value1'] ?? 0), (int)($item['value2'] ?? 0)];
+                        $params = [(int)$item['eventId'], (int)$item['machineId'], (int)$item['orderNumber'], (int)($item['value1'] ?? 0), (float)($item['value2'] ?? 0)];
                         for ($i = 1; $i <= 10; $i++) $params[] = (int)($item['values'][$i] ?? 0);
                     }
                     $pdo->prepare($sql)->execute($params);
@@ -215,7 +215,7 @@ try {
             validateLeagueAccess($pdo, $lId);
 
             $sql = 'UPDATE target_scores SET machine_id = ?, order_number = ?, value1 = ?, value2 = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
-            $params = [(int)$input['machineId'], (int)$input['orderNumber'], (int)($input['value1'] ?? 0), (int)($input['value2'] ?? 0)];
+            $params = [(int)$input['machineId'], (int)$input['orderNumber'], (int)($input['value1'] ?? 0), (float)($input['value2'] ?? 0)];
             for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
             $params[] = $id;
             $pdo->prepare($sql)->execute($params);

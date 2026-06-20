@@ -1,0 +1,75 @@
+/* baseball.css - Scoped to Baseball theme */
+.theme-baseball {
+  --pb-primary: #0a2d48; /* Navy Blue */
+  --pb-primary-hover: #124f7e;
+  --pb-accent: #0a2d48; /* Navy Blue */
+  --pb-black: #222222;
+  --pb-white: #ffffff;
+  --pb-gray: #f2f2f2;
+  --pb-border: 3px solid var(--pb-primary);
+  --pb-shadow: 6px 6px 0px var(--pb-accent);
+  --pb-background: #ffffff;
+}
+
+/* Specific styling for Baseball game elements */
+.theme-baseball .matchup-inning {
+  font-weight: bold;
+  color: var(--pb-accent);
+  padding: 5px;
+  border-bottom: 1px solid var(--pb-gray);
+  margin-bottom: 10px;
+}
+
+.theme-baseball .player-score-baseball {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.theme-baseball .player-score-baseball .role-label {
+  font-size: 0.8em;
+  color: var(--pb-primary);
+  text-transform: uppercase;
+}
+
+.theme-baseball .player-score-baseball .runs-display {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: var(--pb-accent);
+  min-width: 30px;
+  text-align: center;
+}
+
+/* Styling for pitcher and batter roles, assuming these classes will be applied in HTML */
+.theme-baseball .player-row.pitcher .runs-display {
+  color: var(--pb-primary); /* Pitcher's runs might be highlighted differently */
+}
+
+.theme-baseball .player-row.batter .runs-display {
+  color: var(--pb-accent); /* Batter's runs */
+}
+
+/* Styling for the score entry inputs */
+.theme-baseball .score-input-baseball {
+  border: 1px solid var(--pb-gray);
+  padding: 5px;
+  width: 60px;
+  text-align: center;
+}
+
+/* Styles for "runs" indicator */
+.theme-baseball .mark-baseball {
+  font-weight: bold;
+  color: var(--pb-accent);
+  background-color: var(--pb-gray);
+  border-radius: 3px;
+  padding: 2px 5px;
+  margin-left: 5px;
+}
+
+/* Styles for different run tiers (e.g., in getMarkFormatting) */
+.theme-baseball .mark-tier-1 { color: #388e3c; } /* Green for average runs */
+.theme-baseball .mark-tier-2 { color: #fbc02d; } /* Yellow for good runs */
+.theme-baseball .mark-tier-3 { color: #e64a19; } /* Orange for great runs */
+.theme-baseball .mark-tier-4 { color: var(--pb-primary); } /* Red for excellent runs */

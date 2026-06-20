@@ -128,6 +128,12 @@ export const PB_API = {
     clear: (playerId) => fetchJSON(`service/scoreService.php?playerId=${playerId}`, { method: 'DELETE' }),
   },
 
+  matchups: {
+    get: (eventId) => fetchJSON(`service/matchupService.php?eventId=${eventId}`),
+    save: (matchups) => fetchJSON('service/matchupService.php', { method: 'POST', body: JSON.stringify(matchups) }),
+    clear: (eventId) => fetchJSON(`service/matchupService.php?eventId=${eventId}`, { method: 'DELETE' }),
+  },
+
   leagues: {
     getAll: (params) => fetchJSON('service/leagueService.php', { params }),
     get: (id) => fetchJSON(`service/leagueService.php?id=${id}`),

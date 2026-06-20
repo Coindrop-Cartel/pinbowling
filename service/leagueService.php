@@ -209,6 +209,19 @@ try {
                 }
             }
 
+            // Enforce 2-player limit for baseball sessions
+            $stmtFormat = $pdo->prepare('SELECT scoring_format FROM leagues WHERE id = ?');
+            $stmtFormat->execute([$leagueId]);
+            $leagueFormat = $stmtFormat->fetchColumn();
+            if ($leagueFormat === 'baseball') {
+                $stmtCount = $pdo->prepare('SELECT COUNT(*) FROM league_players WHERE league_id = ?');
+                $stmtCount->execute([$leagueId]);
+                $currentCount = (int)$stmtCount->fetchColumn();
+                if ($currentCount >= 2) {
+                    sendJson(['error' => 'Baseball sessions are limited to 2 players'], 400);
+                }
+            }
+
             $stmt = $pdo->prepare('INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)');
             $stmt->execute([$leagueId, $playerId]);
             sendJson(['success' => true]);
@@ -292,10 +305,11 @@ try {
 
             $stmt = $pdo->prepare('SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id WHERE e.id = ?');
         } else {
-            $sql = 'UPDATE leagues SET name = ?, start_date = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ? WHERE id = ?';
+            $sql = 'UPDATE leagues SET name = ?, start_date = ?, participants = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ? WHERE id = ?';
             $params = [
                 $input['name'], 
                 $input['startDate'] ?? null, 
+                $input['participants'] ?? 'individual',
                 $input['scoringFormat'] ?? 'bowling',
                 $input['seasonScoring'] ?? 'weekly',
                 (int)($input['dropLowestWeeks'] ?? 0),

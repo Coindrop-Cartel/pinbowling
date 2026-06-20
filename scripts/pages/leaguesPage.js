@@ -54,12 +54,28 @@ export async function initLeaguesPage() {
   const leagueDropLowestInput = document.getElementById('league-drop-weeks');
   const dropLowestRow = document.getElementById('league-drop-weeks-row');
 
+  const getParticipantMeta = (league) => {
+    if (league?.participants === 'team') return { mode: 'Team', countLabel: 'Teams', count: league.teams?.length || 0, listLabel: 'Teams', emptyLabel: 'teams' };
+    if (league?.participants === 'head2head') return { mode: 'Head-to-head', countLabel: 'Players', count: league.players?.length || 0, listLabel: 'Roster', emptyLabel: 'players' };
+    return { mode: 'Individual', countLabel: 'Players', count: league?.players?.length || 0, listLabel: 'Roster', emptyLabel: 'players' };
+  };
+
+  const syncParticipantDefault = () => {
+    if (!leagueParticipantsInput || editingLeagueId) return;
+    if (leagueFormatInput?.value === 'baseball') leagueParticipantsInput.value = 'head2head';
+  };
+
   if (leagueFormatInput) {
     const preferredFormat = getCookie('pb_preferred_format') || 'bowling';
-    leagueFormatInput.innerHTML = SCORING_FORMATS.map(f => 
-      `<option value="${f.value}" ${f.value === preferredFormat ? 'selected' : ''}>${f.label}</option>`
-    ).join('');
-    leagueFormatInput.addEventListener('change', () => applyPreferredTheme(leagueFormatInput.value));
+    leagueFormatInput.innerHTML = SCORING_FORMATS
+      .filter(f => f.value !== 'baseball') // Exclude baseball for leagues
+      .map(f => 
+        `<option value="${f.value}" ${f.value === preferredFormat ? 'selected' : ''}>${f.label}</option>`
+      ).join('');
+    leagueFormatInput.addEventListener('change', () => {
+      syncParticipantDefault();
+      applyPreferredTheme(leagueFormatInput.value);
+    });
   }
 
   if (leagueSeasonScoringInput) {
@@ -178,13 +194,12 @@ export async function initLeaguesPage() {
       filtered.forEach(league => {
         const shouldExpand = activeLeagueId && String(league.id) === String(activeLeagueId);
         
-        const participantCount = league.participants === 'team' ? (league.teams?.length || 0) : (league.players?.length || 0);
-        const participantLabel = league.participants === 'team' ? 'Teams' : 'Players';
+        const participantMeta = getParticipantMeta(league);
 
         const headerHtml = `
           <div>
             <h3 class="section-heading">${escapeHTML(league.name)}</h3>
-            <small>Started: ${escapeHTML(league.startDate) || 'N/A'} | ${league.participants === 'team' ? 'Team' : 'Individual'} | Events: ${league.events?.length || 0} | ${participantLabel}: ${participantCount} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}</small>
+            <small>Started: ${escapeHTML(league.startDate) || 'N/A'} | ${participantMeta.mode} | Events: ${league.events?.length || 0} | ${participantMeta.countLabel}: ${participantMeta.count} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}</small>
           </div>
         `;
 
@@ -196,11 +211,11 @@ export async function initLeaguesPage() {
           <ul class="league-events-list list-unstyled"></ul>
           <div class="league-players-section roster-section">
             <div class="section-bar">
-              <h4 class="section-subheading">${league.participants === 'team' ? 'Teams' : 'Roster'}</h4>
+              <h4 class="section-subheading">${participantMeta.listLabel}</h4>
               ${isAuthorized ? `<button class="${league.participants === 'team' ? 'add-team-btn' : 'add-player-btn'} secondary btn-row" data-league-id="${league.id}" data-league-name="${escapeHTML(league.name)}">Add ${league.participants === 'team' ? 'Team' : 'Player'}</button>` : ''}
             </div>
             <ul class="league-participants-list list-unstyled"></ul>
-            <div class="notice league-participants-empty hidden">No ${league.participants === 'team' ? 'teams' : 'players'} assigned to this league.</div>
+            <div class="notice league-participants-empty hidden">No ${participantMeta.emptyLabel} assigned to this league.</div>
           </div>
           <div class="action-buttons">
             ${isAuthorized ? '<button class="edit-league-btn secondary btn-row">Edit League</button>' : ''}
@@ -484,10 +499,9 @@ export async function initLeaguesPage() {
 
     const statsEl = card.querySelector('.league-header small');
     if (statsEl) {
-      const participantCount = league.participants === 'team' ? (league.teams?.length || 0) : (league.players?.length || 0);
-      const participantLabel = league.participants === 'team' ? 'Teams' : 'Players';
+      const participantMeta = getParticipantMeta(league);
 
-      statsEl.textContent = `Started: ${league.startDate || 'N/A'} | ${league.participants === 'team' ? 'Team' : 'Individual'} | Events: ${league.events?.length || 0} | ${participantLabel}: ${participantCount} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}`;
+      statsEl.textContent = `Started: ${league.startDate || 'N/A'} | ${participantMeta.mode} | Events: ${league.events?.length || 0} | ${participantMeta.countLabel}: ${participantMeta.count} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}`;
     }
   }
 

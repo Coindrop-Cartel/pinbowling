@@ -75,6 +75,7 @@
   <!-- Preview Section (Populated after Generation) -->
   <section id="qp-preview-section" data-testid="qp-preview-section" class="card hidden">
   <h2 data-testid="preview-section-title">Review Lineup & Targets</h2>
+  <div id="qp-matchups-preview" data-testid="qp-matchups-preview" class="mb-20 hidden"></div>
   <div id="qp-frames-list" data-testid="qp-frames-list" class="mb-20"></div>
     <div class="form-actions" data-testid="qp-preview-actions">
       <button id="finalize-qp-btn" data-testid="finalize-qp-button" class="primary">Create Session</button>

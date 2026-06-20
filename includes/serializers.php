@@ -46,7 +46,7 @@ function serializeLocationMachine($row) {
         'machineName' => $row['machine_name'] ?? null,
         'note' => $row['note'] ?? null,
         'value1' => (int)($row['value1'] ?? 0),
-        'value2' => (int)($row['value2'] ?? 0),
+        'value2' => (float)($row['value2'] ?? 0),
         'values' => [
             1 => (int)($row['score1'] ?? 0),
             2 => (int)($row['score2'] ?? 0),
@@ -140,7 +140,7 @@ function serializeTargetScore($row) {
         'machineName' => $row['machine_name'] ?? null,
         'orderNumber' => (int)$row['order_number'],
         'value1' => (int)($row['value1'] ?? 0),
-        'value2' => (int)($row['value2'] ?? 0),
+        'value2' => (float)($row['value2'] ?? 0),
         'values' => [
             1 => (int)($row['score1'] ?? 0),
             2 => (int)($row['score2'] ?? 0),
@@ -171,5 +171,22 @@ function serializeTeam($row) {
                 'playerName' => $m['player_name']
             ];
         }, $row['members'] ?? [])
+    ];
+}
+
+/**
+ * Normalizes a matchup database row.
+ */
+function serializeMatchup($row) {
+    return [
+        'id' => (int)$row['id'],
+        'eventId' => (int)$row['event_id'],
+        'orderNumber' => (int)$row['order_number'],
+        'player1Id' => (int)$row['player1_id'],
+        'player2Id' => (int)$row['player2_id'],
+        'machineId' => (int)$row['machine_id'],
+        'player1Name' => $row['player1_name'] ?? null,
+        'player2Name' => $row['player2_name'] ?? null,
+        'machineName' => $row['machine_name'] ?? null
     ];
 }

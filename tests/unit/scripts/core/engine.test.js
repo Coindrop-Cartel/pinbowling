@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
 import { BowlingEngine } from '@core/engines/BowlingEngine.js';
 import { GolfEngine } from '@core/engines/GolfEngine.js';
+import { BaseballEngine } from '@core/engines/BaseballEngine.js';
 
 describe('Scoring Engine Factory (engine.js)', () => {
   beforeEach(() => { document.cookie = ''; });
@@ -25,6 +26,11 @@ describe('Scoring Engine Factory (engine.js)', () => {
   it('should return an instance of GolfEngine for "golf" format', () => {
     const engine = getScoringEngine('golf');
     expect(engine).toBeInstanceOf(GolfEngine);
+  });
+
+  it('should return an instance of BaseballEngine for "baseball" format', () => {
+    const engine = getScoringEngine('baseball');
+    expect(engine).toBeInstanceOf(BaseballEngine);
   });
 
   it('should fall back to cookie preference when no format is provided', () => {
@@ -53,6 +59,14 @@ describe('Scoring Engine Factory (engine.js)', () => {
     delete window.PB_SETTINGS;
   });
 
+  it('should pass window.PB_SETTINGS.baseball to BaseballEngine constructor', () => {
+    window.PB_SETTINGS = { baseball: { roundLabel: 'Inning' } };
+    const engine = getScoringEngine('baseball');
+    expect(engine).toBeInstanceOf(BaseballEngine);
+    expect(engine.getRoundLabel()).toBe('Inning');
+    delete window.PB_SETTINGS;
+  });
+
   it('should pass window.PB_SETTINGS.bowling to BowlingEngine constructor', () => {
     window.PB_SETTINGS = { bowling: { roundLabel: 'Inning' } };
     const engine = getScoringEngine('bowling');
@@ -62,10 +76,11 @@ describe('Scoring Engine Factory (engine.js)', () => {
   });
 
   describe('SCORING_FORMATS', () => {
-    it('should contain bowling and golf format options', () => {
-      expect(SCORING_FORMATS).toHaveLength(2);
+    it('should contain bowling, golf, and baseball format options', () => {
+      expect(SCORING_FORMATS).toHaveLength(3);
       expect(SCORING_FORMATS[0].value).toBe('bowling');
       expect(SCORING_FORMATS[1].value).toBe('golf');
+      expect(SCORING_FORMATS[2].value).toBe('baseball');
     });
 
     it('should have label strings for each format', () => {
