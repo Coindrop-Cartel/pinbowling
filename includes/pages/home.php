@@ -9,6 +9,7 @@
       <p class="hero-intro-text"><?php echo $heroIntroText; ?></p>
       <div class="hero-brand-selector-inner"> <!-- Added a wrapper for the images to maintain flex gap -->
         <img src="images/pinbowling.png" class="hero-logo-btn" data-format="bowling" alt="PinBowling">
+        <img src="images/pinbaseball.png" class="hero-logo-btn" data-format="baseball" alt="PinBaseball">
         <img src="images/pingolf.png" class="hero-logo-btn" data-format="golf" alt="PinGolf">
       </div>
       <div class="hero-action-buttons" data-testid="hero-action-buttons">

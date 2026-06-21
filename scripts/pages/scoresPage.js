@@ -174,21 +174,31 @@ export async function initScoresPage() {
     const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
     const currentPlayerId = Number(getCurrentPlayerId());
     const matchup = activeFormat === 'baseball'
-      ? eventMatchups.find(m => Number(m.orderNumber) === Number(round.orderNumber) && (Number(m.player1Id) === currentPlayerId || Number(m.player2Id) === currentPlayerId))
+      ? eventMatchups.find(m => Number(m.machineId) === Number(round.machineId) && (Number(m.player1Id) === currentPlayerId || Number(m.player2Id) === currentPlayerId))
       : null;
-    const isPlayer1 = matchup ? Number(matchup.player1Id) === currentPlayerId : true;
-    const isBatter = matchup ? (Number(round.orderNumber) % 2 !== 0 ? !isPlayer1 : isPlayer1) : false;
-    const opponentName = matchup ? (isPlayer1 ? matchup.player2Name : matchup.player1Name) : '';
+    const isPitcher = matchup ? Number(matchup.player1Id) === currentPlayerId : true;
+    const opponentName = matchup ? (isPitcher ? matchup.player2Name : matchup.player1Name) : '';
     const roleHtml = matchup ? `
         <div class="baseball-role-row">
-          <span class="role-label ${isBatter ? 'batter' : 'pitcher'}">${isBatter ? 'Batter' : 'Pitcher'}</span>
+          <span class="role-label ${isPitcher ? 'pitcher' : 'batter'}">${isPitcher ? 'Pitcher' : 'Batter'}</span>
           <span class="meta-muted">vs ${escapeHTML(opponentName)}</span>
         </div>
       ` : '';
 
+    // For baseball, show the correct inning number and top/bottom designation
+    let displayInningNumber = round.orderNumber;
+    let displayInningLabel = Engine.getRoundLabel();
+    
+    if (activeFormat === 'baseball' && matchup) {
+      const inningNumber = matchup.orderNumber;
+      const positionLabel = matchup.playerOrder === 1 ? 'Top' : 'Bottom';
+      displayInningNumber = `${positionLabel} of Inning ${inningNumber}`;
+      displayInningLabel = Engine.getRoundLabel();
+    }
+    
     row.innerHTML = `
       <div class="round-info">
-        <div class="round-label"><b>${escapeHTML(Engine.getRoundLabel())} ${round.orderNumber}:</b> ${escapeHTML(round.machineName)}</div>
+        <div class="round-label"><b>${escapeHTML(displayInningLabel)} ${displayInningNumber}:</b> ${escapeHTML(round.machineName)}</div>
         ${roleHtml}
         ${Engine.getRowSummaryHtml(round, formatNumber)}
         ${bonusHtml}
@@ -521,23 +531,32 @@ export async function initScoresPage() {
 
       // Render combined results table with matchup context
       resultsBody.innerHTML = turnResults.map(result => {
-        const matchup = myMatchups.find(m => Number(m.orderNumber) === Number(result.orderNumber));
-        const isPlayer1 = matchup ? Number(matchup.player1Id) === currentPlayerId : true;
-        const isBatter = matchup ? (Number(result.orderNumber) % 2 !== 0 ? !isPlayer1 : isPlayer1) : false;
-        const roleLabel = isBatter ? 'Batter' : 'Pitcher';
-        const oppRoleLabel = isBatter ? 'Pitcher' : 'Batter';
+        const matchup = myMatchups.find(m => m.machineName === result.machineName);
+
+        const isPitcher = matchup ? Number(matchup.player1Id) === currentPlayerId : true;
+
+        const roleLabel = isPitcher ? 'Pitcher' : 'Batter';
+        const oppRoleLabel = isPitcher ? 'Batter' : 'Pitcher';
+
+        // For baseball, show the correct inning number and top/bottom designation in the results table
+        let displayInningNumber = result.orderNumber;
+        if (activeFormat === 'baseball' && matchup) {
+          const inningNumber = matchup.orderNumber;
+          const positionLabel = matchup.playerOrder === 1 ? 'Top' : 'Bottom';
+          displayInningNumber = `${positionLabel} of Inning ${inningNumber}`;
+        }
         
         // Find opponent's result for this same inning
         const oppResult = opponentResults.length > 0 ? opponentResults[0].turnResults.find(t => Number(t.orderNumber) === Number(result.orderNumber)) : null;
 
         return `
           <tr>
-            <td>${result.orderNumber}</td>
+            <td>${displayInningNumber}</td>
             <td>${result.machineName}</td>
-            <td><span class="role-label ${isBatter ? 'batter' : 'pitcher'}">${roleLabel}</span></td>
+            <td><span class="role-label ${isPitcher ? 'pitcher' : 'batter'}">${roleLabel}</span></td>
             <td>${result.displayMark}</td>
             <td>${result.displayRunningTotal}</td>
-            ${oppResult ? `<td class="meta-muted"><span class="role-label ${isBatter ? 'pitcher' : 'batter'}">${oppRoleLabel}</span> ${oppResult.displayMark}</td>` : '<td>-</td>'}
+            ${oppResult ? `<td class="meta-muted"><span class="role-label ${isPitcher ? 'batter' : 'pitcher'}">${oppRoleLabel}</span> ${oppResult.displayMark}</td>` : '<td>-</td>'}
           </tr>
         `;
       }).join('');
@@ -549,14 +568,27 @@ export async function initScoresPage() {
       totalScore.innerHTML = `${myTotal} <span class="meta-muted">vs ${escapeHTML(oppName)}: ${oppTotalDisplay}</span>`;
     } else {
       resultsBody.innerHTML = turnResults
-        .map(result => `
+        .map(result => {
+          // For baseball, show the correct inning number and position designation
+          let displayInningNumber = result.orderNumber;
+          if (activeFormat === 'baseball' && eventMatchups.length > 0) {
+            const matchup = eventMatchups.find(m => Number(m.orderNumber) === Number(result.orderNumber));
+            if (matchup) {
+              const inningNumber = Math.floor((result.orderNumber - 1) / 2) + 1;
+              const positionLabel = (result.orderNumber - 1) % 2 === 0 ? 'Top' : 'Bottom';
+              displayInningNumber = `${positionLabel} of Inning ${inningNumber}`;
+            }
+          }
+          
+          return `
             <tr>
-              <td>${result.orderNumber}</td>
+              <td>${displayInningNumber}</td>
               <td>${result.machineName}</td>
               <td>${result.displayMark}</td>
               <td>${result.displayRunningTotal}</td>
             </tr>
-        `)
+          `;
+        })
         .join('');
 
       totalScore.textContent = totalDisplay;

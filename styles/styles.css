@@ -3,6 +3,7 @@
 
 @import 'bowling.css';
 @import 'golf.css';
+@import 'baseball.css';
 
 :root {
   /* Common variables */
@@ -300,8 +301,12 @@ body {
 }
 
 /* Visual feedback: Fade out the format that isn't active */
-body:not(.theme-golf) .hero-logo-btn[data-format="golf"],
-body.theme-golf .hero-logo-btn[data-format="bowling"] {
+body.theme-golf .hero-logo-btn[data-format="bowling"],
+body.theme-golf .hero-logo-btn[data-format="baseball"],
+body.theme-bowling .hero-logo-btn[data-format="golf"],
+body.theme-bowling .hero-logo-btn[data-format="baseball"],
+body.theme-baseball .hero-logo-btn[data-format="bowling"],
+body.theme-baseball .hero-logo-btn[data-format="golf"] {
   opacity: 0.3;
   filter: grayscale(1);
 }

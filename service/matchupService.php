@@ -49,9 +49,9 @@ try {
         $pdo->beginTransaction();
         try {
             $stmt = $pdo->prepare('
-                INSERT INTO matchups (event_id, order_number, player1_id, player2_id, machine_id)
-                VALUES (?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id)
+                INSERT INTO matchups (event_id, order_number, player1_id, player2_id, machine_id, player_order)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), player_order = VALUES(player_order)
             ');
 
             foreach ($matchups as $m) {
@@ -60,12 +60,13 @@ try {
                 $p1_id = isset($m['player1Id']) ? (int)$m['player1Id'] : 0;
                 $p2_id = isset($m['player2Id']) ? (int)$m['player2Id'] : 0;
                 $machine_id = isset($m['machineId']) ? (int)$m['machineId'] : 0;
+                $player_order = isset($m['playerOrder']) ? (int)$m['playerOrder'] : 1;
 
                 if (!$event_id || !$order_number || !$p1_id || !$p2_id || !$machine_id) {
                     throw new Exception('eventId, orderNumber, player1Id, player2Id, and machineId are required');
                 }
 
-                $stmt->execute([$event_id, $order_number, $p1_id, $p2_id, $machine_id]);
+                $stmt->execute([$event_id, $order_number, $p1_id, $p2_id, $machine_id, $player_order]);
             }
             $pdo->commit();
             sendJson(['success' => true]);

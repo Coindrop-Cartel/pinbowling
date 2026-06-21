@@ -311,6 +311,32 @@ try {
     } else {
         echo "Baseball decimal/head-to-head migration already applied.\n";
     }
+
+    // Add top_bottom column to matchups table for baseball inning designation
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'matchups_add_top_bottom'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `top_bottom` ENUM('top','bottom') NOT NULL DEFAULT 'top' AFTER `machine_id`");
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('matchups_add_top_bottom')")->execute();
+        echo "✓ Matchups top_bottom column migration applied successfully.\n";
+    } else {
+        echo "Matchups top_bottom column migration already applied.\n";
+    }
+
+    // Replace top_bottom ENUM with player_order SMALLINT for flexible head-to-head matchups
+    // player_order: 1 = home (was 'top'), 2 = away (was 'bottom'), 3+ for future multi-player matchups
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'matchups_player_order'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        // Add new player_order column, migrate data, drop old column
+        $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `player_order` SMALLINT UNSIGNED NOT NULL DEFAULT 1 AFTER `machine_id`");
+        $pdo->exec("UPDATE `matchups` SET `player_order` = CASE WHEN `top_bottom` = 'top' THEN 1 WHEN `top_bottom` = 'bottom' THEN 2 ELSE 1 END");
+        $pdo->exec("ALTER TABLE `matchups` DROP COLUMN `top_bottom`");
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('matchups_player_order')")->execute();
+        echo "✓ Matchups player_order column migration applied successfully.\n";
+    } else {
+        echo "Matchups player_order column migration already applied.\n";
+    }
 } catch (PDOException $e) {
     echo "\n✗ Migration failed: " . $e->getMessage() . "\n";
     exit(1);

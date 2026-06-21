@@ -79,7 +79,7 @@ export class BaseballEngine extends ScoringEngine {
    * @returns {Object} Calculated turn data.
    */
   getInningData(machine, playerEntry, opponentEntry, isBatter) {
-    const p1 = Number(playerEntry?.ball1 || 0);
+ const p1 = Number(playerEntry?.ball1 || 0);
     const p2 = Number(playerEntry?.ball2 || 0);
     const p3 = Number(playerEntry?.ball3 || 0);
 
@@ -91,23 +91,31 @@ export class BaseballEngine extends ScoringEngine {
     let played = false;
 
     if (isBatter) {
-      // Batter runs are calculated per-ball and summed cumulatively.
-      // Each ball's runs are independently determined by the score difference
-      // on that ball. Once earned, runs are kept even if later balls yield fewer.
-      const b1 = p1;
-      const b2 = p2;
-      const b3 = p3;
-      
-      const pit1 = o1;
-      const pit2 = o2;
-      const pit3 = o3;
+      // Batter runs are calculated cumulatively across the three balls.
+      // We calculate the differential for each ball and then sum up the marginal run gains.
+      const differentials = [
+        { p: p1, o: o1 }, // Ball 1: Opponent is batter (o), Player is pitcher (p)
+        { p: p2, o: o2 }, // Ball 2
+        { p: p3, o: o3 }  // Ball 3
+      ];
 
-      const runs1 = this.calculateBallRuns(machine, pit1, b1);
-      const runs2 = this.calculateBallRuns(machine, pit2, b2);
-      const runs3 = this.calculateBallRuns(machine, pit3, b3);
+      let currentRunningDiff = 0;
+      let runsAccumulated = 0;
 
-      runs = runs1 + runs2 + runs3;
-      played = b1 > 0 || b2 > 0 || b3 > 0;
+      for (const diffPair of differentials) {
+        const ballDifferential = Number(diffPair.o - diffPair.p); // Opponent score - Player score
+        currentRunningDiff += ballDifferential;
+
+        // Calculate the total potential runs for this new cumulative differential
+        let totalPossibleRuns = this.getRunCount(machine, Math.abs(currentRunningDiff));
+        
+        // Marginal gain: New Total Runs - Previously Accumulated Runs
+        const marginalGain = Math.max(0, totalPossibleRuns - runsAccumulated);
+        runsAccumulated += marginalGain;
+      }
+      runs = runsAccumulated;
+
+      played = p1 > 0 || o1 > 0 || p2 > 0 || o2 > 0 || p3 > 0 || o3 > 0;
     } else {
       // Pitcher scores 0 runs.
       runs = 0;
@@ -141,14 +149,17 @@ export class BaseballEngine extends ScoringEngine {
     // Walk-off: if the batter is already ahead going into the last inning,
     // they win — no need to play it (like real baseball).
     let opponentRunningTotal = 0;
-    const opponentResults = machines.map(machine => {
+    const opponentResults = machines.map((machine, idx) => {
       const orderStr = String(machine.orderNumber);
       const opponentEntry = opponentMap[orderStr] || { ball1: 0, ball2: 0, ball3: 0 };
       const playerEntry = scoreMap?.[orderStr] || { ball1: 0, ball2: 0, ball3: 0 };
-      const isInningOdd = machine.orderNumber % 2 !== 0;
-      // Opponent's role is the reverse of this player's role
-      const opponentIsBatter = isInningOdd ? isPlayer1 : !isPlayer1;
-      const turn = this.getInningData(machine, opponentEntry, playerEntry, opponentIsBatter);
+      
+      // For baseball with top/bottom structure:
+      // Each inning has 2 machines (top and bottom)
+      // Top of inning (even index): Player 1 is Pitcher, Player 2 is Batter
+      // Bottom of inning (odd index): Player 1 is Batter, Player 2 is Pitcher
+      const isBatter = idx % 2 === 1 ? isPlayer1 : !isPlayer1;
+      const turn = this.getInningData(machine, opponentEntry, playerEntry, isBatter);
       if (turn.played) opponentRunningTotal += turn.score;
       return turn;
     });
@@ -160,10 +171,11 @@ export class BaseballEngine extends ScoringEngine {
       const playerEntry = scoreMap?.[orderStr] || { ball1: 0, ball2: 0, ball3: 0 };
       const opponentEntry = opponentMap[orderStr] || { ball1: 0, ball2: 0, ball3: 0 };
 
-      // Odd innings: Player 1 is Pitcher, Player 2 is Batter
-      // Even innings: Player 1 is Batter, Player 2 is Pitcher
-      const isInningOdd = machine.orderNumber % 2 !== 0;
-      const isBatter = isInningOdd ? !isPlayer1 : isPlayer1;
+      // For baseball with top/bottom structure:
+      // Each inning has 2 machines (top and bottom)
+      // Top of inning (even index): Player 1 is Pitcher, Player 2 is Batter
+      // Bottom of inning (odd index): Player 1 is Batter, Player 2 is Pitcher
+      const isBatter = idx % 2 === 1 ? isPlayer1 : !isPlayer1;
 
       // Walk-off check for the last inning:
       // If this player is the batter in the last inning and is already ahead,

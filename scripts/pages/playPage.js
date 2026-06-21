@@ -299,9 +299,13 @@ export async function initPlayPage() {
       return;
     }
 
+    // For baseball, we need 2 machines per inning (top and bottom)
+    const machinesPerInning = currentSessionFormat === 'baseball' ? 2 : 1;
+    const totalMachinesNeeded = frameCount * machinesPerInning;
+    
     // Pick random machines
-    const selected = selectRandomMachines(locMachines, frameCount);
-    while (selected.length < frameCount) {
+    const selected = selectRandomMachines(locMachines, totalMachinesNeeded);
+    while (selected.length < totalMachinesNeeded) {
       selected.push(locMachines[Math.floor(Math.random() * locMachines.length)]);
     }
 
@@ -351,10 +355,13 @@ export async function initPlayPage() {
     // Show a placeholder that explains matchups will be generated on finalize
     // based on the players in the league roster
     matchupContainer.classList.remove('hidden');
+    const inningCount = currentSessionFormat === 'baseball' 
+      ? generatedFrames.length / 2 
+      : generatedFrames.length;
     matchupContainer.innerHTML = `
       <div class="card matchup-preview-card">
         <h3>Head-to-Head Matchups</h3>
-        <p class="text-muted">Exactly 2 players compete head-to-head across ${generatedFrames.length} innings. Roles alternate each inning (Pitcher/Batter).</p>
+        <p class="text-muted">Exactly 2 players compete head-to-head across ${inningCount} innings. Roles alternate each inning (Pitcher/Batter) and each inning has 2 machines (Top and Bottom).</p>
         <div class="matchup-preview-grid">
           <div class="matchup-info">
             <span class="matchup-label">Format:</span>
@@ -362,7 +369,7 @@ export async function initPlayPage() {
           </div>
           <div class="matchup-info">
             <span class="matchup-label">Innings:</span>
-            <span>${generatedFrames.length}</span>
+            <span>${inningCount}</span>
           </div>
           <div class="matchup-info">
             <span class="matchup-label">Machines:</span>
@@ -383,11 +390,15 @@ export async function initPlayPage() {
       let contentHtml = '';
 
       if (currentSessionFormat === 'baseball') {
+        // For baseball, each inning has 2 machines (home and away)
+        const inningNumber = Math.floor(index / 2) + 1;
+        const positionLabel = index % 2 === 0 ? 'Top' : 'Bottom';
+        
         headerHtml =  `
           <div class="flex gap-12 w-100 wrap matchup-inning">
             <div class="flex gap-12 flex-1 min-250 align-center">
               <div class="drag-handle">☰</div>
-              <span class="round-number">Inning ${index + 1}</span>
+              <span class="round-number">${positionLabel} of Inning ${inningNumber}</span>
               <span class="machine-name-display">${escapeHTML(frame.machineName)}</span>
             </div>
           </div>
@@ -707,7 +718,9 @@ export async function initPlayPage() {
         const finalRoster = updatedLeague?.players || [];
 
         if (finalRoster.length >= 2) {
-          const inningCount = generatedFrames.length;
+          const inningCount = currentSessionFormat === 'baseball' 
+            ? generatedFrames.length / 2 
+            : generatedFrames.length;
           const machines = generatedFrames.map(f => ({ machineId: f.machineId }));
           const matchups = generateMatchups(finalRoster, inningCount, machines);
 

@@ -71,17 +71,18 @@ export function getTargetScoreForDifficulty(machine, difficulty) {
  * Generate head-to-head matchup pairings for a baseball session.
  * Produces a round-robin schedule where each player faces every other player.
  *
- * Each matchup is assigned an order number corresponding to the inning it belongs to.
- * For N players, there are N*(N-1)/2 unique pairings (single round-robin).
+ * For baseball, each inning has 2 machines (home and away). Each matchup is assigned
+ * an order number corresponding to the inning it belongs to, with playerOrder indicating
+ * home (1) or away (2). For N players, there are N*(N-1)/2 unique pairings (single round-robin).
  * If the number of innings exceeds the number of unique pairings, the schedule
  * cycles through the same pairings again. Role alternation (Pitcher/Batter)
- * is handled by the isBatter formula based on odd/even innings, so player1/player2
- * assignments remain consistent across all innings for the same pair of players.
+ * is handled by the isBatter formula based on playerOrder,
+ * so player1/player2 assignments remain consistent across all innings for the same pair of players.
  *
  * @param {Array<{id: number, playerName?: string}>} players - Array of player objects
  * @param {number} inningCount - Number of innings (rounds) in the session
- * @param {Array<{machineId: number}>} machines - Array of machine objects for the session (one per inning)
- * @returns {Array<{orderNumber: number, player1Id: number, player2Id: number, machineId: number}>}
+ * @param {Array<{machineId: number}>} machines - Array of machine objects for the session (2 per inning: home then away)
+ * @returns {Array<{orderNumber: number, player1Id: number, player2Id: number, machineId: number, playerOrder: number}>}
  *   Array of matchup objects ready to be saved via PB_API.matchups.save()
  */
 export function generateMatchups(players, inningCount, machines) {
@@ -97,19 +98,34 @@ export function generateMatchups(players, inningCount, machines) {
 
     // Cycle through pairings for additional innings.
     // Role alternation (Pitcher/Batter) is handled by the isBatter formula
-    // based on odd/even innings, so player1/player2 must stay consistent
+    // based on playerOrder, so player1/player2 must stay consistent
     // across all innings for the same pair of players.
     const allPairings = [...pairings];
 
     const matchups = [];
     for (let inning = 0; inning < inningCount; inning++) {
         const pairing = allPairings[inning % allPairings.length];
-        const machine = machines[inning] || machines[machines.length - 1];
+        
+        // Each inning has 2 machines: home (even index) and away (odd index)
+        const homeMachine = machines[inning * 2] || machines[0];
+        const awayMachine = machines[inning * 2 + 1] || machines[1] || homeMachine;
+        
+        // Home (playerOrder 1): player1 is pitcher, player2 is batter
         matchups.push({
             orderNumber: inning + 1,
+            playerOrder: 1,
             player1Id: pairing.player1Id,
             player2Id: pairing.player2Id,
-            machineId: machine.machineId || machine.id
+            machineId: homeMachine.machineId || homeMachine.id
+        });
+        
+        // Away (playerOrder 2): roles are swapped (player2 is pitcher, player1 is batter)
+        matchups.push({
+            orderNumber: inning + 1,
+            playerOrder: 2,
+            player1Id: pairing.player2Id,
+            player2Id: pairing.player1Id,
+            machineId: awayMachine.machineId || awayMachine.id
         });
     }
 
