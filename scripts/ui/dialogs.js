@@ -136,7 +136,7 @@ export const showPrompt = (message, title = 'Admin Password', isPassword = true)
  * @returns {Promise<boolean>} Resolves with true when dismissed.
  */
 export const showAlert = (message, title = 'Notice') =>
-  showDialog({ title, message, confirmText: 'OK', cancelText: null });
+  showDialog({ title, message, confirmText: 'OK', hideCancel: true });
 
 /**
  * Displays a dialog with a list of selectable choices (radio buttons).

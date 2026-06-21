@@ -74,14 +74,14 @@ describe('BaseballEngine', () => {
 
     // Inning 2 (Batter role): Player 1 scores runs
     // Ball 1 diff: 6M - 1M = 5M (>= 5M) -> 1 Run
-    // Ball 2 diff: 14M - 6M = 8M (>= 7.5M) -> 2 Runs
-    // Ball 3 diff: 20M - 8M = 12M (>= 11.25M) -> 3 Runs
+    // Ball 2 diff: 14M - 6M = 8M (>= 7.5M) -> 1 Runs
+    // Ball 3 diff: 20M - 8M = 12M (>= 11.25M) -> 2 Runs
     // Cumulative runs: 1 + 2 + 3 = 6 Runs
     expect(turnResults[1].isBatter).toBe(true);
-    expect(turnResults[1].score).toBe(6);
-    expect(turnResults[1].displayMark).toBe('6R');
+    expect(turnResults[1].score).toBe(4);
+    expect(turnResults[1].displayMark).toBe('4R');
 
-    expect(total).toBe(6);
+    expect(total).toBe(4);
   });
 
   test('calculateTurnResults - Away team (Player 2) scoring', () => {

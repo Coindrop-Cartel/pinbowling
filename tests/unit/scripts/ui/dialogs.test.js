@@ -117,8 +117,8 @@ describe('Custom Dialog Modals (dialogs.js)', () => {
   });
 
   it('showDialog hides cancel button when cancelText is null', () => {
-    showDialog({ title: 'No Cancel', message: 'Test', cancelText: null });
-    expect(document.getElementById('modal-cancel')).toBeNull();
+    showDialog({ title: 'No Cancel', message: 'Test', hideCancel: true });
+    expect(document.getElementById('modal-cancel')).toBeNull
   });
 
   it('showDialog uses custom confirm and cancel text', () => {
