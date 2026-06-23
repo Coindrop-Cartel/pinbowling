@@ -74,14 +74,14 @@ describe('BaseballEngine', () => {
 
     // Inning 2 (Batter role): Player 1 scores runs
     // Ball 1 diff: 6M - 1M = 5M (>= 5M) -> 1 Run
-    // Ball 2 diff: 14M - 6M = 8M (>= 7.5M) -> 1 Runs
-    // Ball 3 diff: 20M - 8M = 12M (>= 11.25M) -> 2 Runs
-    // Cumulative runs: 1 + 2 + 3 = 6 Runs
+    // Ball 2 diff: 14M - 6M = 8M (>= 7.5M) -> 2 Runs total, marginal 1 Run
+    // Ball 3 diff: 20M - 8M = 12M (>= 11.25M) -> 3 Runs total, marginal 1 Run
+    // Cumulative runs: 1 + 1 + 1 = 3 Runs
     expect(turnResults[1].isBatter).toBe(true);
-    expect(turnResults[1].score).toBe(4);
-    expect(turnResults[1].displayMark).toBe('4R');
+    expect(turnResults[1].score).toBe(3);
+    expect(turnResults[1].displayMark).toBe('3R');
 
-    expect(total).toBe(4);
+    expect(total).toBe(3);
   });
 
   test('calculateTurnResults - Away team (Player 2) scoring', () => {
@@ -102,19 +102,65 @@ describe('BaseballEngine', () => {
 
     // Inning 1 (Batter role): Player 2 scores runs
     // Ball 1 diff: 7M - 3M = 4M (< 5M) -> 0 Runs
-    // Ball 2 diff: 14M - 6M = 8M (>= 7.5M) -> 2 Runs
-    // Ball 3 diff: 18M - 8M = 10M (< 11.25M) -> 2 Runs
-    // Cumulative runs: 0 + 2 + 2 = 4 Runs
+    // Ball 2 diff: 14M - 6M = 8M (>= 7.5M) -> 2 Runs total, marginal 2 Runs
+    // Ball 3 diff: 18M - 8M = 10M (< 11.25M) -> 2 Runs total, marginal 0 Runs
+    // Cumulative runs: 0 + 2 + 0 = 2 Runs
     expect(turnResults[0].isBatter).toBe(true);
-    expect(turnResults[0].score).toBe(4);
-    expect(turnResults[0].displayMark).toBe('4R');
+    expect(turnResults[0].score).toBe(2);
+    expect(turnResults[0].displayMark).toBe('2R');
 
     // Inning 2 (Pitcher role): Player 2 scores 0 runs
     expect(turnResults[1].isBatter).toBe(false);
     expect(turnResults[1].score).toBe(0);
     expect(turnResults[1].displayMark).toBe('P');
 
-    expect(total).toBe(4);
+    expect(total).toBe(2);
+  });
+
+  test('getInningData - cumulative pinball scoring with marginal run gains', () => {
+    // User's example: Machine thresholds 10=1R, 20=2R, 30=3R, etc.
+    const machine = {
+      orderNumber: 1,
+      machineName: 'Godzilla',
+      values: { 1: 10, 2: 20, 3: 30, 4: 40, 5: 50, 6: 60, 7: 70, 8: 80, 9: 90, 10: 100 }
+    };
+
+    // Pitcher: Ball 1: 5, Ball 2: 10, Ball 3: 15
+    // Batter:  Ball 1: 15, Ball 2: 25, Ball 3: 35
+    const pitcherEntry = { ball1: 5, ball2: 10, ball3: 15 };
+    const batterEntry = { ball1: 15, ball2: 25, ball3: 35 };
+
+    // Ball 1: batter-pitcher = 15-5 = 10 → 1R, accumulated=1R
+    // Ball 2: batter-pitcher = 25-10 = 15 → 1R, marginal=0R, accumulated=1R
+    // Ball 3: batter-pitcher = 35-15 = 20 → 2R, marginal=1R, accumulated=2R
+    const result = engine.getInningData(machine, batterEntry, pitcherEntry, true);
+    expect(result.score).toBe(2);
+    expect(result.played).toBe(true);
+    expect(result.mark).toBe('2R');
+  });
+
+  test('getInningData - no runs when batter never exceeds pitcher', () => {
+    const machine = {
+      orderNumber: 1,
+      machineName: 'Test',
+      values: { 1: 10, 2: 20, 3: 30, 4: 40, 5: 50, 6: 60, 7: 70, 8: 80, 9: 90, 10: 100 }
+    };
+
+    const pitcherEntry = { ball1: 20, ball2: 40, ball3: 60 };
+    const batterEntry = { ball1: 10, ball2: 20, ball3: 30 };
+
+    const result = engine.getInningData(machine, batterEntry, pitcherEntry, true);
+    expect(result.score).toBe(0);
+  });
+
+  test('getInningData - pitcher always scores 0', () => {
+    const machine = mockInning(1);
+    const playerEntry = { ball1: 5000000, ball2: 10000000, ball3: 15000000 };
+    const opponentEntry = { ball1: 1000000, ball2: 2000000, ball3: 3000000 };
+
+    const result = engine.getInningData(machine, playerEntry, opponentEntry, false);
+    expect(result.score).toBe(0);
+    expect(result.isBatter).toBe(false);
   });
 
   // ── compareScores ────────────────────────────────────────────────────

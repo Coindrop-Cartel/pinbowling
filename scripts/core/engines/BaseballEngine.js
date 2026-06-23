@@ -92,23 +92,21 @@ export class BaseballEngine extends ScoringEngine {
 
     if (isBatter) {
       // Batter runs are calculated cumulatively across the three balls.
-      // We calculate the differential for each ball and then sum up the marginal run gains.
-      const differentials = [
-        { p: p1, o: o1 }, // Ball 1: Opponent is batter (o), Player is pitcher (p)
-        { p: p2, o: o2 }, // Ball 2
-        { p: p3, o: o3 }  // Ball 3
-      ];
+      // Pinball scores are cumulative, so each ball's score already represents
+      // the running total. The differential for each ball is simply
+      // batterScore - pitcherScore. We then check if the new differential
+      // crosses the next run threshold, scoring only the marginal gain.
+      const batterScores = [p1, p2, p3]; // Player is batter
+      const pitcherScores = [o1, o2, o3]; // Opponent is pitcher
 
-      let currentRunningDiff = 0;
       let runsAccumulated = 0;
 
-      for (const diffPair of differentials) {
-        const ballDifferential = Number(diffPair.o - diffPair.p); // Opponent score - Player score
-        currentRunningDiff += ballDifferential;
+      for (let i = 0; i < 3; i++) {
+        const cumulativeDiff = batterScores[i] - pitcherScores[i];
 
-        // Calculate the total potential runs for this new cumulative differential
-        let totalPossibleRuns = this.getRunCount(machine, Math.abs(currentRunningDiff));
-        
+        // Calculate the total potential runs for this cumulative differential
+        const totalPossibleRuns = this.getRunCount(machine, cumulativeDiff);
+
         // Marginal gain: New Total Runs - Previously Accumulated Runs
         const marginalGain = Math.max(0, totalPossibleRuns - runsAccumulated);
         runsAccumulated += marginalGain;
