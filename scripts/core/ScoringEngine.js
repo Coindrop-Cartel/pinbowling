@@ -233,4 +233,92 @@ export class ScoringEngine {
   getInitialValues(suggestedTarget = 0) {
     return { value1: suggestedTarget, value2: 0 };
   }
+
+  // --- Score Map & Results Rendering Hooks ---
+  // These methods allow format-specific engines to handle their own
+  // enrichment and rendering logic, keeping the UI page format-agnostic.
+
+  /**
+   * Enriches the score map with format-specific data before calculation.
+   * Default implementation returns the score map unchanged.
+   * Baseball overrides this to attach opponent scores and player-role info.
+   *
+   * @param {Object} scoreMap Map of orderNumber to ball scores from the DOM.
+   * @param {Object} context Format-specific context data.
+   * @param {Array} context.allEventScores All scores for the current event.
+   * @param {Array} context.eventMatchups Matchup data for the current event.
+   * @param {Array} context.allPlayersCache Cached player list.
+   * @param {Function} context.getCurrentPlayerId Returns the selected player ID.
+   * @param {Function} context.normalizeScores Normalizes raw score rows.
+   * @param {Function} context.groupScoresByPlayer Groups scores by player ID.
+   * @param {Function} context.buildBaseballScoreMapForPlayer Builds a baseball score map.
+   * @returns {Object} The enriched score map.
+   */
+  enrichScoreMap(scoreMap, context) {
+    return scoreMap;
+  }
+
+  /**
+   * Renders the results panel content for this format.
+   * Default implementation renders a standard table of turn results.
+   * Baseball overrides this to render a head-to-head scoreboard grid.
+   *
+   * @param {{turnResults: Array, totalDisplay: string}} calcResult Output from calculateTurnResults.
+   * @param {Array} machines Target definitions for the event.
+   * @param {Object} scoreMap The enriched score map used for calculation.
+   * @param {Object} context Format-specific context data (same keys as enrichScoreMap).
+   * @param {Object} domRefs DOM element references for the results panel.
+   * @param {HTMLElement} domRefs.resultsPanel The results panel container.
+   * @param {HTMLElement} domRefs.resultsBody The table body for standard results.
+   * @param {HTMLElement} domRefs.totalScore The total score display element.
+   * @param {HTMLElement} domRefs.resultsEmpty The empty-state element.
+   * @param {Function} domRefs.escapeHTML HTML escaping utility.
+   */
+  renderResults(calcResult, machines, scoreMap, context, domRefs) {
+    const { turnResults, totalDisplay } = calcResult;
+    const { resultsPanel, resultsBody, totalScore, resultsEmpty, escapeHTML: escHTML } = domRefs;
+
+    // Show the standard table (may have been hidden by a previous format)
+    const resultsTable = resultsPanel.querySelector('table.data-table');
+    if (resultsTable) resultsTable.classList.remove('hidden');
+
+    // Remove any format-specific grid from a previous render
+    const existingGrid = resultsPanel.querySelector('.scoreboard-grid');
+    if (existingGrid) existingGrid.remove();
+
+    resultsBody.innerHTML = turnResults
+      .map(result => {
+        return `
+          <tr>
+            <td>${result.orderNumber}</td>
+            <td>${result.machineName}</td>
+            <td>${result.displayMark}</td>
+            <td>${result.displayRunningTotal}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    totalScore.textContent = totalDisplay;
+    resultsEmpty.classList.add('hidden');
+    resultsPanel.classList.remove('hidden');
+  }
+
+  /**
+   * Returns format-specific context for a round row in the scoring form.
+   * Default implementation returns an empty object (no extra context).
+   * Baseball overrides this to provide matchup/role information.
+   *
+   * @param {Object} round The machine configuration for this round.
+   * @param {Object} context Format-specific context data (same keys as enrichScoreMap).
+   * @returns {Object} Format-specific row context. May include:
+   *   - {Object|null} matchup The matchup for this round (if applicable).
+   *   - {boolean} isPitcher Whether the current player is the pitcher.
+   *   - {string} opponentName Name of the opponent.
+   *   - {string} displayRoundNumber How to label this round (e.g. "Top of Inning 1").
+   *   - {string} roleHtml Additional HTML for the role indicator.
+   */
+  getRoundRowContext(round, context) {
+    return {};
+  }
 }

@@ -172,33 +172,14 @@ export async function initScoresPage() {
     row.dataset.orderNumber = round.orderNumber;
 
     const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
-    const currentPlayerId = Number(getCurrentPlayerId());
-    const matchup = activeFormat === 'baseball'
-      ? eventMatchups.find(m => Number(m.machineId) === Number(round.machineId) && (Number(m.player1Id) === currentPlayerId || Number(m.player2Id) === currentPlayerId))
-      : null;
-    const isPitcher = matchup ? Number(matchup.player1Id) === currentPlayerId : true;
-    const opponentName = matchup ? (isPitcher ? matchup.player2Name : matchup.player1Name) : '';
-    const roleHtml = matchup ? `
-        <div class="baseball-role-row">
-          <span class="role-label ${isPitcher ? 'pitcher' : 'batter'}">${isPitcher ? 'Pitcher' : 'Batter'}</span>
-          <span class="meta-muted">vs ${escapeHTML(opponentName)}</span>
-        </div>
-      ` : '';
-
-    // For baseball, show the correct inning number and top/bottom designation
-    let displayInningNumber = round.orderNumber;
-    let displayInningLabel = Engine.getRoundLabel();
-    
-    if (activeFormat === 'baseball' && matchup) {
-      const inningNumber = matchup.orderNumber;
-      const positionLabel = matchup.playerOrder === 1 ? 'Top' : 'Bottom';
-      displayInningNumber = `${positionLabel} of Inning ${inningNumber}`;
-      displayInningLabel = Engine.getRoundLabel();
-    }
+    const rowContext = Engine.getRoundRowContext(round, getEngineContext());
+    const displayRoundNumber = rowContext.displayRoundNumber ?? round.orderNumber;
+    const displayRoundLabel = rowContext.displayRoundLabel ?? Engine.getRoundLabel();
+    const roleHtml = rowContext.roleHtml ?? '';
     
     row.innerHTML = `
       <div class="round-info">
-        <div class="round-label"><b>${escapeHTML(displayInningLabel)} ${displayInningNumber}:</b> ${escapeHTML(round.machineName)}</div>
+        <div class="round-label"><b>${escapeHTML(displayRoundLabel)} ${displayRoundNumber}:</b> ${escapeHTML(round.machineName)}</div>
         ${roleHtml}
         ${Engine.getRowSummaryHtml(round, formatNumber)}
         ${bonusHtml}
@@ -491,19 +472,30 @@ export async function initScoresPage() {
   }
 
   /**
+   * Builds the context object passed to engine methods (enrichScoreMap, renderResults, getRoundRowContext).
+   * This allows format-specific engines to access the data they need without the UI
+   * branching on activeFormat.
+   */
+  function getEngineContext() {
+    return {
+      allEventScores,
+      eventMatchups,
+      allPlayersCache,
+      getCurrentPlayerId,
+      normalizeScores,
+      groupScoresByPlayer,
+      buildBaseballScoreMapForPlayer,
+      escapeHTML
+    };
+  }
+
+  /**
    * Aggregates current input values into a map for the scoring engine.
    * @returns {Object} Map of order_number to ball scores.
    */
   function getScoreMapFromInputs() {
     const scoreMap = buildScoreMapFromDOM(roundsInput);
-    if (activeFormat === 'baseball') {
-      const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
-      const selectedPlayerId = getCurrentPlayerId();
-      const opponentMap = buildBaseballScoreMapForPlayer(selectedPlayerId, scoresByPlayer, eventMatchups);
-      scoreMap.opponent = opponentMap.opponent || {};
-      scoreMap.isPlayer1 = opponentMap.isPlayer1;
-    }
-    return scoreMap;
+    return Engine.enrichScoreMap(scoreMap, getEngineContext());
   }
 
   /**
@@ -512,90 +504,15 @@ export async function initScoresPage() {
    */
   function renderCurrentResults() {
     const scoreMap = getScoreMapFromInputs();
-    const { turnResults, totalDisplay } = Engine.calculateTurnResults(machines, scoreMap);
+    const calcResult = Engine.calculateTurnResults(machines, scoreMap);
 
-    if (activeFormat === 'baseball' && eventMatchups.length > 0) {
-      const currentPlayerId = Number(getCurrentPlayerId());
-      // Find all matchups involving this player
-      const myMatchups = eventMatchups.filter(m => Number(m.player1Id) === currentPlayerId || Number(m.player2Id) === currentPlayerId);
-      const opponentIds = [...new Set(myMatchups.map(m => Number(m.player1Id) === currentPlayerId ? Number(m.player2Id) : Number(m.player1Id)))];
-      
-      // Build opponent score maps and calculate their totals
-      const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
-      const opponentResults = opponentIds.map(oppId => {
-        const oppScoreMap = buildBaseballScoreMapForPlayer(oppId, scoresByPlayer, eventMatchups);
-        const { turnResults: oppTurnResults, totalDisplay: oppTotalDisplay, total: oppTotal } = Engine.calculateTurnResults(machines, oppScoreMap);
-        const oppPlayer = allPlayersCache.find(p => p.id === oppId);
-        return { id: oppId, name: oppPlayer?.playerName || `Player ${oppId}`, turnResults: oppTurnResults, totalDisplay: oppTotalDisplay, total: oppTotal };
-      });
-
-      // Render combined results table with matchup context
-      resultsBody.innerHTML = turnResults.map(result => {
-        const matchup = myMatchups.find(m => m.machineName === result.machineName);
-
-        const isPitcher = matchup ? Number(matchup.player1Id) === currentPlayerId : true;
-
-        const roleLabel = isPitcher ? 'Pitcher' : 'Batter';
-        const oppRoleLabel = isPitcher ? 'Batter' : 'Pitcher';
-
-        // For baseball, show the correct inning number and top/bottom designation in the results table
-        let displayInningNumber = result.orderNumber;
-        if (activeFormat === 'baseball' && matchup) {
-          const inningNumber = matchup.orderNumber;
-          const positionLabel = matchup.playerOrder === 1 ? 'Top' : 'Bottom';
-          displayInningNumber = `${positionLabel} of Inning ${inningNumber}`;
-        }
-        
-        // Find opponent's result for this same inning
-        const oppResult = opponentResults.length > 0 ? opponentResults[0].turnResults.find(t => Number(t.orderNumber) === Number(result.orderNumber)) : null;
-
-        return `
-          <tr>
-            <td>${displayInningNumber}</td>
-            <td>${result.machineName}</td>
-            <td><span class="role-label ${isPitcher ? 'pitcher' : 'batter'}">${roleLabel}</span></td>
-            <td>${result.displayMark}</td>
-            <td>${result.displayRunningTotal}</td>
-            ${oppResult ? `<td class="meta-muted"><span class="role-label ${isPitcher ? 'batter' : 'pitcher'}">${oppRoleLabel}</span> ${oppResult.displayMark}</td>` : '<td>-</td>'}
-          </tr>
-        `;
-      }).join('');
-
-      // Show matchup summary below the table
-      const myTotal = totalDisplay;
-      const oppTotalDisplay = opponentResults.length > 0 ? opponentResults[0].totalDisplay : '-';
-      const oppName = opponentResults.length > 0 ? opponentResults[0].name : '';
-      totalScore.innerHTML = `${myTotal} <span class="meta-muted">vs ${escapeHTML(oppName)}: ${oppTotalDisplay}</span>`;
-    } else {
-      resultsBody.innerHTML = turnResults
-        .map(result => {
-          // For baseball, show the correct inning number and position designation
-          let displayInningNumber = result.orderNumber;
-          if (activeFormat === 'baseball' && eventMatchups.length > 0) {
-            const matchup = eventMatchups.find(m => Number(m.orderNumber) === Number(result.orderNumber));
-            if (matchup) {
-              const inningNumber = Math.floor((result.orderNumber - 1) / 2) + 1;
-              const positionLabel = (result.orderNumber - 1) % 2 === 0 ? 'Top' : 'Bottom';
-              displayInningNumber = `${positionLabel} of Inning ${inningNumber}`;
-            }
-          }
-          
-          return `
-            <tr>
-              <td>${displayInningNumber}</td>
-              <td>${result.machineName}</td>
-              <td>${result.displayMark}</td>
-              <td>${result.displayRunningTotal}</td>
-            </tr>
-          `;
-        })
-        .join('');
-
-      totalScore.textContent = totalDisplay;
-    }
-
-    resultsEmpty.classList.add('hidden');
-    resultsPanel.classList.remove('hidden');
+    Engine.renderResults(calcResult, machines, scoreMap, getEngineContext(), {
+      resultsPanel,
+      resultsBody,
+      totalScore,
+      resultsEmpty,
+      escapeHTML
+    });
   }
 
   /**
@@ -710,26 +627,12 @@ export async function initScoresPage() {
     playerSelectionCard.classList.remove('hidden');
     await refreshPlayerSelection();
 
-    // Update the results table header to use "Frame" (mapping data from order_number)
-    const resultsTableHeader = resultsPanel.querySelector('thead tr');
+    // Update the results table header to use the engine's round label
+    const resultsTableHeader = resultsPanel.querySelector('table.data-table thead tr');
     if (resultsTableHeader) {
       const roundHeader = resultsTableHeader.querySelector('th:first-child');
       if (roundHeader) {
         roundHeader.textContent = Engine.getRoundLabel();
-      }
-      // For baseball, add Role and Opponent columns to the header
-      if (activeFormat === 'baseball' && eventMatchups.length > 0) {
-        const existingHeaders = resultsTableHeader.querySelectorAll('th');
-        // Standard headers: Round, Machine, Mark, Running Total
-        // Add Role after Machine, and Opponent after Running Total
-        if (existingHeaders.length >= 4) {
-          const roleTh = document.createElement('th');
-          roleTh.textContent = 'Role';
-          existingHeaders[1].after(roleTh);
-          const oppTh = document.createElement('th');
-          oppTh.textContent = 'Opponent';
-          resultsTableHeader.appendChild(oppTh);
-        }
       }
     }
   };

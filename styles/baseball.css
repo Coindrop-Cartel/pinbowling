@@ -73,3 +73,74 @@
 .theme-baseball .mark-tier-2 { color: #fbc02d; } /* Yellow for good runs */
 .theme-baseball .mark-tier-3 { color: #e64a19; } /* Orange for great runs */
 .theme-baseball .mark-tier-4 { color: var(--pb-primary); } /* Red for excellent runs */
+
+/* Scoreboard Grid — baseball-style results table */
+.theme-baseball .scoreboard-grid {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.theme-baseball .scoreboard-row {
+  display: table-row;
+}
+
+.theme-baseball .scoreboard-row.header {
+  font-weight: bold;
+  background: var(--pb-primary);
+  color: var(--pb-white);
+}
+
+.theme-baseball .scoreboard-row.header > span,
+.theme-baseball .scoreboard-row.player-row > span {
+  display: table-cell;
+  padding: 6px 10px;
+  text-align: center;
+  border: 1px solid var(--pb-gray);
+}
+
+/* Top row of a player pair gets a slightly darker background */
+.theme-baseball .scoreboard-row.player-row.top-row {
+  background: var(--pb-white);
+}
+
+/* Bot row is visually lighter to distinguish the half-inning */
+.theme-baseball .scoreboard-row.player-row.bot-row {
+  background: var(--pb-gray);
+  font-size: 0.85em;
+}
+
+/* The "Bot" label in the second sub-row is indented to show hierarchy */
+.theme-baseball .scoreboard-row .player-name.half-label {
+  font-weight: 400;
+  font-size: 0.8em;
+  padding-left: 1.5em;
+  color: var(--pb-muted, #666);
+}
+
+.theme-baseball .scoreboard-row .player-col {
+  text-align: left;
+}
+
+.theme-baseball .scoreboard-row .player-name {
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.theme-baseball .scoreboard-row .inning-header {
+  min-width: 48px;
+  font-size: 0.8em;
+}
+
+.theme-baseball .scoreboard-row .inning-score {
+  min-width: 36px;
+}
+
+.theme-baseball .scoreboard-row .total-header,
+.theme-baseball .scoreboard-row .total-score {
+  font-weight: bold;
+  min-width: 48px;
+  border-left: 2px solid var(--pb-primary);
+}
