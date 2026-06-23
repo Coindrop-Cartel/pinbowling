@@ -72,10 +72,10 @@ export async function initLeaguesPage() {
       .map(f => 
         `<option value="${f.value}" ${f.value === preferredFormat ? 'selected' : ''}>${f.label}</option>`
       ).join('');
-    leagueFormatInput.addEventListener('change', () => {
+    leagueFormatInput.onchange = () => {
       syncParticipantDefault();
       applyPreferredTheme(leagueFormatInput.value);
-    });
+    };
   }
 
   if (leagueSeasonScoringInput) {
@@ -87,7 +87,7 @@ export async function initLeaguesPage() {
 
   const eventFormatInput = document.getElementById('event-scoring-format');
   if (eventFormatInput) {
-    eventFormatInput.addEventListener('change', () => applyPreferredTheme(eventFormatInput.value));
+    eventFormatInput.onchange = () => applyPreferredTheme(eventFormatInput.value);
   }
 
   const actionsRow = createBtn.closest('.form-actions');
@@ -290,7 +290,7 @@ export async function initLeaguesPage() {
     onFilter: onFilterUpdate
   });
 
-  leagueDateInput.addEventListener('input', () => filterInstance.performFilter());
+  leagueDateInput.oninput = () => filterInstance.performFilter();
 
   const refresh = async (data = null) => {
     try {
@@ -311,7 +311,7 @@ export async function initLeaguesPage() {
     }
   };
 
-  leagueForm.addEventListener('submit', async (e) => {
+  leagueForm.onsubmit = async (e) => {
     e.preventDefault();
     const name = leagueNameInput.value.trim();
     const date = leagueDateInput.value;
@@ -341,7 +341,7 @@ export async function initLeaguesPage() {
       createBtn.disabled = false;
       createBtn.textContent = editingLeagueId ? 'Update League' : 'Save League';
     }
-  });
+  };
 
   function renderEventsForLeague(leagueId, leagueEvents, leagueName) {
     const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
@@ -622,6 +622,7 @@ export async function initLeaguesPage() {
 
   document.getElementById('event-form').onsubmit = async (e) => {
     e.preventDefault();
+
     const leagueId = document.getElementById('event-league-id').value;
     const eventId = document.getElementById('event-id').value;
     const name = document.getElementById('event-name').value.trim();
@@ -668,6 +669,8 @@ export async function initLeaguesPage() {
     } catch (err) {
       console.error('Event save failed:', err);
       alert(`Failed to save event: ${err.message}`);
+    } finally {
+      isSubmitting = false;
     }
   };
 

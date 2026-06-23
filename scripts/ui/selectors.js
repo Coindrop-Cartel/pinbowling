@@ -137,7 +137,7 @@ export function setupLiveFilter(inputElement, initialData, { labelKey = 'name', 
     if (onFilter) onFilter(filtered, query);
   };
 
-  inputElement.addEventListener('input', performFilter);
+  inputElement.oninput = performFilter;
 
   return {
     performFilter,

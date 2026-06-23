@@ -225,6 +225,71 @@ export class ScoringEngine {
     return isMajor ? 'threshold-major' : 'threshold-minor';
   }
 
+    /**
+   * Detects the scaling type (flat or curved) from a set of round values.
+   * @param {Object} values
+   * @returns {string} 'flat' or 'curved'
+   */
+  getScalingType(values) {
+    if (!values) return 'curved';
+    const ranks = Object.keys(values).map(Number).sort((a, b) => a - b);
+    if (ranks.length < 3) return 'flat';
+
+    // Check if the gap is increasing significantly (curved/exponential)
+    // Note: Bowling uses descending (10 is high), Golf uses ascending (1 is high).
+    // We use absolute differences to detect scaling regardless of order.
+    const gapStart = Math.abs(values[ranks[1]] - values[ranks[0]]);
+    const gapEnd = Math.abs(values[ranks[ranks.length - 1]] - values[ranks[ranks.length - 2]]);
+
+    return (gapEnd > gapStart * 1.5) ? 'curved' : 'flat';
+  }
+
+  /**
+   * Returns HTML for a threshold grid display, showing all ranks and their corresponding values.
+   * @param {Object} values Map of rank to score value.
+   * @param {Function} formatNumber Function to format numeric values for display.
+   * @param {number} value1 Primary context value (e.g. high score).
+   * @param {number} value2 Secondary context value (e.g. low score).
+   * @returns {string}
+   */
+  getThresholdGridHtml(values, formatNumber, value1 = 0, value2 = 0) {
+    if (!values || Object.keys(values).length === 0) return '<div class="notice">Enter scores to see thresholds.</div>';
+    const prefix = this.getThresholdPrefix();
+
+    const ranksToDisplay = this.getThresholdRange()
+      .filter(rank => values[rank] !== undefined);
+
+    return `
+      <div class="threshold-grid-container">
+        ${prefix ? `<div class="threshold-prefix">${prefix}:</div>` : ''}
+        <div class="threshold-grid">
+          ${ranksToDisplay
+            .map(rank => {
+              const val = values[rank];
+              const label = this.getThresholdLabel(rank, value1, value2);
+              const rowClass = this.getThresholdRowClass(rank, value1, value2);
+              return `<div class="threshold-row ${rowClass}"><strong>${label}:</strong> ${formatNumber(val)}</div>`;
+            })
+            .join('')
+          }
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Calculates quick-fill suggested values for a machine.
+   * @param {Object} machineData { targetEasy, targetMed, targetHard }
+   * @param {string} type 'easy', 'med', or 'hard'
+   * @returns {{value1: number, value2: number}}
+   */
+  getQuickFillValues(machineData, type) {
+    const val = machineData?.['target' + type.charAt(0).toUpperCase() + type.slice(1)];
+    if (!val) return null;
+    const defaults = this.getInitialValues(val);
+    return { value1: val, value2: defaults.value2 };
+  }
+
   /**
    * Returns default scoring values for a new machine setup.
    * @param {number} [suggestedTarget] Optional base value to derive defaults from.
