@@ -95,6 +95,20 @@ export class ScoringEngine {
   getBonusTargetHtml() { return ''; }
 
   /**
+   * Returns the HTML summary of target information for a single round/machine
+   * on the printable blank score sheet. Each engine format controls its own
+   * display so the UI does not branch on format.
+   *
+   * @param {import('@scripts/types.js').Machine} machine The machine/round data.
+   * @param {boolean} isLastRound Whether this is the last round.
+   * @param {Function} formatNumber Function to format numeric values for display.
+   * @returns {string} HTML string for the targets summary line.
+   */
+  getPrintTargetSummaryHtml(machine, isLastRound, formatNumber) {
+    return '';
+  }
+
+  /**
    * Returns the terminology used for an individual round (e.g., "Round", "Frame", "Hole").
    * @returns {string}
    */
@@ -225,25 +239,6 @@ export class ScoringEngine {
     return isMajor ? 'threshold-major' : 'threshold-minor';
   }
 
-    /**
-   * Detects the scaling type (flat or curved) from a set of round values.
-   * @param {Object} values
-   * @returns {string} 'flat' or 'curved'
-   */
-  getScalingType(values) {
-    if (!values) return 'curved';
-    const ranks = Object.keys(values).map(Number).sort((a, b) => a - b);
-    if (ranks.length < 3) return 'flat';
-
-    // Check if the gap is increasing significantly (curved/exponential)
-    // Note: Bowling uses descending (10 is high), Golf uses ascending (1 is high).
-    // We use absolute differences to detect scaling regardless of order.
-    const gapStart = Math.abs(values[ranks[1]] - values[ranks[0]]);
-    const gapEnd = Math.abs(values[ranks[ranks.length - 1]] - values[ranks[ranks.length - 2]]);
-
-    return (gapEnd > gapStart * 1.5) ? 'curved' : 'flat';
-  }
-
   /**
    * Returns HTML for a threshold grid display, showing all ranks and their corresponding values.
    * @param {Object} values Map of rank to score value.
@@ -297,6 +292,28 @@ export class ScoringEngine {
    */
   getInitialValues(suggestedTarget = 0) {
     return { value1: suggestedTarget, value2: 0 };
+  }
+
+  // --- Data Fetching Hooks ---
+  // These methods allow format-specific engines to declare what additional
+  // API data they need, keeping the UI page format-agnostic.
+
+  /**
+   * Returns an object describing additional API data this engine requires
+   * for a given event. The UI calls this method and fetches the declared
+   * data generically, then merges it into the engine context.
+   *
+   * Default implementation returns an empty object (no extra data needed).
+   * Baseball overrides this to request matchups and all event scores.
+   *
+   * @param {string|number} eventId The active event ID.
+   * @param {Object} api The PB_API object (avoids circular import).
+   * @returns {Object} Map of contextKey → Promise. Each key becomes a
+   *   property in the engine context after the promise resolves.
+   *   Example: { eventMatchups: api.matchups.get(eventId), allEventScores: api.scores.get(null, eventId) }
+   */
+  getRequiredEventData(eventId, api) {
+    return {};
   }
 
   // --- Score Map & Results Rendering Hooks ---
@@ -386,4 +403,38 @@ export class ScoringEngine {
   getRoundRowContext(round, context) {
     return {};
   }
+
+  /**
+   * Simple helper to tell if an orderNumber is the last round.
+   * @param {number} orderNumber
+   * @returns {boolean}
+   */
+  isLastRound(orderNumber) {
+    return orderNumber === this.getMaxOrder();
+  }
+
+  /**
+   * Max order number in the current event – used by several derived engines.
+   * Derived classes should set `this.maxOrder` appropriately after loading targets.
+   */
+  getMaxOrder() { return this.config?.maxOrder ?? 0; }
+
+  /**
+   * Builds an entire round row for the UI.
+   *
+   * @param {Object}   round         Machine config (orderNumber, machineName, values…)
+   * @param {Object|null} turnValues Existing scores from the DB (or null)
+   * @param {boolean} isLastRound  Is this frame 10?
+   * @param {Object|null} targetPlayer Player being scored
+   * @param {Object} roundContext Engine‑specific data from getRoundRowContext()
+   * @returns {HTMLElement}
+   */
+  async renderRoundRow(round, turnValues, isLastRound, targetPlayer, roundContext) {
+    const row = document.createElement('div');
+    // Copy the entire old body of buildRoundRow here …
+    // Use `roundContext.roleHtml`, `roundContext.displayRoundNumber` etc. if present.
+    // Attach listeners (input → dirty flag, save button click).
+    return row;
+  }
+  
 }

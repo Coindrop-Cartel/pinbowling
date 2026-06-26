@@ -159,13 +159,18 @@ export function buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchup
   scoreMap.isPlayer1 = firstMatchup ? Number(firstMatchup.player1Id ?? firstMatchup.player1_id) === id : true;
 
   playerMatchups.forEach(matchup => {
-    const orderNumber = String(matchup.orderNumber ?? matchup.order_number);
+    const matchupOrderNumber = Number(matchup.orderNumber ?? matchup.order_number);
+    // With sequential order_numbers, the matchup orderNumber IS the machine orderNumber directly.
+    // Odd = Top of inning, Even = Bottom of inning (e.g., 1=Top 1st, 2=Bottom 1st, 3=Top 2nd, etc.)
+    const machineOrderNumber = String(matchupOrderNumber);
     const opponentId = Number(matchup.player1Id ?? matchup.player1_id) === id
       ? Number(matchup.player2Id ?? matchup.player2_id)
       : Number(matchup.player1Id ?? matchup.player1_id);
     const opponentScores = scoresByPlayer?.[opponentId] || scoresByPlayer?.[String(opponentId)] || [];
-    const opponentRow = opponentScores.find(s => Number(s.orderNumber ?? s.order_number) === Number(orderNumber));
-    if (opponentRow) opponent[orderNumber] = buildScoreMapFromRows([opponentRow])[orderNumber];
+    // Find the opponent's score row for this specific machine (by machineId from matchup)
+    const matchupMachineId = Number(matchup.machineId ?? matchup.machine_id);
+    const opponentRow = opponentScores.find(s => Number(s.machineId ?? s.machine_id) === matchupMachineId);
+    if (opponentRow) opponent[machineOrderNumber] = buildScoreMapFromRows([opponentRow])[String(opponentRow.orderNumber ?? opponentRow.order_number)];
   });
 
   scoreMap.opponent = opponent;

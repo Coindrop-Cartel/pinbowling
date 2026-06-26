@@ -466,9 +466,16 @@ td {
 .machine-name-display { flex: 1; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .round-number { font-weight: 700; min-width: 30px; text-align: center; display: inline-block; }
 .score-input { flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px; }
-.round-inputs-container { display: flex; gap: 0.5rem; align-items: center; }
-.round-actions { display: flex; align-items: center; gap: 1rem; }
+.round-inputs-container { display: flex; gap: 0.5rem; align-items: center; flex-basis: 100%; }
+.round-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .round-inputs-disabled { opacity: 0.5; pointer-events: none; }
+.opponent-inputs-container { display: flex; gap: 0.5rem; align-items: center; flex-basis: 100%; }
+.save-round-button { flex-basis: 100%; }
+.input-role-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; margin-right: 0.25rem; white-space: nowrap; min-width: 5.5em; display: inline-block; }
+.pitcher-label { color: var(--pb-primary, #0a2d48); }
+.batter-label { color: var(--pb-accent, #e64a19); }
+.roll-input-readonly { opacity: 0.6; background-color: #f0f0f0; border-color: #ccc; cursor: not-allowed; }
+.roll-input-readonly:focus { outline: none; box-shadow: none; }
 .ball-locked { opacity: 0.6; background-color: #f0f0f0; border-color: #ccc; cursor: not-allowed; }
 .ball-locked:focus { outline: none; box-shadow: none; }
 
@@ -1067,6 +1074,7 @@ body.tv-ui-large .modal-controls-inline button {
   font-weight: 800;
   font-size: 1.1rem;
   min-width: 0;
+  flex: 1;
 }
 
 .roll-input::placeholder {
@@ -1217,6 +1225,12 @@ body.tv-ui-large .modal-controls-inline button {
   }
 
   .round-inputs-container {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .opponent-inputs-container {
     flex-direction: column;
     width: 100%;
     gap: 10px;

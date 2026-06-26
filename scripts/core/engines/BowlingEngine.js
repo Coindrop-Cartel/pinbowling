@@ -59,6 +59,22 @@ export class BowlingEngine extends ScoringEngine {
   }
 
   /**
+   * Bowling-specific target summary for the printable blank score sheet.
+   * Shows the Strike target, and bonus targets (Target 1 / Target 2) for the last frame.
+   */
+  getPrintTargetSummaryHtml(machine, isLastRound, formatNumberFn) {
+    let html = `<span>Strike: <strong>${formatNumberFn(machine.values[10])}</strong></span>`;
+    if (isLastRound) {
+      const { t1, t2 } = this.getBonusTargets(machine);
+      html += `
+          <span class="ml-15">Target 1: <strong>${formatNumberFn(t1)}</strong></span>
+          <span class="ml-15">Target 2: <strong>${formatNumberFn(t2)}</strong></span>
+        `;
+    }
+    return html;
+  }
+
+  /**
    * Orchestrates the branching paths for the 10th frame (Final Round).
    * Handles "Instant Perfect Finish", multiple strikes, and early/late spares.
    * 

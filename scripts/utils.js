@@ -243,3 +243,24 @@ export function renderThresholdGrid(values, formatFn = (v) => v, engine = undefi
     </div>
   `;
 }
+
+/**
+ * Detects whether threshold values exhibit exponential (curved) or linear (flat) scaling.
+ * Analyzes gaps between consecutive rank thresholds to determine if the growth rate
+ * is increasing significantly (indicating curved/exponential scaling).
+ *
+ * @param {Object<string, number>} values - Map of rank (as string key) to score value.
+ * @returns {'flat'|'curved'} Returns 'curved' if end gap > start gap * 1.5, otherwise 'flat'.
+ */
+export function detectScalingFromValues(values) {
+  if (!values || Object.keys(values).length < 3) return 'flat';
+
+  const ranks = Object.keys(values).map(Number).sort((a, b) => a - b);
+  if (ranks.length < 3) return 'flat';
+
+  // Calculate gaps between consecutive ranks
+  const gapStart = Math.abs(values[ranks[1]] - values[ranks[0]]);
+  const gapEnd = Math.abs(values[ranks[ranks.length - 1]] - values[ranks[ranks.length - 2]]);
+
+  return (gapEnd > gapStart * 1.5) ? 'curved' : 'flat';
+}

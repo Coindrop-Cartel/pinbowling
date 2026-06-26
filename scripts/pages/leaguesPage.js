@@ -669,9 +669,7 @@ export async function initLeaguesPage() {
     } catch (err) {
       console.error('Event save failed:', err);
       alert(`Failed to save event: ${err.message}`);
-    } finally {
-      isSubmitting = false;
-    }
+    } 
   };
 
   await refresh(leaguesData);

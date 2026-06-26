@@ -274,17 +274,17 @@ describe('GolfEngine', () => {
     expect(html).toContain('<b>Par:</b> 3');
   });
 
-  // ── getThresholdRowStyle ─────────────────────────────────────────────
-  test('getThresholdRowStyle - highlights start, end, and par ranks', () => {
+  // ── getThresholdRowClass ─────────────────────────────────────────────
+  test('getThresholdRowClass - highlights start, end, and par ranks', () => {
     const e = new GolfEngine({ thresholdStart: 1, thresholdEnd: 10 });
-    const styleStart = e.getThresholdRowStyle(1, 10000, 3);
-    expect(styleStart).toContain('font-weight: bold');
-    const styleEnd = e.getThresholdRowStyle(10, 100, 3);
-    expect(styleEnd).toContain('font-weight: bold');
-    const stylePar = e.getThresholdRowStyle(3, 10000, 3);
-    expect(stylePar).toContain('font-weight: bold');
-    const styleMid = e.getThresholdRowStyle(5, 5000, 3);
-    expect(styleMid).toContain('opacity: 0.8');
+    const styleStart = e.getThresholdRowClass(1, 10000, 3);
+    expect(styleStart).toContain('threshold-highlight');
+    const styleEnd = e.getThresholdRowClass(10, 100, 3);
+    expect(styleEnd).toContain('threshold-highlight');
+    const stylePar = e.getThresholdRowClass(3, 10000, 3);
+    expect(stylePar).toContain('threshold-highlight');
+    const styleMid = e.getThresholdRowClass(5, 5000, 3);
+    expect(styleMid).toContain('');
   });
 
   // ── getInitialValues ─────────────────────────────────────────────────

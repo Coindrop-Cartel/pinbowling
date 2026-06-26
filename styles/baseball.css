@@ -144,3 +144,26 @@
   min-width: 48px;
   border-left: 2px solid var(--pb-primary);
 }
+
+/* Away/Home labels in scoreboard and summary */
+.theme-baseball .home-away-label {
+  font-size: 0.75em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-right: 0.3em;
+}
+
+.theme-baseball .away-label {
+  color: var(--pb-primary);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.85em;
+}
+
+.theme-baseball .home-label {
+  color: var(--pb-accent);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.85em;
+}

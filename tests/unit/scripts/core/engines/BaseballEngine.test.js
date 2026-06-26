@@ -59,10 +59,10 @@ describe('BaseballEngine', () => {
       isPlayer1: true,
       opponent: {
         '1': { ball1: 7000000, ball2: 14000000, ball3: 18000000 }, // Opponent batter (Top of 1st)
-        '2': { ball1: 1000000, ball2: 6000000, ball3: 8000000 }    // Opponent pitcher (Bottom of 2nd)
+        '2': { ball1: 1000000, ball2: 6000000, ball3: 8000000 }    // Opponent pitcher (Bottom of 1st)
       },
-      '1': { ball1: 3000000, ball2: 6000000, ball3: 8000000 },    // Player 1 pitcher
-      '2': { ball1: 6000000, ball2: 14000000, ball3: 20000000 }   // Player 1 batter (Bottom of 2nd)
+      '1': { ball1: 3000000, ball2: 6000000, ball3: 8000000 },    // Player 1 pitcher (Top of 1st)
+      '2': { ball1: 6000000, ball2: 14000000, ball3: 20000000 }   // Player 1 batter (Bottom of 1st)
     };
 
     const { turnResults, total } = engine.calculateTurnResults(innings, scoreMap);
@@ -70,7 +70,7 @@ describe('BaseballEngine', () => {
     // Inning 1 (Pitcher role): Player 1 scores 0 runs
     expect(turnResults[0].isBatter).toBe(false);
     expect(turnResults[0].score).toBe(0);
-    expect(turnResults[0].displayMark).toBe('P');
+    expect(turnResults[0].displayMark).toBe('0R');
 
     // Inning 2 (Batter role): Player 1 scores runs
     // Ball 1 diff: 6M - 1M = 5M (>= 5M) -> 1 Run
@@ -112,7 +112,7 @@ describe('BaseballEngine', () => {
     // Inning 2 (Pitcher role): Player 2 scores 0 runs
     expect(turnResults[1].isBatter).toBe(false);
     expect(turnResults[1].score).toBe(0);
-    expect(turnResults[1].displayMark).toBe('P');
+    expect(turnResults[1].displayMark).toBe('0R');
 
     expect(total).toBe(2);
   });

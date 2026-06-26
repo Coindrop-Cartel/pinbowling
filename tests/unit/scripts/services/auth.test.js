@@ -380,12 +380,12 @@ describe('Auth Service (auth.js)', () => {
       expect(result.lockedBalls).toEqual({ ball1: true, ball2: true, ball3: true });
     });
 
-    it('should lock already-saved balls but allow adding new ones for self in session league', async () => {
+    it('should not lock already-saved balls for self in session league', async () => {
       PB_API.auth.me.mockResolvedValue({ role: 'player', player_id: 5 });
       const targetPlayer = { id: 5, userId: 10 };
       const turnValues = { ball1: '1000' };
       const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, 'session');
-      expect(result).toEqual({ access: 'allowed', lockedBalls: { ball1: true } });
+      expect(result).toEqual({ access: 'allowed', lockedBalls: { } });
     });
 
     it('should allow access for authenticated user scoring an unregistered player', async () => {

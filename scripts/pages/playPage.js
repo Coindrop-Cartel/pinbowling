@@ -1,5 +1,4 @@
 import { PB_API } from '@services/api.js';
-import { BaseballEngine } from '@core/engines/BaseballEngine.js';
 import { can, PERMISSIONS, filterPlayersForUser } from '@services/auth.js';
 import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
 import { getCookie, formatNumber, applyScoreFormatting, parseFormattedNumber, loadPage, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
@@ -421,19 +420,6 @@ export async function initPlayPage() {
             </div>
           </div>
           <div class="preview-values-container">${renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2)}</div>
-          <!-- Baseball specific score entry -->
-          <div class="baseball-matchup-scores">
-            <div class="player-score-baseball player-row pitcher">
-              <span class="role-label">Pitcher</span>
-              <input type="text" class="score-input-baseball pitcher-score" placeholder="Score">
-              <span class="runs-display pitcher-runs">0R</span>
-            </div>
-            <div class="player-score-baseball player-row batter">
-              <span class="role-label">Batter</span>
-              <input type="text" class="score-input-baseball batter-score" placeholder="Score">
-              <span class="runs-display batter-runs">0R</span>
-            </div>
-          </div>
         `;
       } else {
         headerHtml =  `
@@ -526,37 +512,6 @@ export async function initPlayPage() {
 
       if (s10) s10.oninput = updateValues;
       if (s1) s1.oninput = updateValues;
-
-      // Baseball-specific: real-time run calculation when pitcher/batter scores change
-      if (currentSessionFormat === 'baseball') {
-        const pitcherInput = row.querySelector('.pitcher-score');
-        const batterInput = row.querySelector('.batter-score');
-        const pitcherRunsEl = row.querySelector('.pitcher-runs');
-        const batterRunsEl = row.querySelector('.batter-runs');
-
-        const calculateBaseballRuns = () => {
-          const pitcherScore = Number(pitcherInput?.value?.replace(/\D/g, '')) || 0;
-          const batterScore = Number(batterInput?.value?.replace(/\D/g, '')) || 0;
-
-          if (pitcherScore > 0 && batterScore > 0) {
-            const batterRuns = engine.calculateBallRuns(frame, pitcherScore, batterScore);
-            const pitcherRuns = 0;
-
-            if (pitcherRunsEl) pitcherRunsEl.textContent = `${pitcherRuns}R`;
-            if (batterRunsEl) batterRunsEl.textContent = `${batterRuns}R`;
-
-            // Store scores on the frame for later submission
-            frame.scores = { pitcher: pitcherScore, batter: batterScore, pitcherRuns, batterRuns };
-          } else {
-            if (pitcherRunsEl) pitcherRunsEl.textContent = '0R';
-            if (batterRunsEl) batterRunsEl.textContent = '0R';
-            frame.scores = {};
-          }
-        };
-
-        if (pitcherInput) pitcherInput.oninput = calculateBaseballRuns;
-        if (batterInput) batterInput.oninput = calculateBaseballRuns;
-      }
 
       // Searchable Select initialization (only if expanded)
       if (isExpanded) {

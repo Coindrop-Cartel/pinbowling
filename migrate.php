@@ -337,6 +337,31 @@ try {
     } else {
         echo "Matchups player_order column migration already applied.\n";
     }
+
+    // Restructure matchups to use sequential order_numbers instead of order_number + player_order combo.
+    // Each matchup now has a unique sequential order_number (1=top 1st, 2=bottom 1st, 3=top 2nd, etc.)
+    // instead of sharing an inning-level order_number with a player_order differentiator.
+    // This drops the player_order column and updates the unique key to (event_id, order_number).
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'matchups_sequential_order'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        // Migrate existing data: convert (order_number, player_order) to sequential order_number
+        // Old: order_number=1,player_order=1 → New: order_number=1 (top of 1st)
+        // Old: order_number=1,player_order=2 → New: order_number=2 (bottom of 1st)
+        // Old: order_number=2,player_order=1 → New: order_number=3 (top of 2nd)
+        // Old: order_number=2,player_order=2 → New: order_number=4 (bottom of 2nd)
+        // Formula: new_order = (old_order - 1) * 2 + player_order
+        $pdo->exec("UPDATE `matchups` SET `order_number` = (`order_number` - 1) * 2 + `player_order`");
+        // Drop old unique key and create new one on (event_id, order_number)
+        $pdo->exec("ALTER TABLE `matchups` DROP INDEX `unique_matchup`");
+        $pdo->exec("ALTER TABLE `matchups` ADD UNIQUE KEY `unique_matchup` (`event_id`, `order_number`)");
+        // Drop the player_order column — no longer needed
+        $pdo->exec("ALTER TABLE `matchups` DROP COLUMN `player_order`");
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('matchups_sequential_order')")->execute();
+        echo "✓ Matchups sequential order_number migration applied successfully.\n";
+    } else {
+        echo "Matchups sequential order_number migration already applied.\n";
+    }
 } catch (PDOException $e) {
     echo "\n✗ Migration failed: " . $e->getMessage() . "\n";
     exit(1);

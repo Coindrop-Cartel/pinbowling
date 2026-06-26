@@ -2,12 +2,13 @@ import { PB_API } from '@services/api.js';
 import { isManagementAuthorized, requireAdmin } from '@services/auth.js';
 import { showAlert } from '@ui/dialogs.js';
 import { loadPage, getActiveEventId, getActiveLeagueId, renderPreview, formatNumber, applyScoreFormatting, parseFormattedNumber, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
-import { applyPreferredTheme } from '@ui/branding.js'; // Import for filtering
+import { applyPreferredTheme } from '@ui/branding.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
 import { getScoringEngine } from '@core/engine.js';
 import { printMachineScores } from '@ui/printing.js';
 import { createSearchableSelect, setupSortableList, createExpandableRow, initReadOnlyTournamentDisplay } from '@ui/selectors.js';
 import { normalizeTargets } from '@services/normalizer.js';
+import { detectScalingFromValues } from '@scripts/utils.js';
 
 /**
  * Logic for configuring events within a league (dates, machines, target scores).
@@ -253,10 +254,9 @@ export async function initEventSetupPage() {
       const bonusHtml = Engine.getBonusTargetHtml(round, round.orderNumber === maxOrder, formatNumber);
       const isExpanded = expandedTargetId === round.id;
 
+
       // Detect scaling from data to sync inline toggles
-      const gapStart = (round.values[2] || 0) - (round.values[1] || 0);
-      const gapEnd = (round.values[10] || 0) - (round.values[9] || 0);
-      const scaling = (gapEnd > gapStart * 1.5) ? 'curved' : 'flat';
+      const scaling = detectScalingFromValues(round.values);
 
       const row = createExpandableRow(roundsList, {
         id: round.id,

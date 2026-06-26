@@ -58,6 +58,7 @@ vi.mock('@core/engine.js', () => ({
     getPrimaryTargetLabel: () => 'Strike',
     getBonusTargetHtml: () => '',
     getRoundRowContext: () => '',
+    getRequiredEventData: () => '',
     enrichScoreMap: () => '',
     renderResults: () => '',
     getRowSummaryHtml: vi.fn(() => '<div>Summary</div>'),

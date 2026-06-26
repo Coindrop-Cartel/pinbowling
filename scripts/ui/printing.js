@@ -73,7 +73,6 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
   if (!printWindow) return alert('Please allow popups to print.');
 
   const Engine = getScoringEngine(format);
-  const isBowling = format === 'bowling';
   const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
   const instructions = `
@@ -103,22 +102,7 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = '
   const machineSectionsHtml = machines.map((m) => {
     const isLast = m.orderNumber === maxOrder;
     const lfHint = isLast ? Engine.getLastFrameHint() : null;
-    let targetsHtml = '';
-    if (isBowling) { // Bowling format
-      targetsHtml = `<span>Strike: <strong>${formatNumber(m.values[10])}</strong></span>`;
-      if (isLast) { // Only for the last frame
-        const { t1, t2 } = Engine.getBonusTargets(m);
-        targetsHtml += `
-          <span class="ml-15">Target 1: <strong>${formatNumber(t1)}</strong></span>
-          <span class="ml-15">Target 2: <strong>${formatNumber(t2)}</strong></span>
-        `;
-      }
-    } else { // Golf format
-      targetsHtml = `
-        <span>Target Score: <strong>${formatNumber(m.values[m.value2] || m.value1)}</strong></span>
-        <span class="ml-15">Par: <strong>${m.value2}</strong></span>
-      `;
-    }
+    let targetsHtml = Engine.getPrintTargetSummaryHtml(m, isLast, formatNumber);
 
     return `
       <div class="print-block">

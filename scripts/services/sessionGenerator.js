@@ -71,18 +71,21 @@ export function getTargetScoreForDifficulty(machine, difficulty) {
  * Generate head-to-head matchup pairings for a baseball session.
  * Produces a round-robin schedule where each player faces every other player.
  *
- * For baseball, each inning has 2 machines (home and away). Each matchup is assigned
- * an order number corresponding to the inning it belongs to, with playerOrder indicating
- * home (1) or away (2). For N players, there are N*(N-1)/2 unique pairings (single round-robin).
+ * For baseball, each inning has 2 machines (top and bottom). Each matchup is
+ * assigned a sequential order number: 1 = Top of 1st, 2 = Bottom of 1st,
+ * 3 = Top of 2nd, 4 = Bottom of 2nd, etc. Player1/player2 assignments stay
+ * consistent across both halves of an inning — role alternation (Pitcher/Batter)
+ * is determined by the order number parity (odd = top, even = bottom) in the
+ * scoring engine, not by swapping player1/player2.
+ *
+ * For N players, there are N*(N-1)/2 unique pairings (single round-robin).
  * If the number of innings exceeds the number of unique pairings, the schedule
- * cycles through the same pairings again. Role alternation (Pitcher/Batter)
- * is handled by the isBatter formula based on playerOrder,
- * so player1/player2 assignments remain consistent across all innings for the same pair of players.
+ * cycles through the same pairings again.
  *
  * @param {Array<{id: number, playerName?: string}>} players - Array of player objects
  * @param {number} inningCount - Number of innings (rounds) in the session
- * @param {Array<{machineId: number}>} machines - Array of machine objects for the session (2 per inning: home then away)
- * @returns {Array<{orderNumber: number, player1Id: number, player2Id: number, machineId: number, playerOrder: number}>}
+ * @param {Array<{machineId: number}>} machines - Array of machine objects for the session (2 per inning: top then bottom)
+ * @returns {Array<{orderNumber: number, player1Id: number, player2Id: number, machineId: number}>}
  *   Array of matchup objects ready to be saved via PB_API.matchups.save()
  */
 export function generateMatchups(players, inningCount, machines) {
@@ -97,35 +100,32 @@ export function generateMatchups(players, inningCount, machines) {
     }
 
     // Cycle through pairings for additional innings.
-    // Role alternation (Pitcher/Batter) is handled by the isBatter formula
-    // based on playerOrder, so player1/player2 must stay consistent
-    // across all innings for the same pair of players.
+    // player1/player2 stay consistent — role alternation is handled
+    // by the scoring engine based on orderNumber parity.
     const allPairings = [...pairings];
 
     const matchups = [];
     for (let inning = 0; inning < inningCount; inning++) {
         const pairing = allPairings[inning % allPairings.length];
         
-        // Each inning has 2 machines: home (even index) and away (odd index)
-        const homeMachine = machines[inning * 2] || machines[0];
-        const awayMachine = machines[inning * 2 + 1] || machines[1] || homeMachine;
+        // Each inning has 2 machines: top (even index) and bottom (odd index)
+        const topMachine = machines[inning * 2] || machines[0];
+        const bottomMachine = machines[inning * 2 + 1] || machines[1] || topMachine;
         
-        // Home (playerOrder 1): player1 is pitcher, player2 is batter
+        // Top of inning (sequential orderNumber = inning*2 + 1)
         matchups.push({
-            orderNumber: inning + 1,
-            playerOrder: 1,
+            orderNumber: inning * 2 + 1,
             player1Id: pairing.player1Id,
             player2Id: pairing.player2Id,
-            machineId: homeMachine.machineId || homeMachine.id
+            machineId: topMachine.machineId || topMachine.id
         });
         
-        // Away (playerOrder 2): roles are swapped (player2 is pitcher, player1 is batter)
+        // Bottom of inning (sequential orderNumber = inning*2 + 2)
         matchups.push({
-            orderNumber: inning + 1,
-            playerOrder: 2,
-            player1Id: pairing.player2Id,
-            player2Id: pairing.player1Id,
-            machineId: awayMachine.machineId || awayMachine.id
+            orderNumber: inning * 2 + 2,
+            player1Id: pairing.player1Id,
+            player2Id: pairing.player2Id,
+            machineId: bottomMachine.machineId || bottomMachine.id
         });
     }
 

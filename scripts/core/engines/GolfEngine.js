@@ -49,20 +49,31 @@ export class GolfEngine extends ScoringEngine {
   }
 
   /**
-   * Highlighting for Golf thresholds (Target Stroke and Par Stroke).
+   * Golf-specific target summary for the printable blank score sheet.
+   * Shows the Target Score and Par for the hole.
    */
-  getThresholdRowStyle(rank, value1, value2) {
-    const r = Number(rank);
-    // Highlighting for the key thresholds: Start (3), End (10), and Par.
-    const isMajor = 
-      r === this.getThresholdStart() || 
-      r === this.getThresholdEnd() || 
-      r === Number(value2);
+  getPrintTargetSummaryHtml(machine, _isLastRound, formatNumberFn) {
+    return `
+        <span>Target Score: <strong>${formatNumberFn(machine.values[machine.value2] || machine.value1)}</strong></span>
+        <span class="ml-15">Par: <strong>${machine.value2}</strong></span>
+      `;
+  }
 
-    if (isMajor) {
-      return 'margin: 2px 0; font-weight: bold; color: var(--pb-primary);';
+  /**
+   * Returns CSS class names for threshold row styling.
+   * Golf-specific: highlights Target Score, End (10), and Par stroke.
+   */
+  getThresholdRowClass(rank, value1, value2) {
+    const r = Number(rank);
+    const isTarget = r === this.getThresholdStart();
+    const isEnd = r === this.getThresholdEnd();
+    const isPar = r === Number(value2);
+
+    // Return class name if major threshold, empty string otherwise
+    if (isTarget || isEnd || isPar) {
+      return 'threshold-highlight';
     }
-    return 'margin: 2px 0; opacity: 0.8;';
+    return '';
   }
 
   /**

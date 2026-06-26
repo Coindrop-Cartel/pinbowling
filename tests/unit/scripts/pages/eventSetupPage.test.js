@@ -38,6 +38,7 @@ vi.mock('@scripts/utils.js', () => ({
   formatNumber: (n) => String(n),
   loadPage: vi.fn(), // Changed from navigateTo
   getCookie: vi.fn(() => 'bowling'),
+  detectScalingFromValues: () => '',
 }));
 
 vi.mock('@scripts/routes.js', () => ({
@@ -104,6 +105,7 @@ vi.mock('@core/engine.js', () => ({
     getBonusTargetHtml: vi.fn(() => ''),
     filterThresholds: vi.fn(v => v),
     buildRoundValues: vi.fn(() => ({ 10: 1000000, 1: 100000 })),
+    getThresholdRowStyle: vi.fn(() => ''),
   }))
 }));
 

@@ -333,9 +333,10 @@ export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues,
   }
 
   // 3. Session League Logic (Remaining logic is for session leagues)
-  //    Determine if the user has permission to update existing scores in session leagues.
-  //    Only TD/Admin (canUpdateAny) can modify already-saved ball values.
-  //    Self-scoring permission (canUpdateSelf) allows entering NEW scores only.
+  //    In session leagues, if a player can enter scores, they can also update them.
+  //    Only TD/Admin (canUpdateAny) restrictions apply to modifying already-saved values
+  //    in standard leagues. Sessions are more permissive — self-scoring and guest-scoring
+  //    users may freely update their own existing ball values.
   let canUpdateSession = canUpdateAny;
   let canAddSessionScore = false;
   if (currentUser) {
@@ -344,8 +345,14 @@ export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues,
     canAddSessionScore = isTargetUnregistered;
   }
 
+  // In session leagues, any user who can add scores can also update existing scores.
+  // This is the key difference from standard leagues — sessions allow self-correction.
+  if (canAddSessionScore) {
+    canUpdateSession = true;
+  }
+
   // Build per-ball lock status for session leagues
-  // Any ball with an existing saved value is locked unless the user has UPDATE_ANY_SCORE.
+  // Only locked if the user lacks both canUpdateAny and canAddSessionScore.
   const lockedBallsSession = {};
   if (!canUpdateSession) {
     if (hasBall1) lockedBallsSession.ball1 = true;

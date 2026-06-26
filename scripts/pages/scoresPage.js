@@ -138,31 +138,44 @@ export async function initScoresPage() {
    * @param {number} machineId 
    * @param {string|number} value 
    * @param {string} placeholder 
+   * @param {Object} [options] Additional options.
+   * @param {boolean} [options.isOpponent=false] If true, marks as opponent (read-only) input.
    * @returns {HTMLInputElement}
    */
-  function createRollInput(roundNumber, ball, machineId, value = '', placeholder = '') {
+  function createRollInput(roundNumber, ball, machineId, value = '', placeholder = '', { isOpponent = false } = {}) {
     const input = document.createElement('input');
     input.placeholder = placeholder || `Ball ${ball} cumulative`;
-    input.className = 'roll-input';
+    input.className = isOpponent ? 'roll-input opponent-input' : 'roll-input';
     input.value = (value !== '' && value !== undefined) ? formatNumber(value) : '';
     input.dataset.order = roundNumber;
-    input.dataset.ball = ball;
+    // Opponent inputs use data-opponent-ball so buildScoreMapFromDOM ignores them
+    input.dataset[isOpponent ? 'opponentBall' : 'ball'] = ball;
     input.dataset.machineId = machineId;
     applyScoreFormatting(input);
+
+    if (isOpponent) {
+      input.readOnly = true;
+      input.classList.add('roll-input-readonly');
+      input.setAttribute('aria-disabled', 'true');
+      input.setAttribute('tabindex', '-1');
+    }
 
     return input;
   }
 
   /**
    * Constructs the HTML structure for a single round's input row.
+   * For baseball head-to-head matchups, also renders the opponent's ball scores
+   * as disabled/read-only inputs. Pitcher inputs always appear above Batter inputs.
    * 
    * @param {Object} round The machine configuration for this round.
    * @param {Object} turnValues Existing scores from the database (if any).
    * @param {boolean} [isLastRound=false] Whether to apply 10th-frame logic.
    * @param {Object} targetPlayer The player being scored.
+   * @param {Object} [opponentScores=null] Opponent's ball scores for this round: { ball1, ball2, ball3 }.
    * @returns {HTMLElement} The row element.
    */
-  async function buildRoundRow(round, turnValues, isLastRound = false, targetPlayer = null) {
+  async function buildRoundRow(round, turnValues, isLastRound = false, targetPlayer = null, opponentScores = null) {
     const row = document.createElement('div'); // Centralized Security Logic
     const { access: accessLevel, reason: msg, lockedBalls = {} } = await getScoreAccessLevel(currentUser, targetPlayer, turnValues, activeLeague?.type);
     const isAccessDenied = accessLevel === 'denied';
@@ -176,6 +189,9 @@ export async function initScoresPage() {
     const displayRoundNumber = rowContext.displayRoundNumber ?? round.orderNumber;
     const displayRoundLabel = rowContext.displayRoundLabel ?? Engine.getRoundLabel();
     const roleHtml = rowContext.roleHtml ?? '';
+    const isPitcher = rowContext.isPitcher ?? false;
+    const opponentName = rowContext.opponentName ?? '';
+    const hasMatchup = !!rowContext.matchup && activeFormat === 'baseball';
     
     row.innerHTML = `
       <div class="round-info">
@@ -189,7 +205,9 @@ export async function initScoresPage() {
         </div>
       </div>
       <div class="round-actions">
-        <div class="round-inputs-container ${isAccessDenied ? 'round-inputs-disabled' : ''}"></div>
+        ${hasMatchup && !isPitcher ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label pitcher-label">Pitcher:</span></div>` : ''}
+        <div class="round-inputs-container ${isAccessDenied ? 'round-inputs-disabled' : ''}">${hasMatchup ? `<span class="input-role-label ${isPitcher ? 'pitcher-label' : 'batter-label'}">${isPitcher ? 'Pitcher:' : 'Batter:'}</span>` : ''}</div>
+        ${hasMatchup && isPitcher ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label batter-label">Batter:</span></div>` : ''}
         <button class="save-round-button btn-mgmt" ${isAccessDenied ? 'hidden' : ''} disabled>Save</button>
       </div>
       ${isAccessDenied ? `
@@ -207,20 +225,14 @@ export async function initScoresPage() {
       row.querySelector('.target-details').classList.toggle('hidden');
     });
 
+    // --- Player's own editable inputs ---
     for (let ball = 1; ball <= 3; ball += 1) {
       const value = turnValues?.[`ball${ball}`] ?? '';
       const placeholder = `Ball ${ball} cumulative`;
       const isBallLocked = !!lockedBalls[`ball${ball}`];
       
-      // Use round.machineId (master list ID) instead of round.id (Target_Scores row ID)
-      // to ensure database foreign key constraints pass.
       const input = createRollInput(round.orderNumber, ball, round.machineId, value, placeholder);
       
-      // Per-ball locking: lock individual inputs that already have saved values.
-      // Uses readOnly + aria-disabled so the value remains visible and is still
-      // read by the save handler, but the field cannot be edited by the user.
-      // A data-saved-value attribute stores the original saved score so the
-      // save handler can enforce the lock even if the DOM is tampered.
       if (isBallLocked) {
         input.readOnly = true;
         input.classList.add('ball-locked');
@@ -235,6 +247,20 @@ export async function initScoresPage() {
       });
 
       inputsContainer.appendChild(input);
+    }
+
+    // --- Opponent's disabled inputs (baseball head-to-head only) ---
+    // Always render opponent inputs when there's a matchup, even if opponent hasn't entered scores yet
+    if (hasMatchup) {
+      const opponentContainer = row.querySelector('.opponent-inputs-container');
+      if (opponentContainer) {
+        for (let ball = 1; ball <= 3; ball += 1) {
+          const oppValue = opponentScores?.[`ball${ball}`];
+          const displayValue = (oppValue !== undefined && oppValue !== null && oppValue !== 0) ? oppValue : '';
+          const input = createRollInput(round.orderNumber, ball, round.machineId, displayValue, `Ball ${ball}`, { isOpponent: true });
+          opponentContainer.appendChild(input);
+        }
+      }
     }
 
     saveBtn.addEventListener('click', async () => {
@@ -270,6 +296,14 @@ export async function initScoresPage() {
           ball3,
         });
         saveBtn.classList.remove('is-dirty');
+        // Refresh allEventScores so opponent data is current for baseball scoring
+        if (activeFormat === 'baseball') {
+          try {
+            allEventScores = await PB_API.scores.get(null, Number(getActiveEventId()));
+          } catch (e) {
+            console.warn('[ScoresPage] Failed to refresh allEventScores after save:', e);
+          }
+        }
         renderCurrentResults();
       } catch (err) {
         const message = err?.message || String(err);
@@ -386,6 +420,10 @@ export async function initScoresPage() {
       map[String(row.orderNumber)] = row;
       return map;
     }, {});
+
+    // Enrich with opponent data for baseball head-to-head matchups
+    const enriched = Engine.enrichScoreMap(scoreMap, getEngineContext());
+    const opponentScores = enriched.opponent || {};
     
     const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
@@ -394,6 +432,7 @@ export async function initScoresPage() {
     for (const round of machines) {
       const isLastRound = round.orderNumber === maxOrder;
       const turnValues = scoreMap[String(round.orderNumber)];
+      const oppTurnValues = opponentScores[String(round.orderNumber)] || null;
 
       // Inject last-frame specific hint if defined for this format
       if (isLastRound) {
@@ -406,7 +445,7 @@ export async function initScoresPage() {
         }
       }
 
-      const row = await buildRoundRow(round, turnValues, isLastRound, player);
+      const row = await buildRoundRow(round, turnValues, isLastRound, player, oppTurnValues);
       fragment.appendChild(row);
     }
 
@@ -575,17 +614,20 @@ export async function initScoresPage() {
 
     const format = event?.scoringFormat || league?.scoringFormat || 'bowling';
     activeFormat = format;
-    if (format === 'baseball') {
-      const [matchupsForEvent, scoresForEvent] = await Promise.all([
-        PB_API.matchups.get(eventId).catch(() => []),
-        PB_API.scores.get(null, Number(eventId)).catch(() => [])
-      ]);
-      eventMatchups = matchupsForEvent || [];
-      allEventScores = scoresForEvent || [];
-    } else {
-      eventMatchups = [];
-      allEventScores = [];
-    }
+    Engine = getScoringEngine(format);
+
+    // Ask the engine what additional data it needs for this event,
+    // then fetch it generically — no format-specific branching required.
+    const requiredData = Engine.getRequiredEventData(eventId, PB_API);
+    const requiredKeys = Object.keys(requiredData);
+    const requiredValues = await Promise.all(Object.values(requiredData));
+    requiredKeys.forEach((key, i) => {
+      if (key === 'eventMatchups') eventMatchups = requiredValues[i] || [];
+      else if (key === 'allEventScores') allEventScores = requiredValues[i] || [];
+    });
+    // Clear any keys not declared by this engine
+    if (!requiredKeys.includes('eventMatchups')) eventMatchups = [];
+    if (!requiredKeys.includes('allEventScores')) allEventScores = [];
     const isSession = league?.type === 'session';
     const leagueTitle = isSession ? '' : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;
     const eventTitle = `<div class="meta-muted">Event: ${escapeHTML(event?.eventName || 'Event')}</div>`;
@@ -598,7 +640,6 @@ export async function initScoresPage() {
     ]);
 
     activeLeague = league;
-    Engine = getScoringEngine(format);
     applyPreferredTheme(format);
 
     // Update the scoring section title using the Engine's specific terminology (Frame vs Hole)

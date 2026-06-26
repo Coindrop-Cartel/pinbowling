@@ -14,6 +14,16 @@ vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => mockEngine),
 }));
 
+vi.mock('@core/engine.js', () => ({
+  getScoringEngine: vi.fn(() => ({
+    getPrintTargetSummaryHtml: () => '<div>Strike: <strong>10,000</strong></div>',
+    getScoringHint: () => '',
+    getLastFrameHint: () => '',
+    getRoundLabel: () => 'Frame',
+    getBonusTargets: () => ({ t1: 13000, t2: 16900 }),
+  })),
+}));
+
 // Mock utils.js to provide escapeHTML
 vi.mock('@scripts/utils.js', () => ({
   formatNumber: vi.fn(n => n?.toLocaleString() || '0'),
@@ -92,7 +102,7 @@ describe('Printing Utilities (printing.js)', () => {
         { id: 1, machineName: 'Machine A', orderNumber: 1, values: { 10: 10000 } },
       ];
       printBlankScoreSheet(machines, 'Test League', 'Test Event');
-
+      
       expect(window.open).toHaveBeenCalledWith('', '_blank');
       expect(mockPrintWindow.document.write).toHaveBeenCalled();
       const html = mockPrintWindow.document.write.mock.calls[0][0];

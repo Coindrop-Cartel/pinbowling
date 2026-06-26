@@ -185,7 +185,6 @@ function serializeMatchup($row) {
         'player1Id' => (int)$row['player1_id'],
         'player2Id' => (int)$row['player2_id'],
         'machineId' => (int)$row['machine_id'],
-        'playerOrder' => (int)($row['player_order'] ?? 1),
         'player1Name' => $row['player1_name'] ?? null,
         'player2Name' => $row['player2_name'] ?? null,
         'machineName' => $row['machine_name'] ?? null
