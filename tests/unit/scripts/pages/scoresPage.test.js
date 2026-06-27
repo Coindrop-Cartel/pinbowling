@@ -24,6 +24,7 @@ vi.mock('@scripts/utils.js', () => ({
   getActiveLeagueId: vi.fn(),
   getCurrentPlayerId: vi.fn(),
   setCurrentPlayerId: vi.fn(),
+  setCurrentPlayerIdSilent: vi.fn(),
   formatNumber: (n) => String(n),
   applyScoreFormatting: vi.fn(),
   renderThresholdGrid: vi.fn(() => 'Grid'),

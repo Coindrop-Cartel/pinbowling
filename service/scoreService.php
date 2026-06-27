@@ -91,7 +91,7 @@ try {
         }
         
         // Basic range validation
-        if ($ball1 < 0 || $ball2 < 0 || $ball3 < 0 || $ball1 > 1000000000) {
+        if ($ball1 < 0 || $ball2 < 0 || $ball3 < 0) {
             sendJson(['error' => 'Invalid score values'], 400);
         }
 

@@ -1,60 +1,10 @@
 /** @vitest-environment jsdom */
 import { vi, describe, it, expect } from 'vitest';
 import {
-  generatePars,
   generateSessionName,
   selectRandomMachines,
   getTargetScoreForDifficulty
 } from '@services/sessionGenerator.js';
-
-// ── generatePars ─────────────────────────────────────────────────────
-describe('generatePars', () => {
-  it('should return empty array for non-golf format', () => {
-    expect(generatePars('bowling', 10)).toEqual([]);
-    expect(generatePars('other', 18)).toEqual([]);
-    expect(generatePars('', 9)).toEqual([]);
-  });
-
-  it('should return array of correct length for golf', () => {
-    expect(generatePars('golf', 9)).toHaveLength(9);
-    expect(generatePars('golf', 18)).toHaveLength(18);
-    expect(generatePars('golf', 3)).toHaveLength(3);
-  });
-
-  it('should guarantee at least one par 3, 4, and 5', () => {
-    const pars = generatePars('golf', 18);
-    expect(pars.filter(p => p === 3).length).toBeGreaterThanOrEqual(1);
-    expect(pars.filter(p => p === 4).length).toBeGreaterThanOrEqual(1);
-    expect(pars.filter(p => p === 5).length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('should only contain par values 3, 4, or 5', () => {
-    const pars = generatePars('golf', 18);
-    pars.forEach(p => {
-      expect(p).toBeGreaterThanOrEqual(3);
-      expect(p).toBeLessThanOrEqual(5);
-    });
-  });
-
-  it('should handle frameCount of 3 (minimum with guarantees)', () => {
-    const pars = generatePars('golf', 3);
-    expect(pars).toHaveLength(3);
-    // Should contain exactly one of each
-    expect(pars).toContain(3);
-    expect(pars).toContain(4);
-    expect(pars).toContain(5);
-  });
-
-  it('should produce different orders on multiple calls (randomness)', () => {
-    // Run multiple times and check that not all results are identical
-    const results = new Set();
-    for (let i = 0; i < 20; i++) {
-      results.add(generatePars('golf', 9).join(','));
-    }
-    // With shuffling, it's extremely unlikely all 20 are identical
-    expect(results.size).toBeGreaterThan(1);
-  });
-});
 
 // ── generateSessionName ──────────────────────────────────────────────
 describe('generateSessionName', () => {

@@ -239,4 +239,26 @@ export class GolfEngine extends ScoringEngine {
   getInitialValues(suggestedTarget = 5000000) {
     return { value1: suggestedTarget, value2: 3 };
   }
+
+  /**
+   * Generates randomized par values for the given hole count.
+   * Guarantees at least one of each common par (3, 4, 5) for variety.
+   * Remaining holes are filled with random 3/4/5 values.
+   * @param {number} count Number of holes.
+   * @returns {number[]}
+   */
+  generateValue2Defaults(count) {
+    const pars = [];
+    // Guarantee at least one of each common par values for variety
+    pars.push(3, 4, 5);
+    while (pars.length < count) {
+      pars.push(Math.floor(Math.random() * 3) + 3); // 3,4,5
+    }
+    // Shuffle
+    for (let i = pars.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pars[i], pars[j]] = [pars[j], pars[i]];
+    }
+    return pars.slice(0, count);
+  }
 }

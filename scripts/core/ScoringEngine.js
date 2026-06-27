@@ -195,6 +195,62 @@ export class ScoringEngine {
   getThresholdEnd() { return this.config.thresholdEnd ?? 1; }     // Default to Bowling
 
   /**
+   * Returns the HTML for a frame preview row in the session generator.
+   * Baseball overrides this to show "Top/Bottom of Inning N" headers.
+   * @param {Object} frame The frame data object.
+   * @param {number} index Zero-based index.
+   * @param {boolean} isExpanded Whether the row is expanded.
+   * @param {string} expandedTempId The tempId of the expanded row.
+   * @param {Function} formatFn Number formatting function.
+   * @param {Function} escapeFn HTML escaping function.
+   * @param {Function} renderGridFn renderThresholdGrid function.
+   * @returns {{headerHtml: string, contentHtml: string}}
+   */
+  getPreviewRowHtml(frame, index, isExpanded, expandedTempId, formatFn, escapeFn, renderGridFn) {
+    const headerHtml = `
+      <div class="flex gap-12 w-100 wrap">
+        <div class="flex gap-12 flex-1 min-250 align-center">
+          <div class="drag-handle">☰</div>
+          <span class="round-number">${this.getRoundDisplayLabel(index)}</span>
+          <span class="machine-name-display">${escapeFn(frame.machineName)}</span>
+        </div>
+        <div class="flex gap-12 wrap justify-end" onclick="event.stopPropagation()">
+          <div class="flex gap-6 min-140 flex-1 align-center">
+            <label class="small value-label">${this.getValue1Label()}:</label>
+            <input type="text" class="score10-input score-input" value="${formatFn(frame.value1)}">
+          </div>
+          <div class="flex gap-6 min-140 flex-1 align-center">
+            <label class="small value-label">${this.getValue2Label()}:</label>
+            <input type="text" class="score1-input score-input" value="${formatFn(frame.value2)}">
+          </div>
+        </div>
+      </div>
+    `;
+
+    const contentHtml = `
+      <div class="form-row">
+        <label class="small">Change Machine</label>
+        <input type="text" class="row-machine-search" placeholder="Filter machines...">
+        <select class="row-machine-select"></select>
+      </div>
+      <div class="flex-between mb-10">
+        <div class="flex gap-6">
+           <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
+           <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
+           <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
+        </div>
+        <div class="flex gap-4">
+           <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
+           <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
+        </div>
+      </div>
+      <div class="preview-values-container">${renderGridFn(this.filterThresholds(frame.values), formatFn, this, frame.value1, frame.value2)}</div>
+    `;
+
+    return { headerHtml, contentHtml };
+  }
+
+  /**
    * Returns an ordered array of ranks (1-10) to display in the threshold grid,
    * based on the engine's configured thresholdStart and thresholdEnd.
    * @returns {Array<number>}
@@ -284,6 +340,50 @@ export class ScoringEngine {
     const defaults = this.getInitialValues(val);
     return { value1: val, value2: defaults.value2 };
   }
+
+  /**
+   * Returns the number of machines required per round.
+   * Baseball uses 2 (top and bottom of inning), others use 1.
+   * @returns {number}
+   */
+  getMachinesPerRound() { return 1; }
+
+  /**
+   * Returns the maximum number of players allowed on a session roster.
+   * Baseball limits to 2 (head-to-head), others have no limit.
+   * @returns {number}
+   */
+  getMaxRosterSize() { return Infinity; }
+
+  /**
+   * Returns the display label for a round at the given index.
+   * Used in the session generator preview to show round headers.
+   * Default: "Frame N" or "Hole N" based on round label.
+   * Baseball overrides to show "Top/Bottom of Inning N".
+   * @param {number} index Zero-based index of the round in the list.
+   * @returns {string}
+   */
+  getRoundDisplayLabel(index) {
+    return `${this.getRoundLabel()} ${index + 1}`;
+  }
+
+  /**
+   * Returns an array of default value2 settings for the given round count.
+   * Golf overrides this to return randomized par values (3, 4, 5).
+   * Other formats return an empty array (no default value2 overrides).
+   * @param {number} count Number of rounds.
+   * @returns {Array<number>}
+   */
+  generateValue2Defaults(count) { return []; }
+
+  /**
+   * Returns a description of the matchup structure for this format, or null
+   * if the format does not use matchups. Used by the UI to conditionally
+   * render matchup preview sections.
+   * @param {number} roundCount Number of rounds in the session.
+   * @returns {{ description: string, details: Array<{ label: string, value: string }> } | null}
+   */
+  getMatchupDescription(roundCount) { return null; }
 
   /**
    * Returns default scoring values for a new machine setup.
@@ -402,6 +502,25 @@ export class ScoringEngine {
    */
   getRoundRowContext(round, context) {
     return {};
+  }
+
+  /**
+   * Builds a score map for a specific player from raw score data.
+   * Default implementation creates a basic {orderNumber: {ball1, ball2, ball3}} map.
+   * Baseball overrides this to include opponent scores and role info.
+   *
+   * @param {number|string} playerId The player ID.
+   * @param {Array} playerScores The player's own score rows.
+   * @param {Object<number, Array>} allScoresByPlayer All scores grouped by player ID.
+   * @param {Array} matchups Matchup data for the event (empty for non-matchup formats).
+   * @returns {Object} Score map with ball scores per order number.
+   */
+  buildPlayerScoreMap(_playerId, playerScores, _allScoresByPlayer, _matchups) {
+    const map = {};
+    (playerScores || []).forEach(row => {
+      map[String(row.orderNumber)] = { ball1: Number(row.ball1), ball2: Number(row.ball2), ball3: Number(row.ball3) };
+    });
+    return map;
   }
 
   /**

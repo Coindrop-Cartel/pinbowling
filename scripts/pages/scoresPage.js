@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { filterPlayersForUser, getScoreAccessLevel, can } from '@services/auth.js';
 import { showAlert } from '@ui/dialogs.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, formatNumber, applyScoreFormatting, renderThresholdGrid, setCurrentPlayerId, getCurrentPlayerId, escapeHTML } from '@scripts/utils.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, formatNumber, applyScoreFormatting, renderThresholdGrid, setCurrentPlayerId, setCurrentPlayerIdSilent, getCurrentPlayerId, escapeHTML } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildBaseballScoreMapForPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
@@ -94,7 +94,7 @@ export async function initScoresPage() {
     playerSummary.classList.add('hidden');
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
-    setCurrentPlayerId('');
+    setCurrentPlayerIdSilent('');
     
     const playerSearch = document.getElementById('player-search');
     if (playerSearch) playerSearch.value = '';
@@ -117,8 +117,10 @@ export async function initScoresPage() {
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
 
-    // Clear selection context when manually changing players
-    setCurrentPlayerId('');
+    // Clear selection context when manually changing players.
+    // Use the silent variant to avoid triggering pb:pageChanged, which would
+    // cause main.js to re-run initApp() and re-initialize this page.
+    setCurrentPlayerIdSilent('');
     const playerSearch = document.getElementById('player-search');
     if (playerSearch) playerSearch.value = '';
     if (playerSelect) playerSelect.value = '';
@@ -191,7 +193,7 @@ export async function initScoresPage() {
     const roleHtml = rowContext.roleHtml ?? '';
     const isPitcher = rowContext.isPitcher ?? false;
     const opponentName = rowContext.opponentName ?? '';
-    const hasMatchup = !!rowContext.matchup && activeFormat === 'baseball';
+    const hasMatchup = !!rowContext.matchup;
     
     row.innerHTML = `
       <div class="round-info">
@@ -296,8 +298,8 @@ export async function initScoresPage() {
           ball3,
         });
         saveBtn.classList.remove('is-dirty');
-        // Refresh allEventScores so opponent data is current for baseball scoring
-        if (activeFormat === 'baseball') {
+        // Refresh allEventScores so opponent data is current for matchup-based formats
+        if (Engine.getMatchupDescription?.(1)) {
           try {
             allEventScores = await PB_API.scores.get(null, Number(getActiveEventId()));
           } catch (e) {

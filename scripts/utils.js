@@ -86,6 +86,19 @@ export function setCurrentPlayerId(playerId) {
 }
 
 /**
+ * Sets the active player ID in the URL without dispatching pb:pageChanged.
+ * Use this when the caller is already inside the target page and does not
+ * need the full app re-initialization that pb:pageChanged triggers.
+ * @param {string|null} playerId
+ */
+export function setCurrentPlayerIdSilent(playerId) {
+  const url = new URL(window.location.href);
+  if (playerId) url.searchParams.set('playerId', playerId);
+  else url.searchParams.delete('playerId');
+  window.history.replaceState({}, '', url);
+}
+
+/**
  * Formats a number with locale-specific thousands separators.
  * @param {number} num 
  * @returns {string}

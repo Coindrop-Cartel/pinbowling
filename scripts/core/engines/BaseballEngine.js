@@ -1,5 +1,6 @@
 import { ScoringEngine } from '../ScoringEngine.js';
 import { formatNumber, escapeHTML } from '../../utils.js';
+import { buildBaseballScoreMapForPlayer } from '../../services/normalizer.js';
 
 /**
  * Implementation of Baseball-style scoring logic (PinBaseball).
@@ -132,7 +133,7 @@ export class BaseballEngine extends ScoringEngine {
         const marginalGain = Math.max(0, totalPossibleRuns - runsAccumulated);
         runsAccumulated += marginalGain;
 
-        if (!silent) console.log(`[Baseball] Inning ${machine.orderNumber} Ball ${ballNum}: ${batterScores[i].toLocaleString()} - ${pitcherScores[i].toLocaleString()} = ${cumulativeDiff.toLocaleString()} → ${marginalGain}R (total: ${runsAccumulated}R, baseline: ${totalPossibleRuns}R)`);
+        if (!silent) {}
       }
       runs = runsAccumulated;
       played = p1 > 0 || o1 > 0 || p2 > 0 || o2 > 0 || p3 > 0 || o3 > 0;
@@ -209,7 +210,6 @@ export class BaseballEngine extends ScoringEngine {
       const isBottomOfLastInning = idx === lastMachineIdx && isBatter;
       const awayTopOfLastInningPlayed = lastMachineIdx >= 1 && opponentResults[lastMachineIdx - 1]?.played;
       if (isBottomOfLastInning && awayTopOfLastInningPlayed && runningTotal > opponentRunningTotal) {
-        console.log(`[Baseball] Walk-off: Player leads ${runningTotal}R > opponent ${opponentRunningTotal}R, skipping bottom of last inning`);
         return {
           orderNumber: machine.orderNumber,
           machineName: machine.machineName,
@@ -271,6 +271,137 @@ formatMark(turn, scoreOverride = null) {
   getValue1Label() { return this.config.value1Label || 'Baseline Score'; }
   getValue2Label() { return this.config.value2Label || 'Multiplier'; }
   getValue2AllowsDecimal() { return true; }
+
+  /** Baseball uses 2 machines per inning (top and bottom). */
+  getMachinesPerRound() { return 2; }
+
+  /** Baseball is head-to-head: maximum 2 players per session. */
+  getMaxRosterSize() { return 2; }
+
+  /**
+   * Returns "Top of Inning N" or "Bottom of Inning N" based on index parity.
+   * Even index = Top, Odd index = Bottom (within the inning pair).
+   * @param {number} index Zero-based index of the round in the list.
+   * @returns {string}
+   */
+  getRoundDisplayLabel(index) {
+    const inningNumber = Math.floor(index / 2) + 1;
+    const positionLabel = index % 2 === 0 ? 'Top' : 'Bottom';
+    return `${positionLabel} of Inning ${inningNumber}`;
+  }
+
+  /**
+   * Returns matchup description for the baseball head-to-head format.
+   * @param {number} roundCount Number of innings in the session.
+   * @returns {{ description: string, details: Array<{ label: string, value: string }> }}
+   */
+  getMatchupDescription(roundCount) {
+    return {
+      description: `Exactly 2 players compete head-to-head across ${roundCount} innings. Roles alternate each inning (Pitcher/Batter) and each inning has 2 machines (Top and Bottom).`,
+      details: [
+        { label: 'Format', value: 'Head-to-Head (2 players per inning)' },
+        { label: 'Innings', value: String(roundCount) },
+      ]
+    };
+  }
+
+  /**
+   * Returns baseball-specific preview row HTML for the session generator.
+   * Uses a simplified header without value1/value2 labels since innings
+   * use consistent baseline/multiplier across both halves.
+   */
+  getPreviewRowHtml(frame, index, _isExpanded, _expandedTempId, formatFn, escapeFn, renderGridFn) {
+    const headerHtml = `
+      <div class="flex gap-12 w-100 wrap matchup-inning">
+        <div class="flex gap-12 flex-1 min-250 align-center">
+          <div class="drag-handle">☰</div>
+          <span class="round-number">${this.getRoundDisplayLabel(index)}</span>
+          <span class="machine-name-display">${escapeFn(frame.machineName)}</span>
+        </div>
+      </div>
+    `;
+
+    const contentHtml = `
+      <div class="form-row">
+        <label class="small">Change Machine</label>
+        <input type="text" class="row-machine-search" placeholder="Filter machines...">
+        <select class="row-machine-select"></select>
+      </div>
+      <div class="flex-between mb-10">
+        <div class="flex gap-6">
+           <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
+           <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
+           <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
+        </div>
+        <div class="flex gap-4">
+           <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
+           <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
+        </div>
+      </div>
+      <div class="preview-values-container">${renderGridFn(this.filterThresholds(frame.values), formatFn, this, frame.value1, frame.value2)}</div>
+    `;
+
+    return { headerHtml, contentHtml };
+  }
+
+  /**
+   * Generates matchup payload objects for a baseball session.
+   * Produces a round-robin schedule where each player faces every other player.
+   *
+   * For baseball, each inning has 2 machines (top and bottom). Each matchup is
+   * assigned a sequential order number: 1 = Top of 1st, 2 = Bottom of 1st,
+   * 3 = Top of 2nd, 4 = Bottom of 2nd, etc. Player1/player2 assignments stay
+   * consistent across both halves of an inning — role alternation (Pitcher/Batter)
+   * is determined by the order number parity (odd = top, even = bottom) in the
+   * scoring engine, not by swapping player1/player2.
+   *
+   * For N players, there are N*(N-1)/2 unique pairings (single round-robin).
+   * If the number of innings exceeds the number of unique pairings, the schedule
+   * cycles through the same pairings again.
+   *
+   * @param {Array<{id: number, playerName?: string}>} players Array of player objects.
+   * @param {number} inningCount Number of innings in the session.
+   * @param {Array<{machineId: number}>} machines Array of machine objects (2 per inning).
+   * @returns {Array<{orderNumber: number, player1Id: number, player2Id: number, machineId: number}>}
+   */
+  generateMatchupPayload(players, inningCount, machines) {
+    if (!players || players.length < 2 || inningCount < 1) return [];
+
+    // Build all unique pairings (round-robin)
+    const pairings = [];
+    for (let i = 0; i < players.length; i++) {
+      for (let j = i + 1; j < players.length; j++) {
+        pairings.push({ player1Id: players[i].id, player2Id: players[j].id });
+      }
+    }
+
+    const matchups = [];
+    for (let inning = 0; inning < inningCount; inning++) {
+      const pairing = pairings[inning % pairings.length];
+
+      // Each inning has 2 machines: top (even index) and bottom (odd index)
+      const topMachine = machines[inning * 2] || machines[0];
+      const bottomMachine = machines[inning * 2 + 1] || machines[1] || topMachine;
+
+      // Top of inning (sequential orderNumber = inning*2 + 1)
+      matchups.push({
+        orderNumber: inning * 2 + 1,
+        player1Id: pairing.player1Id,
+        player2Id: pairing.player2Id,
+        machineId: topMachine.machineId || topMachine.id
+      });
+
+      // Bottom of inning (sequential orderNumber = inning*2 + 2)
+      matchups.push({
+        orderNumber: inning * 2 + 2,
+        player1Id: pairing.player1Id,
+        player2Id: pairing.player2Id,
+        machineId: bottomMachine.machineId || bottomMachine.id
+      });
+    }
+
+    return matchups;
+  }
 
   formatTotalScore(total) {
     return `${formatNumber(total)} R`;
@@ -461,6 +592,18 @@ formatMark(turn, scoreOverride = null) {
 
     resultsEmpty.classList.add('hidden');
     resultsPanel.classList.remove('hidden');
+  }
+
+  /**
+   * Builds a baseball score map for a player including opponent scores.
+   * @param {number|string} playerId
+   * @param {Array} _playerScores Unused — baseball uses allScoresByPlayer.
+   * @param {Object<number, Array>} allScoresByPlayer
+   * @param {Array} matchups
+   * @returns {Object}
+   */
+  buildPlayerScoreMap(playerId, _playerScores, allScoresByPlayer, matchups) {
+    return buildBaseballScoreMapForPlayer(playerId, allScoresByPlayer, matchups);
   }
 
   /**

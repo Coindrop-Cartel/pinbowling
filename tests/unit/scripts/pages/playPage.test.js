@@ -42,6 +42,15 @@ const engineMock = vi.hoisted(() => ({
   getThemeClass: vi.fn(() => 'theme-bowling'),
   filterThresholds: vi.fn((v) => v),
   getRoundCountOptions: vi.fn(() => [3, 5, 10]),
+  getMachinesPerRound: vi.fn(() => 1),
+  generateValue2Defaults: vi.fn(() => []),
+  getMaxRosterSize: vi.fn(() => Infinity),
+  getMatchupDescription: vi.fn(() => null),
+  getPreviewRowHtml: vi.fn((frame, index) => ({
+    headerHtml: `<div class="header"><span>${index}</span><span>${frame.machineName}</span></div>`,
+    contentHtml: '<div class="content">content</div>'
+  })),
+  generateMatchupPayload: vi.fn(() => []),
 }));
 
 vi.mock('@core/engine.js', () => ({
@@ -99,7 +108,6 @@ vi.mock('@ui/dialogs.js', () => uiMocks);
 vi.mock('@ui/branding.js', () => uiMocks);
 
 vi.mock('@services/sessionGenerator.js', () => ({
-  generatePars: vi.fn(() => [3, 4, 3]),
   generateSessionName: vi.fn((raw, loc, date, time) => raw || `${loc} ${date} ${time}`),
   selectRandomMachines: vi.fn((machines, count) => machines.slice(0, count)),
   getTargetScoreForDifficulty: vi.fn((m, diff) => m.targetMed || 1000),

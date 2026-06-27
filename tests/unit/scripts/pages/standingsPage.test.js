@@ -30,6 +30,12 @@ vi.mock('@core/engine.js', () => ({
     getMarkFormatting: vi.fn(() => ''),
     formatMark: vi.fn((turn) => turn.mark),
     shouldShowRoundScore: vi.fn(() => true),
+    getMatchupDescription: vi.fn(() => null),
+    buildPlayerScoreMap: vi.fn((playerId, scores) => {
+      const scoreMap = {};
+      scores.forEach(s => { scoreMap[s.orderNumber] = s; });
+      return scoreMap;
+    }),
   }))
 }));
 

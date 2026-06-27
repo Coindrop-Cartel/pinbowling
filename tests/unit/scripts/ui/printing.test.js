@@ -2,18 +2,6 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { printMachineScores, printBlankScoreSheet } from '@ui/printing.js'; // Import actual functions
 
-// Mock engine and scoring labels
-const mockEngine = {
-  getBonusTargets: vi.fn(() => ({ t1: 13000, t2: 16900 })),
-  getRoundLabel: vi.fn(() => 'Frame'),
-  getScoringHint: vi.fn(() => 'Hint'),
-  getLastFrameHint: vi.fn(() => 'Last Hint'),
-};
-
-vi.mock('@core/engine.js', () => ({
-  getScoringEngine: vi.fn(() => mockEngine),
-}));
-
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
     getPrintTargetSummaryHtml: () => '<div>Strike: <strong>10,000</strong></div>',

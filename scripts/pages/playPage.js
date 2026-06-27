@@ -6,7 +6,7 @@ import { applyPreferredTheme } from '@ui/branding.js';
 import { createExpandableRow, setupSortableList, createSearchableSelect } from '@ui/selectors.js';
 import { showDialog, showPlayerSelectionDialog } from '@ui/dialogs.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
-import { generatePars, generateSessionName, selectRandomMachines, getTargetScoreForDifficulty, generateMatchups } from '@services/sessionGenerator.js';
+import { generateSessionName, selectRandomMachines, getTargetScoreForDifficulty } from '@services/sessionGenerator.js';
 
 /**
  * Logic for the Play page where players enter their scores for the current session.
@@ -159,9 +159,11 @@ export async function initPlayPage() {
           try {
             // If the selected player isn't in the league yet, join them automatically
             if (!joinedIds.has(Number(selectedId))) {
-              // Enforce 2-player limit for baseball sessions
-              if (event.scoringFormat === 'baseball' && joinedIds.size >= 2) {
-                showDialog({title: 'Session Full', message: 'This baseball session already has 2 players and cannot accept more.', confirmText: 'OK' , hideCancel: true });
+              const engine = getScoringEngine(event.scoringFormat);
+              const maxRoster = engine.getMaxRosterSize();
+              // Enforce roster limit for formats with player constraints (e.g., baseball)
+              if (joinedIds.size >= maxRoster) {
+                showDialog({title: 'Session Full', message: `This session has reached its maximum roster size of ${maxRoster} and cannot accept more players.`, confirmText: 'OK' , hideCancel: true });
                 return;
               }
               const result = await PB_API.leagues.addPlayer(event.leagueId, Number(selectedId));
@@ -298,9 +300,8 @@ export async function initPlayPage() {
       return;
     }
 
-    // For baseball, we need 2 machines per inning (top and bottom)
-    const machinesPerInning = currentSessionFormat === 'baseball' ? 2 : 1;
-    const totalMachinesNeeded = frameCount * machinesPerInning;
+    const machinesPerRound = engine.getMachinesPerRound();
+    const totalMachinesNeeded = frameCount * machinesPerRound;
     
     // Pick random machines
     const selected = selectRandomMachines(locMachines, totalMachinesNeeded);
@@ -308,14 +309,17 @@ export async function initPlayPage() {
       selected.push(locMachines[Math.floor(Math.random() * locMachines.length)]);
     }
 
-    // Generate randomized pars for Golf (ensure variety)
-    const pars = generatePars(currentSessionFormat, frameCount);
+    // Generate default value2 settings for the format (e.g., par values for golf)
+    const value2Defaults = engine.generateValue2Defaults(frameCount);
 
       generatedFrames = selected.map((m, index) => {
         const baseScore = getTargetScoreForDifficulty(m, difficulty);
         let { value1, value2 } = engine.getInitialValues(baseScore);
 
-        if (currentSessionFormat === 'golf') value2 = pars[index];
+        // Apply default value2 for formats that support it (e.g., golf pars)
+        if (value2Defaults.length > 0 && value2Defaults[index] !== undefined) {
+          value2 = value2Defaults[index];
+        }
 
         return {
             machineId: Number(m.machineId),
@@ -346,30 +350,26 @@ export async function initPlayPage() {
     const matchupContainer = document.getElementById('qp-matchups-preview');
     if (!matchupContainer) return;
 
-    if (currentSessionFormat !== 'baseball') {
+    const engine = getScoringEngine(currentSessionFormat);
+    const matchupInfo = engine.getMatchupDescription(generatedFrames.length);
+
+    if (!matchupInfo) {
       matchupContainer.classList.add('hidden');
       return;
     }
 
-    // Show a placeholder that explains matchups will be generated on finalize
-    // based on the players in the league roster
     matchupContainer.classList.remove('hidden');
-    const inningCount = currentSessionFormat === 'baseball' 
-      ? generatedFrames.length / 2 
-      : generatedFrames.length;
     matchupContainer.innerHTML = `
       <div class="card matchup-preview-card">
         <h3>Head-to-Head Matchups</h3>
-        <p class="text-muted">Exactly 2 players compete head-to-head across ${inningCount} innings. Roles alternate each inning (Pitcher/Batter) and each inning has 2 machines (Top and Bottom).</p>
+        <p class="text-muted">${escapeHTML(matchupInfo.description)}</p>
         <div class="matchup-preview-grid">
-          <div class="matchup-info">
-            <span class="matchup-label">Format:</span>
-            <span>Head-to-Head (2 players per inning)</span>
-          </div>
-          <div class="matchup-info">
-            <span class="matchup-label">Innings:</span>
-            <span>${inningCount}</span>
-          </div>
+          ${matchupInfo.details.map(d => `
+            <div class="matchup-info">
+              <span class="matchup-label">${escapeHTML(d.label)}:</span>
+              <span>${escapeHTML(d.value)}</span>
+            </div>
+          `).join('')}
           <div class="matchup-info">
             <span class="matchup-label">Machines:</span>
             <span>${generatedFrames.filter(f => f.machineId).length} selected</span>
@@ -385,83 +385,10 @@ export async function initPlayPage() {
       const isExpanded = expandedTempId === frame.tempId;
       const engine = getScoringEngine(currentSessionFormat);
 
-      let headerHtml = '';
-      let contentHtml = '';
-
-      if (currentSessionFormat === 'baseball') {
-        // For baseball, each inning has 2 machines (home and away)
-        const inningNumber = Math.floor(index / 2) + 1;
-        const positionLabel = index % 2 === 0 ? 'Top' : 'Bottom';
-        
-        headerHtml =  `
-          <div class="flex gap-12 w-100 wrap matchup-inning">
-            <div class="flex gap-12 flex-1 min-250 align-center">
-              <div class="drag-handle">☰</div>
-              <span class="round-number">${positionLabel} of Inning ${inningNumber}</span>
-              <span class="machine-name-display">${escapeHTML(frame.machineName)}</span>
-            </div>
-          </div>
-        `;
-        contentHtml = `
-          <div class="form-row">
-            <label class="small">Change Machine</label>
-            <input type="text" class="row-machine-search" placeholder="Filter machines...">
-            <select class="row-machine-select"></select>
-          </div>
-          <div class="flex-between mb-10">
-            <div class="flex gap-6">
-               <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
-               <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
-               <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
-            </div>
-            <div class="flex gap-4">
-               <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
-               <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
-            </div>
-          </div>
-          <div class="preview-values-container">${renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2)}</div>
-        `;
-      } else {
-        headerHtml =  `
-          <div class="flex gap-12 w-100 wrap">
-            <div class="flex gap-12 flex-1 min-250 align-center">
-              <div class="drag-handle">☰</div>
-              <span class="round-number">${index + 1}</span>
-              <span class="machine-name-display">${escapeHTML(frame.machineName)}</span>
-            </div>
-            <div class="flex gap-12 wrap justify-end" onclick="event.stopPropagation()">
-              <div class="flex gap-6 min-140 flex-1 align-center">
-                <label class="small value-label">${engine.getValue1Label()}:</label>
-                <input type="text" class="score10-input score-input" value="${formatNumber(frame.value1)}">
-              </div>
-              <div class="flex gap-6 min-140 flex-1 align-center">
-                <label class="small value-label">${engine.getValue2Label()}:</label>
-                <input type="text" class="score1-input score-input" value="${formatNumber(frame.value2)}">
-              </div>
-            </div>
-          </div>
-        `;
-
-        contentHtml = `
-            <div class="form-row">
-              <label class="small">Change Machine</label>
-              <input type="text" class="row-machine-search" placeholder="Filter machines...">
-              <select class="row-machine-select"></select>
-            </div>
-            <div class="flex-between mb-10">
-              <div class="flex gap-6">
-                 <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
-                 <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
-                 <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
-              </div>
-              <div class="flex gap-4">
-                 <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
-                 <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
-              </div>
-            </div>
-            <div class="preview-values-container">${renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2)}</div>
-        `;
-      }
+      const { headerHtml, contentHtml } = engine.getPreviewRowHtml(
+        frame, index, isExpanded, expandedTempId,
+        formatNumber, escapeHTML, renderThresholdGrid
+      );
 
       const row = createExpandableRow(framesList, {
         id: frame.tempId,
@@ -642,13 +569,13 @@ export async function initPlayPage() {
         await PB_API.leagues.addPlayer(qpLeague.id, currentUser.player_id);
       }
 
-      // For baseball (head-to-head), generate matchups between players
-      if (currentSessionFormat === 'baseball') {
-        // Fetch the league's current roster (may include the just-added player)
+      // Generate matchups for formats that use them (e.g., baseball head-to-head)
+      const engine = getScoringEngine(currentSessionFormat);
+      const matchupInfo = engine.getMatchupDescription(generatedFrames.length);
+      if (matchupInfo) {
         const leagueData = await PB_API.leagues.get(qpLeague.id);
         const roster = leagueData?.players || [];
 
-        // If only one player, prompt to select an opponent
         if (roster.length < 2 && allPlayersCache.length > 0) {
           const opponentOptions = allPlayersCache
             .filter(p => !roster.some(r => r.id === p.id))
@@ -657,7 +584,7 @@ export async function initPlayPage() {
           if (opponentOptions.length > 0) {
             const opponentId = await showPlayerSelectionDialog(
               'Select Opponent',
-              'Baseball requires at least 2 players. Choose an opponent:',
+              'This format requires at least 2 players. Choose an opponent:',
               opponentOptions,
               'Add & Continue'
             );
@@ -668,16 +595,13 @@ export async function initPlayPage() {
           }
         }
 
-        // Re-fetch roster if we added an opponent
         const updatedLeague = roster.length >= 2 ? { players: roster } : await PB_API.leagues.get(qpLeague.id);
         const finalRoster = updatedLeague?.players || [];
 
         if (finalRoster.length >= 2) {
-          const inningCount = currentSessionFormat === 'baseball' 
-            ? generatedFrames.length / 2 
-            : generatedFrames.length;
+          const inningCount = generatedFrames.length / engine.getMachinesPerRound();
           const machines = generatedFrames.map(f => ({ machineId: f.machineId }));
-          const matchups = generateMatchups(finalRoster, inningCount, machines);
+          const matchups = engine.generateMatchupPayload(finalRoster, inningCount, machines);
 
           if (matchups.length > 0) {
             await PB_API.matchups.save(matchups.map(m => ({

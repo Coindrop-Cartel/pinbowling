@@ -5,7 +5,7 @@ import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { showDialog } from '@ui/dialogs.js';
 import { renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { filterLeaguesForUser } from '@services/auth.js'; // Import for filtering
-import { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer, groupScoresByPlayer, groupMatchupsByEvent, buildBaseballScoreMapForPlayer, buildScoreMapFromRows } from '@services/normalizer.js';
+import { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer, groupScoresByPlayer, groupMatchupsByEvent } from '@services/normalizer.js';
 import { calculateSeasonSummary, calculateBaseballRecords } from '@services/seasonCalculator.js';
 
 /**
@@ -294,7 +294,7 @@ export async function initStandingsPage() {
     const [rawScores, allLeagueTargets, leagueMatchupsByEvent] = await Promise.all([
       PB_API.scores.get(null, null, leagueId),
       PB_API.machines.getTargets(null, leagueId),
-      format === 'baseball'
+      engine.getMatchupDescription(1)
         ? Promise.all(events.map(e => PB_API.matchups.get(e.id).catch(() => []))).then(results => groupMatchupsByEvent(results.flat()))
         : Promise.resolve({})
     ]);
@@ -317,8 +317,8 @@ export async function initStandingsPage() {
 
       const playerLabel = isTeamLeague ? 'Team' : 'Player';
 
-      const isBaseball = format === 'baseball';
-      if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${events.map((e, i) => `<th class="text-center">${i + 1}</th>`).join('')}${isBaseball ? '<th class="text-center">W-L</th>' : ''}<th class="text-center">Total</th></tr>`;
+      const supportsMatchups = !!engine.getMatchupDescription(1);
+      if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${events.map((e, i) => `<th class="text-center">${i + 1}</th>`).join('')}${supportsMatchups ? '<th class="text-center">W-L</th>' : ''}<th class="text-center">Total</th></tr>`;
       
       if (standingsBody) {
         standingsBody.innerHTML = rows.map((res, idx) => {
@@ -335,9 +335,9 @@ export async function initStandingsPage() {
             ? `${res.totalSeasonPoints} pts` 
             : Engine.formatTotalScore(res.totalSeasonPoints);
 
-          const recordCell = isBaseball && res.displayRecord
+          const recordCell = supportsMatchups && res.displayRecord
             ? `<td class="standings-record text-center">${res.displayRecord}</td>`
-            : (isBaseball ? '<td class="standings-record text-center">-</td>' : '');
+            : (supportsMatchups ? '<td class="standings-record text-center">-</td>' : '');
 
           return `
             <tr>
@@ -448,7 +448,7 @@ export async function initStandingsPage() {
     const [rawScores, allTeamsData, eventMatchups] = await Promise.all([
       PB_API.scores.get(null, Number(eventId)),
       PB_API.teams.getAll(),
-      format === 'baseball' ? PB_API.matchups.get(eventId).catch(() => []) : Promise.resolve([])
+      Engine.getMatchupDescription(1) ? PB_API.matchups.get(eventId).catch(() => []) : Promise.resolve([])
     ]);
     
     const allEventScores = normalizeScores(rawScores);
@@ -473,9 +473,7 @@ export async function initStandingsPage() {
 
     const rows = filteredPlayers.map(player => {
       const scores = scoresByPlayer[player.id] || [];
-      const scoreMap = format === 'baseball'
-        ? buildBaseballScoreMapForPlayer(player.id, scoresByPlayer, eventMatchups)
-        : buildScoreMapFromRows(scores);
+      const scoreMap = Engine.buildPlayerScoreMap(player.id, scores, scoresByPlayer, eventMatchups);
       // Check all three possible balls to see if a turn has data
       const ordersWithScores = new Set(scores.filter(s => Number(s.ball1) > 0 || Number(s.ball2) > 0 || Number(s.ball3) > 0).map(s => s.orderNumber));
       
@@ -492,8 +490,8 @@ export async function initStandingsPage() {
     const isTeamLeague = league?.participants === 'team';
     const playerLabel = isTeamLeague ? 'Team' : 'Player';
 
-    const isBaseball = format === 'baseball';
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${machines.map(m => `<th class="text-center">${m.orderNumber}</th>`).join('')}${isBaseball ? '<th class="text-center">W-L</th>' : ''}<th class="text-center">Total</th></tr>`;
+    const supportsMatchups = !!Engine.getMatchupDescription(1);
+    if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${machines.map(m => `<th class="text-center">${m.orderNumber}</th>`).join('')}${supportsMatchups ? '<th class="text-center">W-L</th>' : ''}<th class="text-center">Total</th></tr>`;
     
     if (standingsBody) {
       if (isTeamLeague) {
@@ -522,9 +520,8 @@ export async function initStandingsPage() {
           return teamHeader + memberRows;
         }).join('');
       } else {
-        // For baseball single-event, calculate W-L records from matchups
         let baseballRecordsMap = null;
-        if (isBaseball && eventMatchups.length > 0) {
+        if (supportsMatchups && eventMatchups.length > 0) {
           const playersForRecords = filteredPlayers.map(p => ({ id: p.id }));
           const matchupsByEvent = { [eventId]: eventMatchups };
           const scoresByEvent = { [eventId]: scoresByPlayer };
@@ -533,7 +530,7 @@ export async function initStandingsPage() {
         }
 
         const sortedRows = rows.sort((a, b) => {
-          if (isBaseball && baseballRecordsMap) {
+          if (supportsMatchups && baseballRecordsMap) {
             const recA = baseballRecordsMap[a.player.id];
             const recB = baseballRecordsMap[b.player.id];
             if (recA && recB) {
@@ -553,7 +550,7 @@ export async function initStandingsPage() {
             }).join('');
 
           const rec = baseballRecordsMap?.[res.player.id];
-          const recordCell = isBaseball
+          const recordCell = supportsMatchups
             ? `<td class="standings-record text-center">${rec ? `${rec.wins}-${rec.losses}${rec.ties > 0 ? `-${rec.ties}` : ''}` : '-'}</td>`
             : '';
 
