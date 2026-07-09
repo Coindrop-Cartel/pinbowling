@@ -348,12 +348,13 @@ formatMark(turn, scoreOverride = null) {
    * Generates matchup payload objects for a baseball session.
    * Produces a round-robin schedule where each player faces every other player.
    *
-   * For baseball, each inning has 2 machines (top and bottom). Each matchup is
-   * assigned a sequential order number: 1 = Top of 1st, 2 = Bottom of 1st,
-   * 3 = Top of 2nd, 4 = Bottom of 2nd, etc. Player1/player2 assignments stay
-   * consistent across both halves of an inning — role alternation (Pitcher/Batter)
-   * is determined by the order number parity (odd = top, even = bottom) in the
-   * scoring engine, not by swapping player1/player2.
+   * For baseball, each inning has 2 machines (top and bottom). Each matchup row
+   * represents a single player's slot in a half-inning:
+   *   orderNumber = inning index (1 = 1st inning, 2 = 2nd inning, ...)
+   *   playerOrder = role within the slot (1 = home/top, 2 = away/bottom)
+   * Both players in a pairing share the same orderNumber; their player_order
+   * distinguishes home (1) from away (2). Role alternation (Pitcher/Batter)
+   * is determined by player_order in the scoring engine.
    *
    * For N players, there are N*(N-1)/2 unique pairings (single round-robin).
    * If the number of innings exceeds the number of unique pairings, the schedule
@@ -362,7 +363,7 @@ formatMark(turn, scoreOverride = null) {
    * @param {Array<{id: number, playerName?: string}>} players Array of player objects.
    * @param {number} inningCount Number of innings in the session.
    * @param {Array<{machineId: number}>} machines Array of machine objects (2 per inning).
-   * @returns {Array<{orderNumber: number, player1Id: number, player2Id: number, machineId: number}>}
+   * @returns {Array<{orderNumber: number, playerId: number, playerOrder: number, machineId: number}>}
    */
   generateMatchupPayload(players, inningCount, machines) {
     if (!players || players.length < 2 || inningCount < 1) return [];
@@ -378,24 +379,25 @@ formatMark(turn, scoreOverride = null) {
     const matchups = [];
     for (let inning = 0; inning < inningCount; inning++) {
       const pairing = pairings[inning % pairings.length];
+      const orderNumber = inning + 1;
 
       // Each inning has 2 machines: top (even index) and bottom (odd index)
       const topMachine = machines[inning * 2] || machines[0];
       const bottomMachine = machines[inning * 2 + 1] || machines[1] || topMachine;
 
-      // Top of inning (sequential orderNumber = inning*2 + 1)
+      // Home player (player_order 1) on the top machine
       matchups.push({
-        orderNumber: inning * 2 + 1,
-        player1Id: pairing.player1Id,
-        player2Id: pairing.player2Id,
+        orderNumber,
+        playerId: pairing.player1Id,
+        playerOrder: 1,
         machineId: topMachine.machineId || topMachine.id
       });
 
-      // Bottom of inning (sequential orderNumber = inning*2 + 2)
+      // Away player (player_order 2) on the bottom machine
       matchups.push({
-        orderNumber: inning * 2 + 2,
-        player1Id: pairing.player1Id,
-        player2Id: pairing.player2Id,
+        orderNumber,
+        playerId: pairing.player2Id,
+        playerOrder: 2,
         machineId: bottomMachine.machineId || bottomMachine.id
       });
     }
@@ -471,9 +473,16 @@ formatMark(turn, scoreOverride = null) {
     }
 
     const currentPlayerId = Number(getCurrentPlayerId());
-    // Find all matchups involving this player
-    const myMatchups = eventMatchups.filter(m => Number(m.player1Id) === currentPlayerId || Number(m.player2Id) === currentPlayerId);
-    const opponentIds = [...new Set(myMatchups.map(m => Number(m.player1Id) === currentPlayerId ? Number(m.player2Id) : Number(m.player1Id)))];
+    // Find all matchups involving this player (one row per player per half-inning)
+    const myMatchups = eventMatchups.filter(m => Number(m.playerId) === currentPlayerId);
+    // Opponents are the sibling rows: same orderNumber, different playerOrder
+    const opponentIds = [...new Set(
+      myMatchups.flatMap(m =>
+        eventMatchups
+          .filter(s => Number(s.orderNumber) === Number(m.orderNumber) && Number(s.playerOrder) !== Number(m.playerOrder))
+          .map(s => Number(s.playerId))
+      )
+    )];
 
     // Build opponent score maps and calculate their totals
     const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
@@ -488,8 +497,8 @@ formatMark(turn, scoreOverride = null) {
       }))
     ];
 
-    // Sort so Away (Player2, isPlayer1=false) always appears first,
-    // Home (Player1, isPlayer1=true) always appears second.
+    // Sort so Away (PlayerOrder 2) always appears first,
+    // Home (PlayerOrder 1) always appears second.
     playerResults.sort((a, b) => {
       const aHome = a.scoreMap.isPlayer1 ? 1 : 0;
       const bHome = b.scoreMap.isPlayer1 ? 1 : 0;
@@ -497,8 +506,11 @@ formatMark(turn, scoreOverride = null) {
     });
 
     // --- Core Scoreboard Aggregation Logic ---
+    // Baseball pairs machines into innings (2 machines per inning: top + bottom).
+    // Each player only bats in one half of each inning, so the inning score is
+    // the runs from the half where they were the batter.
     const playerTotalScores = {};   // {playerId: total}
-    const inningData = {};          // {orderNumber: {playerId: score}}
+    const inningData = {};          // {inningNumber: {playerId: score}}
     const playerEngineResults = {}; // {playerId: turnResults[]}
 
     playerResults.forEach(pResult => {
@@ -507,17 +519,31 @@ formatMark(turn, scoreOverride = null) {
       playerEngineResults[playerIdNum] = pTurnResults;
 
       let currentTotal = 0;
-      for (const turn of pTurnResults) {
-        const orderNum = String(turn.orderNumber);
-        if (!inningData[orderNum]) inningData[orderNum] = {};
+      for (let i = 0; i < pTurnResults.length; i++) {
+        const turn = pTurnResults[i];
+        // Pair machines into innings: machines 0+1 = inning 1, 2+3 = inning 2, etc.
+        const inningNumber = Math.floor(i / 2) + 1;
+        const inningKey = String(inningNumber);
+        if (!inningData[inningKey]) inningData[inningKey] = {};
 
         if (turn.played) {
           currentTotal += turn.score;
-          inningData[orderNum][playerIdNum] = turn.isBatter ? String(turn.score) : '0';
+          // Only show the batter's runs for the inning; pitcher shows '0'.
+          // If a player already has a score for this inning (from the top half),
+          // keep it — the bottom half is their pitching turn ('0').
+          if (turn.isBatter && inningData[inningKey][playerIdNum] === undefined) {
+            inningData[inningKey][playerIdNum] = String(turn.score);
+          } else if (inningData[inningKey][playerIdNum] === undefined) {
+            inningData[inningKey][playerIdNum] = '0';
+          }
         } else if (turn.isWalkOff) {
-          inningData[orderNum][playerIdNum] = 'X';
+          if (inningData[inningKey][playerIdNum] === undefined) {
+            inningData[inningKey][playerIdNum] = 'X';
+          }
         } else {
-          inningData[orderNum][playerIdNum] = '-';
+          if (inningData[inningKey][playerIdNum] === undefined) {
+            inningData[inningKey][playerIdNum] = '-';
+          }
         }
       }
       playerTotalScores[playerIdNum] = currentTotal;
@@ -532,15 +558,11 @@ formatMark(turn, scoreOverride = null) {
     const existingGrid = resultsPanel.querySelector('.scoreboard-grid');
     if (existingGrid) existingGrid.remove();
 
-    // Group machines into innings (pairs of Top/Bot)
-    const inningGroups = []; // { inningNumber, topOrder, botOrder }
-    for (let i = 0; i < machines.length; i += 2) {
-      const inningNumber = Math.floor(i / 2) + 1;
-      inningGroups.push({
-        inningNumber,
-        topOrder: machines[i]?.orderNumber,
-        botOrder: machines[i + 1]?.orderNumber
-      });
+    // Group machines into innings (2 machines per inning: top + bottom)
+    const inningGroups = []; // { inningNumber }
+    const totalInnings = Math.ceil(machines.length / 2);
+    for (let i = 1; i <= totalInnings; i++) {
+      inningGroups.push({ inningNumber: i });
     }
 
     let scoreboardHTML = '<div class="scoreboard-grid">';
@@ -552,19 +574,16 @@ formatMark(turn, scoreOverride = null) {
     }
     scoreboardHTML += '<span class="total-header">TOTAL</span></div>';
 
-    // 2. Player Rows — each player gets two sub-rows (Top / Bot) per inning
+    // 2. Player Rows — each player gets one row
     playerResults.forEach(pResult => {
       const playerIdNum = Number(pResult.id);
       const totalScoreValue = playerTotalScores[playerIdNum] || 0;
       const homeAwayLabel = pResult.scoreMap.isPlayer1 ? 'Home' : 'Away';
 
-      // Top half-row
-      scoreboardHTML += '<div class="scoreboard-row player-row top-row">';
+      scoreboardHTML += '<div class="scoreboard-row player-row">';
       scoreboardHTML += `<span class="player-name"><span class="home-away-label">${homeAwayLabel}:</span> ${escHTML(pResult.name)}</span>`;
       for (const ig of inningGroups) {
-        const score = pResult.scoreMap.isPlayer1 ? inningData[String(ig.botOrder)]?.[playerIdNum] || '-'
-            : inningData[String(ig.topOrder)]?.[playerIdNum] || '-';
-
+        const score = inningData[String(ig.inningNumber)]?.[playerIdNum] || '-';
         scoreboardHTML += `<span class="inning-score">${score}</span>`;
       }
       scoreboardHTML += `<span class="total-score">${totalScoreValue}</span></div>`;
@@ -617,13 +636,54 @@ formatMark(turn, scoreOverride = null) {
   getRoundRowContext(round, context) {
     const { eventMatchups, getCurrentPlayerId } = context;
     const currentPlayerId = Number(getCurrentPlayerId());
-    const matchup = eventMatchups.find(m => Number(m.machineId) === Number(round.machineId) && (Number(m.player1Id) === currentPlayerId || Number(m.player2Id) === currentPlayerId));
-    // With sequential orderNumbers: odd = Top (Player1=Pitcher, Player2=Batter),
-    // even = Bottom (Player1=Batter, Player2=Pitcher)
-    const isTop = matchup ? Number(matchup.orderNumber) % 2 === 1 : true;
-    const isPlayer1 = matchup ? Number(matchup.player1Id) === currentPlayerId : true;
-    const isPitcher = matchup ? (isTop ? isPlayer1 : !isPlayer1) : true;
-    const opponentName = matchup ? (isPlayer1 ? matchup.player2Name : matchup.player1Name) : '';
+
+    // Each baseball inning has 2 machines (top + bottom). Each player has ONE
+    // matchup row per inning, on their own machine. The current player may be
+    // viewing either their own machine OR the opponent's machine for the inning.
+    // So we find the inning (orderNumber) that contains round.machineId, then
+    // resolve the player's matchup and the opponent (sibling) within that inning.
+
+    // Step 1: Find any matchup row whose machineId matches this round's machine.
+    // That tells us which inning (orderNumber) this machine belongs to.
+    const machineMatch = eventMatchups.find(
+      m => Number(m.machineId ?? m.machine_id) === Number(round.machineId)
+    );
+    const inningOrderNumber = machineMatch ? Number(machineMatch.orderNumber ?? machineMatch.order_number) : null;
+
+    // Step 2: Within that inning, find the current player's matchup row.
+    const matchup = inningOrderNumber !== null
+      ? eventMatchups.find(
+          m => Number(m.orderNumber ?? m.order_number) === inningOrderNumber
+            && Number(m.playerId ?? m.player_id) === currentPlayerId
+        )
+      : null;
+    // Sibling row = same inning, different playerOrder (the opponent).
+    const sibling = inningOrderNumber !== null
+      ? eventMatchups.find(
+          m => Number(m.orderNumber ?? m.order_number) === inningOrderNumber
+            && Number(m.playerId ?? m.player_id) !== currentPlayerId
+        )
+      : null;
+
+    // playerOrder 1 = Home, 2 = Away.
+    // In baseball: Top of inning = Away bats, Home pitches.
+    //              Bottom of inning = Home bats, Away pitches.
+    // Determine whether this machine is the Top or Bottom half.
+    // In our generator, playerOrder 1 is always the Top machine.
+    const topMatchup = eventMatchups.find(
+      m => Number(m.orderNumber ?? m.order_number) === inningOrderNumber && Number(m.playerOrder ?? m.player_order) === 1
+    );
+    const isTop = topMatchup ? Number(topMatchup.machineId ?? topMatchup.machine_id) === Number(round.machineId) : true;
+
+    const isHome = matchup ? Number(matchup.playerOrder ?? matchup.player_order) === 1 : true;
+    // isPitcher reflects the CURRENT player's role on this machine, not the
+    // machine owner's role. The current player may be viewing the opponent's
+    // machine for the inning, so we use the current player's home/away status.
+    // Home pitches on Top, bats on Bottom. Away is the inverse.
+    // Top (playerOrder 1) = Home pitches, Away bats.
+    // Bottom (playerOrder 2) = Away pitches, Home bats.
+    const isPitcher = isHome ? isTop : !isTop;
+    const opponentName = sibling ? (sibling.playerName ?? sibling.player_name) : '';
     const roleHtml = matchup ? `
         <div class="baseball-role-row">
           <span class="role-label ${isPitcher ? 'pitcher' : 'batter'}">${isPitcher ? 'Pitcher' : 'Batter'}</span>
@@ -633,9 +693,8 @@ formatMark(turn, scoreOverride = null) {
 
     let displayRoundNumber = round.orderNumber;
     if (matchup) {
-      const orderNum = Number(matchup.orderNumber);
-      const inningNumber = Math.ceil(orderNum / 2);
-      const positionLabel = orderNum % 2 === 1 ? 'Top' : 'Bottom';
+      const inningNumber = Number(matchup.orderNumber ?? matchup.order_number);
+      const positionLabel = isTop ? 'Top' : 'Bottom';
       displayRoundNumber = `${positionLabel} of ${inningNumber}`;
     }
 

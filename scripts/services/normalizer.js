@@ -152,25 +152,38 @@ export function buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchup
   const opponent = {};
 
   const playerMatchups = (matchups || [])
-    .filter(m => Number(m.player1Id ?? m.player1_id) === id || Number(m.player2Id ?? m.player2_id) === id)
+    .filter(m => Number(m.playerId ?? m.player_id) === id)
     .sort((a, b) => Number(a.orderNumber ?? a.order_number) - Number(b.orderNumber ?? b.order_number));
 
   const firstMatchup = playerMatchups[0];
-  scoreMap.isPlayer1 = firstMatchup ? Number(firstMatchup.player1Id ?? firstMatchup.player1_id) === id : true;
+  scoreMap.isPlayer1 = firstMatchup ? Number(firstMatchup.playerOrder ?? firstMatchup.player_order) === 1 : true;
 
   playerMatchups.forEach(matchup => {
     const matchupOrderNumber = Number(matchup.orderNumber ?? matchup.order_number);
-    // With sequential order_numbers, the matchup orderNumber IS the machine orderNumber directly.
-    // Odd = Top of inning, Even = Bottom of inning (e.g., 1=Top 1st, 2=Bottom 1st, 3=Top 2nd, etc.)
-    const machineOrderNumber = String(matchupOrderNumber);
-    const opponentId = Number(matchup.player1Id ?? matchup.player1_id) === id
-      ? Number(matchup.player2Id ?? matchup.player2_id)
-      : Number(matchup.player1Id ?? matchup.player1_id);
+    // Find the sibling row (same orderNumber/inning, different playerOrder) to get the opponent.
+    const sibling = (matchups || []).find(
+      m => Number(m.orderNumber ?? m.order_number) === matchupOrderNumber
+        && Number(m.playerOrder ?? m.player_order) !== Number(matchup.playerOrder ?? matchup.player_order)
+    );
+    const opponentId = sibling ? Number(sibling.playerId ?? sibling.player_id) : 0;
     const opponentScores = scoresByPlayer?.[opponentId] || scoresByPlayer?.[String(opponentId)] || [];
-    // Find the opponent's score row for this specific machine (by machineId from matchup)
-    const matchupMachineId = Number(matchup.machineId ?? matchup.machine_id);
-    const opponentRow = opponentScores.find(s => Number(s.machineId ?? s.machine_id) === matchupMachineId);
-    if (opponentRow) opponent[machineOrderNumber] = buildScoreMapFromRows([opponentRow])[String(opponentRow.orderNumber ?? opponentRow.order_number)];
+
+    // Both players enter scores on BOTH machines in the inning (they alternate
+    // pitching/batting). The opponent's score for a given machine is found by
+    // matching the opponent's score row to that machine's machineId. We need to
+    // populate the opponent map for BOTH machines in this inning, keyed by each
+    // machine's orderNumber (the sequential machine index the UI looks up).
+    const inningMachineIds = [
+      Number(matchup.machineId ?? matchup.machine_id),
+      Number(sibling ? (sibling.machineId ?? sibling.machine_id) : (matchup.machineId ?? matchup.machine_id)),
+    ];
+    inningMachineIds.forEach(machineId => {
+      const opponentRow = opponentScores.find(s => Number(s.machineId ?? s.machine_id) === machineId);
+      if (opponentRow) {
+        const machineOrderNumber = String(opponentRow.orderNumber ?? opponentRow.order_number);
+        opponent[machineOrderNumber] = buildScoreMapFromRows([opponentRow])[machineOrderNumber];
+      }
+    });
   });
 
   scoreMap.opponent = opponent;

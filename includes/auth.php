@@ -35,7 +35,7 @@ function canManageLeague($pdo, $leagueId) {
  * provided league-specific password matches.
  */
 function validateLeagueAccess($pdo, $leagueId) {
-    global $apiSecret;
+    $apiSecret = Configuration::getInstance()->getApiSecret();
 
     $providedSecret = getHeader('X-PB-Secret');
 
@@ -58,7 +58,7 @@ function validateLeagueAccess($pdo, $leagueId) {
  * Used for system-wide modifications like master machine/player editing.
  */
 function validateAdminAccess() {
-    global $apiSecret;
+    $apiSecret = Configuration::getInstance()->getApiSecret();
 
     $providedSecret = getHeader('X-PB-Secret');
 
@@ -79,7 +79,7 @@ function validateAdminAccess() {
  * Verifies that the user is at least a TD or has master credentials.
  */
 function validateTDAccess() {
-    global $apiSecret;
+    $apiSecret = Configuration::getInstance()->getApiSecret();
 
     $providedSecret = getHeader('X-PB-Secret');
 
@@ -101,7 +101,7 @@ function validateTDAccess() {
  * the server-side API_SECRET OR checks for a valid authenticated session.
  */
 function validateSessionOrSecret() {
-    global $apiSecret;
+    $apiSecret = Configuration::getInstance()->getApiSecret();
     $providedSecret = getHeader('X-PB-Secret');
     if ($providedSecret === $apiSecret) {
         return;

@@ -31,12 +31,14 @@ function serializeLocation($row) {
         'name' => $row['name'],
         'city' => $row['city'] ?? null,
         'state' => $row['state'] ?? null,
-        'machines' => $row['machines'] ?? []
+        'machines' => serializeLocationMachinesGrouped($row['machines'] ?? [])
     ];
 }
 
 /**
  * Normalizes a location_machine junction row with machine details.
+ * When multiple score rows exist for a machine (one per format), they are
+ * grouped into a `scores` map keyed by format.
  */
 function serializeLocationMachine($row) {
     return [
@@ -45,24 +47,49 @@ function serializeLocationMachine($row) {
         'machineId' => (int)$row['machine_id'],
         'machineName' => $row['machine_name'] ?? null,
         'note' => $row['note'] ?? null,
-        'value1' => (int)($row['value1'] ?? 0),
-        'value2' => (float)($row['value2'] ?? 0),
-        'values' => [
-            1 => (int)($row['score1'] ?? 0),
-            2 => (int)($row['score2'] ?? 0),
-            3 => (int)($row['score3'] ?? 0),
-            4 => (int)($row['score4'] ?? 0),
-            5 => (int)($row['score5'] ?? 0),
-            6 => (int)($row['score6'] ?? 0),
-            7 => (int)($row['score7'] ?? 0),
-            8 => (int)($row['score8'] ?? 0),
-            9 => (int)($row['score9'] ?? 0),
-            10 => (int)($row['score10'] ?? 0),
-        ],
+        'format' => $row['format'] ?? 'bowling',
         'targetEasy' => (int)($row['target_easy'] ?? 0),
         'targetMed' => (int)($row['target_med'] ?? 0),
         'targetHard' => (int)($row['target_hard'] ?? 0),
+        'scores' => isset($row['scores']) ? $row['scores'] : null,
     ];
+}
+
+/**
+ * Groups flat location_machine rows (from a JOIN with location_machine_scores)
+ * into machine objects with a `scores` map keyed by format.
+ *
+ * Input: array of rows, each with lm.* + lms.format, lms.target_easy, lms.target_med, lms.target_hard
+ * Output: array of machine objects, each with a `scores` map like:
+ *   { bowling: {targetEasy, targetMed, targetHard}, baseball: {...}, ... }
+ * Also sets top-level `format`/`targetEasy`/`targetMed`/`targetHard` from the first score row.
+ */
+function serializeLocationMachinesGrouped(array $rows): array {
+    $grouped = [];
+    foreach ($rows as $row) {
+        $lmId = (int)$row['id'];
+        if (!isset($grouped[$lmId])) {
+            $grouped[$lmId] = [
+                'id' => $lmId,
+                'locationId' => isset($row['location_id']) ? (int)$row['location_id'] : null,
+                'machineId' => (int)$row['machine_id'],
+                'machineName' => $row['machine_name'] ?? null,
+                'note' => $row['note'] ?? null,
+                'format' => $row['format'] ?? 'bowling',
+                'targetEasy' => (int)($row['target_easy'] ?? 0),
+                'targetMed' => (int)($row['target_med'] ?? 0),
+                'targetHard' => (int)($row['target_hard'] ?? 0),
+                'scores' => [],
+            ];
+        }
+        $fmt = $row['format'] ?? 'bowling';
+        $grouped[$lmId]['scores'][$fmt] = [
+            'targetEasy' => (int)($row['target_easy'] ?? 0),
+            'targetMed' => (int)($row['target_med'] ?? 0),
+            'targetHard' => (int)($row['target_hard'] ?? 0),
+        ];
+    }
+    return array_values($grouped);
 }
 
 /**
@@ -176,17 +203,19 @@ function serializeTeam($row) {
 
 /**
  * Normalizes a matchup database row.
+ *
+ * Each row represents a single player's slot in a half-inning:
+ *   orderNumber = inning/slot index, playerOrder = role (1=home, 2=away).
  */
 function serializeMatchup($row) {
     return [
         'id' => (int)$row['id'],
         'eventId' => (int)$row['event_id'],
         'orderNumber' => (int)$row['order_number'],
-        'player1Id' => (int)$row['player1_id'],
-        'player2Id' => (int)$row['player2_id'],
+        'playerId' => (int)$row['player_id'],
         'machineId' => (int)$row['machine_id'],
-        'player1Name' => $row['player1_name'] ?? null,
-        'player2Name' => $row['player2_name'] ?? null,
+        'playerOrder' => (int)($row['player_order'] ?? 1),
+        'playerName' => $row['player_name'] ?? null,
         'machineName' => $row['machine_name'] ?? null
     ];
 }

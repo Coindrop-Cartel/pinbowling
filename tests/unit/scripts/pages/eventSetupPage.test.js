@@ -212,7 +212,7 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
   });
 
   it('should handle quick fill buttons', async () => {
-    const machine = { id: 1, machineName: 'Iron Maiden', targetEasy: 1000, targetMed: 2000, targetHard: 3000 };
+    const machine = { id: 1, machineName: 'Iron Maiden', format: 'bowling', targetEasy: 1000, targetMed: 2000, targetHard: 3000 };
     // Ensure machines are returned before initialization
     PB_API.machines.getAll.mockResolvedValue([machine]);
     // Mock location machines as the active event has locationId: 1

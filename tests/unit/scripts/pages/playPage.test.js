@@ -1,12 +1,24 @@
 /** @vitest-environment jsdom */
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+// Shared store so the getMachines mock can read location data set by getAll
+const apiMock = vi.hoisted(() => ({
+  locations: [],
+  getMachines: vi.fn((locationId) => {
+    const loc = apiMock.locations.find(l => l.id === Number(locationId));
+    return Promise.resolve(loc?.machines || []);
+  }),
+}));
+
 // Mock dependencies
 vi.mock('@services/api.js', () => ({
   PB_API: {
     leagues: { getAll: vi.fn(), create: vi.fn(), addPlayer: vi.fn() },
     players: { getAll: vi.fn() },
-    locations: { getAll: vi.fn() },
+    locations: {
+      getAll: vi.fn(() => Promise.resolve(apiMock.locations)),
+      getMachines: apiMock.getMachines,
+    },
     events: { create: vi.fn() },
     machines: { saveTarget: vi.fn() },
     auth: {
@@ -150,6 +162,14 @@ describe('Play Page (playPage.js)', () => {
     `;
     vi.clearAllMocks();
     Element.prototype.scrollIntoView = vi.fn();
+
+    // Sync the shared location store whenever a test sets getAll's return value
+    apiMock.locations = [];
+    const originalMockResolvedValue = PB_API.locations.getAll.mockResolvedValue.bind(PB_API.locations.getAll);
+    PB_API.locations.getAll.mockResolvedValue = (value) => {
+      apiMock.locations = Array.isArray(value) ? value : [];
+      return originalMockResolvedValue(value);
+    };
   });
 
   afterEach(() => {

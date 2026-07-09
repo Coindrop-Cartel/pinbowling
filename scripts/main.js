@@ -31,6 +31,65 @@ import { showAlert } from '@ui/dialogs.js';
  * PHP pages while ensuring only the necessary module logic is executed 
  * for the current view context.
  */
+/**
+ * Mobile carousel for the home page format logos.
+ *
+ * On small screens only the active format logo is shown, flanked by
+ * prev/next arrows that let the user cycle through the available formats.
+ * On larger screens all logos are shown and the arrows are hidden (via CSS).
+ */
+function initHeroLogoCarousel() {
+  const track = document.querySelector('.hero-logo-track');
+  if (!track) return;
+
+  const logos = Array.from(track.querySelectorAll('.hero-logo-btn'));
+  if (logos.length === 0) return;
+
+  const navButtons = document.querySelectorAll('.hero-logo-nav');
+
+  const getActiveIndex = () => {
+    const theme = document.body.classList;
+    for (let i = 0; i < logos.length; i++) {
+      const fmt = logos[i].dataset.format;
+      if (theme.contains(`theme-${fmt}`)) return i;
+    }
+    return 0;
+  };
+
+  const render = () => {
+    const active = getActiveIndex();
+    logos.forEach((logo, i) => {
+      if (i === active) {
+        logo.removeAttribute('hidden');
+      } else {
+        logo.setAttribute('hidden', '');
+      }
+    });
+  };
+
+  const cycle = (direction) => {
+    const current = getActiveIndex();
+    const next = (current + direction + logos.length) % logos.length;
+    const format = logos[next].dataset.format;
+    document.cookie = `pb_preferred_format=${format}; path=/; max-age=31536000`;
+    applyPreferredTheme(format);
+    render();
+  };
+
+  navButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const dir = parseInt(btn.dataset.direction || '1', 10);
+      cycle(dir);
+    });
+  });
+
+  // Keep the carousel in sync when the theme changes from any source
+  // (e.g. direct logo tap on desktop, or other brand-switching UI).
+  document.addEventListener('pb:themeChanged', render);
+
+  render();
+}
+
 export function initApp() {
   // Handle specific brand selection on the Home Page
   const heroLogoBtns = document.querySelectorAll('.hero-logo-btn');
@@ -41,6 +100,8 @@ export function initApp() {
       applyPreferredTheme(format);
     };
   });
+
+  initHeroLogoCarousel();
 
   initNavigation('.nav-container'); 
   applyPreferredTheme();

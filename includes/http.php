@@ -8,50 +8,49 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-CSRF-TOKEN');
 
+/**
+ * Global helper to access the current Request object.
+ * This allows legacy code to transition to the new Request object gradually.
+ */
+function request(): \App\Http\Request {
+    static $request = null;
+    if ($request === null) {
+        $request = \App\Http\Request::createFromGlobals();
+    }
+    return $request;
+}
+
 // Handle CORS preflight requests globally. This is required because custom 
 // headers like X-CSRF-TOKEN trigger an OPTIONS request for ALL method types.
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit;
+if (request()->isOptions()) {
+    (new \App\Http\Response())->sendAndExit();
 }
 
 /**
  * Standardized JSON response handler.
+ * Now a backward-compatible wrapper around JsonResponse.
  * @param mixed $data Data to encode.
  * @param int $status HTTP status code.
  */
 function sendJson($data, $status = 200) {
-    if (ob_get_length()) ob_clean();
-    header('Content-Type: application/json');
-    http_response_code($status);
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
-    exit;
+    (new \App\Http\JsonResponse($data, $status))->sendAndExit();
 }
 
 /**
  * Reads and decodes JSON data from the request body.
+ * Now a backward-compatible wrapper around Request::getBodyParam().
  * @return array
  */
 function getJsonInput() {
-    $body = file_get_contents('php://input');
-    return json_decode($body, true) ?: [];
+    return request()->getBody();
 }
 
 /**
  * Helper to retrieve custom headers from various server environments.
- * Handles standard, lowercase, and REDIRECT_ prefixed variants (common in CGI/FastCGI).
+ * Now a backward-compatible wrapper around Request::getHeader().
  */
 function getHeader($name) {
-    static $headers_cache = null;
-    if ($headers_cache === null) {
-        $headers_cache = function_exists('getallheaders') ? getallheaders() : [];
-    }
-    
-    $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
-    return $_SERVER[$serverKey] 
-        ?? $headers_cache[$name] 
-        ?? $headers_cache[strtolower($name)] 
-        ?? $_SERVER["REDIRECT_$serverKey"] 
-        ?? null;
+    return request()->getHeader($name);
 }
 
 /**
@@ -61,9 +60,9 @@ function getHeader($name) {
  * @return bool
  */
 function verifyCsrfToken() {
-    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $request = request();
     // Safe methods do not require CSRF validation
-    if (in_array($method, ['GET', 'HEAD', 'OPTIONS'])) {
+    if ($request->isSafeMethod()) {
         return true;
     }
 

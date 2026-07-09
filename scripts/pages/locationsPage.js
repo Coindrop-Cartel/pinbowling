@@ -237,15 +237,37 @@ export async function initLocationsPage() {
     }
     empty.classList.add('hidden');
 
-    machines.sort((a, b) => a.machineName.localeCompare(b.machineName));
+    // DEBUG: Log raw machine data to trace target score values
+
+    machines = machines.map(m => ({
+      ...m,
+      machineName: m.machineName || m.machine_name,
+      machineId: m.machineId || m.machine_id,
+      format: m.format || 'bowling',
+      targetEasy: m.targetEasy ?? m.target_easy ?? 0,
+      targetMed: m.targetMed ?? m.target_med ?? 0,
+      targetHard: m.targetHard ?? m.target_hard ?? 0,
+      scores: m.scores || {}
+    }));
+    machines.sort((a, b) => (a.machineName || '').localeCompare(b.machineName || ''));
 
     machines.forEach(m => {
       const item = document.createElement('div');
       item.className = 'list-item-row';
+      const scoreFormats = Object.keys(m.scores);
+      const formatBadges = scoreFormats.length > 0
+        ? scoreFormats.map(f => `<span class="badge small">${f}</span>`).join(' ')
+        : `<span class="badge small">${m.format}</span>`;
+      const scoreLines = scoreFormats.length > 0
+        ? scoreFormats.map(f => {
+            const s = m.scores[f];
+            return `<small>${f}: E: ${formatNumber(s.targetEasy)} | M: ${formatNumber(s.targetMed)} | H: ${formatNumber(s.targetHard)}</small>`;
+          }).join('<br>')
+        : `<small>E: ${formatNumber(m.targetEasy)} | M: ${formatNumber(m.targetMed)} | H: ${formatNumber(m.targetHard)}</small>`;
       item.innerHTML = `
         <span>
-          <strong class="small">${escapeHTML(m.machineName)}</strong><br>
-          <small>E: ${formatNumber(m.targetEasy)} | M: ${formatNumber(m.targetMed)} | H: ${formatNumber(m.targetHard)}</small>
+          <strong class="small">${escapeHTML(m.machineName)} ${formatBadges}</strong><br>
+          ${scoreLines}
         </span>
         <div class="small-action-buttons">
           <button class="edit-mach-btn secondary btn-row">Edit</button>
@@ -277,11 +299,56 @@ export async function initLocationsPage() {
     machineFormCard.classList.remove('hidden');
     machineFormCard.innerHTML = `<h2>Loading Machine Details...</h2>`;
 
-    const engine = getScoringEngine();
-    const highScoreLabel = engine.getValue1Label();
+    const allMachines = await PB_API.machines.getAll();
+    const formats = ['bowling', 'golf', 'baseball'];
+    const currentFormat = existing?.format || 'bowling';
+
+    /**
+     * Updates the target score fields and labels to match the selected format.
+     * Looks up existing scores for the format, or falls back to engine defaults / zeros.
+     * @param {string} fmt The scoring format key (bowling, golf, baseball)
+     */
+    const updateTargetFieldsForFormat = (fmt) => {
+      const eng = getScoringEngine(fmt);
+      const defs = eng.getInitialValues();
+      const v1Label = eng.getValue1Label();
+      const existingScores = existing?.scores?.[fmt] || {};
+
+      const easyInput = document.getElementById('target-easy');
+      const medInput = document.getElementById('target-med');
+      const hardInput = document.getElementById('target-hard');
+
+      // Update labels
+      easyInput.closest('.form-row').querySelector('label').textContent = `${v1Label}: Easy`;
+      medInput.closest('.form-row').querySelector('label').textContent = `${v1Label}: Medium`;
+      hardInput.closest('.form-row').querySelector('label').textContent = `${v1Label}: Hard`;
+
+      // Update placeholders
+      easyInput.placeholder = `e.g. ${formatNumber(defs.value1)}`;
+      medInput.placeholder = `e.g. ${formatNumber(defs.value1 * 2)}`;
+      hardInput.placeholder = `e.g. ${formatNumber(defs.value1 * 3)}`;
+
+      // Update values: use existing scores for this format, or empty for new entries
+      easyInput.value = existingScores.targetEasy != null ? formatNumber(existingScores.targetEasy) : '';
+      medInput.value = existingScores.targetMed != null ? formatNumber(existingScores.targetMed) : '';
+      hardInput.value = existingScores.targetHard != null ? formatNumber(existingScores.targetHard) : '';
+
+      applyScoreFormatting(easyInput);
+      applyScoreFormatting(medInput);
+      applyScoreFormatting(hardInput);
+    };
+
+    const engine = getScoringEngine(currentFormat);
+    const v1Label = engine.getValue1Label();
+    const v2Label = engine.getValue2Label();
     const defaults = engine.getInitialValues();
 
-    const allMachines = await PB_API.machines.getAll();
+    // Get initial values from existing scores for the current format, or top-level fallbacks
+    const currentScores = existing?.scores?.[currentFormat] || {};
+    const initEasy = currentScores.targetEasy ?? existing?.targetEasy ?? existing?.target_easy;
+    const initMed = currentScores.targetMed ?? existing?.targetMed ?? existing?.target_med;
+    const initHard = currentScores.targetHard ?? existing?.targetHard ?? existing?.target_hard;
+
     machineFormCard.innerHTML = `
       <h2>${existing ? 'Edit' : 'Add'} Machine for ${locationName}</h2>
       <div class="form-row">
@@ -292,16 +359,23 @@ export async function initLocationsPage() {
         </select>
       </div>
       <div class="form-row">
-        <label>${highScoreLabel}: Easy</label>
-        <input type="text" id="target-easy" placeholder="e.g. ${formatNumber(defaults.value1)}" value="${existing ? formatNumber(existing.targetEasy) : ''}">
+        <label>Scoring Format</label>
+        <select id="loc-mach-format">
+          ${formats.map(f => `<option value="${f}" ${f === currentFormat ? 'selected' : ''}>${f.charAt(0).toUpperCase() + f.slice(1)}</option>`).join('')}
+        </select>
+      </div>
+      <hr class="my-10">
+      <div class="form-row">
+        <label>${v1Label}: Easy</label>
+        <input type="text" id="target-easy" placeholder="e.g. ${formatNumber(defaults.value1)}" value="${existing ? formatNumber(initEasy) : ''}">
       </div>
       <div class="form-row">
-        <label>${highScoreLabel}: Medium</label>
-        <input type="text" id="target-med" placeholder="e.g. ${formatNumber(defaults.value1 * 2)}" value="${existing ? formatNumber(existing.targetMed) : ''}">
+        <label>${v1Label}: Medium</label>
+        <input type="text" id="target-med" placeholder="e.g. ${formatNumber(defaults.value1 * 2)}" value="${existing ? formatNumber(initMed) : ''}">
       </div>
       <div class="form-row">
-        <label>${highScoreLabel}: Hard</label>
-        <input type="text" id="target-hard" placeholder="e.g. ${formatNumber(defaults.value1 * 3)}" value="${existing ? formatNumber(existing.targetHard) : ''}">
+        <label>${v1Label}: Hard</label>
+        <input type="text" id="target-hard" placeholder="e.g. ${formatNumber(defaults.value1 * 3)}" value="${existing ? formatNumber(initHard) : ''}">
       </div>
       <div class="form-actions">
         <button id="save-loc-mach" class="btn-mgmt">${existing ? 'Update' : 'Add to'} Location</button>
@@ -312,6 +386,11 @@ export async function initLocationsPage() {
     applyScoreFormatting(document.getElementById('target-easy'));
     applyScoreFormatting(document.getElementById('target-med'));
     applyScoreFormatting(document.getElementById('target-hard'));
+
+    // When format dropdown changes, update labels, placeholders, and target values
+    document.getElementById('loc-mach-format').addEventListener('change', (e) => {
+      updateTargetFieldsForFormat(e.target.value);
+    });
 
     machineFormCard.scrollIntoView({ behavior: 'smooth' });
 
@@ -327,15 +406,20 @@ export async function initLocationsPage() {
       if (!machineId) return;
 
       const extra = {
-        targetEasy: Number(document.getElementById('target-easy').value.replace(/\D/g, '')) || 0,
-        targetMed: Number(document.getElementById('target-med').value.replace(/\D/g, '')) || 0,
-        targetHard: Number(document.getElementById('target-hard').value.replace(/\D/g, '')) || 0,
+        format: document.getElementById('loc-mach-format').value,
+        target_easy: Number(document.getElementById('target-easy').value.replace(/\D/g, '')) || 0,
+        target_med: Number(document.getElementById('target-med').value.replace(/\D/g, '')) || 0,
+        target_hard: Number(document.getElementById('target-hard').value.replace(/\D/g, '')) || 0,
       };
 
       try {
-        await PB_API.locations.addMachine(locationId, machineId, extra);
+        if (existing) {
+          await PB_API.locations.updateMachine(locationId, machineId, extra);
+        } else {
+          await PB_API.locations.addMachine(locationId, machineId, extra);
+        }
         machineFormCard.classList.add('hidden');
-        renderLocations();
+        await renderLocations();
       } catch (err) {
         alert(`Failed to save machine: ${err.message}`);
       }

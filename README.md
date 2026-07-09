@@ -96,5 +96,3 @@ To ensure client-side cache clearing, increment the version in **`package.json`*
 - Database migrations are automated and tracked via a versioning system.
 
 Visit `index.php` to start the application.
-
-Visit `index.php` to start the application.

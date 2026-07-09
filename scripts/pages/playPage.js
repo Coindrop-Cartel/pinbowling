@@ -262,12 +262,12 @@ export async function initPlayPage() {
 
   form.onsubmit = (e) => {
     e.preventDefault();
-    generatePreview();
+    generatePreview().catch(err => { console.error('[generatePreview]', err); alert(err.message); });
   };
 
   renderExistingSessions();
 
-  function generatePreview() {
+  async function generatePreview() {
     const locId = Number(locSelect.value);
     const location = locationsCache.find(l => l.id === locId);
     const now = new Date();
@@ -292,7 +292,7 @@ export async function initPlayPage() {
     currentSessionFormat = formatSelect?.value || 'bowling';
     const engine = getScoringEngine(currentSessionFormat);
 
-    const locMachines = location?.machines || [];
+    const locMachines = await PB_API.locations.getMachines(locId);
     currentLocMachines = locMachines;
     
     if (locMachines.length === 0) {
@@ -461,10 +461,12 @@ export async function initPlayPage() {
           }
         });
 
-        // To prevent the blank dropdown, clear the search and force an update
-        // so the full list of machines at this location is visible immediately.
-        mSearch.value = ''; 
+        // Show all options unfiltered, then pre-select the assigned machine
         mSearchInstance.updateOptions('');
+        if (frame.machineId) {
+          mSelect.value = String(frame.machineId);
+          mSearch.value = frame.machineName || '';
+        }
         mSearch.addEventListener('focus', (e) => e.target.select());
         setTimeout(() => mSearch.focus(), 50);
 

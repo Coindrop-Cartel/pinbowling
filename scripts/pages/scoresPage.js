@@ -177,9 +177,23 @@ export async function initScoresPage() {
    * @param {Object} [opponentScores=null] Opponent's ball scores for this round: { ball1, ball2, ball3 }.
    * @returns {HTMLElement} The row element.
    */
-  async function buildRoundRow(round, turnValues, isLastRound = false, targetPlayer = null, opponentScores = null) {
+  async function buildRoundRow(round, turnValues, isLastRound = false, targetPlayer = null, opponentScores = null, roundIndex = 0) {
     const row = document.createElement('div'); // Centralized Security Logic
-    const { access: accessLevel, reason: msg, lockedBalls = {} } = await getScoreAccessLevel(currentUser, targetPlayer, turnValues, activeLeague?.type);
+    
+    let isTargetInRoster = false;
+    if (activeLeague) {
+      if (activeLeague.type === 'session') {
+        isTargetInRoster = true;
+      } else if (activeLeague.participants === 'team') {
+        isTargetInRoster = (activeLeague.teams || []).some(t => (t.members || []).some(m => String(m.id) === String(targetPlayer?.id)));
+      } else {
+        isTargetInRoster = (activeLeague.players || []).some(p => String(p.id) === String(targetPlayer?.id));
+      }
+    } else {
+      isTargetInRoster = true;
+    }
+
+    const { access: accessLevel, reason: msg, lockedBalls = {} } = await getScoreAccessLevel(currentUser, targetPlayer, turnValues, activeLeague?.type, isTargetInRoster);
     const isAccessDenied = accessLevel === 'denied';
     const hasLockedBalls = Object.keys(lockedBalls).length > 0;
 
@@ -187,7 +201,7 @@ export async function initScoresPage() {
     row.dataset.orderNumber = round.orderNumber;
 
     const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
-    const rowContext = Engine.getRoundRowContext(round, getEngineContext());
+    const rowContext = Engine.getRoundRowContext(round, getEngineContext(), { machines, roundIndex });
     const displayRoundNumber = rowContext.displayRoundNumber ?? round.orderNumber;
     const displayRoundLabel = rowContext.displayRoundLabel ?? Engine.getRoundLabel();
     const roleHtml = rowContext.roleHtml ?? '';
@@ -201,15 +215,16 @@ export async function initScoresPage() {
         ${roleHtml}
         ${Engine.getRowSummaryHtml(round, formatNumber)}
         ${bonusHtml}
-        <div class="target-details hidden">
-          <div class="small threshold-heading">Scoring Thresholds</div>
-          ${renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2)}
-        </div>
+      </div>
+      <div class="target-details hidden">
+        <div class="small threshold-heading">Scoring Thresholds</div>
+        ${renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2)}
       </div>
       <div class="round-actions">
-        ${hasMatchup && !isPitcher ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label pitcher-label">Pitcher:</span></div>` : ''}
-        <div class="round-inputs-container ${isAccessDenied ? 'round-inputs-disabled' : ''}">${hasMatchup ? `<span class="input-role-label ${isPitcher ? 'pitcher-label' : 'batter-label'}">${isPitcher ? 'Pitcher:' : 'Batter:'}</span>` : ''}</div>
-        ${hasMatchup && isPitcher ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label batter-label">Batter:</span></div>` : ''}
+        <!-- Always show opponent inputs container if there's a matchup -->
+        ${hasMatchup ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label pitcher-label">Pitcher:</span></div>` : ''}
+        <div class="round-inputs-container ${isAccessDenied ? 'round-inputs-disabled' : ''}">${hasMatchup ? `<span class="input-role-label">${isPitcher ? 'Pitcher:' : 'Batter:'}</span>` : ''}</div>
+        ${hasMatchup ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label batter-label">Batter:</span></div>` : ''}
         <button class="save-round-button btn-mgmt" ${isAccessDenied ? 'hidden' : ''} disabled>Save</button>
       </div>
       ${isAccessDenied ? `
@@ -225,6 +240,11 @@ export async function initScoresPage() {
 
     row.querySelector('.round-info').addEventListener('click', () => {
       row.querySelector('.target-details').classList.toggle('hidden');
+    });
+    // Also allow clicking the target-details itself to collapse it
+    row.querySelector('.target-details').addEventListener('click', (e) => {
+      e.stopPropagation();
+      row.querySelector('.target-details').classList.add('hidden');
     });
 
     // --- Player's own editable inputs ---
@@ -430,8 +450,9 @@ export async function initScoresPage() {
     const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
     const fragment = document.createDocumentFragment();
+    const pendingRows = [];
 
-    for (const round of machines) {
+    machines.forEach((round, index) => {
       const isLastRound = round.orderNumber === maxOrder;
       const turnValues = scoreMap[String(round.orderNumber)];
       const oppTurnValues = opponentScores[String(round.orderNumber)] || null;
@@ -447,9 +468,12 @@ export async function initScoresPage() {
         }
       }
 
-      const row = await buildRoundRow(round, turnValues, isLastRound, player, oppTurnValues);
-      fragment.appendChild(row);
-    }
+      // buildRoundRow is async, so we collect the promise and await below
+      pendingRows.push(buildRoundRow(round, turnValues, isLastRound, player, oppTurnValues, index));
+    });
+
+    const rows = await Promise.all(pendingRows);
+    rows.forEach(row => fragment.appendChild(row));
 
     roundsInput.innerHTML = '';
     roundsInput.appendChild(fragment);

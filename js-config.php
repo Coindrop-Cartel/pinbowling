@@ -6,7 +6,7 @@
  * configuration (UI version, debug mode) to the client-side scripts.
  * Secrets are no longer exposed client-side; API auth uses session cookies.
  */
-require_once __DIR__ . '/includes/config.php';
+require_once __DIR__ . '/includes/bootstrap.php';
 
 // Light domain protection: Only serve if the referer matches our host
 $referer = $_SERVER['HTTP_REFERER'] ?? '';

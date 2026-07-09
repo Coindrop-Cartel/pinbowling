@@ -311,17 +311,17 @@ describe('API Client (api.js)', () => {
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('task=sort'), expect.objectContaining({ method: 'POST' }));
     });
 
-    it('system.runCleanup should call the cleanup service via GET', async () => {
+    it('system.runCleanup should call the cleanup service via POST', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.system.runCleanup();
-      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/cleanupService.php'), expect.any(Object));
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/cleanupService.php'), expect.objectContaining({ method: 'POST' }));
     });
 
     it('system.runCleanup should pass the days parameter if provided', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       // Verification for Issue 1.4 bug fix
       await PB_API.system.runCleanup(15);
-      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/cleanupService.php?days=15'), expect.any(Object));
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/cleanupService.php?days=15'), expect.objectContaining({ method: 'POST' }));
     });
 
     it('machines.deleteTarget should include threshold task', async () => {
@@ -668,7 +668,7 @@ describe('API Client (api.js)', () => {
       const target = { eventId: 1, machineId: 2, value1: 100 };
       await PB_API.machines.saveTarget(target);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('task=threshold'),
+        expect.stringContaining('eventId=1'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(target) })
       );
     });

@@ -1,176 +1,130 @@
 <?php
 /**
- * REST API for managing the global registry of pinball locations.
+ * Location Management REST API Endpoint.
+ * HTTP controller that delegates to the LocationService class.
  */
-require_once __DIR__ . '/../includes/config.php';
+
+require_once __DIR__ . '/../includes/bootstrap.php';
 
 try {
-    $pdo = getDbConnection();
+    $container = $GLOBALS['container'];
+    $locationService = $container->get(\App\Service\LocationService::class);
+    
     $method = $_SERVER['REQUEST_METHOD'];
-    $input = getJsonInput();
     $task = $_GET['task'] ?? 'location';
+    $input = getJsonInput();
 
-    // GET: Retrieve all locations or a specific one by ID
+    // GET: Retrieve locations or machines
     if ($method === 'GET') {
         if ($task === 'units') {
-            $location_id = isset($_GET['locationId']) ? (int)$_GET['locationId'] : 0;
-
-            if ($location_id) {
-                $stmt = $pdo->prepare('
-                    SELECT lm.*, m.machine_name 
-                    FROM location_machines lm 
-                    JOIN machines m ON lm.machine_id = m.id 
-                    WHERE lm.location_id = ?
-                ');
-                $stmt->execute([$location_id]);
+            // Get machines at locations
+            $locationId = isset($_GET['locationId']) ? (int)$_GET['locationId'] : null;
+            $machines = $locationService->getLocationMachines($locationId);
+            sendJson(serializeLocationMachinesGrouped($machines));
+        } else {
+            $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+            if ($id) {
+                $location = $locationService->getLocation($id);
+                if ($location) {
+                    sendJson(serializeLocation($location));
+                } else {
+                    sendJson(['error' => 'Location not found'], 404);
+                }
             } else {
-                $stmt = $pdo->query('
-                    SELECT lm.*, m.machine_name 
-                    FROM location_machines lm 
-                    JOIN machines m ON lm.machine_id = m.id 
-                    ORDER BY lm.location_id ASC
-                ');
+                $locations = $locationService->getAllLocations();
+                sendJson(array_map('serializeLocation', $locations));
             }
-            sendJson(array_map('serializeLocationMachine', $stmt->fetchAll()));
         }
-
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if ($id) {
-            $stmt = $pdo->prepare('SELECT * FROM locations WHERE id = ?');
-            $stmt->execute([$id]);
-            $location = $stmt->fetch();
-            if (!$location) {
-                sendJson(['error' => 'Location not found'], 404);
-            }
-            $result = serializeLocation($location);
-            // Automatically include machines when fetching a specific location
-            $stmt = $pdo->prepare('SELECT lm.*, m.machine_name FROM location_machines lm JOIN machines m ON lm.machine_id = m.id WHERE lm.location_id = ?');
-            $stmt->execute([$id]);
-            $result['machines'] = array_map('serializeLocationMachine', $stmt->fetchAll());
-            sendJson($result);
-        }
-
-        // Fetch all locations
-        $locationsStmt = $pdo->query('SELECT * FROM locations ORDER BY name ASC');
-        $locations = array_map('serializeLocation', $locationsStmt->fetchAll());
-
-        // Fetch all location-machine mappings
-        $machinesStmt = $pdo->query('SELECT lm.*, m.machine_name FROM location_machines lm JOIN machines m ON lm.machine_id = m.id ORDER BY lm.location_id ASC');
-        $allMachines = $machinesStmt->fetchAll();
-
-        // Group machines by location_id
-        $machinesByLocation = [];
-        foreach ($allMachines as $mach) {
-            $machinesByLocation[$mach['location_id']][] = serializeLocationMachine($mach);
-        }
-
-        // Attach machines to their corresponding locations
-        foreach ($locations as &$loc) {
-            $loc['machines'] = $machinesByLocation[$loc['id']] ?? [];
-        }
-
-        sendJson($locations);
     }
 
-    // POST: Create a new location (Protected by API Secret)
+    // POST: Create location or add machine
     if ($method === 'POST') {
-        $user = getCurrentUser();
-        $isPlayer = $user && in_array($user['role'], ['player', 'td', 'admin']);
-        $isTD = $user && in_array($user['role'], ['td', 'admin']);
-
-        if (empty($input['name'])) {
-            if ($task === 'units') {
-                if (empty($input['locationId']) || empty($input['machineId'])) {
-                    sendJson(['error' => 'locationId and machineId are required'], 400);
-                }
-                // Players, TDs, and Admins can add machines to venues
-                if (!$isPlayer) validateTDAccess();
-
-                $sql = 'INSERT INTO location_machines (location_id, machine_id, value1, value2, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10, target_easy, target_med, target_hard) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ON DUPLICATE KEY UPDATE 
-                            value1=VALUES(value1), value2=VALUES(value2),
-                            score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5), 
-                            score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10),
-                            target_easy=VALUES(target_easy), target_med=VALUES(target_med), target_hard=VALUES(target_hard)';
-                $params = [(int)$input['locationId'], (int)$input['machineId'], (int)($input['value1'] ?? 0), (int)($input['value2'] ?? 0)];
-                for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
-                
-                $params[] = (int)($input['targetEasy'] ?? 0);
-                $params[] = (int)($input['targetMed'] ?? 0);
-                $params[] = (int)($input['targetHard'] ?? 0);
-
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute($params);
-                sendJson(['success' => true]);
-            } else {
+        if ($task === 'units') {
+            // Add machine to location
+            if (empty($input['locationId']) || empty($input['machineId'])) {
+                sendJson(['error' => 'locationId and machineId are required'], 400);
+            }
+            
+            $user = \App\Service\AuthService::getCurrentUser();
+            $isPlayer = $user && in_array($user['role'], ['player', 'td', 'admin']);
+            if (!$isPlayer) validateTDAccess();
+            
+            $allowed = ['format', 'note', 'target_easy', 'target_med', 'target_hard'];
+            $data = array_intersect_key($input, array_flip($allowed));
+            $locationService->addMachineToLocation(
+                (int)$input['locationId'],
+                (int)$input['machineId'],
+                $data
+            );
+            sendJson(['success' => true]);
+        } else {
+            // Create new location
+            if (empty($input['name'])) {
                 sendJson(['error' => 'name is required'], 400);
             }
-        } else {
-            // Only TDs and Admins can create new locations
-            if (!$isTD) validateTDAccess();
-
-            $stmt = $pdo->prepare('INSERT INTO locations (name, city, state) VALUES (?, ?, ?)');
-            $stmt->execute([$input['name'], $input['city'] ?? null, $input['state'] ?? null]);
-            $newId = $pdo->lastInsertId();
-
-            $stmt = $pdo->prepare('SELECT * FROM locations WHERE id = ?');
-            $stmt->execute([$newId]);
-            $row = $stmt->fetch();
-            if (!$row) {
-                sendJson(['error' => 'Location created but could not be retrieved.'], 500);
-            }
-            sendJson(serializeLocation($row), 201);
+            
+            validateTDAccess();
+            
+            $location = $locationService->createLocation(
+                $input['name'],
+                $input['city'] ?? null,
+                $input['state'] ?? null
+            );
+            sendJson(serializeLocation($location), 201);
         }
     }
 
-    // PUT: Update an existing location (Protected by API Secret)
+    // PUT: Update location or location machine
     if ($method === 'PUT') {
-        validateTDAccess(); // TDs and Admins can edit locations
-        
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if (!$id || empty($input['name'])) {
-            sendJson(['error' => 'id query parameter and name are required'], 400);
-        }
+        validateTDAccess();
 
-        $stmt = $pdo->prepare('UPDATE locations SET name = ?, city = ?, state = ? WHERE id = ?');
-        $stmt->execute([$input['name'], $input['city'] ?? null, $input['state'] ?? null, $id]);
-
-        $stmt = $pdo->prepare('SELECT * FROM locations WHERE id = ?');
-        $stmt->execute([$id]);
-        $row = $stmt->fetch();
-        if (!$row) {
-            sendJson(['error' => 'Location updated but could not be retrieved.'], 500);
+        if ($task === 'units') {
+            if (empty($input['locationId']) || empty($input['machineId'])) {
+                sendJson(['error' => 'locationId and machineId are required'], 400);
+            }
+            $allowed = ['format', 'note', 'target_easy', 'target_med', 'target_hard'];
+            $data = array_intersect_key($input, array_flip($allowed));
+            $locationService->updateLocationMachine((int)$input['locationId'], (int)$input['machineId'], $data);
+            sendJson(['success' => true]);
+        } else {
+            $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+            if (!$id) {
+                sendJson(['error' => 'id query parameter is required'], 400);
+            }
+            $location = $locationService->updateLocation($id, $input);
+            sendJson(serializeLocation($location));
         }
-        sendJson(serializeLocation($row));
     }
 
-    // DELETE: Remove a location (Protected by API Secret)
+    // DELETE: Remove location or machine
     if ($method === 'DELETE') {
         if ($task === 'units') {
-            validateTDAccess(); // Restricting removal to TD+ to prevent griefing
+            // Remove machine from location
+            if (empty($_GET['locationId']) || empty($_GET['machineId'])) {
+                sendJson(['error' => 'locationId and machineId are required'], 400);
+            }
             
-            $location_id = isset($_GET['locationId']) ? (int)$_GET['locationId'] : 0;
-            $machine_id = isset($_GET['machineId']) ? (int)$_GET['machineId'] : 0;
-            $stmt = $pdo->prepare('DELETE FROM location_machines WHERE location_id = ? AND machine_id = ?');
-            $stmt->execute([$location_id, $machine_id]);
+            validateTDAccess();
+            
+            $locationService->removeMachineFromLocation(
+                (int)$_GET['locationId'],
+                (int)$_GET['machineId']
+            );
+            sendJson(['success' => true]);
+        } else {
+            // Delete location
+            validateAdminAccess();
+            
+            $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+            if (!$id) {
+                sendJson(['error' => 'id query parameter is required'], 400);
+            }
+            
+            $locationService->deleteLocation($id);
             sendJson(['success' => true]);
         }
-
-        validateTDAccess(); // TDs and Admins can delete locations
-
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if (!$id) {
-            sendJson(['error' => 'id query parameter is required'], 400);
-        }
-
-        $stmt = $pdo->prepare('DELETE FROM locations WHERE id = ?');
-        $stmt->execute([$id]);
-        
-        sendJson(['success' => true]);
     }
 
-    sendJson(['error' => 'Unsupported request method'], 405);
 } catch (Exception $e) {
     sendJson(['error' => $e->getMessage()], 500);
 }

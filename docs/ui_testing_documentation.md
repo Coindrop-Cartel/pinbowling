@@ -11,6 +11,15 @@ To ensure that new deployments of PinBowling do not introduce regressions in exi
 
 **Recommended Tooling:** Playwright or Cypress.
 
+**Coverage Status:**
+*   [x] Home Page Navigation
+*   [x] Scores Page Structure
+*   [x] Event Setup Structure
+*   [ ] Login / Logout Flow
+*   [ ] Full Score Entry & Calculation
+*   [ ] RBAC Enforcement (Role-based visibility)
+*   [ ] Standings & TV Mode
+
 **Execution:**
 *   Run all tests: `npx playwright test`
 *   Seed test data: `php tests/bin/seed.php`

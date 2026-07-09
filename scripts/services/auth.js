@@ -276,7 +276,11 @@ export async function isManagementAuthorized() {
  * @param {string} [leagueType='standard'] - The type of league ('standard' or 'session').
  * @returns {Promise<{access: 'allowed'|'denied', reason?: string, lockedBalls: Object<string, boolean>}>}
  */
-export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues, leagueType = 'standard') {
+export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues, leagueType = 'standard', isTargetInRoster = true) {
+  if (!isTargetInRoster) {
+    return { access: 'denied', reason: 'Player is not registered in this league.', lockedBalls: {} };
+  }
+
   const canUpdateAny = await can(PERMISSIONS.UPDATE_ANY_SCORE);
   const canUpdateSelf = await can(PERMISSIONS.UPDATE_SELF);
   const canAddAny = await can(PERMISSIONS.ADD_ANY_SCORE);

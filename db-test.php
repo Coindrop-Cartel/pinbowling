@@ -16,10 +16,10 @@ try {
     $stmt = $pdo->query('SELECT DATABASE() AS dbname, @@hostname AS hostname');
     $info = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    global $dbHost, $dbPort, $dbName;
-    $configuredHost = $dbHost;
-    $configuredPort = $dbPort;
-    $configuredDb = $dbName;
+    $dbConfig = Configuration::getInstance()->getDbConfig();
+    $configuredHost = $dbConfig['host'];
+    $configuredPort = $dbConfig['port'];
+    $configuredDb = $dbConfig['name'];
 
     $phpVersion = PHP_VERSION;
     $pdoDrivers = PDO::getAvailableDrivers();

@@ -38,7 +38,7 @@ function ensureMigrationsTable($pdo) {
  * @param PDO $pdo
  */
 function initializeDatabaseSchema($pdo) {
-    global $adminPassword;
+    $adminPassword = Configuration::getInstance()->getAdminPassword();
     
     $pdo->exec("CREATE TABLE IF NOT EXISTS `locations` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -104,7 +104,6 @@ function initializeDatabaseSchema($pdo) {
         `username` VARCHAR(255) UNIQUE NOT NULL,
         `password_hash` VARCHAR(255) NOT NULL,
         `role` ENUM('player', 'td', 'admin') DEFAULT 'player',
-        `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT `fk_user_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
@@ -142,21 +141,6 @@ function initializeDatabaseSchema($pdo) {
         CONSTRAINT `fk_scores_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `score_history` (
-        `id` INT AUTO_INCREMENT PRIMARY KEY,
-        `score_id` INT DEFAULT NULL,
-        `event_id` INT NOT NULL,
-        `player_id` INT NOT NULL,
-        `order_number` INT NOT NULL,
-        `machine_id` INT NOT NULL,
-        `ball1` BIGINT DEFAULT 0,
-        `ball2` BIGINT DEFAULT 0,
-        `ball3` BIGINT DEFAULT 0,
-        `status` ENUM('pending', 'approved') DEFAULT 'approved',
-        `change_type` ENUM('INSERT', 'UPDATE', 'DELETE') NOT NULL,
-        `changed_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
     $pdo->exec("CREATE TABLE IF NOT EXISTS `league_players` (
         `league_id` INT NOT NULL,
         `player_id` INT NOT NULL,
@@ -184,13 +168,6 @@ function initializeDatabaseSchema($pdo) {
         `location_id` INT NOT NULL,
         `machine_id` INT NOT NULL,
         `note` TEXT DEFAULT NULL,
-        `value1` BIGINT DEFAULT 0,
-        `value2` DECIMAL(12,3) DEFAULT 0,
-        `score1` BIGINT DEFAULT 0, `score2` BIGINT DEFAULT 0, `score3` BIGINT DEFAULT 0, `score4` BIGINT DEFAULT 0, `score5` BIGINT DEFAULT 0,
-        `score6` BIGINT DEFAULT 0, `score7` BIGINT DEFAULT 0, `score8` BIGINT DEFAULT 0, `score9` BIGINT DEFAULT 0, `score10` BIGINT DEFAULT 0,
-        `target_easy` BIGINT DEFAULT 0,
-        `target_med` BIGINT DEFAULT 0,
-        `target_hard` BIGINT DEFAULT 0,
         UNIQUE KEY `unique_location_machine` (`location_id`, `machine_id`),
         CONSTRAINT `fk_lm_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_lm_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
@@ -207,15 +184,6 @@ function initializeDatabaseSchema($pdo) {
     // Ensure 'scores' table has the unique constraint for upsert logic
     $checkScores = $pdo->query("SHOW TABLES LIKE 'scores'")->fetch();
     if ($checkScores) {
-        $checkStatus = $pdo->query("SHOW COLUMNS FROM `scores` LIKE 'status'")->fetch();
-        if (!$checkStatus) {
-            $pdo->exec("ALTER TABLE `scores` ADD COLUMN `status` ENUM('pending', 'approved') DEFAULT 'approved' AFTER `ball3` ");
-        }
-        $checkOldIndex = $pdo->query("SHOW INDEX FROM `scores` WHERE Key_name = 'player_id_2' OR (Column_name = 'order_number' AND Seq_in_index = 2 AND Key_name != 'unique_player_round')")->fetch();
-        if ($checkOldIndex) {
-            $indexName = $checkOldIndex['Key_name'];
-            $pdo->exec("ALTER TABLE `scores` DROP INDEX `$indexName` ");
-        }
         $checkIndex = $pdo->query("SHOW INDEX FROM `scores` WHERE Key_name = 'unique_player_round'")->fetch();
         if (!$checkIndex) {
             $pdo->exec("ALTER TABLE `scores` ADD UNIQUE KEY `unique_player_round` (event_id, player_id, order_number)");
@@ -285,13 +253,12 @@ try {
           `id` INT AUTO_INCREMENT PRIMARY KEY,
           `event_id` INT NOT NULL,
           `order_number` INT NOT NULL,
-          `player1_id` INT NOT NULL,
-          `player2_id` INT NOT NULL,
+          `player_id` INT NOT NULL,
           `machine_id` INT NOT NULL,
-          UNIQUE KEY `unique_matchup` (`event_id`, `order_number`, `player1_id`, `player2_id`),
+          `player_order` SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+          UNIQUE KEY `unique_matchup` (`event_id`, `order_number`, `player_order`),
           CONSTRAINT `fk_matchup_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
-          CONSTRAINT `fk_matchup_p1` FOREIGN KEY (`player1_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
-          CONSTRAINT `fk_matchup_p2` FOREIGN KEY (`player2_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+          CONSTRAINT `fk_matchup_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
           CONSTRAINT `fk_matchup_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
         $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('create_matchups_table')")->execute();
@@ -313,10 +280,14 @@ try {
     }
 
     // Add top_bottom column to matchups table for baseball inning designation
+    // (Legacy migration — on fresh installs the column never existed; skip gracefully.)
     $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'matchups_add_top_bottom'");
     $stmt->execute();
     if (!$stmt->fetch()) {
-        $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `top_bottom` ENUM('top','bottom') NOT NULL DEFAULT 'top' AFTER `machine_id`");
+        $hasTopBottom = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'top_bottom'")->fetch();
+        if ($hasTopBottom) {
+            $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `top_bottom` ENUM('top','bottom') NOT NULL DEFAULT 'top' AFTER `machine_id`");
+        }
         $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('matchups_add_top_bottom')")->execute();
         echo "✓ Matchups top_bottom column migration applied successfully.\n";
     } else {
@@ -325,43 +296,347 @@ try {
 
     // Replace top_bottom ENUM with player_order SMALLINT for flexible head-to-head matchups
     // player_order: 1 = home (was 'top'), 2 = away (was 'bottom'), 3+ for future multi-player matchups
+    // (Legacy migration — on fresh installs player_order already exists; skip gracefully.)
     $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'matchups_player_order'");
     $stmt->execute();
     if (!$stmt->fetch()) {
-        // Add new player_order column, migrate data, drop old column
-        $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `player_order` SMALLINT UNSIGNED NOT NULL DEFAULT 1 AFTER `machine_id`");
-        $pdo->exec("UPDATE `matchups` SET `player_order` = CASE WHEN `top_bottom` = 'top' THEN 1 WHEN `top_bottom` = 'bottom' THEN 2 ELSE 1 END");
-        $pdo->exec("ALTER TABLE `matchups` DROP COLUMN `top_bottom`");
+        $hasTopBottom = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'top_bottom'")->fetch();
+        $hasPlayerOrder = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'player_order'")->fetch();
+        if ($hasTopBottom) {
+            if (!$hasPlayerOrder) {
+                $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `player_order` SMALLINT UNSIGNED NOT NULL DEFAULT 1 AFTER `machine_id`");
+            }
+            $pdo->exec("UPDATE `matchups` SET `player_order` = CASE WHEN `top_bottom` = 'top' THEN 1 WHEN `top_bottom` = 'bottom' THEN 2 ELSE 1 END");
+            $pdo->exec("ALTER TABLE `matchups` DROP COLUMN `top_bottom`");
+        } elseif (!$hasPlayerOrder) {
+            $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `player_order` SMALLINT UNSIGNED NOT NULL DEFAULT 1 AFTER `machine_id`");
+        }
         $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('matchups_player_order')")->execute();
         echo "✓ Matchups player_order column migration applied successfully.\n";
     } else {
         echo "Matchups player_order column migration already applied.\n";
     }
 
-    // Restructure matchups to use sequential order_numbers instead of order_number + player_order combo.
-    // Each matchup now has a unique sequential order_number (1=top 1st, 2=bottom 1st, 3=top 2nd, etc.)
-    // instead of sharing an inning-level order_number with a player_order differentiator.
-    // This drops the player_order column and updates the unique key to (event_id, order_number).
-    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'matchups_sequential_order'");
+    // Drop unused order_number and machine_condition columns from location_machines.
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'location_machines_drop_unused_cols'");
     $stmt->execute();
     if (!$stmt->fetch()) {
-        // Migrate existing data: convert (order_number, player_order) to sequential order_number
-        // Old: order_number=1,player_order=1 → New: order_number=1 (top of 1st)
-        // Old: order_number=1,player_order=2 → New: order_number=2 (bottom of 1st)
-        // Old: order_number=2,player_order=1 → New: order_number=3 (top of 2nd)
-        // Old: order_number=2,player_order=2 → New: order_number=4 (bottom of 2nd)
-        // Formula: new_order = (old_order - 1) * 2 + player_order
-        $pdo->exec("UPDATE `matchups` SET `order_number` = (`order_number` - 1) * 2 + `player_order`");
-        // Drop old unique key and create new one on (event_id, order_number)
-        $pdo->exec("ALTER TABLE `matchups` DROP INDEX `unique_matchup`");
-        $pdo->exec("ALTER TABLE `matchups` ADD UNIQUE KEY `unique_matchup` (`event_id`, `order_number`)");
-        // Drop the player_order column — no longer needed
-        $pdo->exec("ALTER TABLE `matchups` DROP COLUMN `player_order`");
-        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('matchups_sequential_order')")->execute();
-        echo "✓ Matchups sequential order_number migration applied successfully.\n";
+        $checkOrder = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'order_number'")->fetch();
+        if ($checkOrder) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `order_number`");
+        }
+        $checkCond = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'machine_condition'")->fetch();
+        if ($checkCond) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `machine_condition`");
+        }
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('location_machines_drop_unused_cols')")->execute();
+        echo "✓ location_machines unused columns dropped successfully.\n";
     } else {
-        echo "Matchups sequential order_number migration already applied.\n";
+        echo "location_machines unused columns migration already applied.\n";
     }
+
+    // Refactor matchups to a normalized per-player-row shape.
+    // Old shape: one row per pairing with player1_id + player2_id.
+    // New shape: one row per (player, slot) with player_id + player_order.
+    //   order_number = inning/slot index (1 = inning 1, 2 = inning 2, ...)
+    //   player_order = role within the slot (1 = home, 2 = away, 3+ future)
+    // This supersedes the abandoned 'matchups_sequential_order' migration, which is
+    // intentionally never applied (it would have dropped player_order and made
+    // order_number sequential — the opposite of this refactor).
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'matchups_per_player_rows'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+        // Detect current shape: does player1_id still exist?
+        $hasPlayer1 = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'player1_id'")->fetch();
+        // Does player_order already exist (from the earlier matchups_player_order migration)?
+        $hasPlayerOrder = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'player_order'")->fetch();
+
+        if ($hasPlayer1) {
+            // Ensure player_order column exists (default 1 = home).
+            if (!$hasPlayerOrder) {
+                $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `player_order` SMALLINT UNSIGNED NOT NULL DEFAULT 1 AFTER `machine_id`");
+            }
+            // Add player_id column (after order_number) if missing.
+            $hasPlayerId = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'player_id'")->fetch();
+            if (!$hasPlayerId) {
+                $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `player_id` INT NOT NULL DEFAULT 0 AFTER `order_number`");
+            }
+
+            // Make old columns nullable so we can insert new rows without providing values for them
+            $pdo->exec("ALTER TABLE `matchups` MODIFY `player1_id` INT DEFAULT NULL");
+            $pdo->exec("ALTER TABLE `matchups` MODIFY `player2_id` INT DEFAULT NULL");
+
+            // Drop the two player FKs first, then the old unique key before splitting rows,
+            // because the split inserts duplicate (event_id, order_number) pairs.
+            $fkP1 = $pdo->query("SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matchups' AND CONSTRAINT_NAME = 'fk_matchup_p1'")->fetch();
+            if ($fkP1) {
+                $pdo->exec("ALTER TABLE `matchups` DROP FOREIGN KEY `fk_matchup_p1`");
+            }
+            $fkP2 = $pdo->query("SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matchups' AND CONSTRAINT_NAME = 'fk_matchup_p2'")->fetch();
+            if ($fkP2) {
+                $pdo->exec("ALTER TABLE `matchups` DROP FOREIGN KEY `fk_matchup_p2`");
+            }
+            $oldKey = $pdo->query("SHOW INDEX FROM `matchups` WHERE Key_name = 'unique_matchup'")->fetch();
+            if ($oldKey) {
+                $pdo->exec("ALTER TABLE `matchups` DROP INDEX `unique_matchup`");
+            }
+
+            // Split each existing row into 2 rows: player1 -> player_order 1 (home),
+            // player2 -> player_order 2 (away). Insert the away rows first with a
+            // temporary id gap, then update the original rows in place to become the
+            // home rows. This preserves existing ids for the home side.
+            $pdo->exec("INSERT INTO `matchups` (`event_id`, `order_number`, `player_id`, `machine_id`, `player_order`)
+                        SELECT `event_id`, `order_number`, `player2_id`, `machine_id`, 2
+                        FROM `matchups`
+                        WHERE `player2_id` IS NOT NULL AND `player2_id` > 0");
+            // Convert the original rows into the home (player_order 1) rows.
+            $pdo->exec("UPDATE `matchups` SET `player_id` = `player1_id`, `player_order` = 1
+                        WHERE `player1_id` IS NOT NULL");
+
+            // Drop the now-redundant player1_id / player2_id columns.
+            $pdo->exec("ALTER TABLE `matchups` DROP COLUMN `player1_id`");
+            $pdo->exec("ALTER TABLE `matchups` DROP COLUMN `player2_id`");
+
+            // Add the new unique key and the single player FK.
+            $pdo->exec("ALTER TABLE `matchups` ADD UNIQUE KEY `unique_matchup` (`event_id`, `order_number`, `player_order`)");
+            $pdo->exec("ALTER TABLE `matchups` ADD CONSTRAINT `fk_matchup_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE");
+        } else {
+            // Already split (e.g. someone applied a prior version of this refactor).
+            // Just ensure the unique key and FK match the target shape.
+            $oldKey = $pdo->query("SHOW INDEX FROM `matchups` WHERE Key_name = 'unique_matchup'")->fetch();
+            if ($oldKey) {
+                $pdo->exec("ALTER TABLE `matchups` DROP INDEX `unique_matchup`");
+            }
+            $pdo->exec("ALTER TABLE `matchups` ADD UNIQUE KEY `unique_matchup` (`event_id`, `order_number`, `player_order`)");
+        }
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('matchups_per_player_rows')")->execute();
+        echo "✓ Matchups per-player-rows refactor applied successfully.\n";
+    } else {
+        echo "Matchups per-player-rows refactor already applied.\n";
+    }
+    // Add format-specific target score columns to location_machines.
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'location_machines_format_targets'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $columnsToAdd = [
+            'target_easy_bowling',
+            'target_med_bowling',
+            'target_hard_bowling',
+            'target_easy_baseball',
+            'target_med_baseball',
+            'target_hard_baseball',
+        ];
+
+        foreach ($columnsToAdd as $column) {
+            $checkColumn = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE '{$column}'")->fetch();
+            if (!$checkColumn) {
+                $pdo->exec("ALTER TABLE `location_machines` ADD COLUMN `{$column}` BIGINT DEFAULT 0 AFTER `target_hard`");
+            }
+        }
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('location_machines_format_targets')")->execute();
+        echo "✓ location_machines format-specific target columns migration applied successfully.\n";
+    } else {
+        echo "location_machines format-specific target columns migration already applied.\n";
+    }
+
+    // Remove value1, value2, and format from location_machines table
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'location_machines_remove_values_and_add_format'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        // Drop value1 column if it exists
+        $checkValue1 = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'value1'")->fetch();
+        if ($checkValue1) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `value1`");
+        }
+
+        // Drop value2 column if it exists
+        $checkValue2 = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'value2'")->fetch();
+        if ($checkValue2) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `value2`");
+        }
+
+        // Drop the format-inclusive unique key FIRST (must drop index before dropping the column it references)
+        $formatKey = $pdo->query("SHOW INDEX FROM `location_machines` WHERE Key_name = 'unique_location_machine_format'")->fetch();
+        if ($formatKey) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP INDEX `unique_location_machine_format`");
+        }
+
+        // Now safe to drop format column (format now lives only in location_machine_scores)
+        $checkFormat = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'format'")->fetch();
+        if ($checkFormat) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `format`");
+        }
+
+        // Ensure simple unique key exists (location_id, machine_id) without format
+        $simpleKey = $pdo->query("SHOW INDEX FROM `location_machines` WHERE Key_name = 'unique_location_machine'")->fetch();
+        if (!$simpleKey) {
+            $pdo->exec("ALTER TABLE `location_machines` ADD UNIQUE KEY `unique_location_machine` (`location_id`, `machine_id`)");
+        }
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('location_machines_remove_values_and_add_format')")->execute();
+        echo "✓ location_machines columns (value1, value2, format removed) migration applied successfully.\n";
+    } else {
+        echo "location_machines columns (value1, value2, format removed) migration already applied.\n";
+    }
+
+    // Refactor location_machines to separate scores into location_machine_scores
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'location_machines_score_refactor'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        // Drop target_easy, target_med, target_hard from location_machines if they exist
+        $checkEasy = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'target_easy'")->fetch();
+        if ($checkEasy) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `target_easy`");
+        }
+        $checkMed = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'target_med'")->fetch();
+        if ($checkMed) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `target_med`");
+        }
+        $checkHard = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'target_hard'")->fetch();
+        if ($checkHard) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `target_hard`");
+        }
+
+        // Drop the format-inclusive unique key FIRST (must drop index before dropping the column it references)
+        $formatKey = $pdo->query("SHOW INDEX FROM `location_machines` WHERE Key_name = 'unique_location_machine_format'")->fetch();
+        if ($formatKey) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP INDEX `unique_location_machine_format`");
+        }
+
+        // Drop format column from location_machines if it still exists (safety net)
+        $checkFormat = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'format'")->fetch();
+        if ($checkFormat) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `format`");
+        }
+
+        // Drop existing format-specific target columns if they exist (from a previous migration, now redundant)
+        $columnsToDrop = [
+            'target_easy_bowling',
+            'target_med_bowling',
+            'target_hard_bowling',
+            'target_easy_baseball',
+            'target_med_baseball',
+            'target_hard_baseball',
+        ];
+        foreach ($columnsToDrop as $column) {
+            $checkColumn = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE '{$column}'")->fetch();
+            if ($checkColumn) {
+                $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `{$column}`");
+            }
+        }
+
+        // Create location_machine_scores table
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `location_machine_scores` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `location_machine_id` INT NOT NULL,
+            `format` VARCHAR(50) DEFAULT 'bowling',
+            `target_easy` BIGINT DEFAULT 0,
+            `target_med` BIGINT DEFAULT 0,
+            `target_hard` BIGINT DEFAULT 0,
+            UNIQUE KEY `unique_location_machine_score_format` (`location_machine_id`, `format`),
+            CONSTRAINT `fk_lms_location_machine` FOREIGN KEY (`location_machine_id`) REFERENCES `location_machines` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('location_machines_score_refactor')")->execute();
+        echo "✓ location_machines score refactor migration applied successfully.\n";
+    } else {
+        echo "location_machines score refactor migration already applied.\n";
+    }
+
+    // Drop format column from location_machines (format now lives only in location_machine_scores)
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'location_machines_drop_format'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        // Drop the format-inclusive unique key FIRST (must drop index before dropping the column it references)
+        $formatKey = $pdo->query("SHOW INDEX FROM `location_machines` WHERE Key_name = 'unique_location_machine_format'")->fetch();
+        if ($formatKey) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP INDEX `unique_location_machine_format`");
+        }
+
+        // Now safe to drop format column
+        $checkFormat = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'format'")->fetch();
+        if ($checkFormat) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `format`");
+        }
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('location_machines_drop_format')")->execute();
+        echo "✓ location_machines format column dropped successfully.\n";
+    } else {
+        echo "location_machines format column drop already applied.\n";
+    }
+
+    // Repair the fk_matchup_event foreign key on the matchups table.
+    // The matchups_per_player_rows migration ran with FOREIGN_KEY_CHECKS = 0 and
+    // dropped/recreated the unique_matchup index and fk_matchup_player, but never
+    // re-verified fk_matchup_event. On databases where the matchups table
+    // pre-existed (or where that migration dropped the event FK), the cascade
+    // from events -> matchups is missing, causing 1451 errors when deleting
+    // events or leagues. This migration restores the FK if absent.
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'repair_matchup_event_fk'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $fkCascade = $pdo->query(
+            "SELECT 1 FROM information_schema.REFERENTIAL_CONSTRAINTS
+             WHERE CONSTRAINT_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'matchups'
+               AND CONSTRAINT_NAME = 'fk_matchup_event'
+               AND DELETE_RULE = 'CASCADE'"
+        )->fetch();
+        if (!$fkCascade) {
+            $fkExists = $pdo->query(
+                "SELECT 1 FROM information_schema.KEY_COLUMN_USAGE
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'matchups'
+                   AND CONSTRAINT_NAME = 'fk_matchup_event'"
+            )->fetch();
+            if ($fkExists) {
+                $pdo->exec("ALTER TABLE `matchups` DROP FOREIGN KEY `fk_matchup_event`");
+            }
+            $pdo->exec("ALTER TABLE `matchups`
+                ADD CONSTRAINT `fk_matchup_event`
+                FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE");
+            echo "✓ Repaired missing fk_matchup_event foreign key on matchups table with ON DELETE CASCADE.\n";
+        } else {
+            echo "fk_matchup_event foreign key already present on matchups table with ON DELETE CASCADE.\n";
+        }
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('repair_matchup_event_fk')")->execute();
+    } else {
+        echo "fk_matchup_event repair migration already applied.\n";
+    }
+
+    // Rebuild the fk_matchup_event foreign key on the matchups table to ensure
+    // index references are fully intact and set to ON DELETE CASCADE.
+    // This is necessary because index drops in previous migrations may have
+    // left the foreign key reference in an orphaned/corrupted state.
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'rebuild_matchup_event_fk_cascade'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+        
+        $fkExists = $pdo->query(
+            "SELECT 1 FROM information_schema.KEY_COLUMN_USAGE
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'matchups'
+               AND CONSTRAINT_NAME = 'fk_matchup_event'"
+        )->fetch();
+        if ($fkExists) {
+            $pdo->exec("ALTER TABLE `matchups` DROP FOREIGN KEY `fk_matchup_event`");
+        }
+        
+        $pdo->exec("ALTER TABLE `matchups`
+            ADD CONSTRAINT `fk_matchup_event`
+            FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE");
+            
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('rebuild_matchup_event_fk_cascade')")->execute();
+        echo "✓ Successfully rebuilt fk_matchup_event foreign key with ON DELETE CASCADE.\n";
+    } else {
+        echo "fk_matchup_event rebuild migration already applied.\n";
+    }
+
+    $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
 } catch (PDOException $e) {
     echo "\n✗ Migration failed: " . $e->getMessage() . "\n";
     exit(1);

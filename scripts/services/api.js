@@ -96,7 +96,10 @@ export const PB_API = {
   },
 
   players: {
-    getAll: (params) => fetchJSON('service/playerService.php', { params }),
+    getAll: async (params) => {
+      const res = await fetchJSON('service/playerService.php', { params });
+      return Array.isArray(res) ? res : (res ? [res] : []);
+    },
     create: (player) => fetchJSON('service/playerService.php', { method: 'POST', body: JSON.stringify(player) }),
     update: (id, player) => fetchJSON(`service/playerService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(player) }),
     delete: (id) => fetchJSON(`service/playerService.php?id=${id}`, { method: 'DELETE' }),
@@ -111,7 +114,11 @@ export const PB_API = {
     delete: (id) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'DELETE' }),
     getTargets: (eventId, leagueId, params) => 
       fetchJSON(`service/machineService.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`, { params }),
-    saveTarget: (target) => fetchJSON(`service/machineService.php?task=threshold`, { method: 'POST', body: JSON.stringify(target) }),
+    saveTarget: (target) => {
+      const eventId = Array.isArray(target) ? target[0]?.eventId : target?.eventId;
+      const url = eventId ? `service/machineService.php?eventId=${eventId}` : 'service/machineService.php';
+      return fetchJSON(url, { method: 'POST', body: JSON.stringify(target) });
+    },
     deleteTarget: (id) => fetchJSON(`service/machineService.php?id=${id}&task=threshold`, { method: 'DELETE' }),
     bulkUpdateSort: (updates) => fetchJSON('service/machineService.php?task=sort', { method: 'POST', body: JSON.stringify(updates) }),
   },
@@ -170,10 +177,14 @@ export const PB_API = {
     getMachines: (locationId, params) => fetchJSON(`service/locationService.php?task=units${locationId ? `&locationId=${locationId}` : ''}`, { params }),
     addMachine: (locationId, machineId, extra = {}) => 
       fetchJSON('service/locationService.php?task=units', { method: 'POST', body: JSON.stringify({ locationId, machineId, ...extra }) }),
+    updateMachine: (locationId, machineId, data) =>
+      fetchJSON('service/locationService.php?task=units', { method: 'PUT', body: JSON.stringify({ locationId, machineId, ...data }) }),
     removeMachine: (locationId, machineId) => fetchJSON(`service/locationService.php?task=units&locationId=${locationId}&machineId=${machineId}`, { method: 'DELETE' }),
   },
 
   system: {
-    runCleanup: (days) => fetchJSON('service/cleanupService.php' + (days ? `?days=${days}` : '')),
+    // Cleanup is a destructive, state-changing operation; the backend only
+    // accepts POST (session league cleanup) or PUT (abandoned players).
+    runCleanup: (days) => fetchJSON('service/cleanupService.php' + (days ? `?days=${days}` : ''), { method: 'POST' }),
   }
 };

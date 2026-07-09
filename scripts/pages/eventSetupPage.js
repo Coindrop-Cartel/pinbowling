@@ -74,6 +74,8 @@ export async function initEventSetupPage() {
   let masterMachines = [];
   let eventTargets = [];
   let currentSuggestedMachines = [];
+  let eventMatch = null;
+  let league = null;
 
   let Engine = getScoringEngine();
 
@@ -142,7 +144,8 @@ export async function initEventSetupPage() {
   }
 
   const updateQuickFillState = (machineName) => {
-    const match = currentSuggestedMachines.find(m => m.machineName === machineName);
+    const format = eventMatch?.scoringFormat || league?.scoringFormat || 'bowling';
+    const match = currentSuggestedMachines.find(m => m.machineName === machineName && m.format === format);
     selectedMachineTargets = match ? { easy: match.targetEasy, med: match.targetMed, hard: match.targetHard } : null;
     
     btnEasy.disabled = !selectedMachineTargets?.easy;
@@ -376,7 +379,8 @@ export async function initEventSetupPage() {
         row.querySelectorAll('.qfill').forEach(btn => {
           btn.onclick = () => {
             const type = btn.dataset.type;
-            const match = currentSuggestedMachines.find(m => String(m.id) === String(round.machineId));
+            const format = eventMatch?.scoringFormat || league?.scoringFormat || 'bowling';
+            const match = currentSuggestedMachines.find(m => String(m.id) === String(round.machineId) && m.format === format);
             const val = match ? match['target' + type.charAt(0).toUpperCase() + type.slice(1)] : null;
             if (val) {
               s10.value = formatNumber(val);
@@ -438,8 +442,8 @@ export async function initEventSetupPage() {
 
     masterMachines = machines;
     const leagueId = getActiveLeagueId();
-    const league = leaguesData.find(l => String(l.id) === String(leagueId));
-    const eventMatch = league?.events?.find(e => String(e.id) === String(eventId));
+    league = leaguesData.find(l => String(l.id) === String(leagueId));
+    eventMatch = league?.events?.find(e => String(e.id) === String(eventId));
 
     const format = eventMatch?.scoringFormat || league?.scoringFormat;
     Engine = getScoringEngine(format);

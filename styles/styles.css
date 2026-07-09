@@ -300,6 +300,19 @@ body {
   margin-bottom: 20px; /* Space between logos and action buttons */
 }
 
+/* Mobile carousel: prev/next arrows (hidden on desktop) */
+.hero-logo-nav {
+  display: none; /* Hidden on desktop; shown in mobile media query */
+}
+
+/* Track holds the logos. On desktop it just lays them out inline. */
+.hero-logo-track {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+}
+
 /* Visual feedback: Fade out the format that isn't active */
 body.theme-golf .hero-logo-btn[data-format="bowling"],
 body.theme-golf .hero-logo-btn[data-format="baseball"],
@@ -467,7 +480,7 @@ td {
 .round-number { font-weight: 700; min-width: 30px; text-align: center; display: inline-block; }
 .score-input { flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px; }
 .round-inputs-container { display: flex; gap: 0.5rem; align-items: center; flex-basis: 100%; }
-.round-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.round-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; flex-basis: 100%; }
 .round-inputs-disabled { opacity: 0.5; pointer-events: none; }
 .opponent-inputs-container { display: flex; gap: 0.5rem; align-items: center; flex-basis: 100%; }
 .save-round-button { flex-basis: 100%; }
@@ -490,7 +503,7 @@ td {
 
 .round-msg { font-size: 0.75rem; color: #d9534f; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 
-.target-details { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--pb-primary); opacity: 0.8; }
+.target-details { flex-basis: 100%; width: 100%; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--pb-primary); opacity: 0.8; }
 
 /* Standings specific */
 .standings-round { text-align: center; }
@@ -1207,9 +1220,50 @@ body.tv-ui-large .modal-controls-inline button {
     padding: 20px; /* Reduce padding for mobile */
   }
 
+  /* Mobile carousel: show only the active logo, hide the others */
   .hero-logo-btn {
-    width: 40%;
+    width: 60%;
+    max-width: 220px;
     height: auto;
+  }
+
+  .hero-logo-btn[hidden] {
+    display: none !important;
+  }
+
+  /* Show the prev/next arrows on mobile */
+  .hero-logo-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--pb-black, #000);
+    background: var(--pb-white, #fff);
+    border: 2px solid var(--pb-gray, #ccc);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+  }
+
+  .hero-logo-nav:hover {
+    transform: scale(1.1);
+  }
+
+  .hero-logo-nav:active {
+    transform: scale(0.95);
+  }
+
+  /* On mobile the track only shows one logo at a time */
+  .hero-logo-track {
+    gap: 0;
+    flex: 1 1 auto;
+    justify-content: center;
   }
 
   /* Stack scoring inputs vertically on mobile */

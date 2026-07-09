@@ -30,6 +30,7 @@ vi.mock('@services/auth.js', () => ({
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
     getValue1Label: vi.fn(() => 'High Score'),
+    getValue2Label: vi.fn(() => 'Low Score'),
     getInitialValues: vi.fn(() => ({ value1: 1000, value2: 100 })),
   })),
 }));

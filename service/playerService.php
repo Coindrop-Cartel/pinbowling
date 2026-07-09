@@ -1,49 +1,41 @@
 <?php
 /**
- * REST API for managing players.
+ * Player Management REST API Endpoint.
+ * HTTP controller that delegates to the PlayerService class.
  * 
  * Supported Methods:
- * - GET: Retrieve the global alphabetical list of players.
- * - POST: Create a new player record. Handles duplicate name conflicts gracefully (409).
- * - PUT: Update an existing player's name or external platform IDs (IFPA/Matchplay).
- * - DELETE: Permanently remove a player and all their recorded scores.
- * 
- * Query Parameters:
- * - id: Required for PUT and DELETE methods (the Player's primary key).
- * - action: (Optional) Future-proofing for specific player sub-actions.
+ * - GET: Retrieve all players or a specific player
+ * - POST: Create a new player
+ * - PUT: Update player details or user role
+ * - DELETE: Remove a player permanently
  */
-require_once __DIR__ . '/../includes/config.php';
+
+require_once __DIR__ . '/../includes/bootstrap.php';
 
 try {
-    $pdo = getDbConnection();
+    $container = $GLOBALS['container'];
+    $playerService = $container->get(\App\Service\PlayerService::class);
     $method = $_SERVER['REQUEST_METHOD'];
     $task = $_GET['task'] ?? null;
+    $input = getJsonInput();
 
-    // GET: Retrieve all registered players alphabetically
+    // GET: Retrieve all registered players alphabetically or a specific player
     if ($method === 'GET') {
-        $user = getCurrentUser();
+        $user = \App\Service\AuthService::getCurrentUser();
         if ($user && $user['role'] === 'player') {
             // Requirement: Players only see their own info
-            $stmt = $pdo->prepare('
-                SELECT p.*, u.role, u.id as user_id 
-                FROM players p 
-                LEFT JOIN users u ON p.id = u.player_id 
-                WHERE p.id = ?');
-            $stmt->execute([$user['player_id']]);
+            $player = $playerService->getPlayer($user['player_id']);
+            sendJson($player ? serializePlayer($player) : null);
         } else {
-            $stmt = $pdo->query('
-                SELECT p.*, u.role, u.id as user_id 
-                FROM players p 
-                LEFT JOIN users u ON p.id = u.player_id 
-                ORDER BY p.player_name ASC');
+            $players = $playerService->getAllPlayers();
+            sendJson(array_map('serializePlayer', $players));
         }
-        sendJson(array_map('serializePlayer', $stmt->fetchAll()));
     }
-
-    $input = getJsonInput();
 
     // POST: Register a new player (Protected by API Secret)
     if ($method === 'POST') {
+        validateAdminAccess();
+        
         if (empty($input['playerName'])) {
             sendJson(['error' => 'playerName is required'], 400);
         }
@@ -52,26 +44,19 @@ try {
         $matchplay_id = $input['matchplayId'] ?? null;
 
         try {
-            $stmt = $pdo->prepare('INSERT INTO players (player_name, ifpa_id, matchplay_id) VALUES (?, ?, ?)');
-            $stmt->execute([$input['playerName'], $ifpa_id, $matchplay_id]);
-            $id = (int)$pdo->lastInsertId();
-        } catch (PDOException $error) {
+            $player = $playerService->createPlayer($input['playerName'], $ifpa_id, $matchplay_id);
+            sendJson(serializePlayer($player));
+        } catch (\PDOException $error) {
             // Handle duplicate names gracefully by returning the existing record
             if ($error->errorInfo[1] === 1062) {
-                $stmt = $pdo->prepare('SELECT p.*, u.id as user_id, u.role FROM players p LEFT JOIN users u ON p.id = u.player_id WHERE p.player_name = ?');
-                $stmt->execute([$input['playerName']]);
-                sendJson(serializePlayer($stmt->fetch()), 409); // Conflict: Player name already exists
+                $players = $playerService->getAllPlayers();
+                $existing = current(array_filter($players, fn($p) => $p['player_name'] === $input['playerName']));
+                if ($existing) {
+                    sendJson(serializePlayer($existing), 409); // Conflict: Player name already exists
+                }
             }
-            throw $error; // Re-throw other DB errors to global handler
+            throw $error;
         }
-
-        $stmt = $pdo->prepare('SELECT p.*, u.id as user_id, u.role FROM players p LEFT JOIN users u ON p.id = u.player_id WHERE p.id = ?');
-        $stmt->execute([$id]);
-        $row = $stmt->fetch();
-        if (!$row) {
-            sendJson(['error' => 'Player created but could not be retrieved.'], 500);
-        }
-        sendJson(serializePlayer($row));
     }
 
     // PUT: Update an existing player (Protected by API Secret)
@@ -81,6 +66,7 @@ try {
             sendJson(['error' => 'id query parameter is required'], 400);
         }
 
+        // Handle role updates
         if ($task === 'role') {
             validateTDAccess();
             $newRole = $input['role'] ?? 'player';
@@ -88,21 +74,18 @@ try {
                 sendJson(['error' => 'Invalid role'], 400);
             }
 
-            $user = getCurrentUser();
+            $user = \App\Service\AuthService::getCurrentUser();
             if ($user && $user['role'] === 'td' && $newRole === 'admin') {
                 sendJson(['error' => 'Unauthorized: TDs cannot assign Admin role'], 403);
             }
 
             // $id here is the user_id passed in the URL
-            $stmt = $pdo->prepare('UPDATE users SET role = ? WHERE id = ?');
-            $stmt->execute([$newRole, $id]);
+            $playerService->updateUserRole($id, $newRole);
             sendJson(['success' => true]);
         }
 
-        // Fetch existing record to check if name is changing
-        $stmt = $pdo->prepare('SELECT player_name FROM players WHERE id = ?');
-        $stmt->execute([$id]);
-        $existing = $stmt->fetch();
+        // Update player details
+        $existing = $playerService->getPlayer($id);
         if (!$existing) {
             sendJson(['error' => 'Player not found'], 404);
         }
@@ -111,12 +94,14 @@ try {
         $ifpa_id = $input['ifpaId'] ?? null;
         $matchplay_id = $input['matchplayId'] ?? null;
 
-        $user = getCurrentUser();
+        $user = \App\Service\AuthService::getCurrentUser();
         $isOwner = $user && (int)$user['player_id'] === $id;
 
         // Rule: Changing the name requires TD/Admin Access OR being the profile owner.
         if ($newName !== $existing['player_name']) {
-            if (!$isOwner) validateTDAccess();
+            if (!$isOwner) {
+                validateTDAccess();
+            }
         } else if (!$isOwner) {
             validateTDAccess();
         }
@@ -126,25 +111,17 @@ try {
         }
 
         try {
-            $stmt = $pdo->prepare('UPDATE players SET player_name = ?, ifpa_id = ?, matchplay_id = ? WHERE id = ?');
-            $stmt->execute([$newName, $ifpa_id, $matchplay_id, $id]);
-        } catch (PDOException $error) {
+            $player = $playerService->updatePlayer($id, $newName, $ifpa_id, $matchplay_id);
+            sendJson(serializePlayer($player));
+        } catch (\PDOException $error) {
             if ($error->errorInfo[1] === 1062) { // Duplicate entry
                 sendJson(['error' => 'Player name already exists'], 409);
             }
             throw $error;
         }
-
-        $stmt = $pdo->prepare('SELECT p.*, u.id as user_id, u.role FROM players p LEFT JOIN users u ON p.id = u.player_id WHERE p.id = ?');
-        $stmt->execute([$id]);
-        $row = $stmt->fetch();
-        if (!$row) {
-            sendJson(['error' => 'Player updated but could not be retrieved.'], 500);
-        }
-        sendJson(serializePlayer($row));
     }
 
-    // DELETE: Remove a player and their associated scores (Protected by API Secret)
+    // DELETE: Remove a player and their associated data (Protected by Admin)
     if ($method === 'DELETE') {
         validateAdminAccess();
         
@@ -153,15 +130,12 @@ try {
             sendJson(['error' => 'id query parameter is required'], 400);
         }
 
-        $stmt = $pdo->prepare('SELECT p.*, u.id as user_id, u.role FROM players p LEFT JOIN users u ON p.id = u.player_id WHERE p.id = ?');
-        $stmt->execute([$id]);
-        $player = $stmt->fetch();
+        $player = $playerService->getPlayer($id);
         if (!$player) {
             sendJson(['error' => 'Player not found'], 404);
         }
 
-        $stmt = $pdo->prepare('DELETE FROM players WHERE id = ?');
-        $stmt->execute([$id]);
+        $playerService->deletePlayer($id);
         sendJson(['success' => true, 'deleted' => $player]);
     }
 
@@ -170,3 +144,4 @@ try {
 } catch (Exception $e) {
     sendJson(['error' => $e->getMessage()], 500);
 }
+
