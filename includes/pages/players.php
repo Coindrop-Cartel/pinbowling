@@ -12,6 +12,14 @@
           <label for="player-name">Player Name</label>
           <input id="player-name" data-testid="player-name-input" type="text" placeholder="Enter player name" required />
         </div>
+        <div id="player-username-row" data-testid="player-username-row" class="form-row hidden">
+          <label for="player-username">Username</label>
+          <input id="player-username" data-testid="player-username-input" type="text" placeholder="Enter username" />
+        </div>
+        <div id="player-email-row" data-testid="player-email-row" class="form-row hidden">
+          <label for="player-email">Email Address</label>
+          <input id="player-email" data-testid="player-email-input" type="email" placeholder="Enter email address" />
+        </div>
         <div id="player-ifpa-row" data-testid="player-ifpa-row" class="form-row hidden">
           <label for="ifpa-id">IFPA ID (Optional)</label>
           <input id="ifpa-id" data-testid="ifpa-id-input" type="text" placeholder="e.g., 12345" />

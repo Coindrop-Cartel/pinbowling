@@ -15,8 +15,9 @@ $authService = $container->get(\App\Service\AuthService::class);
 $task = $_GET['task'] ?? '';
 $input = getJsonInput();
 
-// Security Gatekeeper: Tasks 'me' and 'login' are public
-if ($task !== 'me' && $task !== 'login') {
+// Security Gatekeeper: Public tasks that do not require active session/secret
+$publicTasks = ['me', 'login', 'forgot', 'reset_with_token'];
+if (!in_array($task, $publicTasks)) {
     validateSessionOrSecret();
 }
 
@@ -52,13 +53,14 @@ switch ($task) {
         $username = $input['username'] ?? '';
         $password = $input['password'] ?? '';
         $playerName = $input['playerName'] ?? '';
+        $email = $input['email'] ?? null;
         $confirmClaim = $input['confirmClaim'] ?? false;
 
         if (!$username || !$password || !$playerName) {
             sendJson(['error' => 'Username, password, and player name are required.'], 400);
         }
 
-        $result = $authService->register($username, $password, $playerName, $confirmClaim);
+        $result = $authService->register($username, $password, $playerName, $email, $confirmClaim);
         
         if (isset($result['error'])) {
             sendJson($result, $result['code']);
@@ -87,6 +89,33 @@ switch ($task) {
             sendJson(['success' => true]);
         } catch (\Exception $e) {
             sendJson(['error' => 'Failed to reset password: ' . $e->getMessage()], 500);
+        }
+        break;
+
+    case 'forgot':
+        $email = $input['email'] ?? '';
+        if (!$email) {
+            sendJson(['error' => 'Email is required.'], 400);
+        }
+        
+        $scriptDir = dirname(dirname($_SERVER['SCRIPT_NAME']));
+        $baseUrl = (empty($_SERVER['HTTPS']) ? 'http' : 'https') . "://$_SERVER[HTTP_HOST]" . rtrim($scriptDir, '/\\') . "/index.php";
+
+        $authService->forgotPassword($email, $baseUrl);
+        sendJson(['success' => true]);
+        break;
+
+    case 'reset_with_token':
+        $token = $input['token'] ?? '';
+        $password = $input['password'] ?? '';
+        if (!$token || !$password) {
+            sendJson(['error' => 'Token and password are required.'], 400);
+        }
+        $success = $authService->resetWithToken($token, $password);
+        if ($success) {
+            sendJson(['success' => true]);
+        } else {
+            sendJson(['error' => 'Invalid or expired reset token.'], 400);
         }
         break;
 

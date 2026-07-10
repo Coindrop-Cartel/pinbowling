@@ -45,8 +45,8 @@ const ROLE_PERMISSIONS = {
 const NAV_PERMISSIONS = {
   '#nav-leagues': null, // Visible to all; internal actions restricted by role
   '#nav-machines': PERMISSIONS.MANAGE_MACHINES,
-  '#nav-locations': null, // Visible to all
-  '#nav-players': null,   // Visible to all
+  '#nav-locations': PERMISSIONS.JOIN_SESSION, // Visible to any registered user
+  '#nav-players': PERMISSIONS.JOIN_SESSION,   // Visible to any registered user
   '#nav-teams': PERMISSIONS.MANAGE_TEAMS,
   '#nav-maintenance': PERMISSIONS.RUN_CLEANUP
 };
@@ -201,12 +201,12 @@ function updateAuthUI(user) {
         const hasAccess = !permission || perms.includes('*') || perms.includes(permission);
         el.classList.toggle('hidden', !hasAccess);
         // Count visible items specifically within the Admin dropdown for its visibility toggle
-        if (hasAccess && permission && adminNav.contains(el)) visibleChildren++;
+        if (hasAccess && adminNav.contains(el)) visibleChildren++;
       }
     });
 
-    // Hide the entire "Admin" dropdown if the user has no accessible sub-items
-    adminNav.classList.toggle('hidden', visibleChildren === 0 || !user);
+    // Hide the entire "Admin" dropdown if the user has no accessible sub-items or is not management (admin/td)
+    adminNav.classList.toggle('hidden', visibleChildren === 0 || !user || (role !== 'admin' && role !== 'td'));
   }
 
   // State-Keyed Rendering Guard:

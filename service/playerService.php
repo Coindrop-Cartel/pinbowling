@@ -93,6 +93,8 @@ try {
         $newName = $input['playerName'] ?? $existing['player_name'];
         $ifpa_id = $input['ifpaId'] ?? null;
         $matchplay_id = $input['matchplayId'] ?? null;
+        $newUsername = $input['username'] ?? null;
+        $newEmail = $input['email'] ?? null;
 
         $user = \App\Service\AuthService::getCurrentUser();
         $isOwner = $user && (int)$user['player_id'] === $id;
@@ -106,18 +108,39 @@ try {
             validateTDAccess();
         }
 
+        // Rule: Changing username requires TD/Admin Access OR being the profile owner.
+        if ($newUsername !== null && !empty($existing['user_id']) && $newUsername !== $existing['username']) {
+            if (!$isOwner) {
+                validateTDAccess();
+            }
+        }
+
+        // Rule: Changing email requires TD/Admin Access OR being the profile owner.
+        if ($newEmail !== null && !empty($existing['user_id']) && $newEmail !== $existing['email']) {
+            if (!$isOwner) {
+                validateTDAccess();
+            }
+        }
+
         if (empty($newName)) {
             sendJson(['error' => 'playerName is required'], 400);
         }
 
         try {
+            if ($newUsername !== null && !empty($existing['user_id']) && $newUsername !== $existing['username']) {
+                $playerService->updateUserUsername((int)$existing['user_id'], $newUsername);
+            }
+            if ($newEmail !== null && !empty($existing['user_id']) && $newEmail !== $existing['email']) {
+                $playerService->updateUserEmail((int)$existing['user_id'], $newEmail);
+            }
             $player = $playerService->updatePlayer($id, $newName, $ifpa_id, $matchplay_id);
             sendJson(serializePlayer($player));
-        } catch (\PDOException $error) {
-            if ($error->errorInfo[1] === 1062) { // Duplicate entry
+        } catch (\Exception $error) {
+            if ($error instanceof \PDOException && $error->errorInfo[1] === 1062) { // Duplicate entry
                 sendJson(['error' => 'Player name already exists'], 409);
+            } else {
+                sendJson(['error' => $error->getMessage()], 400);
             }
-            throw $error;
         }
     }
 

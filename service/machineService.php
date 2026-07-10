@@ -62,7 +62,10 @@ try {
                 sendJson(['error' => 'machineName is required'], 400);
             }
             
-            validateAdminAccess();
+            $currentUser = \App\Service\AuthService::getCurrentUser();
+            if (!$currentUser || !in_array($currentUser['role'], ['admin', 'td', 'player'])) {
+                sendJson(['error' => 'Unauthorized to add machines'], 403);
+            }
             
             $machine = $machineService->createMachine(
                 $input['machineName'],
@@ -87,7 +90,16 @@ try {
             $machineService->saveTargetScores($eventId, [$input]);
         } else {
             // Update machine
-            validateAdminAccess();
+            $currentUser = \App\Service\AuthService::getCurrentUser();
+            if (!$currentUser || !in_array($currentUser['role'], ['admin', 'td', 'player'])) {
+                sendJson(['error' => 'Unauthorized to update machines'], 403);
+            }
+            if ($currentUser['role'] === 'player') {
+                $existingMach = $machineService->getMachine($id);
+                if ($existingMach && isset($input['machineName']) && $input['machineName'] !== $existingMach['machine_name']) {
+                    sendJson(['error' => 'Players cannot change machine names'], 403);
+                }
+            }
             $machineService->updateMachine(
                 $id,
                 $input['machineName'] ?? null,

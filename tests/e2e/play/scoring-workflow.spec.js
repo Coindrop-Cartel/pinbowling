@@ -14,7 +14,10 @@ async function loginAs(page, username, password) {
   await loginBtn.click();
   await page.fill('#auth-username', username);
   await page.fill('#auth-pass', password);
-  await page.click('#auth-modal-form button[type="submit"]');
+  await Promise.all([
+    page.waitForNavigation({ waitUntil: 'networkidle' }),
+    page.click('#auth-modal-form button[type="submit"]')
+  ]);
   await expect(page.locator('.auth-user-greeting')).toBeVisible();
 }
 

@@ -25,11 +25,11 @@ class AuthService {
      */
     public function login(string $username, string $password) {
         $stmt = $this->db->query(
-            "SELECT u.id, u.player_id, u.username, u.password_hash, u.role, p.player_name 
+            "SELECT u.id, u.player_id, u.username, u.email, u.password_hash, u.role, p.player_name 
              FROM users u 
              LEFT JOIN players p ON u.player_id = p.id 
-             WHERE u.username = ?",
-            [$username]
+             WHERE u.username = ? OR u.email = ?",
+            [$username, $username]
         );
         $user = $stmt->fetch();
 
@@ -47,10 +47,11 @@ class AuthService {
      * @param string $username
      * @param string $password
      * @param string $playerName
+     * @param string|null $email
      * @param bool $confirmClaim
      * @return array Result with 'error' and 'code' on failure, or user data on success
      */
-    public function register(string $username, string $password, string $playerName, bool $confirmClaim = false): array {
+    public function register(string $username, string $password, string $playerName, ?string $email = null, bool $confirmClaim = false): array {
         try {
             $pdo = $this->db->getPdo();
             $pdo->beginTransaction();
@@ -88,8 +89,8 @@ class AuthService {
 
             // Create user account
             $passwordHash = password_hash($password, PASSWORD_BCRYPT);
-            $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, player_id, role) VALUES (?, ?, ?, 'player')");
-            $stmt->execute([$username, $passwordHash, $playerId]);
+            $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, email, player_id, role) VALUES (?, ?, ?, ?, 'player')");
+            $stmt->execute([$username, $passwordHash, $email, $playerId]);
             $userId = (int)$pdo->lastInsertId();
 
             $pdo->commit();
@@ -150,5 +151,73 @@ class AuthService {
         }
         $_SESSION = [];
         session_destroy();
+    }
+
+    /**
+     * Generate password reset token, update user table, and send simulated email.
+     * Always returns true if email input is received, to prevent user harvesting.
+     *
+     * @param string $email
+     * @param string $baseUrl
+     * @return bool
+     */
+    public function forgotPassword(string $email, string $baseUrl): bool {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+
+        if ($user) {
+            $token = bin2hex(random_bytes(16));
+            $expires = date('Y-m-d H:i:s', strtotime('+1 hour'));
+
+            $update = $pdo->prepare("UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?");
+            $update->execute([$token, $expires, $user['id']]);
+
+            $resetLink = $baseUrl . "?reset_token=" . $token;
+
+            // Send simulated email
+            $to = $email;
+            $subject = "Password Reset Request - PinBowling";
+            $message = "You requested a password reset. Please click the following link to reset your password:\n\n$resetLink\n\nThis link will expire in 1 hour.";
+            $headers = "From: no-reply@" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "\r\n";
+
+            $sent = mail($to, $subject, $message, $headers);
+            if (!$sent) {
+                $lastError = error_get_last();
+                error_log(sprintf(
+                    "[AuthService] mail() failed to send to %s. Headers: %s. Last PHP Error: %s",
+                    $to,
+                    trim($headers),
+                    $lastError ? $lastError['message'] : 'No PHP error message.'
+                ));
+            } else {
+                error_log(sprintf("[AuthService] mail() successfully dispatched to %s. Reset link: %s", $to, $resetLink));
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Resets user password using reset token.
+     *
+     * @param string $token
+     * @param string $password
+     * @return bool Success
+     */
+    public function resetWithToken(string $token, string $password): bool {
+        $pdo = $this->db->getPdo();
+        $now = date('Y-m-d H:i:s');
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE reset_token = ? AND reset_token_expires > ?");
+        $stmt->execute([$token, $now]);
+        $user = $stmt->fetch();
+
+        if (!$user) {
+            return false;
+        }
+
+        $passwordHash = password_hash($password, PASSWORD_BCRYPT);
+        $update = $pdo->prepare("UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?");
+        return $update->execute([$passwordHash, $user['id']]);
     }
 }

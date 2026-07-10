@@ -17,6 +17,8 @@ function serializePlayer($row) {
         'ifpaId' => $row['ifpa_id'] ?? null,
         'matchplayId' => $row['matchplay_id'] ?? null,
         'userRole' => $row['role'] ?? null,
+        'username' => $row['username'] ?? null,
+        'email' => $row['email'] ?? null,
         'userId' => isset($row['user_id']) ? (int)$row['user_id'] 
             : (isset($row['userId']) ? (int)$row['userId'] : null)
     ];

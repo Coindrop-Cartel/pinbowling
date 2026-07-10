@@ -48,9 +48,8 @@ export async function initMachinesPage() {
   let allMachines = [];
   let filterInstance = null;
 
-  // Setup "Create Machine" toggle
   const metadataRow = document.getElementById('machine-metadata-row');
-  const actionsRow = saveMachineButton.closest('.form-actions');
+  const actionsRow = saveMachineButton?.closest('.form-actions');
 
   if (saveMachineButton) saveMachineButton.classList.add('btn-mgmt');
 
@@ -60,7 +59,7 @@ export async function initMachinesPage() {
   createToggle.textContent = 'Create New Machine';
   machineNameInput.after(createToggle);
 
-  if (!hasElevatedPrivileges) {
+  if (!currentUser) {
     createToggle.classList.add('hidden');
     machineForm.closest('.card').classList.add('hidden');
   }

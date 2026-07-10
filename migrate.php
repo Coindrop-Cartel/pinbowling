@@ -103,6 +103,9 @@ function initializeDatabaseSchema($pdo) {
         `player_id` INT UNIQUE,
         `username` VARCHAR(255) UNIQUE NOT NULL,
         `password_hash` VARCHAR(255) NOT NULL,
+        `email` VARCHAR(255) UNIQUE DEFAULT NULL,
+        `reset_token` VARCHAR(255) UNIQUE DEFAULT NULL,
+        `reset_token_expires` DATETIME DEFAULT NULL,
         `role` ENUM('player', 'td', 'admin') DEFAULT 'player',
         CONSTRAINT `fk_user_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
@@ -634,6 +637,38 @@ try {
         echo "✓ Successfully rebuilt fk_matchup_event foreign key with ON DELETE CASCADE.\n";
     } else {
         echo "fk_matchup_event rebuild migration already applied.\n";
+    }
+
+    // Add email column to users table for password/username recovery
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'users_add_email'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $checkEmail = $pdo->query("SHOW COLUMNS FROM `users` LIKE 'email'")->fetch();
+        if (!$checkEmail) {
+            $pdo->exec("ALTER TABLE `users` ADD COLUMN `email` VARCHAR(255) UNIQUE DEFAULT NULL AFTER `password_hash`");
+        }
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('users_add_email')")->execute();
+        echo "✓ users email column migration applied successfully.\n";
+    } else {
+        echo "users email column migration already applied.\n";
+    }
+
+    // Add reset_token and reset_token_expires columns to users table
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'users_add_reset_token'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $checkToken = $pdo->query("SHOW COLUMNS FROM `users` LIKE 'reset_token'")->fetch();
+        if (!$checkToken) {
+            $pdo->exec("ALTER TABLE `users` ADD COLUMN `reset_token` VARCHAR(255) UNIQUE DEFAULT NULL AFTER `email`");
+        }
+        $checkExpires = $pdo->query("SHOW COLUMNS FROM `users` LIKE 'reset_token_expires'")->fetch();
+        if (!$checkExpires) {
+            $pdo->exec("ALTER TABLE `users` ADD COLUMN `reset_token_expires` DATETIME DEFAULT NULL AFTER `reset_token`");
+        }
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('users_add_reset_token')")->execute();
+        echo "✓ users reset token columns migration applied successfully.\n";
+    } else {
+        echo "users reset token columns migration already applied.\n";
     }
 
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");

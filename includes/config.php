@@ -35,7 +35,6 @@ if (is_readable($packageFile)) {
     if (json_last_error() === JSON_ERROR_NONE && isset($packageData['version'])) {
         $uiVersion = $packageData['version'];
         $uiVersionSource = 'package.json';
-        error_log("[PinBowling DEBUG] Successfully read UI Version '{$uiVersion}' from {$packageFile}");
     } else {
         $uiVersion = '1.0.0';
         $uiVersionSource = 'Hardcoded Fallback (JSON parse error or missing version key)';

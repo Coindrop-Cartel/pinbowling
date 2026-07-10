@@ -63,7 +63,10 @@ try {
                 sendJson(['error' => 'name is required'], 400);
             }
             
-            validateTDAccess();
+            $currentUser = \App\Service\AuthService::getCurrentUser();
+            if (!$currentUser || !in_array($currentUser['role'], ['admin', 'td', 'player'])) {
+                sendJson(['error' => 'Unauthorized to add locations'], 403);
+            }
             
             $location = $locationService->createLocation(
                 $input['name'],
@@ -76,7 +79,10 @@ try {
 
     // PUT: Update location or location machine
     if ($method === 'PUT') {
-        validateTDAccess();
+        $currentUser = \App\Service\AuthService::getCurrentUser();
+        if (!$currentUser || !in_array($currentUser['role'], ['admin', 'td', 'player'])) {
+            sendJson(['error' => 'Unauthorized to update locations/machines'], 403);
+        }
 
         if ($task === 'units') {
             if (empty($input['locationId']) || empty($input['machineId'])) {

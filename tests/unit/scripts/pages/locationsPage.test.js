@@ -9,6 +9,9 @@ import { getScoringEngine } from '@core/engine.js';
 
 vi.mock('@services/api.js', () => ({
   PB_API: {
+    auth: {
+      me: vi.fn().mockResolvedValue({ id: 1, role: 'admin' }),
+    },
     locations: {
       getAll: vi.fn(),
       create: vi.fn(),
@@ -222,7 +225,7 @@ describe('Locations Management Page (locationsPage.js)', () => {
       }));
     });
 
-    it('should require admin password before creating', async () => {
+    it('should not require admin password before creating', async () => {
       await initLocationsPage();
       const toggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Create New Location'));
       toggle.click();
@@ -230,19 +233,8 @@ describe('Locations Management Page (locationsPage.js)', () => {
       document.getElementById('location-city').value = 'Town';
       document.getElementById('location-state').value = 'ST';
       await document.getElementById('location-form').dispatchEvent(new Event('submit'));
-      expect(requireAdmin).toHaveBeenCalled();
-    });
-
-    it('should not create location if admin password rejected', async () => {
-      requireAdmin.mockResolvedValue(false);
-      await initLocationsPage();
-      const toggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Create New Location'));
-      toggle.click();
-      document.getElementById('location-name').value = 'New Spot';
-      document.getElementById('location-city').value = 'Town';
-      document.getElementById('location-state').value = 'ST';
-      await document.getElementById('location-form').dispatchEvent(new Event('submit'));
-      expect(PB_API.locations.create).not.toHaveBeenCalled();
+      expect(requireAdmin).not.toHaveBeenCalled();
+      expect(PB_API.locations.create).toHaveBeenCalled();
     });
 
     it('should not submit if location name is empty', async () => {
@@ -267,21 +259,13 @@ describe('Locations Management Page (locationsPage.js)', () => {
       }));
     });
 
-    it('should require admin password before updating', async () => {
+    it('should not require admin password before updating', async () => {
       await initLocationsPage();
       const editBtn = document.querySelector('.edit-loc-btn');
       editBtn.click();
       await document.getElementById('location-form').dispatchEvent(new Event('submit'));
-      expect(requireAdmin).toHaveBeenCalledWith(expect.stringContaining('update'));
-    });
-
-    it('should not update if admin password rejected', async () => {
-      requireAdmin.mockResolvedValue(false);
-      await initLocationsPage();
-      const editBtn = document.querySelector('.edit-loc-btn');
-      editBtn.click();
-      await document.getElementById('location-form').dispatchEvent(new Event('submit'));
-      expect(PB_API.locations.update).not.toHaveBeenCalled();
+      expect(requireAdmin).not.toHaveBeenCalled();
+      expect(PB_API.locations.update).toHaveBeenCalled();
     });
   });
 

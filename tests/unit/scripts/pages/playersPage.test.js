@@ -91,6 +91,8 @@ describe('Player Management Page (playersPage.js)', () => {
         <form id="player-form">
           <input id="editing-player-id" />
           <input id="player-name" />
+          <div id="player-username-row" class="form-row hidden"><input id="player-username" /></div>
+          <div id="player-email-row" class="form-row hidden"><input id="player-email" /></div>
           <div id="player-ifpa-row" class="form-row hidden"><input id="ifpa-id" /></div>
           <div id="player-matchplay-row" class="form-row hidden"><input id="matchplay-id" /></div>
           <div id="player-form-actions" class="form-actions hidden">
@@ -285,6 +287,28 @@ describe('Player Management Page (playersPage.js)', () => {
       const roleBtn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Change Role'));
       expect(resetBtn.classList.contains('hidden')).toBe(true);
       expect(roleBtn.classList.contains('hidden')).toBe(true);
+    });
+
+    it('should show username and email row and populate them when editing user with account', async () => {
+      PB_API.players.getAll.mockResolvedValue([{ id: 10, playerName: 'Alice', userId: 100, username: 'alice_un', email: 'alice@example.com' }]);
+      await initPlayersPage();
+      const editBtn = document.querySelector('.edit-player-btn');
+      editBtn.click();
+      expect(document.getElementById('player-username-row').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('player-username').value).toBe('alice_un');
+      expect(document.getElementById('player-email-row').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('player-email').value).toBe('alice@example.com');
+    });
+
+    it('should hide username and email row when editing user without account', async () => {
+      PB_API.players.getAll.mockResolvedValue([{ id: 11, playerName: 'Bob' }]);
+      await initPlayersPage();
+      const editBtn = document.querySelector('.edit-player-btn');
+      editBtn.click();
+      expect(document.getElementById('player-username-row').classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('player-username').value).toBe('');
+      expect(document.getElementById('player-email-row').classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('player-email').value).toBe('');
     });
 
     it('should allow self-edit for non-admin users', async () => {

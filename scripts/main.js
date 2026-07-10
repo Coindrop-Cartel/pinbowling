@@ -21,7 +21,8 @@ import { getCookie } from '@scripts/utils.js';
 import { initAuthHeader } from '@services/auth.js';
 import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { loadPage } from '@scripts/utils.js';
-import { showAlert } from '@ui/dialogs.js';
+import { showAlert, showPrompt } from '@ui/dialogs.js';
+import { PB_API } from '@services/api.js';
 
 /**
  * Main entry point. Identifies which page is currently loaded 
@@ -153,6 +154,28 @@ async function ready() {
   document.addEventListener('pb:pageChanged', () => {
     initApp();
   });
+
+  // Check for reset_token in URL query parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const resetToken = urlParams.get('reset_token');
+  if (resetToken) {
+    // Clear token from URL so it doesn't trigger again on reload
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, newUrl);
+    
+    // Defer showing prompt slightly to let app initialize and render
+    setTimeout(async () => {
+      const newPassword = await showPrompt('Enter your new password:', 'Reset Password', true);
+      if (newPassword) {
+        try {
+          await PB_API.auth.resetWithToken(resetToken, newPassword);
+          showAlert('Your password has been reset successfully. You can now login.', 'Success');
+        } catch (err) {
+          showAlert(err.message, 'Reset Failed');
+        }
+      }
+    }, 100);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', ready);

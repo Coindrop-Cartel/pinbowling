@@ -8,17 +8,43 @@ require_once __DIR__ . '/config.php';
 
 // Manually require the new service classes (since we aren't using Composer autoloader for them yet)
 require_once __DIR__ . '/container.php';
-require_once __DIR__ . '/../service/databaseService.php';
-require_once __DIR__ . '/../service/settingsService.php';
-require_once __DIR__ . '/../service/Auth/AuthService.php';
-require_once __DIR__ . '/../service/Player/PlayerService.php';
-require_once __DIR__ . '/../service/League/LeagueService.php';
-require_once __DIR__ . '/../service/Location/LocationService.php';
-require_once __DIR__ . '/../service/Machine/MachineService.php';
-require_once __DIR__ . '/../service/Score/ScoreService.php';
-require_once __DIR__ . '/../service/Team/TeamService.php';
-require_once __DIR__ . '/../service/Matchup/MatchupService.php';
-require_once __DIR__ . '/../service/Cleanup/CleanupService.php';
+spl_autoload_register(function ($class) {
+    if (strpos($class, 'App\\Service\\') === 0) {
+        $className = str_replace('App\\Service\\', '', $class);
+        $baseDir = __DIR__ . '/../service/';
+
+        // 1. Check flat structure - mixed case (e.g. databaseService.php)
+        $flatPath = $baseDir . lcfirst($className) . '.php';
+        if (file_exists($flatPath)) {
+            require_once $flatPath;
+            return;
+        }
+
+        // 2. Check flat structure - original case (e.g. DatabaseService.php)
+        $flatPath2 = $baseDir . $className . '.php';
+        if (file_exists($flatPath2)) {
+            require_once $flatPath2;
+            return;
+        }
+
+        // 3. Check nested folder structure matching the class prefix (e.g. App\Service\AuthService -> service/Auth/AuthService.php)
+        if (preg_match('/^([A-Za-z0-9]+)Service$/', $className, $matches)) {
+            $folder = $matches[1];
+            
+            $nestedPath = $baseDir . $folder . '/' . $className . '.php';
+            if (file_exists($nestedPath)) {
+                require_once $nestedPath;
+                return;
+            }
+
+            $nestedPath2 = $baseDir . strtolower($folder) . '/' . $className . '.php';
+            if (file_exists($nestedPath2)) {
+                require_once $nestedPath2;
+                return;
+            }
+        }
+    }
+});
 
 use App\Includes\Container;
 use App\Http\Request;

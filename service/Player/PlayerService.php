@@ -20,7 +20,7 @@ class PlayerService {
     public function getAllPlayers(?string $role = null): array {
         if ($role) {
             $stmt = $this->db->query(
-                "SELECT p.*, u.role, u.id as user_id 
+                "SELECT p.*, u.role, u.id as user_id, u.username, u.email 
                  FROM players p 
                  LEFT JOIN users u ON p.id = u.player_id 
                  WHERE u.role = ?
@@ -29,7 +29,7 @@ class PlayerService {
             );
         } else {
             $stmt = $this->db->getPdo()->query(
-                "SELECT p.*, u.role, u.id as user_id 
+                "SELECT p.*, u.role, u.id as user_id, u.username, u.email 
                  FROM players p 
                  LEFT JOIN users u ON p.id = u.player_id 
                  ORDER BY p.player_name ASC"
@@ -46,7 +46,7 @@ class PlayerService {
      */
     public function getPlayer(int $playerId) {
         $stmt = $this->db->query(
-            "SELECT p.*, u.id as user_id, u.role 
+            "SELECT p.*, u.id as user_id, u.role, u.username, u.email 
              FROM players p 
              LEFT JOIN users u ON p.id = u.player_id 
              WHERE p.id = ?",
@@ -178,5 +178,57 @@ class PlayerService {
         $pdo = $this->db->getPdo();
         $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE id = ?");
         return $stmt->execute([$role, $userId]);
+    }
+
+    /**
+     * Update a user's username.
+     *
+     * @param int $userId
+     * @param string $username
+     * @return bool Success
+     */
+    public function updateUserUsername(int $userId, string $username): bool {
+        $username = trim($username);
+        if (empty($username)) {
+            throw new \InvalidArgumentException("Username cannot be empty");
+        }
+        
+        $pdo = $this->db->getPdo();
+        // Check if username already exists for a different user
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
+        $stmt->execute([$username, $userId]);
+        if ($stmt->fetch()) {
+            throw new \RuntimeException("Username already exists");
+        }
+
+        $stmt = $pdo->prepare("UPDATE users SET username = ? WHERE id = ?");
+        return $stmt->execute([$username, $userId]);
+    }
+
+    /**
+     * Update a user's email.
+     *
+     * @param int $userId
+     * @param string|null $email
+     * @return bool Success
+     */
+    public function updateUserEmail(int $userId, ?string $email): bool {
+        $email = $email !== null ? trim($email) : null;
+        if ($email === '') {
+            $email = null;
+        }
+        
+        $pdo = $this->db->getPdo();
+        if ($email !== null) {
+            // Check if email already exists for a different user
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+            $stmt->execute([$email, $userId]);
+            if ($stmt->fetch()) {
+                throw new \RuntimeException("Email address already exists");
+            }
+        }
+
+        $stmt = $pdo->prepare("UPDATE users SET email = ? WHERE id = ?");
+        return $stmt->execute([$email, $userId]);
     }
 }

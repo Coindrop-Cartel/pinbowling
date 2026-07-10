@@ -235,8 +235,12 @@ describe('showAuthDialog', () => {
     const promise = showAuthDialog();
     await vi.advanceTimersByTimeAsync(50);
     expect(document.querySelector('#auth-username')).not.toBeNull();
+    expect(document.querySelector('#auth-username').previousElementSibling.textContent).toBe('Username or Email');
     expect(document.querySelector('#auth-pass')).not.toBeNull();
     expect(document.querySelector('#auth-name')).toBeNull(); // No player name in login mode
+    expect(document.querySelector('#auth-email')).toBeNull(); // No email in login mode
+    expect(document.querySelector('#auth-forgot')).not.toBeNull();
+    expect(document.querySelector('#auth-forgot').style.display).not.toBe('none');
     const submitBtn = document.querySelector('#auth-modal-form button[type="submit"]');
     expect(submitBtn.textContent).toBe('Login');
     expect(document.getElementById('auth-switch').textContent).toBe('Need an account? Register now');
@@ -251,6 +255,8 @@ describe('showAuthDialog', () => {
     document.getElementById('auth-switch').click();
     // Now in register mode
     expect(document.querySelector('#auth-name')).not.toBeNull();
+    expect(document.querySelector('#auth-email')).not.toBeNull(); // Email in register mode
+    expect(document.querySelector('#auth-forgot').style.display).toBe('none');
     const submitBtn = document.querySelector('#auth-modal-form button[type="submit"]');
     expect(submitBtn.textContent).toBe('Register');
     expect(document.getElementById('auth-switch').textContent).toBe('Already have an account? Login');
@@ -281,6 +287,30 @@ describe('showAuthDialog', () => {
     expect(result).toBeNull();
   });
 
+  it('should trigger forgot password flow on forgot link click', async () => {
+    PB_API.auth.forgotPassword = vi.fn().mockResolvedValue({});
+    const promise = showAuthDialog();
+    await vi.advanceTimersByTimeAsync(50);
+
+    // Click forgot password
+    document.getElementById('auth-forgot').click();
+
+    // Confirm that the auth dialog is closed
+    const result = await promise;
+    expect(result).toBeNull();
+
+    // Wait for prompt to render
+    await vi.advanceTimersByTimeAsync(50);
+    
+    expect(document.getElementById('modal-input')).not.toBeNull();
+    document.getElementById('modal-input').value = 'test@example.com';
+    document.getElementById('modal-confirm').click();
+
+    // Wait for API call to complete
+    await vi.advanceTimersByTimeAsync(50);
+    expect(PB_API.auth.forgotPassword).toHaveBeenCalledWith('test@example.com');
+  });
+
   it('should call register API on register form submit', async () => {
     PB_API.auth.register.mockResolvedValue({});
     PB_API.auth.login.mockResolvedValue({ id: 2, username: 'newuser' });
@@ -293,6 +323,7 @@ describe('showAuthDialog', () => {
     document.querySelector('#auth-username').value = 'newuser';
     document.querySelector('#auth-pass').value = 'pass123';
     document.querySelector('#auth-name').value = 'New Player';
+    document.querySelector('#auth-email').value = 'newuser@example.com';
     document.querySelector('#auth-modal-form').dispatchEvent(new Event('submit', { cancelable: true }));
 
     const result = await promise;
@@ -300,6 +331,7 @@ describe('showAuthDialog', () => {
       username: 'newuser',
       password: 'pass123',
       playerName: 'New Player',
+      email: 'newuser@example.com',
     });
     expect(PB_API.auth.login).toHaveBeenCalledWith('newuser', 'pass123');
   });
@@ -317,6 +349,7 @@ describe('showAuthDialog', () => {
     document.querySelector('#auth-username').value = 'claimer';
     document.querySelector('#auth-pass').value = 'pass';
     document.querySelector('#auth-name').value = 'Claimer';
+    document.querySelector('#auth-email').value = 'claimer@example.com';
     document.querySelector('#auth-modal-form').dispatchEvent(new Event('submit', { cancelable: true }));
 
     // Wait for the confirm dialog to appear
@@ -336,6 +369,7 @@ describe('showAuthDialog', () => {
       username: 'claimer',
       password: 'pass',
       playerName: 'Claimer',
+      email: 'claimer@example.com',
       confirmClaim: true,
     });
   });

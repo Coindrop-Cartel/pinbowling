@@ -41,6 +41,10 @@ export async function initPlayersPage() {
   const playerNameInput = document.getElementById('player-name');
   const ifpaIdInput = document.getElementById('ifpa-id');
   const matchplayIdInput = document.getElementById('matchplay-id');
+  const usernameRow = document.getElementById('player-username-row');
+  const usernameInput = document.getElementById('player-username');
+  const emailRow = document.getElementById('player-email-row');
+  const emailInput = document.getElementById('player-email');
   const savePlayerButton = document.getElementById('save-player-button');
 
   const playerList = document.getElementById('player-list');
@@ -130,6 +134,8 @@ export async function initPlayersPage() {
 
         const contentHtml = `
           <div class="content-muted-col">
+            ${p.username ? `<div><strong>Username:</strong> ${escapeHTML(p.username)}</div>` : ''}
+            ${p.email ? `<div><strong>Email:</strong> ${escapeHTML(p.email)}</div>` : ''}
             ${p.ifpaId ? `<div><strong>IFPA ID:</strong> ${escapeHTML(p.ifpaId)}</div>` : ''}
             ${p.matchplayId ? `<div><strong>MatchPlay ID:</strong> ${escapeHTML(p.matchplayId)}</div>` : ''}
             ${!p.ifpaId && !p.matchplayId ? '<div class="muted-italic">No external IDs linked.</div>' : ''}
@@ -200,6 +206,16 @@ export async function initPlayersPage() {
     playerNameInput.value = '';
     ifpaIdInput.value = '';
     matchplayIdInput.value = '';
+    if (usernameRow) usernameRow.classList.add('hidden');
+    if (usernameInput) {
+      usernameInput.value = '';
+      usernameInput.disabled = false;
+    }
+    if (emailRow) emailRow.classList.add('hidden');
+    if (emailInput) {
+      emailInput.value = '';
+      emailInput.disabled = false;
+    }
     if (playerFormTitle) playerFormTitle.textContent = 'Add New Player';
     savePlayerButton.textContent = 'Save Player';
     
@@ -242,6 +258,26 @@ export async function initPlayersPage() {
     
     ifpaIdInput.value = player.ifpaId || '';
     matchplayIdInput.value = player.matchplayId || '';
+    
+    const hasAccount = !!player.userId;
+    if (hasAccount) {
+      if (usernameRow) usernameRow.classList.remove('hidden');
+      if (usernameInput) {
+        usernameInput.value = player.username || '';
+        usernameInput.disabled = !hasElevatedPrivileges && !isSelf;
+      }
+      if (emailRow) emailRow.classList.remove('hidden');
+      if (emailInput) {
+        emailInput.value = player.email || '';
+        emailInput.disabled = !hasElevatedPrivileges && !isSelf;
+      }
+    } else {
+      if (usernameRow) usernameRow.classList.add('hidden');
+      if (usernameInput) usernameInput.value = '';
+      if (emailRow) emailRow.classList.add('hidden');
+      if (emailInput) emailInput.value = '';
+    }
+
     if (playerFormTitle) playerFormTitle.textContent = `Edit Player: ${player.playerName}`;
     savePlayerButton.textContent = 'Update Player';
     if (ifpaRow) ifpaRow.classList.remove('hidden');
@@ -251,7 +287,6 @@ export async function initPlayersPage() {
     createToggle.classList.replace('mt-10', 'mt-0');
     actionsRow.appendChild(createToggle);
 
-    const hasAccount = !!player.userId;
     resetPassBtn.classList.toggle('hidden', !hasAccount || !hasElevatedPrivileges);
     changeRoleBtn.classList.toggle('hidden', !hasAccount || !hasElevatedPrivileges);
 
@@ -305,6 +340,8 @@ export async function initPlayersPage() {
     const name = playerNameInput.value.trim();
     const ifpaId = ifpaIdInput.value.trim() || null;
     const matchplayId = matchplayIdInput.value.trim() || null;
+    const username = usernameInput ? usernameInput.value.trim() : '';
+    const email = emailInput ? emailInput.value.trim() : '';
 
     if (!name) return;
 
@@ -320,7 +357,9 @@ export async function initPlayersPage() {
     const payload = { 
       playerName: name, 
       ifpaId: ifpaId, 
-      matchplayId: matchplayId
+      matchplayId: matchplayId,
+      username: username || null,
+      email: email || null
     };
 
     savePlayerButton.disabled = true;

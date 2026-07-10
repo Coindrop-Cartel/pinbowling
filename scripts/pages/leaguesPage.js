@@ -90,7 +90,7 @@ export async function initLeaguesPage() {
     eventFormatInput.onchange = () => applyPreferredTheme(eventFormatInput.value);
   }
 
-  const actionsRow = createBtn.closest('.form-actions');
+  const actionsRow = createBtn?.closest('.form-actions');
   
   // Initially hide the creation fields
   if (dateRow) dateRow.classList.add('hidden');

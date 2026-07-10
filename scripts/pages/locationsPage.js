@@ -16,6 +16,11 @@ import { requireAdmin } from '@services/auth.js';
  * @returns {Promise<void>}
  */
 export async function initLocationsPage() {
+  const currentUser = await PB_API.auth.me();
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const isTD = currentUser && currentUser.role === 'td';
+  const hasElevatedPrivileges = isAdmin || isTD;
+
   const form = document.getElementById('location-form');
   const editingIdInput = document.getElementById('editing-location-id');
   const list = document.getElementById('locations-list');
@@ -31,7 +36,7 @@ export async function initLocationsPage() {
   const cityStateContainer = document.getElementById('location-city-state-row');
 
   // Setup "Create Location" toggle behavior
-  const actionsRow = saveBtn.closest('.form-actions');
+  const actionsRow = saveBtn?.closest('.form-actions');
   if (cityStateContainer) cityStateContainer.classList.add('hidden');
   if (actionsRow) actionsRow.classList.add('hidden');
 
@@ -42,6 +47,11 @@ export async function initLocationsPage() {
   nameInput.after(createToggle);
 
   if (saveBtn) saveBtn.classList.add('btn-mgmt');
+
+  if (!currentUser) {
+    if (createToggle) createToggle.classList.add('hidden');
+    if (form) form.closest('.card').classList.add('hidden');
+  }
 
   createToggle.onclick = () => {
     if (!cityStateContainer) return;
@@ -90,16 +100,18 @@ export async function initLocationsPage() {
               <small>Machines: (${loc.machines?.length || 0})</small>
             </h3>
             <div class="action-buttons">
-              <button class="edit-loc-btn secondary btn-row">Edit</button>
-              <button class="delete-loc-btn btn-row">Delete</button>
+              ${currentUser ? `<button class="edit-loc-btn secondary btn-row">Edit</button>` : ''}
+              ${isAdmin ? `<button class="delete-loc-btn btn-row">Delete</button>` : ''}
             </div>
           </div>
         `;
 
         const contentHtml = `
+          ${currentUser ? `
           <div class="mb-15">
             <button class="add-mach-btn secondary btn-row">Add Machine to Venue</button>
           </div>
+          ` : ''}
           <div class="league-details-columns columns-wrap">
             <div class="machines-list flex-1 min-250" id="mach-for-loc-${loc.id}">
               <div class="mach-list-inner"></div>
@@ -120,9 +132,14 @@ export async function initLocationsPage() {
           }
         });
 
-        row.querySelector('.edit-loc-btn').onclick = (e) => { e.stopPropagation(); editLocation(loc.id); };
-        row.querySelector('.delete-loc-btn').onclick = (e) => { e.stopPropagation(); deleteLocation(loc.id); };
-        row.querySelector('.add-mach-btn').onclick = (e) => { e.stopPropagation(); showMachineForm(loc.id, loc.name); };
+        const editBtn = row.querySelector('.edit-loc-btn');
+        if (editBtn) editBtn.onclick = (e) => { e.stopPropagation(); editLocation(loc.id); };
+        
+        const deleteBtn = row.querySelector('.delete-loc-btn');
+        if (deleteBtn) deleteBtn.onclick = (e) => { e.stopPropagation(); deleteLocation(loc.id); };
+        
+        const addMachBtn = row.querySelector('.add-mach-btn');
+        if (addMachBtn) addMachBtn.onclick = (e) => { e.stopPropagation(); showMachineForm(loc.id, loc.name); };
 
         renderMachinesForLocation(loc.id, loc.name, loc.machines);
       });
@@ -270,17 +287,22 @@ export async function initLocationsPage() {
           ${scoreLines}
         </span>
         <div class="small-action-buttons">
-          <button class="edit-mach-btn secondary btn-row">Edit</button>
-          <button class="remove-mach-btn btn-row">Remove</button>
+          ${currentUser ? `<button class="edit-mach-btn secondary btn-row">Edit</button>` : ''}
+          ${hasElevatedPrivileges ? `<button class="remove-mach-btn btn-row">Remove</button>` : ''}
         </div>
       `;
-      item.querySelector('.edit-mach-btn').onclick = () => showMachineForm(locationId, locationName, m);
-      item.querySelector('.remove-mach-btn').onclick = async () => {
-        if (await showConfirm(`Remove ${m.machineName} from this location?`, 'Remove Machine')) {
-          await PB_API.locations.removeMachine(locationId, m.machineId);
-          renderLocations();
-        }
-      };
+      const editBtn = item.querySelector('.edit-mach-btn');
+      if (editBtn) editBtn.onclick = () => showMachineForm(locationId, locationName, m);
+      
+      const removeBtn = item.querySelector('.remove-mach-btn');
+      if (removeBtn) {
+        removeBtn.onclick = async () => {
+          if (await showConfirm(`Remove ${m.machineName} from this location?`, 'Remove Machine')) {
+            await PB_API.locations.removeMachine(locationId, m.machineId);
+            renderLocations();
+          }
+        };
+      }
       inner.appendChild(item);
     });
   }
@@ -435,10 +457,7 @@ export async function initLocationsPage() {
     const state = stateInput.value.trim();
 
     if (!locationName) return;
-
-    if (!await requireAdmin(`Enter Admin Password to ${id ? 'update' : 'create'} location "${locationName}":`)) {
-      return;
-    }
+    if (!currentUser) return;
 
     const payload = { name: locationName, city, state };
 

@@ -199,6 +199,7 @@ export const showAuthDialog = () => {
       const isLogin = mode === 'login';
       card.querySelector('h2').textContent = isLogin ? 'Login' : 'Create Account';
       
+      const authPassEl = card.querySelector('#auth-pass');
       let nameRow = card.querySelector('#auth-name-row');
       if (isLogin && nameRow) {
         nameRow.remove();
@@ -207,7 +208,28 @@ export const showAuthDialog = () => {
         row.className = 'form-row';
         row.id = 'auth-name-row';
         row.innerHTML = '<label>Player Name</label><input type="text" id="auth-name" class="modal-input">';
-        card.querySelector('#auth-pass').closest('.form-row').after(row);
+        authPassEl?.closest('.form-row')?.after(row);
+      }
+
+      let emailRow = card.querySelector('#auth-email-row');
+      if (isLogin && emailRow) {
+        emailRow.remove();
+      } else if (!isLogin && !emailRow) {
+        const row = document.createElement('div');
+        row.className = 'form-row';
+        row.id = 'auth-email-row';
+        row.innerHTML = '<label>Email Address</label><input type="email" id="auth-email" class="modal-input">';
+        const currentNameRow = card.querySelector('#auth-name-row');
+        if (currentNameRow) {
+          currentNameRow.after(row);
+        } else {
+          authPassEl?.closest('.form-row')?.after(row);
+        }
+      }
+
+      let forgotBtn = card.querySelector('#auth-forgot');
+      if (forgotBtn) {
+        forgotBtn.style.display = isLogin ? 'inline-block' : 'none';
       }
 
       card.querySelector('button[type="submit"]').textContent = isLogin ? 'Login' : 'Register';
@@ -216,10 +238,11 @@ export const showAuthDialog = () => {
 
     const contentHtml = `
       <form id="auth-modal-form">
-        <div class="form-row"><label>Username</label><input type="text" id="auth-username" class="modal-input" required></div>
+        <div class="form-row"><label>Username or Email</label><input type="text" id="auth-username" class="modal-input" required></div>
         <div class="form-row"><label>Password</label><input type="password" id="auth-pass" class="modal-input" required></div>
         <div class="modal-actions mt-20">
           <button type="submit">Login</button>
+          <button type="button" id="auth-forgot" class="btn-link-auth">Forgot password?</button>
           <button type="button" id="auth-switch" class="btn-link-auth">Need an account? Register now</button>
           <button type="button" id="auth-cancel" class="secondary">Cancel</button>
         </div>
@@ -231,21 +254,38 @@ export const showAuthDialog = () => {
     
     card.querySelector('#auth-switch').onclick = () => { mode = (mode === 'login' ? 'register' : 'login'); updateUI(card); };
     card.querySelector('#auth-cancel').onclick = () => close(null, resolve);
+    
+    const forgotBtn = card.querySelector('#auth-forgot');
+    if (forgotBtn) {
+      forgotBtn.onclick = async () => {
+        close(null, resolve);
+        const email = await showPrompt('Enter your email address to receive a password reset link:', 'Forgot Password', false);
+        if (email) {
+          try {
+            await PB_API.auth.forgotPassword(email);
+            showAlert('If that email is registered, a password reset link has been sent to it. Please check your inbox (and spam folder) or the developer logs.', 'Reset Link Sent');
+          } catch (err) {
+            showAlert(err.message, 'Error');
+          }
+        }
+      };
+    }
 
     form.onsubmit = async (e) => {
       e.preventDefault();
       const username = card.querySelector('#auth-username').value;
       const password = card.querySelector('#auth-pass').value;
       const playerName = card.querySelector('#auth-name')?.value;
+      const email = card.querySelector('#auth-email')?.value || null;
       try {
         let user;
         if (mode === 'login') {
           user = await PB_API.auth.login(username, password);
         } else {
-          let reg = await PB_API.auth.register({ username, password, playerName });
+          let reg = await PB_API.auth.register({ username, password, playerName, email });
           if (reg.claimRequired) {
             if (await showConfirm(reg.message, 'Claim Profile')) {
-              reg = await PB_API.auth.register({ username, password, playerName, confirmClaim: true });
+              reg = await PB_API.auth.register({ username, password, playerName, email, confirmClaim: true });
             } else return;
           }
           user = await PB_API.auth.login(username, password);
