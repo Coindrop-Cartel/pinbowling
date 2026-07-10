@@ -44,10 +44,10 @@ const ROLE_PERMISSIONS = {
  */
 const NAV_PERMISSIONS = {
   '#nav-leagues': null, // Visible to all; internal actions restricted by role
-  '#nav-machines': PERMISSIONS.MANAGE_MACHINES,
+  '#nav-machines': PERMISSIONS.CREATE_SESSION,
   '#nav-locations': PERMISSIONS.JOIN_SESSION, // Visible to any registered user
   '#nav-players': PERMISSIONS.JOIN_SESSION,   // Visible to any registered user
-  '#nav-teams': PERMISSIONS.MANAGE_TEAMS,
+  '#nav-teams': PERMISSIONS.CREATE_SESSION,
   '#nav-maintenance': PERMISSIONS.RUN_CLEANUP
 };
 
@@ -205,8 +205,8 @@ function updateAuthUI(user) {
       }
     });
 
-    // Hide the entire "Admin" dropdown if the user has no accessible sub-items or is not management (admin/td)
-    adminNav.classList.toggle('hidden', visibleChildren === 0 || !user || (role !== 'admin' && role !== 'td'));
+    // Hide the entire "Admin" dropdown if the user has no accessible sub-items or is not management (admin/td/player)
+    adminNav.classList.toggle('hidden', visibleChildren === 0 || !user || (role !== 'admin' && role !== 'td' && role !== 'player'));
   }
 
   // State-Keyed Rendering Guard:

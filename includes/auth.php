@@ -113,10 +113,3 @@ function validateSessionOrSecret() {
     }
     sendJson(['error' => 'Unauthorized: Invalid or missing authentication'], 401);
 }
-
-/**
- * Backward compatibility alias for validateSessionOrSecret.
- */
-function validateApiSecret() {
-    validateSessionOrSecret();
-}

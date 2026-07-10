@@ -1,136 +1,292 @@
 <?php
-/**
- * Location Management REST API Endpoint.
- * HTTP controller that delegates to the LocationService class.
- */
 
-require_once __DIR__ . '/../includes/bootstrap.php';
+namespace App\Service;
 
-try {
-    $container = $GLOBALS['container'];
-    $locationService = $container->get(\App\Service\LocationService::class);
-    
-    $method = $_SERVER['REQUEST_METHOD'];
-    $task = $_GET['task'] ?? 'location';
-    $input = getJsonInput();
+class LocationService {
+    private DatabaseService $db;
 
-    // GET: Retrieve locations or machines
-    if ($method === 'GET') {
-        if ($task === 'units') {
-            // Get machines at locations
-            $locationId = isset($_GET['locationId']) ? (int)$_GET['locationId'] : null;
-            $machines = $locationService->getLocationMachines($locationId);
-            sendJson(serializeLocationMachinesGrouped($machines));
-        } else {
-            $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
-            if ($id) {
-                $location = $locationService->getLocation($id);
-                if ($location) {
-                    sendJson(serializeLocation($location));
-                } else {
-                    sendJson(['error' => 'Location not found'], 404);
-                }
-            } else {
-                $locations = $locationService->getAllLocations();
-                sendJson(array_map('serializeLocation', $locations));
-            }
-        }
+    public function __construct(DatabaseService $db) {
+        $this->db = $db;
     }
 
-    // POST: Create location or add machine
-    if ($method === 'POST') {
-        if ($task === 'units') {
-            // Add machine to location
-            if (empty($input['locationId']) || empty($input['machineId'])) {
-                sendJson(['error' => 'locationId and machineId are required'], 400);
-            }
-            
-            $user = \App\Service\AuthService::getCurrentUser();
-            $isPlayer = $user && in_array($user['role'], ['player', 'td', 'admin']);
-            if (!$isPlayer) validateTDAccess();
-            
-            $allowed = ['format', 'note', 'target_easy', 'target_med', 'target_hard'];
-            $data = array_intersect_key($input, array_flip($allowed));
-            $locationService->addMachineToLocation(
-                (int)$input['locationId'],
-                (int)$input['machineId'],
-                $data
+    /**
+     * Get all locations with their machines.
+     *
+     * @return array
+     */
+    public function getAllLocations(): array {
+        $pdo = $this->db->getPdo();
+        
+        $stmt = $pdo->query('SELECT * FROM locations ORDER BY name ASC');
+        $locations = $stmt->fetchAll();
+
+        $machinesStmt = $pdo->query(
+            'SELECT lm.*, m.machine_name, lms.target_easy, lms.target_med, lms.target_hard, lms.format
+             FROM location_machines lm 
+             JOIN machines m ON lm.machine_id = m.id 
+             LEFT JOIN location_machine_scores lms ON lms.location_machine_id = lm.id
+             ORDER BY lm.location_id ASC'
+        );
+        $allMachines = $machinesStmt->fetchAll();
+
+        $machinesByLocation = [];
+        foreach ($allMachines as $mach) {
+            $machinesByLocation[(int)$mach['location_id']][] = $mach;
+        }
+
+        foreach ($locations as &$loc) {
+            $loc['machines'] = $machinesByLocation[(int)$loc['id']] ?? [];
+        }
+
+        return $locations;
+    }
+
+    /**
+     * Get a specific location with its machines.
+     *
+     * @param int $locationId
+     * @return array|false
+     */
+    public function getLocation(int $locationId) {
+        $pdo = $this->db->getPdo();
+        
+        $stmt = $pdo->prepare('SELECT * FROM locations WHERE id = ?');
+        $stmt->execute([$locationId]);
+        $location = $stmt->fetch();
+        
+        if (!$location) {
+            return false;
+        }
+
+        $stmt = $pdo->prepare(
+            'SELECT lm.*, m.machine_name, lms.target_easy, lms.target_med, lms.target_hard, lms.format
+             FROM location_machines lm 
+             JOIN machines m ON lm.machine_id = m.id 
+             LEFT JOIN location_machine_scores lms ON lms.location_machine_id = lm.id
+             WHERE lm.location_id = ?'
+        );
+        $stmt->execute([$locationId]);
+        $location['machines'] = $stmt->fetchAll();
+
+        return $location;
+    }
+
+    /**
+     * Get machines at a specific location.
+     *
+     * @param int|null $locationId Optional location filter
+     * @return array
+     */
+    public function getLocationMachines(?int $locationId = null): array {
+        $pdo = $this->db->getPdo();
+        
+        if ($locationId) {
+            $stmt = $pdo->prepare(
+                'SELECT lm.*, m.machine_name, lms.target_easy, lms.target_med, lms.target_hard, lms.format
+                 FROM location_machines lm 
+                 JOIN machines m ON lm.machine_id = m.id 
+                 LEFT JOIN location_machine_scores lms ON lms.location_machine_id = lm.id
+                 WHERE lm.location_id = ?'
             );
-            sendJson(['success' => true]);
+            $stmt->execute([$locationId]);
         } else {
-            // Create new location
-            if (empty($input['name'])) {
-                sendJson(['error' => 'name is required'], 400);
-            }
-            
-            $currentUser = \App\Service\AuthService::getCurrentUser();
-            if (!$currentUser || !in_array($currentUser['role'], ['admin', 'td', 'player'])) {
-                sendJson(['error' => 'Unauthorized to add locations'], 403);
-            }
-            
-            $location = $locationService->createLocation(
-                $input['name'],
-                $input['city'] ?? null,
-                $input['state'] ?? null
+            $stmt = $pdo->query(
+                'SELECT lm.*, m.machine_name, lms.target_easy, lms.target_med, lms.target_hard, lms.format
+                 FROM location_machines lm 
+                 JOIN machines m ON lm.machine_id = m.id 
+                 LEFT JOIN location_machine_scores lms ON lms.location_machine_id = lm.id
+                 ORDER BY lm.location_id ASC'
             );
-            sendJson(serializeLocation($location), 201);
+        }
+        
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Create a new location.
+     *
+     * @param string $name
+     * @param string|null $address
+     * @param string|null $city
+     * @param string|null $state
+     * @return array Created location data
+     */
+    public function createLocation(string $name, ?string $city = null, ?string $state = null): array {
+        $pdo = $this->db->getPdo();
+        
+        $stmt = $pdo->prepare(
+            'INSERT INTO locations (name, city, state) VALUES (?, ?, ?)'
+        );
+        $stmt->execute([$name, $city, $state]);
+        
+        return $this->getLocation((int)$pdo->lastInsertId());
+    }
+
+    /**
+     * Update a location.
+     *
+     * @param int $locationId
+     * @param array $data
+     * @return array Updated location
+     */
+    public function updateLocation(int $locationId, array $data): array {
+        $pdo = $this->db->getPdo();
+        $allowed = ['name', 'city', 'state'];
+        
+        $fields = [];
+        $params = [];
+        
+        foreach ($data as $key => $value) {
+            if (in_array($key, $allowed)) {
+                $fields[] = "$key = ?";
+                $params[] = $value;
+            }
+        }
+        
+        if (!empty($fields)) {
+            $params[] = $locationId;
+            $sql = "UPDATE locations SET " . implode(", ", $fields) . " WHERE id = ?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+        }
+        
+        return $this->getLocation($locationId);
+    }
+
+    /**
+     * Delete a location.
+     *
+     * @param int $locationId
+     * @return bool
+     */
+    public function deleteLocation(int $locationId): bool {
+        $pdo = $this->db->getPdo();
+        
+        try {
+            $pdo->beginTransaction();
+            
+            // Delete location machines first
+            $stmt = $pdo->prepare('DELETE FROM location_machines WHERE location_id = ?');
+            $stmt->execute([$locationId]);
+            
+            // Delete the location
+            $stmt = $pdo->prepare('DELETE FROM locations WHERE id = ?');
+            $result = $stmt->execute([$locationId]);
+            
+            $pdo->commit();
+            return $result;
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
     }
 
-    // PUT: Update location or location machine
-    if ($method === 'PUT') {
-        $currentUser = \App\Service\AuthService::getCurrentUser();
-        if (!$currentUser || !in_array($currentUser['role'], ['admin', 'td', 'player'])) {
-            sendJson(['error' => 'Unauthorized to update locations/machines'], 403);
+    /**
+     * Add a machine to a location.
+     *
+     * @param int $locationId
+     * @param int $machineId
+     * @param array $data Optional extra fields (target_easy, target_med, target_hard, etc.)
+     * @return bool
+     */
+    public function addMachineToLocation(int $locationId, int $machineId, array $data = []): bool {
+        $pdo = $this->db->getPdo();
+        $allowed = ['note'];
+
+        $cols = ['location_id', 'machine_id'];
+        $placeholders = ['?', '?'];
+        $params = [$locationId, $machineId];
+
+        foreach ($data as $key => $value) {
+            if (in_array($key, $allowed)) {
+                $cols[] = "`$key`";
+                $placeholders[] = '?';
+                $params[] = $value;
+            }
         }
 
-        if ($task === 'units') {
-            if (empty($input['locationId']) || empty($input['machineId'])) {
-                sendJson(['error' => 'locationId and machineId are required'], 400);
-            }
-            $allowed = ['format', 'note', 'target_easy', 'target_med', 'target_hard'];
-            $data = array_intersect_key($input, array_flip($allowed));
-            $locationService->updateLocationMachine((int)$input['locationId'], (int)$input['machineId'], $data);
-            sendJson(['success' => true]);
-        } else {
-            $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-            if (!$id) {
-                sendJson(['error' => 'id query parameter is required'], 400);
-            }
-            $location = $locationService->updateLocation($id, $input);
-            sendJson(serializeLocation($location));
-        }
-    }
+        $sql = 'INSERT INTO location_machines (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
+        $stmt = $pdo->prepare($sql);
+        $result = $stmt->execute($params);
 
-    // DELETE: Remove location or machine
-    if ($method === 'DELETE') {
-        if ($task === 'units') {
-            // Remove machine from location
-            if (empty($_GET['locationId']) || empty($_GET['machineId'])) {
-                sendJson(['error' => 'locationId and machineId are required'], 400);
-            }
-            
-            validateTDAccess();
-            
-            $locationService->removeMachineFromLocation(
-                (int)$_GET['locationId'],
-                (int)$_GET['machineId']
+        if ($result) {
+            $locationMachineId = (int)$pdo->lastInsertId();
+            $format = $data['format'] ?? 'bowling';
+            $targetEasy = (int)($data['target_easy'] ?? 0);
+            $targetMed = (int)($data['target_med'] ?? 0);
+            $targetHard = (int)($data['target_hard'] ?? 0);
+
+            $scoreStmt = $pdo->prepare(
+                'INSERT INTO location_machine_scores (location_machine_id, format, target_easy, target_med, target_hard) VALUES (?, ?, ?, ?, ?)'
             );
-            sendJson(['success' => true]);
-        } else {
-            // Delete location
-            validateAdminAccess();
-            
-            $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-            if (!$id) {
-                sendJson(['error' => 'id query parameter is required'], 400);
-            }
-            
-            $locationService->deleteLocation($id);
-            sendJson(['success' => true]);
+            $scoreStmt->execute([$locationMachineId, $format, $targetEasy, $targetMed, $targetHard]);
         }
+
+        return $result;
     }
 
-} catch (Exception $e) {
-    sendJson(['error' => $e->getMessage()], 500);
+    /**
+     * Update target scores for a machine at a location.
+     *
+     * @param int $locationId
+     * @param int $machineId
+     * @param array $data
+     * @return bool
+     */
+    public function updateLocationMachine(int $locationId, int $machineId, array $data): bool {
+        $pdo = $this->db->getPdo();
+        $allowed = ['note'];
+
+        $fields = [];
+        $params = [];
+        foreach ($data as $key => $value) {
+            if (in_array($key, $allowed)) {
+                $fields[] = "`$key` = ?";
+                $params[] = $value;
+            }
+        }
+
+        if (!empty($fields)) {
+            $params[] = $locationId;
+            $params[] = $machineId;
+            $sql = "UPDATE location_machines SET " . implode(', ', $fields) . " WHERE location_id = ? AND machine_id = ?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+        }
+
+        // Upsert scores into location_machine_scores
+        $format = $data['format'] ?? 'bowling';
+        $targetEasy = (int)($data['target_easy'] ?? 0);
+        $targetMed = (int)($data['target_med'] ?? 0);
+        $targetHard = (int)($data['target_hard'] ?? 0);
+
+        $idStmt = $pdo->prepare('SELECT id FROM location_machines WHERE location_id = ? AND machine_id = ?');
+        $idStmt->execute([$locationId, $machineId]);
+        $lmRow = $idStmt->fetch();
+        if ($lmRow) {
+            $locationMachineId = (int)$lmRow['id'];
+            $scoreStmt = $pdo->prepare(
+                'INSERT INTO location_machine_scores (location_machine_id, format, target_easy, target_med, target_hard) VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE target_easy = VALUES(target_easy), target_med = VALUES(target_med), target_hard = VALUES(target_hard)'
+            );
+            $scoreStmt->execute([$locationMachineId, $format, $targetEasy, $targetMed, $targetHard]);
+        }
+
+        return true;
+    }
+
+    /**
+     * Remove a machine from a location.
+     *
+     * @param int $locationId
+     * @param int $machineId
+     * @return bool
+     */
+    public function removeMachineFromLocation(int $locationId, int $machineId): bool {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare('DELETE FROM location_machines WHERE location_id = ? AND machine_id = ?');
+        return $stmt->execute([$locationId, $machineId]);
+    }
 }

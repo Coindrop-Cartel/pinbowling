@@ -264,11 +264,13 @@ describe('Auth Service (auth.js)', () => {
       expect(PB_API.auth.me.mock.calls.length).toBe(callCount);
     });
 
-    it('should hide admin nav when user has no accessible sub-items (player)', async () => {
+    it('should reveal admin navigation but hide maintenance for players', async () => {
       PB_API.auth.me.mockResolvedValue({ id: 1, role: 'player', player_name: 'Player' });
       await initAuthHeader();
       const adminNav = document.getElementById('admin-nav-item');
-      expect(adminNav.classList.contains('hidden')).toBe(true);
+      expect(adminNav.classList.contains('hidden')).toBe(false);
+      const maintenance = document.getElementById('nav-maintenance');
+      expect(maintenance.classList.contains('hidden')).toBe(true);
     });
 
     it('should hide admin nav when user is null', async () => {

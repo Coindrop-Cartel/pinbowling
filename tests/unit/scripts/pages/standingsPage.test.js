@@ -258,4 +258,108 @@ describe('Standings Page (standingsPage.js)', () => {
     
     expect(clearIntervalSpy).toHaveBeenCalled();
   });
+
+  it('should handle TV mode Escape keydown, visibility change, and requestFullscreen error', async () => {
+    getActiveLeagueId.mockReturnValue('1');
+    getActiveEventId.mockReturnValue('101');
+    PB_API.leagues.getAll.mockResolvedValue([{ id: '1', name: 'L1', events: [{ id: '101' }] }]);
+
+    // Mock fullscreen throwing error
+    const err = new Error('Fullscreen denied');
+    const originalRequestFullscreen = document.documentElement.requestFullscreen;
+    document.documentElement.requestFullscreen = vi.fn().mockRejectedValue(err);
+
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await initStandingsPage();
+
+    const tvBtn = document.getElementById('tv-mode-btn');
+    tvBtn.click(); // Enter TV mode
+
+    await vi.waitFor(() => {
+      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Fullscreen request deferred or denied'), 'Fullscreen denied');
+    });
+
+    // Press Escape to exit TV mode
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.body.classList.contains('tv-mode-active')).toBe(false);
+
+    // Restore
+    document.documentElement.requestFullscreen = originalRequestFullscreen;
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('should handle Select All and Clear All inside the player filter dialog', async () => {
+    const players = [
+      { id: '1', playerName: 'Alice' },
+      { id: '2', playerName: 'Bob' }
+    ];
+    getActiveLeagueId.mockReturnValue('1');
+    getActiveEventId.mockReturnValue('101');
+    PB_API.leagues.getAll.mockResolvedValue([{ id: '1', name: 'L1', players, events: [{ id: '101' }] }]);
+
+    await initStandingsPage();
+
+    const { showDialog } = await import('@ui/dialogs.js');
+    const showDialogMock = vi.mocked(showDialog).mockResolvedValue(true);
+
+    const calls = vi.mocked(renderActionSummary).mock.calls;
+    const filterAction = calls.find(c => c[1].includes('Showing Everyone'))[2][0];
+    
+    await filterAction.onclick();
+
+    const dialogArgs = showDialogMock.mock.calls[0][0];
+    const container = dialogArgs.customElement;
+
+    const selectAllBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'Select All');
+    const clearAllBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'Clear All');
+
+    selectAllBtn.click();
+    container.querySelectorAll('input[type="checkbox"]').forEach(i => expect(i.checked).toBe(true));
+
+    clearAllBtn.click();
+    container.querySelectorAll('input[type="checkbox"]').forEach(i => expect(i.checked).toBe(false));
+  });
+
+  it('should handle matchup description for baseball engine in league summary', async () => {
+    const { getScoringEngine } = await import('@core/engine.js');
+    vi.mocked(getScoringEngine).mockImplementationOnce(() => ({
+      getTurnHeaderPrefix: vi.fn(() => 'I'),
+      calculateTurnResults: vi.fn(() => ({
+        turnResults: [{ orderNumber: 1, displayMark: '3R', displayRoundTotal: 3, played: true }],
+        total: 3,
+        totalDisplay: '3R',
+      })),
+      getRoundLabel: vi.fn(() => 'Inning'),
+      getThresholdSort: vi.fn(() => (a, b) => b[0] - a[0]),
+      compareScores: vi.fn((a, b) => b - a),
+      getTotalColumnLabel: vi.fn(() => 'Runs'),
+      formatTotalScore: vi.fn((total) => String(total)),
+      getMarkFormatting: vi.fn(() => ''),
+      formatMark: vi.fn((turn) => turn.mark),
+      shouldShowRoundScore: vi.fn(() => true),
+      getMatchupDescription: vi.fn(() => ({ description: 'Head to Head' })),
+      buildPlayerScoreMap: vi.fn(() => ({})),
+    }));
+
+    getActiveLeagueId.mockReturnValue('1');
+    getActiveEventId.mockReturnValue('summary');
+    PB_API.leagues.getAll.mockResolvedValue([{ 
+      id: '1', name: 'L1', players: [{ id: '7', playerName: 'Kyle' }], events: [{ id: '101', eventName: 'W1' }]
+    }]);
+    PB_API.machines.getTargets.mockResolvedValue([{ eventId: '101', orderNumber: 1, machineName: 'M1' }]);
+    PB_API.scores.get.mockResolvedValue([]);
+
+    await initStandingsPage();
+
+    expect(document.getElementById('tv-title').textContent).toContain('Season Summary');
+  });
+
+  it('should reset UI when no event is selected on refresh', async () => {
+    getActiveLeagueId.mockReturnValue('');
+    getActiveEventId.mockReturnValue('');
+    PB_API.leagues.getAll.mockResolvedValue([]);
+    await initStandingsPage();
+    expect(document.getElementById('standings-wrapper').classList.contains('hidden')).toBe(true);
+  });
 });

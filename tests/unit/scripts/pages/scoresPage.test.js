@@ -22,6 +22,8 @@ vi.mock('@services/api.js', () => ({
 vi.mock('@scripts/utils.js', () => ({
   getActiveEventId: vi.fn(),
   getActiveLeagueId: vi.fn(),
+  setActiveEventId: vi.fn(),
+  setActiveLeagueId: vi.fn(),
   getCurrentPlayerId: vi.fn(),
   setCurrentPlayerId: vi.fn(),
   setCurrentPlayerIdSilent: vi.fn(),
@@ -164,4 +166,162 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
     expect(document.getElementById('rounds-input').children.length).toBe(1);
   });
 
+  it('should handle tournament change and player change actions', async () => {
+    Utils.getCurrentPlayerId.mockReturnValue('20');
+    PB_API.players.getAll.mockResolvedValue([{ id: 20, playerName: 'Alice' }]);
+    
+    await initScoresPage();
+
+    // Verify tournament summary click/action triggers tournament change
+    const tourSummary = document.getElementById('tournament-summary');
+    expect(tourSummary._actions).toBeDefined();
+    const changeTourAction = tourSummary._actions.find(a => a.text === 'Change');
+    expect(changeTourAction).toBeDefined();
+    changeTourAction.onclick();
+    expect(document.getElementById('tournament-selector-ui').classList.contains('hidden')).toBe(false);
+
+    // Verify player summary click/action triggers player change
+    const playSummary = document.getElementById('player-summary');
+    expect(playSummary._actions).toBeDefined();
+    const changePlayAction = playSummary._actions.find(a => a.text === 'Change');
+    expect(changePlayAction).toBeDefined();
+    changePlayAction.onclick();
+    expect(document.getElementById('player-selector-ui').classList.contains('hidden')).toBe(false);
+  });
+
+  it('should print blank score sheet when clicked', async () => {
+    await initScoresPage();
+    const tourSummary = document.getElementById('tournament-summary');
+    const printAction = tourSummary._actions.find(a => a.text === 'Print Blank Score Sheet');
+    expect(printAction).toBeDefined();
+    printAction.onclick();
+    expect(printBlankScoreSheet).toHaveBeenCalled();
+  });
+
+  it('should toggle target details when clicking round-info or target-details', async () => {
+    Utils.getCurrentPlayerId.mockReturnValue('20');
+    PB_API.players.getAll.mockResolvedValue([{ id: 20, playerName: 'Alice' }]);
+    await initScoresPage();
+
+    const infoDiv = document.querySelector('.round-info');
+    const detailsDiv = document.querySelector('.target-details');
+    expect(detailsDiv.classList.contains('hidden')).toBe(true);
+
+    // Click to show
+    infoDiv.click();
+    expect(detailsDiv.classList.contains('hidden')).toBe(false);
+
+    // Click to hide
+    detailsDiv.click();
+    expect(detailsDiv.classList.contains('hidden')).toBe(true);
+  });
+
+  it('should enable save button on input and handle successful save', async () => {
+    Utils.getCurrentPlayerId.mockReturnValue('20');
+    PB_API.players.getAll.mockResolvedValue([{ id: 20, playerName: 'Alice' }]);
+    PB_API.scores.save.mockResolvedValue({ success: true });
+    await initScoresPage();
+
+    const saveBtn = document.querySelector('.save-round-button');
+    const input = document.querySelector('.roll-input');
+    expect(saveBtn.disabled).toBe(true);
+
+    // Input score
+    input.value = '10000';
+    input.dispatchEvent(new Event('input'));
+    expect(saveBtn.disabled).toBe(false);
+    expect(saveBtn.classList.contains('is-dirty')).toBe(true);
+
+    // Save score
+    await saveBtn.click();
+    expect(PB_API.scores.save).toHaveBeenCalled();
+  });
+
+  it('should show alert warning when saving fails', async () => {
+    Utils.getCurrentPlayerId.mockReturnValue('20');
+    PB_API.players.getAll.mockResolvedValue([{ id: 20, playerName: 'Alice' }]);
+    PB_API.scores.save.mockRejectedValue(new Error('Save Failed'));
+    await initScoresPage();
+
+    const saveBtn = document.querySelector('.save-round-button');
+    const input = document.querySelector('.roll-input');
+
+    input.value = '10000';
+    input.dispatchEvent(new Event('input'));
+    await saveBtn.click();
+    expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Failed to save score: Save Failed'), 'Error');
+  });
+
+  it('should show setup warning when event has no machines', async () => {
+    PB_API.machines.getTargets.mockResolvedValue([]);
+    await initScoresPage();
+
+    expect(document.getElementById('player-warning').innerHTML).toContain('not been setup');
+  });
+
+  it('should render warning reason and lock input when access is denied', async () => {
+    Utils.getCurrentPlayerId.mockReturnValue('20');
+    PB_API.players.getAll.mockResolvedValue([{ id: 20, playerName: 'Alice' }]);
+    getScoreAccessLevel.mockResolvedValueOnce({ access: 'denied', reason: 'Time locked' });
+    await initScoresPage();
+
+    expect(document.querySelector('.round-msg').textContent).toBe('Time locked');
+    expect(document.querySelector('.save-round-button').hidden).toBe(true);
+  });
+
+  it('should handle API errors gracefully during init', async () => {
+    PB_API.leagues.getAll.mockRejectedValueOnce(new Error('API failure'));
+    PB_API.auth.me.mockRejectedValueOnce(new Error('Auth failure'));
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await initScoresPage();
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to fetch leagues'), expect.any(Object));
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('should reset event ID if virtual summary event is loaded', async () => {
+    Utils.getActiveLeagueId.mockReturnValue('1');
+    Utils.getActiveEventId.mockReturnValue('summary');
+    await initScoresPage();
+    expect(Utils.setActiveEventId).toHaveBeenCalledWith('');
+  });
+
+  it('should resolve and render player selection for team participant leagues', async () => {
+    Utils.getCurrentPlayerId.mockReturnValue('20');
+    PB_API.players.getAll.mockResolvedValue([
+      { id: 20, playerName: 'Alice' },
+      { id: 30, playerName: 'Bob' }
+    ]);
+    PB_API.leagues.getAll.mockResolvedValue([
+      {
+        id: 1,
+        participants: 'team',
+        teams: [
+          { id: 10, name: 'Team A', members: [{ id: 20, playerName: 'Alice' }] }
+        ],
+        events: [{ id: 101, eventName: 'Week 1' }]
+      }
+    ]);
+
+    await initScoresPage();
+
+    expect(document.getElementById('scoring-card').classList.contains('hidden')).toBe(false);
+  });
+
+  it('should lock inputs when certain balls are marked as locked', async () => {
+    Utils.getCurrentPlayerId.mockReturnValue('20');
+    PB_API.players.getAll.mockResolvedValue([{ id: 20, playerName: 'Alice' }]);
+    getScoreAccessLevel.mockResolvedValueOnce({
+      access: 'allowed',
+      reason: '',
+      lockedBalls: { ball1: true }
+    });
+
+    await initScoresPage();
+
+    const input1 = document.querySelector('[data-ball="1"]');
+    expect(input1.readOnly).toBe(true);
+    expect(input1.classList.contains('ball-locked')).toBe(true);
+  });
 });

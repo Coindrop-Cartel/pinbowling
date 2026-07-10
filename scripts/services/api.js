@@ -89,104 +89,104 @@ export async function fetchJSON(url, options = {}) {
  */
 export const PB_API = {
   auth: {
-    login: (username, password) => fetchJSON('service/authService.php?task=login', { method: 'POST', body: JSON.stringify({ username, password }) }),
-    logout: () => fetchJSON('service/authService.php?task=logout', { method: 'POST' }),
-    register: (data) => fetchJSON('service/authService.php?task=register', { method: 'POST', body: JSON.stringify(data) }),
-    me: () => fetchJSON('service/authService.php?task=me'),
-    forgotPassword: (email) => fetchJSON('service/authService.php?task=forgot', { method: 'POST', body: JSON.stringify({ email }) }),
-    resetWithToken: (token, password) => fetchJSON('service/authService.php?task=reset_with_token', { method: 'POST', body: JSON.stringify({ token, password }) }),
+    login: (username, password) => fetchJSON('api/auth.php?task=login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+    logout: () => fetchJSON('api/auth.php?task=logout', { method: 'POST' }),
+    register: (data) => fetchJSON('api/auth.php?task=register', { method: 'POST', body: JSON.stringify(data) }),
+    me: () => fetchJSON('api/auth.php?task=me'),
+    forgotPassword: (email) => fetchJSON('api/auth.php?task=forgot', { method: 'POST', body: JSON.stringify({ email }) }),
+    resetWithToken: (token, password) => fetchJSON('api/auth.php?task=reset_with_token', { method: 'POST', body: JSON.stringify({ token, password }) }),
   },
 
   players: {
     getAll: async (params) => {
-      const res = await fetchJSON('service/playerService.php', { params });
+      const res = await fetchJSON('api/player.php', { params });
       return Array.isArray(res) ? res : (res ? [res] : []);
     },
-    create: (player) => fetchJSON('service/playerService.php', { method: 'POST', body: JSON.stringify(player) }),
-    update: (id, player) => fetchJSON(`service/playerService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(player) }),
-    delete: (id) => fetchJSON(`service/playerService.php?id=${id}`, { method: 'DELETE' }),
-    updatePassword: (userId, password) => fetchJSON(`service/authService.php?task=reset&id=${userId}`, { method: 'POST', body: JSON.stringify({ password }) }),
-    updateRole: (userId, role) => fetchJSON(`service/playerService.php?task=role&id=${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
+    create: (player) => fetchJSON('api/player.php', { method: 'POST', body: JSON.stringify(player) }),
+    update: (id, player) => fetchJSON(`api/player.php?id=${id}`, { method: 'PUT', body: JSON.stringify(player) }),
+    delete: (id) => fetchJSON(`api/player.php?id=${id}`, { method: 'DELETE' }),
+    updatePassword: (userId, password) => fetchJSON(`api/auth.php?task=reset&id=${userId}`, { method: 'POST', body: JSON.stringify({ password }) }),
+    updateRole: (userId, role) => fetchJSON(`api/player.php?task=role&id=${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
   },
 
   machines: {
-    getAll: (params) => fetchJSON('service/machineService.php', { params }),
-    create: (machine) => fetchJSON('service/machineService.php', { method: 'POST', body: JSON.stringify(machine) }),
-    update: (id, machine) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(machine) }),
-    delete: (id) => fetchJSON(`service/machineService.php?id=${id}`, { method: 'DELETE' }),
+    getAll: (params) => fetchJSON('api/machine.php', { params }),
+    create: (machine) => fetchJSON('api/machine.php', { method: 'POST', body: JSON.stringify(machine) }),
+    update: (id, machine) => fetchJSON(`api/machine.php?id=${id}`, { method: 'PUT', body: JSON.stringify(machine) }),
+    delete: (id) => fetchJSON(`api/machine.php?id=${id}`, { method: 'DELETE' }),
     getTargets: (eventId, leagueId, params) => 
-      fetchJSON(`service/machineService.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`, { params }),
+      fetchJSON(`api/machine.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`, { params }),
     saveTarget: (target) => {
       const eventId = Array.isArray(target) ? target[0]?.eventId : target?.eventId;
-      const url = eventId ? `service/machineService.php?eventId=${eventId}` : 'service/machineService.php';
+      const url = eventId ? `api/machine.php?eventId=${eventId}` : 'api/machine.php';
       return fetchJSON(url, { method: 'POST', body: JSON.stringify(target) });
     },
-    deleteTarget: (id) => fetchJSON(`service/machineService.php?id=${id}&task=threshold`, { method: 'DELETE' }),
-    bulkUpdateSort: (updates) => fetchJSON('service/machineService.php?task=sort', { method: 'POST', body: JSON.stringify(updates) }),
+    deleteTarget: (id) => fetchJSON(`api/machine.php?id=${id}&task=threshold`, { method: 'DELETE' }),
+    bulkUpdateSort: (updates) => fetchJSON('api/machine.php?task=sort', { method: 'POST', body: JSON.stringify(updates) }),
   },
 
   scores: {
     get: (playerId, eventId, leagueId) => {
       if (!eventId && !leagueId) return [];
-      let url = 'service/scoreService.php?';
+      let url = 'api/score.php?';
       if (leagueId) url += `leagueId=${leagueId}`;
       else url += `eventId=${eventId}${playerId ? `&playerId=${playerId}` : ''}`;
       return fetchJSON(url);
     },
-    save: (score) => fetchJSON('service/scoreService.php', { method: 'POST', body: JSON.stringify(score) }),
-    clear: (playerId) => fetchJSON(`service/scoreService.php?playerId=${playerId}`, { method: 'DELETE' }),
+    save: (score) => fetchJSON('api/score.php', { method: 'POST', body: JSON.stringify(score) }),
+    clear: (playerId) => fetchJSON(`api/score.php?playerId=${playerId}`, { method: 'DELETE' }),
   },
 
   matchups: {
-    get: (eventId) => fetchJSON(`service/matchupService.php?eventId=${eventId}`),
-    save: (matchups) => fetchJSON('service/matchupService.php', { method: 'POST', body: JSON.stringify(matchups) }),
-    clear: (eventId) => fetchJSON(`service/matchupService.php?eventId=${eventId}`, { method: 'DELETE' }),
+    get: (eventId) => fetchJSON(`api/matchup.php?eventId=${eventId}`),
+    save: (matchups) => fetchJSON('api/matchup.php', { method: 'POST', body: JSON.stringify(matchups) }),
+    clear: (eventId) => fetchJSON(`api/matchup.php?eventId=${eventId}`, { method: 'DELETE' }),
   },
 
   leagues: {
-    getAll: (params) => fetchJSON('service/leagueService.php', { params }),
-    get: (id) => fetchJSON(`service/leagueService.php?id=${id}`),
-    create: (league) => fetchJSON('service/leagueService.php', { method: 'POST', body: JSON.stringify(league) }),
-    update: (id, league) => fetchJSON(`service/leagueService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(league) }),
-    delete: (id) => fetchJSON(`service/leagueService.php?id=${id}`, { method: 'DELETE' }),
-    addPlayer: (leagueId, playerId) => fetchJSON('service/leagueService.php?task=member', { method: 'POST', body: JSON.stringify({ leagueId, playerId }) }),
-    removePlayer: (leagueId, playerId) => fetchJSON(`service/leagueService.php?task=member&leagueId=${leagueId}&playerId=${playerId}`, { method: 'DELETE' }),
+    getAll: (params) => fetchJSON('api/league.php', { params }),
+    get: (id) => fetchJSON(`api/league.php?id=${id}`),
+    create: (league) => fetchJSON('api/league.php', { method: 'POST', body: JSON.stringify(league) }),
+    update: (id, league) => fetchJSON(`api/league.php?id=${id}`, { method: 'PUT', body: JSON.stringify(league) }),
+    delete: (id) => fetchJSON(`api/league.php?id=${id}`, { method: 'DELETE' }),
+    addPlayer: (leagueId, playerId) => fetchJSON('api/league.php?task=member', { method: 'POST', body: JSON.stringify({ leagueId, playerId }) }),
+    removePlayer: (leagueId, playerId) => fetchJSON(`api/league.php?task=member&leagueId=${leagueId}&playerId=${playerId}`, { method: 'DELETE' }),
   },
 
   events: {
-    getAll: (leagueId, params) => fetchJSON(`service/leagueService.php?task=fixture${leagueId ? `&leagueId=${leagueId}` : ''}`, { params }),
-    create: (event) => fetchJSON('service/leagueService.php?task=fixture', { method: 'POST', body: JSON.stringify(event) }),
-    update: (id, event) => fetchJSON(`service/leagueService.php?task=fixture&id=${id}`, { method: 'PUT', body: JSON.stringify(event) }),
-    delete: (id, leagueId) => fetchJSON(`service/leagueService.php?task=fixture&id=${id}${leagueId ? `&leagueId=${leagueId}` : ''}`, { method: 'DELETE' }),
+    getAll: (leagueId, params) => fetchJSON(`api/league.php?task=fixture${leagueId ? `&leagueId=${leagueId}` : ''}`, { params }),
+    create: (event) => fetchJSON('api/league.php?task=fixture', { method: 'POST', body: JSON.stringify(event) }),
+    update: (id, event) => fetchJSON(`api/league.php?task=fixture&id=${id}`, { method: 'PUT', body: JSON.stringify(event) }),
+    delete: (id, leagueId) => fetchJSON(`api/league.php?task=fixture&id=${id}${leagueId ? `&leagueId=${leagueId}` : ''}`, { method: 'DELETE' }),
   },
 
   teams: {
-    getAll: () => fetchJSON('service/teamService.php'),
-    create: (data) => fetchJSON('service/teamService.php', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id, data) => fetchJSON(`service/teamService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id) => fetchJSON(`service/teamService.php?id=${id}`, { method: 'DELETE' }),
-    addMember: (teamId, playerId) => fetchJSON('service/teamService.php?task=member', { method: 'POST', body: JSON.stringify({ teamId, playerId }) }),
-    removeMember: (teamId, playerId) => fetchJSON(`service/teamService.php?task=member&teamId=${teamId}&playerId=${playerId}`, { method: 'DELETE' }),
-    addToLeague: (leagueId, teamId) => fetchJSON('service/teamService.php?task=league', { method: 'POST', body: JSON.stringify({ leagueId, teamId }) }),
-    removeFromLeague: (leagueId, teamId) => fetchJSON(`service/teamService.php?task=league&leagueId=${leagueId}&teamId=${teamId}`, { method: 'DELETE' }),
+    getAll: () => fetchJSON('api/team.php'),
+    create: (data) => fetchJSON('api/team.php', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id, data) => fetchJSON(`api/team.php?id=${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id) => fetchJSON(`api/team.php?id=${id}`, { method: 'DELETE' }),
+    addMember: (teamId, playerId) => fetchJSON('api/team.php?task=member', { method: 'POST', body: JSON.stringify({ teamId, playerId }) }),
+    removeMember: (teamId, playerId) => fetchJSON(`api/team.php?task=member&teamId=${teamId}&playerId=${playerId}`, { method: 'DELETE' }),
+    addToLeague: (leagueId, teamId) => fetchJSON('api/team.php?task=league', { method: 'POST', body: JSON.stringify({ leagueId, teamId }) }),
+    removeFromLeague: (leagueId, teamId) => fetchJSON(`api/team.php?task=league&leagueId=${leagueId}&teamId=${teamId}`, { method: 'DELETE' }),
   },
 
   locations: {
-    getAll: (params) => fetchJSON('service/locationService.php', { params }),
-    create: (loc) => fetchJSON('service/locationService.php', { method: 'POST', body: JSON.stringify(loc) }),
-    update: (id, loc) => fetchJSON(`service/locationService.php?id=${id}`, { method: 'PUT', body: JSON.stringify(loc) }),
-    delete: (id) => fetchJSON(`service/locationService.php?id=${id}`, { method: 'DELETE' }),
-    getMachines: (locationId, params) => fetchJSON(`service/locationService.php?task=units${locationId ? `&locationId=${locationId}` : ''}`, { params }),
+    getAll: (params) => fetchJSON('api/location.php', { params }),
+    create: (loc) => fetchJSON('api/location.php', { method: 'POST', body: JSON.stringify(loc) }),
+    update: (id, loc) => fetchJSON(`api/location.php?id=${id}`, { method: 'PUT', body: JSON.stringify(loc) }),
+    delete: (id) => fetchJSON(`api/location.php?id=${id}`, { method: 'DELETE' }),
+    getMachines: (locationId, params) => fetchJSON(`api/location.php?task=units${locationId ? `&locationId=${locationId}` : ''}`, { params }),
     addMachine: (locationId, machineId, extra = {}) => 
-      fetchJSON('service/locationService.php?task=units', { method: 'POST', body: JSON.stringify({ locationId, machineId, ...extra }) }),
+      fetchJSON('api/location.php?task=units', { method: 'POST', body: JSON.stringify({ locationId, machineId, ...extra }) }),
     updateMachine: (locationId, machineId, data) =>
-      fetchJSON('service/locationService.php?task=units', { method: 'PUT', body: JSON.stringify({ locationId, machineId, ...data }) }),
-    removeMachine: (locationId, machineId) => fetchJSON(`service/locationService.php?task=units&locationId=${locationId}&machineId=${machineId}`, { method: 'DELETE' }),
+      fetchJSON('api/location.php?task=units', { method: 'PUT', body: JSON.stringify({ locationId, machineId, ...data }) }),
+    removeMachine: (locationId, machineId) => fetchJSON(`api/location.php?task=units&locationId=${locationId}&machineId=${machineId}`, { method: 'DELETE' }),
   },
 
   system: {
     // Cleanup is a destructive, state-changing operation; the backend only
     // accepts POST (session league cleanup) or PUT (abandoned players).
-    runCleanup: (days) => fetchJSON('service/cleanupService.php' + (days ? `?days=${days}` : ''), { method: 'POST' }),
+    runCleanup: (days) => fetchJSON('api/cleanup.php' + (days ? `?days=${days}` : ''), { method: 'POST' }),
   }
 };

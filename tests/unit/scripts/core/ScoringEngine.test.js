@@ -330,4 +330,156 @@ describe('ScoringEngine (Base Class)', () => {
       expect(html).toContain('5000');
     });
   });
+
+  // ── Missing Coverage Helpers and Hooks ───────────────────────────────
+  describe('default hooks and getters', () => {
+    it('getMachinesPerRound should return 1 by default', () => {
+      expect(engine.getMachinesPerRound()).toBe(1);
+    });
+
+    it('getMaxRosterSize should return Infinity by default', () => {
+      expect(engine.getMaxRosterSize()).toBe(Infinity);
+    });
+
+    it('getRoundDisplayLabel should label using round label and 1-based index', () => {
+      const e = new ScoringEngine({ roundLabel: 'Hole' });
+      expect(e.getRoundDisplayLabel(0)).toBe('Hole 1');
+      expect(e.getRoundDisplayLabel(8)).toBe('Hole 9');
+    });
+
+    it('generateValue2Defaults should return empty array by default', () => {
+      expect(engine.generateValue2Defaults(5)).toEqual([]);
+    });
+
+    it('getMatchupDescription should return null by default', () => {
+      expect(engine.getMatchupDescription(5)).toBeNull();
+    });
+
+    it('getRequiredEventData should return empty object by default', () => {
+      expect(engine.getRequiredEventData(123, {})).toEqual({});
+    });
+
+    it('enrichScoreMap should pass through score map unchanged by default', () => {
+      const scoreMap = { 1: { ball1: 10 } };
+      expect(engine.enrichScoreMap(scoreMap, {})).toBe(scoreMap);
+    });
+
+    it('getRoundRowContext should return empty object by default', () => {
+      expect(engine.getRoundRowContext({}, {})).toEqual({});
+    });
+
+    it('buildPlayerScoreMap should map player scores by orderNumber', () => {
+      const playerScores = [
+        { orderNumber: 1, ball1: 10, ball2: 20, ball3: 30 },
+        { orderNumber: 2, ball1: 5, ball2: 15, ball3: 25 }
+      ];
+      const result = engine.buildPlayerScoreMap('p1', playerScores);
+      expect(result).toEqual({
+        '1': { ball1: 10, ball2: 20, ball3: 30 },
+        '2': { ball1: 5, ball2: 15, ball3: 25 }
+      });
+    });
+
+    it('buildPlayerScoreMap should handle null/empty playerScores gracefully', () => {
+      expect(engine.buildPlayerScoreMap('p1', null)).toEqual({});
+    });
+
+    it('isLastRound and getMaxOrder should behave correctly', () => {
+      const e1 = new ScoringEngine();
+      expect(e1.getMaxOrder()).toBe(0);
+      expect(e1.isLastRound(0)).toBe(true);
+
+      const e2 = new ScoringEngine({ maxOrder: 10 });
+      expect(e2.getMaxOrder()).toBe(10);
+      expect(e2.isLastRound(10)).toBe(true);
+      expect(e2.isLastRound(9)).toBe(false);
+    });
+
+    it('renderRoundRow should return a div element', async () => {
+      const row = await engine.renderRoundRow({}, null, false, null, {});
+      expect(row).toBeInstanceOf(HTMLElement);
+      expect(row.tagName).toBe('DIV');
+    });
+
+    it('renderResults should construct standard HTML table rows', () => {
+      const mockTable = { classList: { remove: vi.fn() } };
+      const mockExistingGrid = { remove: vi.fn() };
+
+      const querySelectorMock = vi.fn((selector) => {
+        if (selector === 'table.data-table') return mockTable;
+        if (selector === '.scoreboard-grid') return mockExistingGrid;
+        return null;
+      });
+
+      const domRefs = {
+        resultsPanel: {
+          querySelector: querySelectorMock,
+          classList: { remove: vi.fn() }
+        },
+        resultsBody: { innerHTML: '' },
+        totalScore: { textContent: '' },
+        resultsEmpty: { classList: { add: vi.fn() } },
+        escapeHTML: (s) => s
+      };
+
+      const calcResult = {
+        turnResults: [
+          { orderNumber: 1, machineName: 'M1', displayMark: '5', displayRunningTotal: '5' }
+        ],
+        totalDisplay: '10'
+      };
+
+      engine.renderResults(calcResult, [], {}, {}, domRefs);
+
+      expect(mockTable.classList.remove).toHaveBeenCalledWith('hidden');
+      expect(mockExistingGrid.remove).toHaveBeenCalled();
+      expect(domRefs.resultsBody.innerHTML).toContain('M1');
+      expect(domRefs.resultsBody.innerHTML).toContain('5');
+      expect(domRefs.totalScore.textContent).toBe('10');
+      expect(domRefs.resultsEmpty.classList.add).toHaveBeenCalledWith('hidden');
+      expect(domRefs.resultsPanel.classList.remove).toHaveBeenCalledWith('hidden');
+    });
+
+    it('getPreviewRowHtml should return structured HTML content', () => {
+      const frame = { machineName: 'M1', value1: 100, value2: 10, scaling: 'flat', values: {} };
+      const formatFn = (v) => `F_${v}`;
+      const escapeFn = (s) => `E_${s}`;
+      const renderGridFn = vi.fn().mockReturnValue('GRID_HTML');
+
+      const result = engine.getPreviewRowHtml(frame, 0, true, 'temp1', formatFn, escapeFn, renderGridFn);
+
+      expect(result.headerHtml).toContain('E_M1');
+      expect(result.headerHtml).toContain('F_100');
+      expect(result.headerHtml).toContain('F_10');
+      expect(result.contentHtml).toContain('GRID_HTML');
+      expect(renderGridFn).toHaveBeenCalled();
+    });
+
+    it('getThresholdGridHtml should render notice or active grid', () => {
+      // Empty values case
+      expect(engine.getThresholdGridHtml(null, (v) => v)).toContain('Enter scores to see thresholds');
+      expect(engine.getThresholdGridHtml({}, (v) => v)).toContain('Enter scores to see thresholds');
+
+      // Active values case
+      const values = { 10: 10000, 1: 1000 };
+      const html = engine.getThresholdGridHtml(values, (v) => `F_${v}`, 10000, 1000);
+      expect(html).toContain('threshold-grid');
+      expect(html).toContain('F_10000');
+      expect(html).toContain('F_1000');
+    });
+
+    it('getQuickFillValues should return correct parsed values', () => {
+      const machineData = { targetEasy: 100, targetMed: 200, targetHard: 300 };
+
+      expect(engine.getQuickFillValues(machineData, 'easy')).toEqual({ value1: 100, value2: 0 });
+      expect(engine.getQuickFillValues(machineData, 'med')).toEqual({ value1: 200, value2: 0 });
+      expect(engine.getQuickFillValues(machineData, 'hard')).toEqual({ value1: 300, value2: 0 });
+      expect(engine.getQuickFillValues(null, 'easy')).toBeNull();
+      expect(engine.getQuickFillValues({}, 'easy')).toBeNull();
+    });
+
+    it('getPrintTargetSummaryHtml should return empty string by default', () => {
+      expect(engine.getPrintTargetSummaryHtml({}, false, (v) => v)).toBe('');
+    });
+  });
 });

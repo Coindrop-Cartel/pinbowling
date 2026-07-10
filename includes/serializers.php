@@ -38,26 +38,6 @@ function serializeLocation($row) {
 }
 
 /**
- * Normalizes a location_machine junction row with machine details.
- * When multiple score rows exist for a machine (one per format), they are
- * grouped into a `scores` map keyed by format.
- */
-function serializeLocationMachine($row) {
-    return [
-        'id' => isset($row['id']) ? (int)$row['id'] : null,
-        'locationId' => isset($row['location_id']) ? (int)$row['location_id'] : null,
-        'machineId' => (int)$row['machine_id'],
-        'machineName' => $row['machine_name'] ?? null,
-        'note' => $row['note'] ?? null,
-        'format' => $row['format'] ?? 'bowling',
-        'targetEasy' => (int)($row['target_easy'] ?? 0),
-        'targetMed' => (int)($row['target_med'] ?? 0),
-        'targetHard' => (int)($row['target_hard'] ?? 0),
-        'scores' => isset($row['scores']) ? $row['scores'] : null,
-    ];
-}
-
-/**
  * Groups flat location_machine rows (from a JOIN with location_machine_scores)
  * into machine objects with a `scores` map keyed by format.
  *

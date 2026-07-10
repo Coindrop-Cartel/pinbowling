@@ -59,9 +59,10 @@ export async function initMachinesPage() {
   createToggle.textContent = 'Create New Machine';
   machineNameInput.after(createToggle);
 
-  if (!currentUser) {
+  if (!hasElevatedPrivileges) {
     createToggle.classList.add('hidden');
-    machineForm.closest('.card').classList.add('hidden');
+    const formCard = machineForm?.closest('.card');
+    if (formCard) formCard.classList.add('hidden');
   }
 
   createToggle.onclick = () => {
@@ -104,7 +105,7 @@ export async function initMachinesPage() {
               ${info ? `<br><small class="machine-info">${escapeHTML(info)}</small>` : ''}
             </div>
             <div class="action-buttons">
-              <button type="button" class="edit-mach-btn secondary btn-row">Edit</button>
+              ${hasElevatedPrivileges ? `<button type="button" class="edit-mach-btn secondary btn-row">Edit</button>` : ''}
               ${isAdmin ? `<button type="button" class="delete-mach-btn btn-row">Delete</button>` : ''}
             </div>
           </div>
@@ -120,7 +121,8 @@ export async function initMachinesPage() {
           isExpanded: false
         });
 
-        row.querySelector('.edit-mach-btn').onclick = (e) => { e.stopPropagation(); editMachine(m); };
+        const editBtn = row.querySelector('.edit-mach-btn');
+        if (editBtn) editBtn.onclick = (e) => { e.stopPropagation(); editMachine(m); };
         const deleteBtn = row.querySelector('.delete-mach-btn');
         if (deleteBtn) deleteBtn.onclick = async (e) => {
           e.stopPropagation();

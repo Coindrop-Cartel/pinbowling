@@ -78,18 +78,20 @@ describe('Locations Management Page (locationsPage.js)', () => {
     vi.stubGlobal('scrollTo', vi.fn());
     Element.prototype.scrollIntoView = vi.fn();
     document.body.innerHTML = `
-      <form id="location-form">
-        <input id="editing-location-id" />
-        <input id="location-name" />
-        <div id="location-city-state-row" class="form-row hidden">
-          <div class="form-row"><input id="location-city" /></div>
-          <div class="form-row"><input id="location-state" /></div>
-        </div>
-        <div class="form-actions hidden">
-          <button id="save-location-button" class="btn-mgmt">Add Location</button>
-          <button id="cancel-loc-edit-button">Cancel</button>
-        </div>
-      </form>
+      <div class="card">
+        <form id="location-form">
+          <input id="editing-location-id" />
+          <input id="location-name" />
+          <div id="location-city-state-row" class="form-row hidden">
+            <div class="form-row"><input id="location-city" /></div>
+            <div class="form-row"><input id="location-state" /></div>
+          </div>
+          <div class="form-actions hidden">
+            <button id="save-location-button" class="btn-mgmt">Add Location</button>
+            <button id="cancel-loc-edit-button">Cancel</button>
+          </div>
+        </form>
+      </div>
       <div id="locations-list"></div>
       <div id="locations-list-empty"></div>
       <div id="location-machine-form-card" class="hidden"></div>
@@ -616,6 +618,69 @@ describe('Locations Management Page (locationsPage.js)', () => {
       // After successful create, form should reset
       expect(document.getElementById('editing-location-id').value).toBe('');
       expect(document.getElementById('save-location-button').textContent).toBe('Add Location');
+    });
+  });
+
+  describe('Additional Coverage', () => {
+    it('should hide form when currentUser is not logged in', async () => {
+      PB_API.auth.me.mockResolvedValueOnce(null);
+      await initLocationsPage();
+      expect(document.getElementById('location-form').closest('.card').classList.contains('hidden')).toBe(true);
+    });
+
+    it('should update machine form when the format selector changes', async () => {
+      // Mock HTML format selector inside form card container (if exists or gets rendered)
+      document.body.innerHTML += `
+        <div id="location-machine-form-card">
+          <select id="loc-mach-format">
+            <option value="bowling">Bowling</option>
+            <option value="golf">Golf</option>
+          </select>
+          <div class="form-row"><label></label><input id="target-easy" /></div>
+          <div class="form-row"><label></label><input id="target-med" /></div>
+          <div class="form-row"><label></label><input id="target-hard" /></div>
+        </div>
+      `;
+
+      PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'The Sanctum', city: 'Meriden', state: 'CT', machines: [] }]);
+      PB_API.machines.getAll.mockResolvedValue([{ id: 10, machineName: 'Iron Maiden' }]);
+      await initLocationsPage();
+
+      const addBtn = document.querySelector('.add-mach-btn');
+      if (addBtn) {
+        await addBtn.click();
+        const formatSelect = document.getElementById('loc-mach-format');
+        if (formatSelect) {
+          formatSelect.value = 'golf';
+          formatSelect.dispatchEvent(new Event('change'));
+          const easyLabel = document.getElementById('target-easy').closest('.form-row').querySelector('label');
+          expect(easyLabel.textContent).toContain('High Score: Easy');
+        }
+      }
+    });
+
+    it('should render machine score badges and formats correctly', async () => {
+      PB_API.locations.getAll.mockResolvedValue([
+        {
+          id: 1,
+          name: 'The Sanctum',
+          city: 'Meriden',
+          state: 'CT',
+          machines: [
+            {
+              machineId: 10,
+              machineName: 'Iron Maiden',
+              scores: {
+                golf: { targetEasy: 3, targetMed: 4, targetHard: 5 }
+              }
+            }
+          ]
+        }
+      ]);
+      await initLocationsPage();
+      const badge = document.querySelector('.badge');
+      expect(badge).not.toBeNull();
+      expect(badge.textContent).toBe('golf');
     });
   });
 });

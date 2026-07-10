@@ -5,7 +5,7 @@
  */
 $user = function_exists('getCurrentUser') ? getCurrentUser() : null;
 $role = $user['role'] ?? 'unregistered';
-$isManagement = in_array($role, ['admin', 'td']);
+$isManagement = in_array($role, ['admin', 'td', 'player']);
 $userId = $user ? "user-" . ($user['id'] ?? 'auth') : 'guest';
 $displayName = htmlspecialchars($user['player_name'] ?? ($user['username'] ?? 'User'));
 ?>

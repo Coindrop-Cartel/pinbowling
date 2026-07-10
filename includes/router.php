@@ -73,7 +73,7 @@ class Router {
 
         // 4. Authorization Guard
         if ($this->isManagementRoute($route)) {
-            if (!$this->isAuthorized()) {
+            if (!$this->isAuthorized($route)) {
                 return ['type' => 'redirect', 'location' => $this->baseUrl . '/', 'status' => 302];
             }
         }
@@ -110,11 +110,11 @@ class Router {
 
     private function isManagementRoute(string $route): bool {
         $checkRoute = str_replace('.php', '', $route);
-        $managementRoutes = ['config', 'machines', 'teams'];
+        $managementRoutes = ['config', 'machines', 'teams', 'management'];
         return in_array($checkRoute, $managementRoutes);
     }
 
-    private function isAuthorized(): bool {
+    private function isAuthorized(string $route): bool {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
@@ -122,6 +122,14 @@ class Router {
             return false;
         }
         $user = getCurrentUser();
-        return $user && ($user['role'] === 'admin' || $user['role'] === 'td');
+        if (!$user) {
+            return false;
+        }
+        $role = $user['role'];
+        $checkRoute = str_replace('.php', '', $route);
+        if ($checkRoute === 'config' || $checkRoute === 'management') {
+            return $role === 'admin';
+        }
+        return in_array($role, ['admin', 'td', 'player']);
     }
 }

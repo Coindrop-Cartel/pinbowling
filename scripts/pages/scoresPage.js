@@ -56,7 +56,7 @@ export async function initScoresPage() {
   // If we land on the scores page with a session/non-standard league active, 
   // we clear it so the selector resets and refreshes to show standard leagues.
   // EXCEPTION: If we have both leagueId and eventId, we are deep-linking from "Let's Bowl".
-  const initialLeagueId = getActiveLeagueId();
+  let initialLeagueId = getActiveLeagueId();
   let initialEventId = getActiveEventId();
 
   // The "summary" eventId is a virtual ID used for the Season Summary scoreboard.

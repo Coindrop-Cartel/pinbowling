@@ -9,7 +9,11 @@ RewriteEngine On
 # This allows for cache-busting while serving the actual file from its original path.
 RewriteRule ^(.*)v[0-9\.]+/+(.*)$ $1$2 [L]
 # We also exclude versioned paths (v1.x.x/) as these are handled dynamically by index.php.
-RewriteCond %{REQUEST_URI} !/(service/|js-config\.php|v[0-9.]+/|includes/) [NC]
+RewriteCond %{REQUEST_URI} !/api/ [NC]
+RewriteCond %{REQUEST_URI} !/service/ [NC]
+RewriteCond %{REQUEST_URI} !/js-config\.php [NC]
+RewriteCond %{REQUEST_URI} !/v[0-9.]+/ [NC]
+RewriteCond %{REQUEST_URI} !/includes/ [NC]
 # Capture the full URL path from the original request to avoid filesystem path leakage.
 # %1 captures the path without the .php extension.
 RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ ([^\ ]+)\.php

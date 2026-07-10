@@ -62,11 +62,11 @@ describe('API Client (api.js)', () => {
       json: () => Promise.resolve({ data: 'ok' })
     });
 
-    await fetchJSON('service/playerService.php');
+    await fetchJSON('api/player.php');
 
     // APP_BASE for /app/index.php should be /app
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost/app/service/playerService.php',
+      'http://localhost/app/api/player.php',
       expect.any(Object)
     );
   });
@@ -77,7 +77,7 @@ describe('API Client (api.js)', () => {
       json: () => Promise.resolve({})
     });
 
-    await fetchJSON('service/machineService.php');
+    await fetchJSON('api/machine.php');
 
     const callHeaders = fetch.mock.calls[0][1].headers;
     expect(callHeaders['Content-Type']).toBe('application/json');
@@ -89,7 +89,7 @@ describe('API Client (api.js)', () => {
       json: () => Promise.resolve({})
     });
 
-    await fetchJSON('service/machineService.php?id=1', { method: 'PUT', body: JSON.stringify({ name: 'New' }) });
+    await fetchJSON('api/machine.php?id=1', { method: 'PUT', body: JSON.stringify({ name: 'New' }) });
 
     const callArgs = fetch.mock.calls[0];
     expect(callArgs[1].method).toBe('PUT');
@@ -103,7 +103,7 @@ describe('API Client (api.js)', () => {
     });
 
     await PB_API.machines.getAll();
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/machineService.php'), expect.any(Object));
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('api/machine.php'), expect.any(Object));
   });
 
   describe('fetchJSON Advanced Logic', () => {
@@ -133,10 +133,10 @@ describe('API Client (api.js)', () => {
     it('should sanitize paths by removing leading slashes', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       
-      await fetchJSON('/service/test.php');
+      await fetchJSON('/api/test.php');
 
       const url = fetch.mock.calls[0][0];
-      expect(url).toBe('http://localhost/app/service/test.php');
+      expect(url).toBe('http://localhost/app/api/test.php');
     });
 
     it('should throw error with message from JSON response on failure', async () => {
@@ -146,7 +146,7 @@ describe('API Client (api.js)', () => {
         json: () => Promise.resolve({ error: 'Validation Failed' })
       });
 
-      await expect(fetchJSON('service/testService.php')).rejects.toThrow('Validation Failed');
+      await expect(fetchJSON('api/test.php')).rejects.toThrow('Validation Failed');
     });
 
     it('should fall back to statusText if JSON error parsing fails', async () => {
@@ -156,7 +156,7 @@ describe('API Client (api.js)', () => {
         json: () => Promise.reject(new Error('Not JSON'))
       });
 
-      await expect(fetchJSON('service/testService.php')).rejects.toThrow('Internal Server Error');
+      await expect(fetchJSON('api/test.php')).rejects.toThrow('Internal Server Error');
     });
 
     it('should throw statusText if JSON response exists but has no error key', async () => {
@@ -166,7 +166,7 @@ describe('API Client (api.js)', () => {
         json: () => Promise.resolve({ success: false })
       });
 
-      await expect(fetchJSON('service/test.php')).rejects.toThrow('Forbidden');
+      await expect(fetchJSON('api/test.php')).rejects.toThrow('Forbidden');
     });
 
     it('should construct origin-based URLs for relative paths', async () => {
@@ -179,7 +179,7 @@ describe('API Client (api.js)', () => {
 
     it('should provide a default empty body for POST requests to prevent server resets', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await fetchJSON('service/testService.php', { method: 'POST' });
+      await fetchJSON('api/test.php', { method: 'POST' });
       
       const callArgs = fetch.mock.calls[0][1];
       expect(callArgs.body).toBe(JSON.stringify({}));
@@ -239,7 +239,7 @@ describe('API Client (api.js)', () => {
       await PB_API.leagues.create(leagueData);
       
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('service/leagueService.php'),
+        expect.stringContaining('api/league.php'),
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify(leagueData)
@@ -254,7 +254,7 @@ describe('API Client (api.js)', () => {
       await PB_API.scores.save(scoreData);
       
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('service/scoreService.php'),
+        expect.stringContaining('api/score.php'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(scoreData) })
       );
     });
@@ -266,7 +266,7 @@ describe('API Client (api.js)', () => {
       await PB_API.events.update(99, eventData);
       
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/leagueService.php?task=fixture&id=99',
+        'http://localhost/app/api/league.php?task=fixture&id=99',
         expect.objectContaining({
           method: 'PUT',
           body: JSON.stringify(eventData)
@@ -314,14 +314,14 @@ describe('API Client (api.js)', () => {
     it('system.runCleanup should call the cleanup service via POST', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.system.runCleanup();
-      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/cleanupService.php'), expect.objectContaining({ method: 'POST' }));
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('api/cleanup.php'), expect.objectContaining({ method: 'POST' }));
     });
 
     it('system.runCleanup should pass the days parameter if provided', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       // Verification for Issue 1.4 bug fix
       await PB_API.system.runCleanup(15);
-      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('service/cleanupService.php?days=15'), expect.objectContaining({ method: 'POST' }));
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('api/cleanup.php?days=15'), expect.objectContaining({ method: 'POST' }));
     });
 
     it('machines.deleteTarget should include threshold task', async () => {
@@ -335,7 +335,7 @@ describe('API Client (api.js)', () => {
 
       await PB_API.locations.addMachine(1, 10, { note: 'Back room' });
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('service/locationService.php?task=units'),
+        expect.stringContaining('api/location.php?task=units'),
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({ locationId: 1, machineId: 10, note: 'Back room' })
@@ -354,7 +354,7 @@ describe('API Client (api.js)', () => {
 
       await PB_API.players.delete(42);
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/playerService.php?id=42',
+        'http://localhost/app/api/player.php?id=42',
         expect.objectContaining({ 
           method: 'DELETE',
           body: '{}'
@@ -403,7 +403,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
       await PB_API.players.getAll({ search: 'test' });
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('service/playerService.php'),
+        expect.stringContaining('api/player.php'),
         expect.any(Object)
       );
     });
@@ -413,7 +413,7 @@ describe('API Client (api.js)', () => {
       const player = { playerName: 'New Player' };
       await PB_API.players.create(player);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('service/playerService.php'),
+        expect.stringContaining('api/player.php'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(player) })
       );
     });
@@ -422,7 +422,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.players.update(5, { playerName: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/playerService.php?id=5',
+        'http://localhost/app/api/player.php?id=5',
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ playerName: 'Updated' }) })
       );
     });
@@ -432,7 +432,7 @@ describe('API Client (api.js)', () => {
       const score = { eventId: 1, playerId: 2, ball1: 10 };
       await PB_API.scores.save(score);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('service/scoreService.php'),
+        expect.stringContaining('api/score.php'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(score) })
       );
     });
@@ -441,7 +441,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.scores.clear(42);
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/scoreService.php?playerId=42',
+        'http://localhost/app/api/score.php?playerId=42',
         expect.objectContaining({ 
           method: 'DELETE',
           body: '{}'
@@ -462,7 +462,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.leagues.update(3, { name: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/leagueService.php?id=3',
+        'http://localhost/app/api/league.php?id=3',
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ name: 'Updated' }) })
       );
     });
@@ -471,7 +471,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.leagues.delete(9);
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/leagueService.php?id=9',
+        'http://localhost/app/api/league.php?id=9',
         expect.objectContaining({ 
           method: 'DELETE',
           body: '{}'
@@ -493,7 +493,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.events.delete(10, 5);
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/leagueService.php?task=fixture&id=10&leagueId=5',
+        'http://localhost/app/api/league.php?task=fixture&id=10&leagueId=5',
         expect.objectContaining({ 
           method: 'DELETE',
           body: '{}'
@@ -525,7 +525,7 @@ describe('API Client (api.js)', () => {
       const data = { name: 'Team A' };
       await PB_API.teams.create(data);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('service/teamService.php'),
+        expect.stringContaining('api/team.php'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(data) })
       );
     });
@@ -534,7 +534,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.teams.update(3, { name: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/teamService.php?id=3',
+        'http://localhost/app/api/team.php?id=3',
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ name: 'Updated' }) })
       );
     });
@@ -543,7 +543,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.teams.delete(7);
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/teamService.php?id=7',
+        'http://localhost/app/api/team.php?id=7',
         expect.objectContaining({ 
           method: 'DELETE',
           body: '{}'
@@ -564,7 +564,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.teams.removeMember(1, 2);
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/teamService.php?task=member&teamId=1&playerId=2',
+        'http://localhost/app/api/team.php?task=member&teamId=1&playerId=2',
         expect.objectContaining({ 
           method: 'DELETE',
           body: '{}'
@@ -585,7 +585,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.teams.removeFromLeague(5, 10);
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/teamService.php?task=league&leagueId=5&teamId=10',
+        'http://localhost/app/api/team.php?task=league&leagueId=5&teamId=10',
         expect.objectContaining({ 
           method: 'DELETE',
           body: '{}'
@@ -597,7 +597,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
       await PB_API.locations.getAll({ search: 'test' });
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('service/locationService.php'),
+        expect.stringContaining('api/location.php'),
         expect.any(Object)
       );
     });
@@ -607,7 +607,7 @@ describe('API Client (api.js)', () => {
       const loc = { name: 'Venue' };
       await PB_API.locations.create(loc);
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('service/locationService.php'),
+        expect.stringContaining('api/location.php'),
         expect.objectContaining({ method: 'POST', body: JSON.stringify(loc) })
       );
     });
@@ -616,7 +616,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.locations.update(3, { name: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/locationService.php?id=3',
+        'http://localhost/app/api/location.php?id=3',
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ name: 'Updated' }) })
       );
     });
@@ -625,7 +625,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.locations.delete(5);
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/locationService.php?id=5',
+        'http://localhost/app/api/location.php?id=5',
         expect.objectContaining({ 
           method: 'DELETE',
           body: '{}'
@@ -655,7 +655,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.locations.removeMachine(1, 2);
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/locationService.php?task=units&locationId=1&machineId=2',
+        'http://localhost/app/api/location.php?task=units&locationId=1&machineId=2',
         expect.objectContaining({ 
           method: 'DELETE',
           body: '{}'
@@ -677,7 +677,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.players.updateRole(5, 'admin');
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/playerService.php?task=role&id=5',
+        'http://localhost/app/api/player.php?task=role&id=5',
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ role: 'admin' }) })
       );
     });
@@ -686,7 +686,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.machines.update(3, { machineName: 'Updated' });
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/machineService.php?id=3',
+        'http://localhost/app/api/machine.php?id=3',
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ machineName: 'Updated' }) })
       );
     });
@@ -695,7 +695,7 @@ describe('API Client (api.js)', () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       await PB_API.machines.delete(7);
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost/app/service/machineService.php?id=7',
+        'http://localhost/app/api/machine.php?id=7',
         expect.objectContaining({
           method: 'DELETE',
           body: '{}'
@@ -711,14 +711,14 @@ describe('API Client (api.js)', () => {
 
     it('fetchJSON should handle GET requests without body', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await fetchJSON('service/test.php', { method: 'GET' });
+      await fetchJSON('api/test.php', { method: 'GET' });
       const callArgs = fetch.mock.calls[0][1];
       expect(callArgs.body).toBeUndefined();
     });
 
     it('fetchJSON should use custom headers when provided', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await fetchJSON('service/test.php', { headers: { 'X-Custom': 'value' } });
+      await fetchJSON('api/test.php', { headers: { 'X-Custom': 'value' } });
       const callHeaders = fetch.mock.calls[0][1].headers;
       expect(callHeaders['X-Custom']).toBe('value');
     });
@@ -727,9 +727,9 @@ describe('API Client (api.js)', () => {
       const logSpy = vi.spyOn(console, 'log');
       localStorage.setItem('pb_debug', 'true');
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await fetchJSON('service/test.php', { method: 'GET' }); // Ensure it's a GET request for specific log messages
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[API] Constructing GET request to: service/test.php'), expect.objectContaining({ params: undefined }));
-      expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/\[API\] Final Request URL:.*http:\/\/localhost\/app\/service\/test\.php/));
+      await fetchJSON('api/test.php', { method: 'GET' }); // Ensure it's a GET request for specific log messages
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('[API] Constructing GET request to: api/test.php'), expect.objectContaining({ params: undefined }));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/\[API\] Final Request URL:.*http:\/\/localhost\/app\/api\/test\.php/));
     });
   });
 });

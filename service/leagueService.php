@@ -1,175 +1,451 @@
 <?php
-/**
- * League Management REST API Endpoint.
- * HTTP controller that delegates to the LeagueService class.
- *
- * Supported Methods:
- * - GET: Retrieve leagues, events (fixtures), or full league details
- * - POST: Create leagues, events, or add players to leagues
- * - PUT: Update leagues or events
- * - DELETE: Remove leagues, events, or players from leagues
- */
 
-require_once __DIR__ . '/../includes/bootstrap.php';
+namespace App\Service;
 
-// Prevent immediate execution during unit testing
-if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING === true) {
-    return;
-}
+use PDO;
 
-try {
-    $container = $GLOBALS['container'];
-    $leagueService = $container->get(\App\Service\LeagueService::class);
-    $method = $_SERVER['REQUEST_METHOD'];
-    $input = getJsonInput();
-    // Use 'task' parameter (formerly 'action') to avoid ad-blocker filters
-    $task = $_GET['task'] ?? 'league';
+class LeagueService {
+    private DatabaseService $db;
 
-    // GET: Retrieve Leagues or Events
-    if ($method === 'GET') {
-        if ($task === 'fixture') {
-            $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : null;
-            $events = $leagueService->getAllEvents($leagueId);
-            sendJson(array_map('serializeEvent', $events));
-        } else {
-            $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-            if ($id) {
-                $league = $leagueService->getLeague($id);
-                if (!$league) sendJson(['error' => 'League not found'], 404);
-                sendJson(serializeLeague($league));
-            } else {
-                $leagues = $leagueService->getAllLeaguesWithDetails($_GET['type'] ?? null);
-                sendJson(array_map('serializeLeague', $leagues));
+    public function __construct(DatabaseService $db) {
+        $this->db = $db;
+    }
+
+    /**
+     * Get all leagues, optionally filtered by type.
+     * NOTE: This is used internally by getAllLeaguesWithDetails(). External callers
+     * should prefer that method to get events, players, and teams in a single pass.
+     *
+     * @param string|null $type Optional type filter ('session', 'standard', etc)
+     * @return array
+     */
+    public function getAllLeagues(?string $type = null): array {
+        $pdo = $this->db->getPdo();
+        
+        $sql = 'SELECT * FROM leagues';
+        if ($type) {
+            $sql .= ' WHERE type = ?';
+        }
+        $sql .= ' ORDER BY start_date DESC';
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($type ? [$type] : []);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Get a complete league with events, players, and teams.
+     *
+     * @param int $leagueId
+     * @return array|false League with nested data or false if not found
+     */
+    public function getLeague(int $leagueId) {
+        $pdo = $this->db->getPdo();
+        
+        $stmt = $pdo->prepare('SELECT * FROM leagues WHERE id = ?');
+        $stmt->execute([$leagueId]);
+        $league = $stmt->fetch();
+        
+        if (!$league) {
+            return false;
+        }
+
+        // Fetch events
+        $stmt = $pdo->prepare(
+            'SELECT e.*, l.name as location_name 
+             FROM events e 
+             LEFT JOIN locations l ON e.location_id = l.id 
+             WHERE e.league_id = ? 
+             ORDER BY e.event_date ASC'
+        );
+        $stmt->execute([$leagueId]);
+        $league['events'] = $stmt->fetchAll();
+
+        // Fetch players
+        $stmt = $pdo->prepare(
+            'SELECT p.id, p.player_name as playerName, p.ifpa_id as ifpaId, u.id as user_id 
+             FROM players p 
+             JOIN league_players lp ON p.id = lp.player_id 
+             LEFT JOIN users u ON p.id = u.player_id 
+             WHERE lp.league_id = ? 
+             ORDER BY p.player_name ASC'
+        );
+        $stmt->execute([$leagueId]);
+        $league['players'] = $stmt->fetchAll();
+
+        // Fetch teams with members
+        $stmt = $pdo->prepare(
+            'SELECT t.*, 
+                    GROUP_CONCAT(p.id, ":", p.player_name SEPARATOR "|") as member_data
+             FROM teams t
+             JOIN league_teams lt ON t.id = lt.team_id
+             LEFT JOIN team_members tm ON t.id = tm.team_id
+             LEFT JOIN players p ON tm.player_id = p.id
+             WHERE lt.league_id = ?
+             GROUP BY t.id'
+        );
+        $stmt->execute([$leagueId]);
+        $teams = $stmt->fetchAll();
+        
+        foreach ($teams as &$t) {
+            $t['members'] = $this->parseTeamMembers($t['member_data'] ?? '');
+        }
+        $league['teams'] = $teams;
+
+        return $league;
+    }
+
+    /**
+     * Get all events, optionally for a specific league.
+     *
+     * @param int|null $leagueId
+     * @return array
+     */
+    public function getAllEvents(?int $leagueId = null): array {
+        $pdo = $this->db->getPdo();
+        $sql = 'SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id';
+        if ($leagueId) {
+            $sql .= ' WHERE e.league_id = ?';
+        }
+        $sql .= ' ORDER BY e.event_date ASC';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($leagueId ? [$leagueId] : []);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Get all leagues with nested events, players, and teams in bulk (avoids N+1).
+     *
+     * @param string|null $type
+     * @return array
+     */
+    public function getAllLeaguesWithDetails(?string $type = null): array {
+        $pdo = $this->db->getPdo();
+
+        $sql = 'SELECT * FROM leagues';
+        if ($type) $sql .= ' WHERE type = ?';
+        $sql .= ' ORDER BY start_date DESC';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($type ? [$type] : []);
+        $leagues = $stmt->fetchAll();
+
+        $allEvents = $this->getAllEvents();
+        $eventsByLeague = [];
+        foreach ($allEvents as $event) {
+            $eventsByLeague[(int)$event['league_id']][] = $event;
+        }
+
+        $lpStmt = $pdo->query(
+            'SELECT lp.league_id, p.id, p.player_name as playerName, p.ifpa_id as ifpaId, u.id as user_id
+             FROM players p
+             JOIN league_players lp ON p.id = lp.player_id
+             LEFT JOIN users u ON p.id = u.player_id
+             ORDER BY p.player_name ASC'
+        );
+        $playersByLeague = [];
+        foreach ($lpStmt->fetchAll() as $lp) {
+            $playersByLeague[(int)$lp['league_id']][] = $lp;
+        }
+
+        $ltStmt = $pdo->query(
+            'SELECT lt.league_id, t.*,
+                    GROUP_CONCAT(p.id, ":", p.player_name SEPARATOR "|") as member_data
+             FROM teams t
+             JOIN league_teams lt ON t.id = lt.team_id
+             LEFT JOIN team_members tm ON t.id = tm.team_id
+             LEFT JOIN players p ON tm.player_id = p.id
+             GROUP BY lt.league_id, t.id
+             ORDER BY t.name ASC'
+        );
+        $teamsByLeague = [];
+        foreach ($ltStmt->fetchAll() as $lt) {
+            $lt['members'] = $this->parseTeamMembers($lt['member_data'] ?? '');
+            $teamsByLeague[(int)$lt['league_id']][] = $lt;
+        }
+
+        foreach ($leagues as &$league) {
+            $id = (int)$league['id'];
+            $league['events']  = $eventsByLeague[$id]  ?? [];
+            $league['players'] = $playersByLeague[$id] ?? [];
+            $league['teams']   = $teamsByLeague[$id]   ?? [];
+        }
+
+        return $leagues;
+    }
+
+    /**
+     * Get the type and scoring_format of a league.
+     *
+     * @param int $leagueId
+     * @return array|false ['type' => ..., 'scoring_format' => ...] or false
+     */
+    public function getLeagueMeta(int $leagueId) {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare('SELECT type, scoring_format FROM leagues WHERE id = ?');
+        $stmt->execute([$leagueId]);
+        return $stmt->fetch();
+    }
+
+    /**
+     * Get the user_id linked to a player (null if unregistered).
+     *
+     * @param int $playerId
+     * @return int|null
+     */
+    public function getPlayerUserId(int $playerId): ?int {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare('SELECT u.id FROM players p JOIN users u ON p.id = u.player_id WHERE p.id = ?');
+        $stmt->execute([$playerId]);
+        $result = $stmt->fetchColumn();
+        return ($result !== false) ? (int)$result : null;
+    }
+
+    /**
+     * Count the number of players currently in a league.
+     *
+     * @param int $leagueId
+     * @return int
+     */
+    public function getLeaguePlayerCount(int $leagueId): int {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM league_players WHERE league_id = ?');
+        $stmt->execute([$leagueId]);
+        return (int)$stmt->fetchColumn();
+    }
+
+    /**
+     * Create a new league.
+     *
+     * @param string $name
+     * @param string|null $startDate
+     * @param string $type
+     * @param string $participants
+     * @param string $scoringFormat
+     * @param string $seasonScoring
+     * @param int $dropLowestWeeks
+     * @return array Created league data
+     */
+    public function createLeague(
+        string $name,
+        ?string $startDate = null,
+        string $type = 'standard',
+        string $participants = 'individual',
+        string $scoringFormat = 'bowling',
+        string $seasonScoring = 'weekly',
+        int $dropLowestWeeks = 0
+    ): array {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare(
+            'INSERT INTO leagues (name, start_date, type, participants, scoring_format, season_scoring, drop_lowest_weeks)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
+        );
+        $stmt->execute([$name, $startDate, $type, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks]);
+        return $this->getLeague((int)$pdo->lastInsertId());
+    }
+
+    /**
+     * Update an existing league.
+     *
+     * @param int $leagueId
+     * @param string $name
+     * @param string|null $startDate
+     * @param string $participants
+     * @param string $scoringFormat
+     * @param string $seasonScoring
+     * @param int $dropLowestWeeks
+     * @return array Updated league data
+     */
+    public function updateLeague(
+        int $leagueId,
+        string $name,
+        ?string $startDate = null,
+        string $participants = 'individual',
+        string $scoringFormat = 'bowling',
+        string $seasonScoring = 'weekly',
+        int $dropLowestWeeks = 0
+    ): array {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare(
+            'UPDATE leagues SET name = ?, start_date = ?, participants = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ? WHERE id = ?'
+        );
+        $stmt->execute([$name, $startDate, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $leagueId]);
+        return $this->getLeague($leagueId);
+    }
+
+    /**
+     * Delete a league and all associated data.
+     *
+     * @param int $leagueId
+     * @return bool Success
+     */
+    public function deleteLeague(int $leagueId): bool {
+        $pdo = $this->db->getPdo();
+        
+        try {
+            $pdo->beginTransaction();
+
+            // Fetch and delete all events associated with this league
+            $stmt = $pdo->prepare("SELECT id FROM events WHERE league_id = ?");
+            $stmt->execute([$leagueId]);
+            $eventIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+            foreach ($eventIds as $eventId) {
+                $this->deleteEvent((int)$eventId);
             }
+
+            // Clean up league associations
+            $pdo->prepare("DELETE FROM league_players WHERE league_id = ?")->execute([$leagueId]);
+            $pdo->prepare("DELETE FROM league_teams WHERE league_id = ?")->execute([$leagueId]);
+            $pdo->prepare("DELETE FROM league_staff WHERE league_id = ?")->execute([$leagueId]);
+
+            // Finally delete the league
+            $stmt = $pdo->prepare("DELETE FROM leagues WHERE id = ?");
+            $result = $stmt->execute([$leagueId]);
+
+            $pdo->commit();
+            return $result;
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw new \Exception("Failed to delete league {$leagueId}: " . $e->getMessage(), 0, $e);
         }
     }
 
-    // POST: Create new League or Event
-    if ($method === 'POST') {
-        if ($task === 'member') {
-            if (empty($input['leagueId']) || empty($input['playerId'])) {
-                sendJson(['error' => 'leagueId and playerId are required'], 400);
-            }
+    /**
+     * Add a player to a league.
+     *
+     * @param int $leagueId
+     * @param int $playerId
+     * @return bool Success
+     */
+    public function addPlayerToLeague(int $leagueId, int $playerId): bool {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare('INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)');
+        return $stmt->execute([$leagueId, $playerId]);
+    }
 
-            $leagueId = (int)$input['leagueId'];
-            $playerId = (int)$input['playerId'];
-            $meta = $leagueService->getLeagueMeta($leagueId);
-            $playerUserId = $leagueService->getPlayerUserId($playerId);
+    /**
+     * Remove a player from a league, including their scores for all events in that league.
+     *
+     * @param int $leagueId
+     * @param int $playerId
+     * @return bool Success
+     */
+    public function removePlayerFromLeague(int $leagueId, int $playerId): bool {
+        $pdo = $this->db->getPdo();
+        $pdo->prepare('DELETE FROM scores WHERE player_id = ? AND event_id IN (SELECT id FROM events WHERE league_id = ?)')
+            ->execute([$playerId, $leagueId]);
+        $stmt = $pdo->prepare('DELETE FROM league_players WHERE league_id = ? AND player_id = ?');
+        return $stmt->execute([$leagueId, $playerId]);
+    }
 
-            if ($meta['type'] === 'session') {
-                if ($playerUserId !== null) validateSessionOrSecret();
-            } else {
-                if ($playerUserId !== null) validateTDAccess();
-            }
+    /**
+     * Create a new event for a league.
+     *
+     * @param int $leagueId
+     * @param string $eventName
+     * @param string|null $eventDate
+     * @param int|null $locationId
+     * @param string|null $scoringFormat  If null, inherits from the league.
+     * @return array Created event row
+     */
+    public function createEvent(int $leagueId, string $eventName, ?string $eventDate = null, ?int $locationId = null, ?string $scoringFormat = null): array {
+        $pdo = $this->db->getPdo();
+        if (!$scoringFormat) {
+            $meta = $this->getLeagueMeta($leagueId);
+            $scoringFormat = $meta['scoring_format'] ?? 'bowling';
+        }
+        $stmt = $pdo->prepare(
+            'INSERT INTO events (league_id, location_id, event_name, event_date, scoring_format) VALUES (?, ?, ?, ?, ?)'
+        );
+        $stmt->execute([$leagueId, $locationId, $eventName, $eventDate, $scoringFormat]);
+        return $this->getEvent((int)$pdo->lastInsertId());
+    }
 
-            if ($meta['scoring_format'] === 'baseball') {
-                if ($leagueService->getLeaguePlayerCount($leagueId) >= 2) {
-                    sendJson(['error' => 'Baseball sessions are limited to 2 players'], 400);
-                }
-            }
+    /**
+     * Get a single event by id.
+     *
+     * @param int $eventId
+     * @return array|false
+     */
+    public function getEvent(int $eventId) {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare(
+            'SELECT e.*, l.name as location_name FROM events e LEFT JOIN locations l ON e.location_id = l.id WHERE e.id = ?'
+        );
+        $stmt->execute([$eventId]);
+        return $stmt->fetch();
+    }
 
-            $leagueService->addPlayerToLeague($leagueId, $playerId);
-            sendJson(['success' => true]);
+    /**
+     * Update an existing event.
+     *
+     * @param int $eventId
+     * @param string|null $eventName
+     * @param string|null $eventDate
+     * @param int|null $locationId
+     * @param string $scoringFormat
+     * @return array|false Updated event row
+     */
+    public function updateEvent(int $eventId, ?string $eventName = null, ?string $eventDate = null, ?int $locationId = null, string $scoringFormat = 'bowling') {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare(
+            'UPDATE events SET location_id = ?, event_name = ?, event_date = ?, scoring_format = ? WHERE id = ?'
+        );
+        $stmt->execute([$locationId, $eventName, $eventDate, $scoringFormat, $eventId]);
+        return $this->getEvent($eventId);
+    }
 
-        } elseif ($task === 'fixture') {
-            validateTDAccess();
-            if (empty($input['leagueId']) || empty($input['eventName'])) {
-                sendJson(['error' => 'leagueId and eventName are required'], 400);
-            }
+    /**
+     * Delete a single event and its associated matchups, scores, and target scores.
+     *
+     * @param int $eventId
+     * @return bool
+     */
+    public function deleteEvent(int $eventId): bool {
+        $pdo = $this->db->getPdo();
+        
+        try {
+            $pdo->prepare('DELETE FROM matchups WHERE event_id = ?')->execute([$eventId]);
+            $pdo->prepare('DELETE FROM scores WHERE event_id = ?')->execute([$eventId]);
+            $pdo->prepare('DELETE FROM target_scores WHERE event_id = ?')->execute([$eventId]);
 
-            $event = $leagueService->createEvent(
-                (int)$input['leagueId'],
-                $input['eventName'],
-                $input['eventDate'] ?? null,
-                !empty($input['locationId']) ? (int)$input['locationId'] : null,
-                $input['scoringFormat'] ?? null
-            );
-            if (!$event) sendJson(['error' => 'Event created but could not be retrieved.'], 500);
-            sendJson(serializeEvent($event));
-
-        } else {
-            if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
-
-            $league = $leagueService->createLeague(
-                $input['name'],
-                $input['startDate'] ?? null,
-                $input['type'] ?? 'standard',
-                $input['participants'] ?? 'individual',
-                $input['scoringFormat'] ?? 'bowling',
-                $input['seasonScoring'] ?? 'weekly',
-                (int)($input['dropLowestWeeks'] ?? 0)
-            );
-            if (!$league) sendJson(['error' => 'League created but could not be retrieved.'], 500);
-            sendJson(serializeLeague($league));
+            $stmt = $pdo->prepare('DELETE FROM events WHERE id = ?');
+            return $stmt->execute([$eventId]);
+        } catch (\PDOException $e) {
+            throw new \Exception("Failed to delete event {$eventId}: " . $e->getMessage(), 0, $e);
         }
     }
 
-    // PUT: Update League or Event
-    if ($method === 'PUT') {
-        validateTDAccess();
-
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
-
-        if ($task === 'fixture') {
-            $event = $leagueService->updateEvent(
-                $id,
-                $input['eventName'] ?? null,
-                $input['eventDate'] ?? null,
-                !empty($input['locationId']) ? (int)$input['locationId'] : null,
-                $input['scoringFormat'] ?? 'bowling'
-            );
-            if (!$event) sendJson(['error' => 'Resource updated but could not be retrieved.'], 500);
-            sendJson(serializeEvent($event));
-        } else {
-            $league = $leagueService->updateLeague(
-                $id,
-                $input['name'],
-                $input['startDate'] ?? null,
-                $input['participants'] ?? 'individual',
-                $input['scoringFormat'] ?? 'bowling',
-                $input['seasonScoring'] ?? 'weekly',
-                (int)($input['dropLowestWeeks'] ?? 0)
-            );
-            if (!$league) sendJson(['error' => 'Resource updated but could not be retrieved.'], 500);
-            sendJson(serializeLeague($league));
-        }
+    /**
+     * Check whether an event exists and return its league_id, or false.
+     *
+     * @param int $eventId
+     * @return int|false
+     */
+    public function getEventLeagueId(int $eventId) {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare('SELECT league_id FROM events WHERE id = ?');
+        $stmt->execute([$eventId]);
+        $result = $stmt->fetchColumn();
+        return ($result !== false) ? (int)$result : false;
     }
 
-    // DELETE: Remove League, Event, or Player from League
-    if ($method === 'DELETE') {
-        if ($task === 'member') {
-            $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
-            $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
-
-            $meta = $leagueService->getLeagueMeta($leagueId);
-            if ($meta['type'] === 'session') {
-                validateSessionOrSecret();
-            } else {
-                validateTDAccess();
-            }
-
-            $leagueService->removePlayerFromLeague($leagueId, $playerId);
-        } else {
-            $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-            if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
-
-            if ($task === 'fixture') {
-                if ($leagueService->getEventLeagueId($id) === false) {
-                    sendJson(['error' => 'Event not found'], 404);
-                }
-                validateTDAccess();
-                $leagueService->deleteEvent($id);
-            } else {
-                validateAdminAccess();
-                $leagueService->deleteLeague($id);
-            }
+    /**
+     * Helper to parse team member data from GROUP_CONCAT.
+     *
+     * @param string $memberData
+     * @return array
+     */
+    private function parseTeamMembers(string $memberData): array {
+        if (!$memberData) {
+            return [];
         }
-        sendJson(['success' => true]);
+        
+        return array_filter(array_map(function($m) {
+            $parts = explode(":", $m);
+            return count($parts) === 2 ? ['id' => (int)$parts[0], 'playerName' => $parts[1]] : null;
+        }, explode("|", $memberData)));
     }
-
-    sendJson(['error' => 'Unsupported request method'], 405);
-
-} catch (Exception $e) {
-    sendJson(['error' => $e->getMessage()], 500);
 }

@@ -33,8 +33,12 @@ test.describe('Authentication & RBAC', () => {
     await page.goto('');
     const adminNav = page.locator('#admin-nav-item');
     
-    // Admin menu should be hidden if no sub-items are allowed
-    await expect(adminNav).toBeHidden();
+    // Players can see the Admin menu, but Maintenance should be hidden
+    await expect(adminNav).toBeVisible();
+    await adminNav.click();
+    await expect(page.locator('#nav-machines')).toBeVisible();
+    await expect(page.locator('#nav-teams')).toBeVisible();
+    await expect(page.locator('#nav-maintenance')).toBeHidden();
   });
 
   test('should handle logout correctly', async ({ page }) => {

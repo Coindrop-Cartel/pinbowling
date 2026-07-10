@@ -1,170 +1,234 @@
 <?php
-/**
- * Player Management REST API Endpoint.
- * HTTP controller that delegates to the PlayerService class.
- * 
- * Supported Methods:
- * - GET: Retrieve all players or a specific player
- * - POST: Create a new player
- * - PUT: Update player details or user role
- * - DELETE: Remove a player permanently
- */
 
-require_once __DIR__ . '/../includes/bootstrap.php';
+namespace App\Service;
 
-try {
-    $container = $GLOBALS['container'];
-    $playerService = $container->get(\App\Service\PlayerService::class);
-    $method = $_SERVER['REQUEST_METHOD'];
-    $task = $_GET['task'] ?? null;
-    $input = getJsonInput();
+use PDO;
 
-    // GET: Retrieve all registered players alphabetically or a specific player
-    if ($method === 'GET') {
-        $user = \App\Service\AuthService::getCurrentUser();
-        if ($user && $user['role'] === 'player') {
-            // Requirement: Players only see their own info
-            $player = $playerService->getPlayer($user['player_id']);
-            sendJson($player ? serializePlayer($player) : null);
+class PlayerService {
+    private DatabaseService $db;
+
+    public function __construct(DatabaseService $db) {
+        $this->db = $db;
+    }
+
+    /**
+     * Get all players, optionally filtered by role.
+     *
+     * @param string|null $role Optional role filter (e.g., 'player', 'admin')
+     * @return array
+     */
+    public function getAllPlayers(?string $role = null): array {
+        if ($role) {
+            $stmt = $this->db->query(
+                "SELECT p.*, u.role, u.id as user_id, u.username, u.email 
+                 FROM players p 
+                 LEFT JOIN users u ON p.id = u.player_id 
+                 WHERE u.role = ?
+                 ORDER BY p.player_name ASC",
+                [$role]
+            );
         } else {
-            $players = $playerService->getAllPlayers();
-            sendJson(array_map('serializePlayer', $players));
+            $stmt = $this->db->getPdo()->query(
+                "SELECT p.*, u.role, u.id as user_id, u.username, u.email 
+                 FROM players p 
+                 LEFT JOIN users u ON p.id = u.player_id 
+                 ORDER BY p.player_name ASC"
+            );
         }
+        return $stmt->fetchAll();
     }
 
-    // POST: Register a new player (Protected by API Secret)
-    if ($method === 'POST') {
-        validateAdminAccess();
+    /**
+     * Get a specific player by ID.
+     *
+     * @param int $playerId
+     * @return array|false
+     */
+    public function getPlayer(int $playerId) {
+        $stmt = $this->db->query(
+            "SELECT p.*, u.id as user_id, u.role, u.username, u.email 
+             FROM players p 
+             LEFT JOIN users u ON p.id = u.player_id 
+             WHERE p.id = ?",
+            [$playerId]
+        );
+        return $stmt->fetch();
+    }
+
+    /**
+     * Create a new player.
+     *
+     * @param string $playerName
+     * @param string|null $ifpaId
+     * @param string|null $matchplayId
+     * @return array Created player data with user_id and role
+     * @throws \PDOException on duplicate name (error code 1062)
+     */
+    public function createPlayer(string $playerName, ?string $ifpaId = null, ?string $matchplayId = null): array {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare("INSERT INTO players (player_name, ifpa_id, matchplay_id) VALUES (?, ?, ?)");
+        $stmt->execute([$playerName, $ifpaId, $matchplayId]);
+        $id = (int)$pdo->lastInsertId();
+
+        $stmt = $pdo->prepare(
+            "SELECT p.*, u.id as user_id, u.role 
+             FROM players p 
+             LEFT JOIN users u ON p.id = u.player_id 
+             WHERE p.id = ?"
+        );
+        $stmt->execute([$id]);
+        $player = $stmt->fetch();
         
-        if (empty($input['playerName'])) {
-            sendJson(['error' => 'playerName is required'], 400);
-        }
-
-        $ifpa_id = $input['ifpaId'] ?? null;
-        $matchplay_id = $input['matchplayId'] ?? null;
-
-        try {
-            $player = $playerService->createPlayer($input['playerName'], $ifpa_id, $matchplay_id);
-            sendJson(serializePlayer($player));
-        } catch (\PDOException $error) {
-            // Handle duplicate names gracefully by returning the existing record
-            if ($error->errorInfo[1] === 1062) {
-                $players = $playerService->getAllPlayers();
-                $existing = current(array_filter($players, fn($p) => $p['player_name'] === $input['playerName']));
-                if ($existing) {
-                    sendJson(serializePlayer($existing), 409); // Conflict: Player name already exists
-                }
-            }
-            throw $error;
-        }
-    }
-
-    // PUT: Update an existing player (Protected by API Secret)
-    if ($method === 'PUT') {
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if (!$id) {
-            sendJson(['error' => 'id query parameter is required'], 400);
-        }
-
-        // Handle role updates
-        if ($task === 'role') {
-            validateTDAccess();
-            $newRole = $input['role'] ?? 'player';
-            if (!in_array($newRole, ['player', 'td', 'admin'])) {
-                sendJson(['error' => 'Invalid role'], 400);
-            }
-
-            $user = \App\Service\AuthService::getCurrentUser();
-            if ($user && $user['role'] === 'td' && $newRole === 'admin') {
-                sendJson(['error' => 'Unauthorized: TDs cannot assign Admin role'], 403);
-            }
-
-            // $id here is the user_id passed in the URL
-            $playerService->updateUserRole($id, $newRole);
-            sendJson(['success' => true]);
-        }
-
-        // Update player details
-        $existing = $playerService->getPlayer($id);
-        if (!$existing) {
-            sendJson(['error' => 'Player not found'], 404);
-        }
-
-        $newName = $input['playerName'] ?? $existing['player_name'];
-        $ifpa_id = $input['ifpaId'] ?? null;
-        $matchplay_id = $input['matchplayId'] ?? null;
-        $newUsername = $input['username'] ?? null;
-        $newEmail = $input['email'] ?? null;
-
-        $user = \App\Service\AuthService::getCurrentUser();
-        $isOwner = $user && (int)$user['player_id'] === $id;
-
-        // Rule: Changing the name requires TD/Admin Access OR being the profile owner.
-        if ($newName !== $existing['player_name']) {
-            if (!$isOwner) {
-                validateTDAccess();
-            }
-        } else if (!$isOwner) {
-            validateTDAccess();
-        }
-
-        // Rule: Changing username requires TD/Admin Access OR being the profile owner.
-        if ($newUsername !== null && !empty($existing['user_id']) && $newUsername !== $existing['username']) {
-            if (!$isOwner) {
-                validateTDAccess();
-            }
-        }
-
-        // Rule: Changing email requires TD/Admin Access OR being the profile owner.
-        if ($newEmail !== null && !empty($existing['user_id']) && $newEmail !== $existing['email']) {
-            if (!$isOwner) {
-                validateTDAccess();
-            }
-        }
-
-        if (empty($newName)) {
-            sendJson(['error' => 'playerName is required'], 400);
-        }
-
-        try {
-            if ($newUsername !== null && !empty($existing['user_id']) && $newUsername !== $existing['username']) {
-                $playerService->updateUserUsername((int)$existing['user_id'], $newUsername);
-            }
-            if ($newEmail !== null && !empty($existing['user_id']) && $newEmail !== $existing['email']) {
-                $playerService->updateUserEmail((int)$existing['user_id'], $newEmail);
-            }
-            $player = $playerService->updatePlayer($id, $newName, $ifpa_id, $matchplay_id);
-            sendJson(serializePlayer($player));
-        } catch (\Exception $error) {
-            if ($error instanceof \PDOException && $error->errorInfo[1] === 1062) { // Duplicate entry
-                sendJson(['error' => 'Player name already exists'], 409);
-            } else {
-                sendJson(['error' => $error->getMessage()], 400);
-            }
-        }
-    }
-
-    // DELETE: Remove a player and their associated data (Protected by Admin)
-    if ($method === 'DELETE') {
-        validateAdminAccess();
-        
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if (!$id) {
-            sendJson(['error' => 'id query parameter is required'], 400);
-        }
-
-        $player = $playerService->getPlayer($id);
         if (!$player) {
-            sendJson(['error' => 'Player not found'], 404);
+            throw new \RuntimeException("Player created but could not be retrieved.");
         }
-
-        $playerService->deletePlayer($id);
-        sendJson(['success' => true, 'deleted' => $player]);
+        
+        return $player;
     }
 
-    sendJson(['error' => 'Unsupported request method'], 405);
+    /**
+     * Update an existing player.
+     *
+     * @param int $playerId
+     * @param string|null $playerName
+     * @param string|null $ifpaId
+     * @param string|null $matchplayId
+     * @return array Updated player data
+     */
+    public function updatePlayer(int $playerId, ?string $playerName = null, ?string $ifpaId = null, ?string $matchplayId = null): array {
+        $fields = [];
+        $params = [];
 
-} catch (Exception $e) {
-    sendJson(['error' => $e->getMessage()], 500);
+        if ($playerName !== null) {
+            $fields[] = "player_name = ?";
+            $params[] = $playerName;
+        }
+        if ($ifpaId !== null) {
+            $fields[] = "ifpa_id = ?";
+            $params[] = $ifpaId;
+        }
+        if ($matchplayId !== null) {
+            $fields[] = "matchplay_id = ?";
+            $params[] = $matchplayId;
+        }
+
+        if (empty($fields)) {
+            return $this->getPlayer($playerId);
+        }
+
+        $params[] = $playerId;
+        $sql = "UPDATE players SET " . implode(", ", $fields) . " WHERE id = ?";
+        $stmt = $this->db->getPdo()->prepare($sql);
+        $stmt->execute($params);
+
+        return $this->getPlayer($playerId);
+    }
+
+    /**
+     * Delete a player and all their associated data.
+     * Cascades to users, scores, league memberships, etc.
+     *
+     * @param int $playerId
+     * @return bool Success
+     */
+    public function deletePlayer(int $playerId): bool {
+        $pdo = $this->db->getPdo();
+        
+        try {
+            $pdo->beginTransaction();
+
+            // Delete user account associated with this player
+            $stmt = $pdo->prepare("DELETE FROM users WHERE player_id = ?");
+            $stmt->execute([$playerId]);
+
+            // Delete scores for this player across all events
+            $stmt = $pdo->prepare("DELETE FROM scores WHERE player_id = ?");
+            $stmt->execute([$playerId]);
+
+            // Remove from league rosters
+            $stmt = $pdo->prepare("DELETE FROM league_players WHERE player_id = ?");
+            $stmt->execute([$playerId]);
+
+            // Finally delete the player record
+            $stmt = $pdo->prepare("DELETE FROM players WHERE id = ?");
+            $result = $stmt->execute([$playerId]);
+
+            $pdo->commit();
+            return $result;
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Update a user's role.
+     *
+     * @param int $userId
+     * @param string $role ('player', 'td', 'admin')
+     * @return bool Success
+     */
+    public function updateUserRole(int $userId, string $role): bool {
+        if (!in_array($role, ['player', 'td', 'admin'])) {
+            throw new \InvalidArgumentException("Invalid role: $role");
+        }
+        
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE id = ?");
+        return $stmt->execute([$role, $userId]);
+    }
+
+    /**
+     * Update a user's username.
+     *
+     * @param int $userId
+     * @param string $username
+     * @return bool Success
+     */
+    public function updateUserUsername(int $userId, string $username): bool {
+        $username = trim($username);
+        if (empty($username)) {
+            throw new \InvalidArgumentException("Username cannot be empty");
+        }
+        
+        $pdo = $this->db->getPdo();
+        // Check if username already exists for a different user
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
+        $stmt->execute([$username, $userId]);
+        if ($stmt->fetch()) {
+            throw new \RuntimeException("Username already exists");
+        }
+
+        $stmt = $pdo->prepare("UPDATE users SET username = ? WHERE id = ?");
+        return $stmt->execute([$username, $userId]);
+    }
+
+    /**
+     * Update a user's email.
+     *
+     * @param int $userId
+     * @param string|null $email
+     * @return bool Success
+     */
+    public function updateUserEmail(int $userId, ?string $email): bool {
+        $email = $email !== null ? trim($email) : null;
+        if ($email === '') {
+            $email = null;
+        }
+        
+        $pdo = $this->db->getPdo();
+        if ($email !== null) {
+            // Check if email already exists for a different user
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+            $stmt->execute([$email, $userId]);
+            if ($stmt->fetch()) {
+                throw new \RuntimeException("Email address already exists");
+            }
+        }
+
+        $stmt = $pdo->prepare("UPDATE users SET email = ? WHERE id = ?");
+        return $stmt->execute([$email, $userId]);
+    }
 }
-

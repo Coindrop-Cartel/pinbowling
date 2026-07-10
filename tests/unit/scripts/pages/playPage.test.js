@@ -13,7 +13,7 @@ const apiMock = vi.hoisted(() => ({
 // Mock dependencies
 vi.mock('@services/api.js', () => ({
   PB_API: {
-    leagues: { getAll: vi.fn(), create: vi.fn(), addPlayer: vi.fn() },
+    leagues: { getAll: vi.fn(), create: vi.fn(), addPlayer: vi.fn(), get: vi.fn() },
     players: { getAll: vi.fn() },
     locations: {
       getAll: vi.fn(() => Promise.resolve(apiMock.locations)),
@@ -21,6 +21,7 @@ vi.mock('@services/api.js', () => ({
     },
     events: { create: vi.fn() },
     machines: { saveTarget: vi.fn() },
+    matchups: { save: vi.fn() },
     auth: {
       me: vi.fn(),
     }
@@ -576,5 +577,150 @@ describe('Play Page (playPage.js)', () => {
     await finalizeBtn.onclick();
 
     expect(alert).toHaveBeenCalledWith(expect.stringContaining('Failed to create event'));
+  });
+
+  describe('Additional playPage Coverage', () => {
+    it('should toggle generator fields via changeBtn', async () => {
+      document.body.innerHTML += `<button id="qp-change-setup-btn"></button>`;
+      PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'L1', machines: [] }]);
+      await initPlayPage();
+
+      // Show generator
+      document.getElementById('create-new-toggle').click();
+
+      // Change button click
+      const changeBtn = document.getElementById('qp-change-setup-btn');
+      changeBtn.click();
+
+      expect(document.getElementById('qp-setup-fields').classList.contains('hidden')).toBe(false);
+      expect(document.getElementById('qp-setup-summary').classList.contains('hidden')).toBe(true);
+    });
+
+    it('should reorder items and toggle expansion state in preview list', async () => {
+      PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1' }] }]);
+      apiMock.locations = [{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1', targetMed: 1000 }, { machineId: 20, machineName: 'M2', targetMed: 2000 }] }];
+      await initPlayPage();
+
+      document.getElementById('create-new-toggle').click();
+      document.getElementById('qp-location').value = '1';
+      document.getElementById('qp-frames').value = '2'; // generate 2 frames
+      await document.getElementById('quick-play-form').dispatchEvent(new Event('submit'));
+
+      // Test toggle expansion
+      const rows = document.querySelectorAll('.frame-preview-item');
+      expect(rows.length).toBe(2);
+
+      // Trigger reorder callback
+      const onReorder = uiMocks.setupSortableList.mock.calls[0][1].onReorder;
+      const originalFrames = [...document.querySelectorAll('.frame-preview-item')];
+      const tidOrder = originalFrames.map(r => r.id);
+      
+      // Swap order
+      onReorder([tidOrder[1], tidOrder[0]]);
+      const reorderedRows = document.querySelectorAll('.frame-preview-item');
+      expect(reorderedRows[0].id).toBe(tidOrder[1]);
+    });
+
+    it('should handle difficulty fills and scaling toggles', async () => {
+      PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'L1', machines: [] }]);
+      apiMock.locations = [{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1', targetEasy: 100, targetMed: 200, targetHard: 300 }] }];
+      
+      // Force engine to return custom inputs
+      engineMock.getPreviewRowHtml.mockImplementation((frame, index) => {
+        return {
+          headerHtml: `<div class="header">Header</div>`,
+          contentHtml: `
+            <input class="score10-input" value="${frame.value1 || ''}" />
+            <input class="score1-input" value="${frame.value2 || ''}" />
+            <button class="qfill" data-type="easy">Easy</button>
+            <button class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : ''}" data-scale="curved">Curved</button>
+            <input class="row-machine-search" />
+            <select class="row-machine-select"></select>
+            <div class="preview-values-container"></div>
+          `
+        };
+      });
+
+      await initPlayPage();
+
+      document.getElementById('create-new-toggle').click();
+      document.getElementById('qp-location').value = '1';
+      document.getElementById('qp-frames').value = '1'; 
+      await document.getElementById('quick-play-form').dispatchEvent(new Event('submit'));
+
+      // Wait for preview to generate
+      await vi.waitFor(() => {
+        expect(document.getElementById('finalize-qp-btn').disabled).toBe(false);
+      });
+
+      // Simulate expansion to show qfill and scaling buttons
+      const onHeaderClick = uiMocks.createExpandableRow.mock.calls[0][1].onHeaderClick;
+      onHeaderClick();
+
+      // Locate qfill button (e.g. Easy)
+      const easyBtn = document.querySelector('.qfill[data-type="easy"]');
+      easyBtn.click();
+      expect(document.querySelector('.score10-input').value).toBe('100');
+
+      // Locate scaling button (e.g. Curved)
+      const curvedBtn = document.querySelector('.scaling-btn[data-scale="curved"]');
+      curvedBtn.click();
+      expect(curvedBtn.classList.contains('btn-standard')).toBe(true);
+
+      // Restore mock
+      engineMock.getPreviewRowHtml.mockImplementation((frame, index) => ({
+        headerHtml: `<div class="header"><span>${index}</span><span>${frame.machineName}</span></div>`,
+        contentHtml: '<div class="content">content</div>'
+      }));
+    });
+
+    it('should prompt for opponent and save matchups in baseball head-to-head format on finalize', async () => {
+      apiMock.locations = [{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1', targetEasy: 100, targetMed: 200, targetHard: 300 }] }];
+      PB_API.locations.getAll.mockResolvedValue(apiMock.locations);
+      PB_API.leagues.create.mockResolvedValue({ id: 99 });
+      PB_API.events.create.mockResolvedValue({ id: 101 });
+      PB_API.auth.me.mockResolvedValue({ player_id: 1 });
+      PB_API.leagues.addPlayer.mockResolvedValue({ success: true });
+      PB_API.leagues.get.mockResolvedValue({ players: [{ id: 1, playerName: 'Kyle' }] });
+      PB_API.players.getAll.mockResolvedValue([{ id: 1, playerName: 'Kyle' }, { id: 2, playerName: 'Brian' }]);
+
+      // Enable baseball format
+      engineMock.getMatchupDescription.mockReturnValue({
+        description: 'Head to Head Baseball',
+        details: []
+      });
+      engineMock.generateMatchupPayload.mockReturnValue([{ roundNumber: 1, player1Id: 1, player2Id: 2 }]);
+
+      // Opponent selection mock
+      uiMocks.showPlayerSelectionDialog.mockResolvedValueOnce(2); // Choose Brian
+
+      await initPlayPage();
+
+      // Setup format selector for baseball
+      const formatSelect = document.getElementById('qp-format');
+      formatSelect.innerHTML = `
+        <option value="bowling">Bowling</option>
+        <option value="baseball">Baseball</option>
+      `;
+      formatSelect.value = 'baseball';
+
+      document.getElementById('create-new-toggle').click();
+      document.getElementById('qp-location').value = '1';
+      document.getElementById('qp-frames').value = '1'; 
+      await document.getElementById('quick-play-form').dispatchEvent(new Event('submit'));
+
+      // Wait for preview to generate
+      await vi.waitFor(() => {
+        expect(document.getElementById('finalize-qp-btn').disabled).toBe(false);
+      });
+
+      // Finalize quick play
+      const finalizeBtn = document.getElementById('finalize-qp-btn');
+      await finalizeBtn.onclick();
+
+      expect(uiMocks.showPlayerSelectionDialog).toHaveBeenCalled();
+      expect(PB_API.leagues.addPlayer).toHaveBeenCalledWith(99, 2);
+      expect(PB_API.matchups.save).toHaveBeenCalled();
+    });
   });
 });

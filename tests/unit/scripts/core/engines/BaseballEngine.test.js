@@ -768,4 +768,203 @@ describe('BaseballEngine', () => {
     engine.renderResults(calcResult, machines, scoreMap, context, domRefs);
     expect(domRefs.resultsPanel.classList.add).not.toHaveBeenCalled();
   });
+
+  test('renderResults - with matchups and full scoreboard rendering (player found in cache, total score div present)', () => {
+    const calcResult = { turnResults: [], totalDisplay: '0' };
+    const machines = [{}, {}, {}, {}]; // 4 machines -> 2 innings
+    const scoreMap = {};
+
+    // Mock calculations inside engine
+    const calculateTurnResultsSpy = vi.spyOn(engine, 'calculateTurnResults');
+    // Player 1 (Home)
+    calculateTurnResultsSpy.mockReturnValueOnce({
+      turnResults: [
+        { played: true, score: 0, isBatter: false, isWalkOff: false }, // Inn 1 top (pitcher) - sets to '0'
+        { played: true, score: 3, isBatter: true, isWalkOff: false },  // Inn 1 bottom (batter)
+        { played: false, isWalkOff: true },                            // Inn 2 top (pitcher) - sets to 'X' (Walk-off)
+        { played: false, isWalkOff: false }                            // Inn 2 bottom
+      ]
+    });
+    // Player 2 (Away)
+    calculateTurnResultsSpy.mockReturnValueOnce({
+      turnResults: [
+        { played: true, score: 1, isBatter: true, isWalkOff: false },  // Inn 1 top (batter) - sets to '1'
+        { played: true, score: 0, isBatter: false, isWalkOff: false }, // Inn 1 bottom (pitcher)
+        { played: false, isWalkOff: false },                           // Inn 2 top (batter) - sets to '-'
+        { played: false, isWalkOff: false }                            // Inn 2 bottom
+      ]
+    });
+
+    const context = {
+      eventMatchups: [
+        { playerId: 1, orderNumber: 1, playerOrder: 1 }, // Player 1 home
+        { playerId: 2, orderNumber: 1, playerOrder: 2 }, // Player 2 away
+      ],
+      allPlayersCache: [
+        { id: 1, playerName: 'Player One' },
+        { id: 2, playerName: 'Player Two' }
+      ],
+      getCurrentPlayerId: () => '1',
+      normalizeScores: (s) => s,
+      groupScoresByPlayer: (s) => s,
+      buildBaseballScoreMapForPlayer: (id, scores, matchups) => {
+        return { isPlayer1: id === 1 };
+      },
+      allEventScores: []
+    };
+
+    const mockTable = { classList: { add: vi.fn(), remove: vi.fn() } };
+    const mockExistingGrid = { remove: vi.fn() };
+    const mockTotalScoreDiv = { insertAdjacentHTML: vi.fn() };
+
+    const querySelectorMock = vi.fn((selector) => {
+      if (selector === 'table.data-table') return mockTable;
+      if (selector === '.scoreboard-grid') return mockExistingGrid;
+      if (selector === '.total-score') return mockTotalScoreDiv;
+      return null;
+    });
+
+    const domRefs = {
+      resultsPanel: {
+        querySelector: querySelectorMock,
+        classList: { add: vi.fn(), remove: vi.fn() },
+        insertAdjacentHTML: vi.fn()
+      },
+      resultsBody: { innerHTML: '' },
+      totalScore: { innerHTML: '' },
+      resultsEmpty: { classList: { add: vi.fn() } },
+      escapeHTML: (s) => s
+    };
+
+    engine.renderResults(calcResult, machines, scoreMap, context, domRefs);
+
+    // Verify mock interactions
+    expect(mockTable.classList.add).toHaveBeenCalledWith('hidden');
+    expect(mockExistingGrid.remove).toHaveBeenCalled();
+    expect(mockTotalScoreDiv.insertAdjacentHTML).toHaveBeenCalledWith('beforebegin', expect.stringContaining('scoreboard-grid'));
+
+    // Check rendered total score
+    expect(domRefs.totalScore.innerHTML).toContain('Player One');
+    expect(domRefs.totalScore.innerHTML).toContain('Player Two');
+    // Away (Player 2) has 1 + 2 = 3 runs (using first mock because sorted first)
+    // Home (Player 1) has 1 run (using second mock)
+    expect(domRefs.totalScore.innerHTML).toContain('Player Two 3');
+    expect(domRefs.totalScore.innerHTML).toContain('Player One 1');
+
+    // Restore spy
+    calculateTurnResultsSpy.mockRestore();
+  });
+
+  test('renderResults - fallback names and missing away team', () => {
+    const calcResult = { turnResults: [], totalDisplay: '0' };
+    const machines = [{}]; // 1 machine -> 1 inning
+    const scoreMap = {};
+
+    const calculateTurnResultsSpy = vi.spyOn(engine, 'calculateTurnResults');
+    // Player 1 (Home)
+    calculateTurnResultsSpy.mockReturnValueOnce({
+      turnResults: [
+        { played: true, score: 5, isBatter: true, isWalkOff: false }
+      ]
+    });
+
+    const context = {
+      eventMatchups: [
+        { playerId: 1, orderNumber: 1, playerOrder: 1 }, // Player 1 home, no opponent
+      ],
+      allPlayersCache: [], // Empty cache to trigger fallback names
+      getCurrentPlayerId: () => '1',
+      normalizeScores: (s) => s,
+      groupScoresByPlayer: (s) => s,
+      buildBaseballScoreMapForPlayer: (id, scores, matchups) => {
+        return { isPlayer1: id === 1 };
+      },
+      allEventScores: []
+    };
+
+    const mockTable = { classList: { add: vi.fn(), remove: vi.fn() } };
+
+    const querySelectorMock = vi.fn((selector) => {
+      if (selector === 'table.data-table') return mockTable;
+      return null;
+    });
+
+    const domRefs = {
+      resultsPanel: {
+        querySelector: querySelectorMock,
+        classList: { add: vi.fn(), remove: vi.fn() },
+        insertAdjacentHTML: vi.fn()
+      },
+      resultsBody: { innerHTML: '' },
+      totalScore: { innerHTML: '' },
+      resultsEmpty: { classList: { add: vi.fn() } },
+      escapeHTML: (s) => s
+    };
+
+    engine.renderResults(calcResult, machines, scoreMap, context, domRefs);
+
+    // Verify insertion fallback (no total-score div)
+    expect(domRefs.resultsPanel.insertAdjacentHTML).toHaveBeenCalledWith('beforeend', expect.stringContaining('scoreboard-grid'));
+
+    // Check rendered total score (Away defaults to string 'Away' because it's missing, Home defaults to 'You')
+    expect(domRefs.totalScore.innerHTML).toContain('Away 0');
+    expect(domRefs.totalScore.innerHTML).toContain('You 5');
+
+    calculateTurnResultsSpy.mockRestore();
+  });
+
+  test('renderResults - missing home team and opponent fallback name', () => {
+    const calcResult = { turnResults: [], totalDisplay: '0' };
+    const machines = [{}];
+    const scoreMap = {};
+
+    const calculateTurnResultsSpy = vi.spyOn(engine, 'calculateTurnResults');
+    // Player 2 (Away, Current Player)
+    calculateTurnResultsSpy.mockReturnValueOnce({
+      turnResults: [
+        { played: true, score: 7, isBatter: true, isWalkOff: false }
+      ]
+    });
+
+    const context = {
+      eventMatchups: [
+        { playerId: 2, orderNumber: 1, playerOrder: 2 }, // Player 2 away, no home team
+      ],
+      allPlayersCache: [], // Empty cache to trigger fallback names
+      getCurrentPlayerId: () => '2',
+      normalizeScores: (s) => s,
+      groupScoresByPlayer: (s) => s,
+      buildBaseballScoreMapForPlayer: (id, scores, matchups) => {
+        return { isPlayer1: id === 1 };
+      },
+      allEventScores: []
+    };
+
+    const mockTable = { classList: { add: vi.fn(), remove: vi.fn() } };
+
+    const querySelectorMock = vi.fn((selector) => {
+      if (selector === 'table.data-table') return mockTable;
+      return null;
+    });
+
+    const domRefs = {
+      resultsPanel: {
+        querySelector: querySelectorMock,
+        classList: { add: vi.fn(), remove: vi.fn() },
+        insertAdjacentHTML: vi.fn()
+      },
+      resultsBody: { innerHTML: '' },
+      totalScore: { innerHTML: '' },
+      resultsEmpty: { classList: { add: vi.fn() } },
+      escapeHTML: (s) => s
+    };
+
+    engine.renderResults(calcResult, machines, scoreMap, context, domRefs);
+
+    // Away defaults to 'You' (because current player is player 2), Home defaults to 'Home' (because it's missing)
+    expect(domRefs.totalScore.innerHTML).toContain('You 7');
+    expect(domRefs.totalScore.innerHTML).toContain('Home 0');
+
+    calculateTurnResultsSpy.mockRestore();
+  });
 });

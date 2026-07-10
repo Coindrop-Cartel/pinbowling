@@ -96,6 +96,18 @@ describe('Machines Page (machinesPage.js)', () => {
     expect(document.querySelector('.card').classList.contains('hidden')).toBe(true);
   });
 
+  it('should hide edit button on machine rows for player role', async () => {
+    PB_API.auth.me.mockResolvedValue({ role: 'player' });
+    PB_API.machines.getAll.mockResolvedValue([
+      { id: 1, machineName: 'Medieval Madness', year: 1997 }
+    ]);
+
+    await initMachinesPage();
+
+    expect(document.getElementById('machines-list').innerHTML).toContain('Medieval Madness');
+    expect(document.querySelector('.edit-mach-btn')).toBeNull();
+  });
+
   it('should render the list and allow editing for admins', async () => {
     // Ensure auth is resolved before init
     vi.mocked(PB_API.auth.me).mockResolvedValue({ role: 'admin' });

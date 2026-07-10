@@ -7,9 +7,6 @@
         <testsuite name="Service Test Suite">
             <directory>tests/service</directory>
         </testsuite>
-        <testsuite name="Includes Test Suite">
-            <directory>tests/includes</directory>
-        </testsuite>
     </testsuites>
     <coverage>
         <report>

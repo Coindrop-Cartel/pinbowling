@@ -32,22 +32,21 @@ test.describe('Global Navigation Visibility', () => {
       await expect(adminMenu).toBeVisible();
       await adminMenu.click();
       await expect(page.locator('#nav-machines')).toBeVisible();
-      await expect(page.locator('#nav-maintenance')).toBeVisible();
+      await expect(page.locator('#nav-locations')).toBeVisible();
       await expect(page.locator('#nav-players')).toBeVisible();
+      await expect(page.locator('#nav-teams')).toBeVisible();
+      await expect(page.locator('#nav-maintenance')).toBeVisible();
     } 
     
-    else if (projectName.includes('td')) {
-      // TD sees the Admin menu, but Maintenance should be hidden
+    else if (projectName.includes('td') || projectName.includes('player')) {
+      // TD and Player see the Admin menu, but Maintenance should be hidden
       await expect(adminMenu).toBeVisible();
       await adminMenu.click();
       await expect(page.locator('#nav-machines')).toBeVisible();
+      await expect(page.locator('#nav-locations')).toBeVisible();
+      await expect(page.locator('#nav-players')).toBeVisible();
       await expect(page.locator('#nav-teams')).toBeVisible();
       await expect(page.locator('#nav-maintenance')).toBeHidden();
-    } 
-    
-    else if (projectName.includes('player')) {
-      // Players are blocked from the Admin menu entirely via PHP ($isManagement check)
-      await expect(adminMenu).toBeHidden();
     }
 
     // 3. Verify the Auth State UI matches the project persona

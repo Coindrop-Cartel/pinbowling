@@ -38,7 +38,7 @@ vi.mock('@scripts/utils.js', () => ({
   formatNumber: (n) => String(n),
   loadPage: vi.fn(), // Changed from navigateTo
   getCookie: vi.fn(() => 'bowling'),
-  detectScalingFromValues: () => '',
+  detectScalingFromValues: vi.fn(() => 'curved'),
 }));
 
 vi.mock('@scripts/routes.js', () => ({
@@ -287,5 +287,141 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
     await initEventSetupPage();
     document.getElementById('done-setup-btn').click();
     expect(Utils.loadPage).toHaveBeenCalledWith(ROUTE_PATHS.LEAGUES(Utils.getActiveLeagueId())); // Changed assertion
+  });
+
+  describe('Additional eventSetupPage Coverage', () => {
+    it('should reset list and hide actions when cancel-order-btn is clicked', async () => {
+      PB_API.machines.getTargets.mockResolvedValue([
+        { id: 1, machineId: 10, orderNumber: 1, machineName: 'M1', values: {} }
+      ]);
+      await initEventSetupPage();
+
+      // Trigger a reorder to make list dirty
+      const onReorder = uiMocks.setupSortableList.mock.calls[0][1].onReorder;
+      onReorder(['1']);
+
+      const cancelBtn = document.getElementById('cancel-order-btn');
+      expect(cancelBtn).not.toBeNull();
+      cancelBtn.click();
+
+      expect(document.getElementById('reorder-actions').classList.contains('hidden')).toBe(true);
+    });
+
+    it('should hide list and actions when eventId is empty during render', async () => {
+      Utils.getActiveEventId.mockReturnValue('');
+      await initEventSetupPage();
+      expect(document.getElementById('rounds-list').classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('list-empty').classList.contains('hidden')).toBe(false);
+    });
+
+    it('should handle onMoveUp and onMoveDown click actions on target items', async () => {
+      PB_API.machines.getTargets.mockResolvedValue([
+        { id: 10, machineId: 10, orderNumber: 1, machineName: 'M1', value1: 100, value2: 10, values: {} },
+        { id: 20, machineId: 20, orderNumber: 2, machineName: 'M2', value1: 200, value2: 20, values: {} }
+      ]);
+      await initEventSetupPage();
+
+      const calls = uiMocks.createExpandableRow.mock.calls;
+      const m1RowOptions = calls.find(c => c[1].id === 10)[1];
+      const m2RowOptions = calls.find(c => c[1].id === 20)[1];
+
+      // Move M2 up (orderNumber 2 > 1)
+      expect(m2RowOptions.onMoveUp).not.toBeNull();
+      m2RowOptions.onMoveUp();
+
+      // Move M1 down (orderNumber 1 < 2)
+      expect(m1RowOptions.onMoveDown).not.toBeNull();
+      m1RowOptions.onMoveDown();
+    });
+
+    it('should update inline inputs and scaling toggles inside rounds', async () => {
+      PB_API.machines.getTargets.mockResolvedValue([
+        { id: 10, machineId: 10, orderNumber: 1, machineName: 'M1', value1: 100, value2: 10, values: { flat: [100], curved: [100] } }
+      ]);
+      await initEventSetupPage();
+
+      const row = document.querySelector('.round-item');
+      const s10 = row.querySelector('.score10-input');
+      const s1 = row.querySelector('.score1-input');
+
+      // Change input values and dispatch input event
+      s10.value = '500';
+      s10.dispatchEvent(new Event('input'));
+      s1.value = '50';
+      s1.dispatchEvent(new Event('input'));
+
+      // Test scaling toggle click inside the row
+      const curvedToggle = row.querySelector('.scaling-btn[data-scale="curved"]');
+      if (curvedToggle) {
+        curvedToggle.click();
+        expect(curvedToggle.classList.contains('btn-standard')).toBe(true);
+      }
+    });
+
+    it('should handle machine selection row-machine-select and difficulty fills qfill inside row content', async () => {
+      PB_API.machines.getTargets.mockResolvedValue([
+        { id: 10, machineId: 10, orderNumber: 1, machineName: 'M1', value1: 100, value2: 10, values: {} }
+      ]);
+      PB_API.machines.getAll.mockResolvedValue([
+        { id: 10, machineName: 'M1', targetEasy: 50, targetMed: 100, targetHard: 200 }
+      ]);
+      // Ensure dropdown suggestions return suggestions
+      PB_API.locations.getMachines.mockResolvedValue([
+        { id: 10, machineId: 10, machineName: 'M1', targetEasy: 50, targetMed: 100, targetHard: 200 }
+      ]);
+
+      await initEventSetupPage();
+
+      // Trigger expand
+      const onHeaderClick = uiMocks.createExpandableRow.mock.calls[0][1].onHeaderClick;
+      onHeaderClick();
+
+      // Simulate searchable select onSelect callback
+      const onSelect = uiMocks.createSearchableSelect.mock.calls[1][3].onSelect;
+      onSelect('10');
+
+      // Locate qfill button inside row
+      const medBtn = document.querySelector('.qfill[data-type="med"]');
+      if (medBtn) medBtn.click();
+    });
+
+    it('should call saveTarget with batch on save-order-btn click', async () => {
+      PB_API.machines.getTargets.mockResolvedValue([
+        { id: 10, machineId: 10, orderNumber: 1, machineName: 'M1', values: {} },
+        { id: 20, machineId: 20, orderNumber: 2, machineName: 'M2', values: {} }
+      ]);
+      await initEventSetupPage();
+
+      // Make dirty by reordering
+      const onReorder = uiMocks.setupSortableList.mock.calls[0][1].onReorder;
+      onReorder(['20', '10']);
+
+      const saveBtn = document.getElementById('save-order-btn');
+      await saveBtn.click();
+
+      expect(PB_API.machines.saveTarget).toHaveBeenCalled();
+    });
+
+    it('should create machine if it does not exist during target creation submit', async () => {
+      PB_API.machines.getAll.mockResolvedValue([]);
+      PB_API.machines.create.mockResolvedValue({ id: 999, machineName: 'New Unique Pinball' });
+      PB_API.machines.saveTarget.mockResolvedValue({ success: true });
+      Auth.requireAdmin.mockResolvedValue(true);
+
+      await initEventSetupPage();
+
+      document.getElementById('machine-name').value = 'New Unique Pinball';
+      document.getElementById('order-number').value = '1';
+      document.getElementById('value-10').value = '100';
+      document.getElementById('value-1').value = '10';
+
+      const form = document.getElementById('round-form');
+      await form.dispatchEvent(new Event('submit'));
+
+      await vi.waitFor(() => {
+        expect(PB_API.machines.create).toHaveBeenCalledWith(expect.objectContaining({ machineName: 'New Unique Pinball' }));
+      });
+      expect(PB_API.machines.saveTarget).toHaveBeenCalled();
+    });
   });
 });
