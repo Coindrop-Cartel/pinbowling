@@ -249,7 +249,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
     input.value = '10000';
     input.dispatchEvent(new Event('input'));
     await saveBtn.click();
-    expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Failed to save score: Save Failed'), 'Error');
+    await vi.waitFor(() => expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Failed to save score: Save Failed'), 'Error'));
   });
 
   it('should show setup warning when event has no machines', async () => {

@@ -49,3 +49,13 @@ $displayName = htmlspecialchars($user['player_name'] ?? ($user['username'] ?? 'U
     </div>
   </div>
 </nav>
+
+<script src='https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'></script>
+<script>
+  kofiWidgetOverlay.draw('kylevoorhees', {
+    'type': 'floating-chat',
+    'floating-chat.donateButton.text': 'Tip',
+    'floating-chat.donateButton.background-color': '#323842',
+    'floating-chat.donateButton.text-color': '#fff'
+  });
+</script>

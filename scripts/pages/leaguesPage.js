@@ -3,9 +3,10 @@ import { isManagementAuthorized, runAuthorizedLeagueAction } from '@services/aut
 import { getCookie, getActiveLeagueId, setActiveLeagueId, setActiveEventId, loadPage, escapeHTML } from '@scripts/utils.js';
 import { SCORING_FORMATS } from '@core/engine.js';
 import { applyPreferredTheme } from '@ui/branding.js';
-import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
+import { setupLiveFilter } from '@ui/selectors.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
 import { showPlayerSelectionDialog, showConfirm } from '@ui/dialogs.js';
+import { renderLeagueList, renderRegistryTeams, renderRegistryPlayers } from '@ui/lists.js';
 
 /**
  * Logic for managing Leagues and Events.
@@ -184,81 +185,44 @@ export async function initLeaguesPage() {
    */
   const onFilterUpdate = (filtered, query) => {
     const activeLeagueId = getActiveLeagueId();
-    leaguesList.innerHTML = '';
 
     if (filtered.length === 0) {
+      leaguesList.innerHTML = '';
       emptyNotice.classList.remove('hidden');
       emptyNotice.textContent = allLeagues.length === 0 ? 'No leagues created yet.' : 'No matching leagues found.';
     } else {
       emptyNotice.classList.add('hidden');
-      filtered.forEach(league => {
-        const shouldExpand = activeLeagueId && String(league.id) === String(activeLeagueId);
-        
-        const participantMeta = getParticipantMeta(league);
-
-        const headerHtml = `
-          <div>
-            <h3 class="section-heading">${escapeHTML(league.name)}</h3>
-            <small>Started: ${escapeHTML(league.startDate) || 'N/A'} | ${participantMeta.mode} | Events: ${league.events?.length || 0} | ${participantMeta.countLabel}: ${participantMeta.count} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}</small>
-          </div>
-        `;
-
-        const contentHtml = `
-          <div class="section-bar">
-            <h4 class="section-subheading">Events</h4>
-            ${isAuthorized ? `<button class="add-event-btn secondary btn-row" data-league-id="${league.id}" data-league-name="${escapeHTML(league.name)}">Add Event</button>` : ''}
-          </div>
-          <ul class="league-events-list list-unstyled"></ul>
-          <div class="league-players-section roster-section">
-            <div class="section-bar">
-              <h4 class="section-subheading">${participantMeta.listLabel}</h4>
-              ${isAuthorized ? `<button class="${league.participants === 'team' ? 'add-team-btn' : 'add-player-btn'} secondary btn-row" data-league-id="${league.id}" data-league-name="${escapeHTML(league.name)}">Add ${league.participants === 'team' ? 'Team' : 'Player'}</button>` : ''}
-            </div>
-            <ul class="league-participants-list list-unstyled"></ul>
-            <div class="notice league-participants-empty hidden">No ${participantMeta.emptyLabel} assigned to this league.</div>
-          </div>
-          <div class="action-buttons">
-            ${isAuthorized ? '<button class="edit-league-btn secondary btn-row">Edit League</button>' : ''}
-            ${isAuthorized ? '<button class="delete-league-btn btn-row">Delete League</button>' : ''}
-          </div>
-        `;
-
-        const row = createExpandableRow(leaguesList, {
-          id: league.id,
-          className: 'league-registry-item',
-          headerHtml,
-          contentHtml,
-          isExpanded: shouldExpand,
-          onHeaderClick: (e) => {
-            if (e.target.closest('button')) return;
-            const currentActive = getActiveLeagueId();
-            setActiveLeagueId(String(currentActive) === String(league.id) ? null : league.id);
-            onFilterUpdate(filtered, query);
-          }
-        });
-
-        // Ensure compatibility with existing component renderers
-        row.dataset.leagueId = league.id;
-
-        // Action listeners
-        if (isAuthorized) {
-          row.querySelector('.edit-league-btn').onclick = () => editLeague(league);
-          row.querySelector('.add-event-btn').onclick = () => showEventForm(league.id, league.name);
-          row.querySelector('.delete-league-btn').onclick = () => deleteLeague(league.id, league.name);
-          if (row.querySelector('.add-player-btn')) row.querySelector('.add-player-btn').onclick = () => addPlayerToLeague(league.id, league.name);
-          if (row.querySelector('.add-team-btn')) row.querySelector('.add-team-btn').onclick = () => addTeamToLeague(league.id, league.name);
-        }
-
-        renderEventsForLeague(league.id, league.events, league.name);
-        if (shouldExpand) {
-          if (league.participants === 'team') renderTeamsForLeague(league.id, league.teams);
-          else renderPlayersForLeague(league.id, league.players, allPlayersCache);
-        }
-
-        // Smooth scroll to the expanded league if we just came from setup
-        if (shouldExpand && !query) {
-          setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
-        }
+      renderLeagueList(leaguesList, filtered, {
+        isAuthorized,
+        activeLeagueId,
+        onHeaderClick: (league) => {
+          const currentActive = getActiveLeagueId();
+          setActiveLeagueId(String(currentActive) === String(league.id) ? null : league.id);
+          onFilterUpdate(filtered, query);
+        },
+        onEditLeague: editLeague,
+        onAddEvent: showEventForm,
+        onDeleteLeague: deleteLeague,
+        onAddPlayer: addPlayerToLeague,
+        onAddTeam: addTeamToLeague,
+        onSetupEvent: (eventId, leagueId) => {
+          setActiveLeagueId(leagueId);
+          setActiveEventId(eventId);
+          loadPage(ROUTE_PATHS.LEAGUE_SETUP({ leagueId, eventId }));
+        },
+        onEditEvent: (leagueId, leagueName, ev) => {
+          showEventForm(leagueId, leagueName, ev);
+        },
+        onDeleteEvent: (eventId, leagueId, leagueName) => {
+          deleteEvent(eventId, leagueId, leagueName);
+        },
+        onRemoveTeam: (leagueId, teamId, teamName) => {
+          removeTeamFromLeague(leagueId, teamId, teamName);
+        },
+        onRemovePlayer: (leagueId, playerId, playerName) => {
+          removePlayerFromLeague(leagueId, playerId, playerName);
+        },
+        getParticipantMeta
       });
     }
 
@@ -377,39 +341,6 @@ export async function initLeaguesPage() {
     });
   }
 
-  async function renderTeamsForLeague(leagueId, leagueTeams) {
-    const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
-    if (!card) return;
-
-    const section = card.querySelector('.league-players-section');
-    const teamsListEl = section.querySelector('.league-participants-list');
-    const emptyNoticeEl = section.querySelector('.league-participants-empty');
-
-    teamsListEl.innerHTML = '';
-    if (leagueTeams && leagueTeams.length > 0) {
-        emptyNoticeEl.classList.add('hidden');
-        leagueTeams.forEach(team => {
-            const li = document.createElement('li');
-            li.className = 'list-item-row';
-            li.innerHTML = `
-                <span>${escapeHTML(team.name)} <small>(${escapeHTML(team.city) || 'No City'})</small></span>
-                ${isAuthorized ? `<button class="remove-team-btn btn-row" data-league-id="${leagueId}" data-team-id="${team.id}" data-team-name="${escapeHTML(team.name)}">Delete</button>` : ''}
-            `;
-            teamsListEl.appendChild(li);
-        });
-    } else {
-        emptyNoticeEl.classList.remove('hidden');
-    }
-
-    teamsListEl.querySelectorAll('.remove-team-btn').forEach(btn => {
-        btn.onclick = (e) => removeTeamFromLeague(
-            Number(e.target.dataset.leagueId),
-            Number(e.target.dataset.teamId),
-            e.target.dataset.teamName
-        );
-    });
-  }
-
   async function addTeamToLeague(leagueId, leagueName) {
     const league = allLeagues.find(l => l.id === leagueId);
     if (!league) return;
@@ -437,7 +368,13 @@ export async function initLeaguesPage() {
         if (team) {
             if (!league.teams) league.teams = [];
             league.teams.push(team);
-            renderTeamsForLeague(leagueId, league.teams);
+            const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
+            if (card) {
+                renderRegistryTeams(card, league.teams, {
+                    isAuthorized,
+                    onRemoveTeam: (teamId, teamName) => removeTeamFromLeague(leagueId, teamId, teamName)
+                });
+            }
             updateLeagueHeaderStats(leagueId, league);
         }
     }
@@ -450,46 +387,15 @@ export async function initLeaguesPage() {
       const league = allLeagues.find(l => l.id === leagueId);
       if (league && league.teams) {
           league.teams = league.teams.filter(t => t.id !== teamId);
-          renderTeamsForLeague(leagueId, league.teams);
+          const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
+          if (card) {
+              renderRegistryTeams(card, league.teams, {
+                  isAuthorized,
+                  onRemoveTeam: (tId, tName) => removeTeamFromLeague(leagueId, tId, tName)
+              });
+          }
           updateLeagueHeaderStats(leagueId, league);
       }
-    });
-  }
-
-  async function renderPlayersForLeague(leagueId, leaguePlayers, allPlayers) {
-    // Find the roster list specifically for this league card
-    const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
-    if (!card) return;
-
-    const section = card.querySelector('.league-players-section');
-    const playersListEl = section.querySelector('.league-participants-list');
-    const emptyNoticeEl = section.querySelector('.league-participants-empty');
-
-    playersListEl.innerHTML = '';
-    if (leaguePlayers && leaguePlayers.length > 0) {
-        emptyNoticeEl.classList.add('hidden');
-        leaguePlayers.forEach(lp => {
-            if (lp && lp.id) {
-                const li = document.createElement('li');
-                li.className = 'list-item-row';
-                li.innerHTML = `
-                    <span>${escapeHTML(lp.playerName)}</span>
-                    ${isAuthorized ? `<button class="remove-player-btn btn-row" data-league-id="${leagueId}" data-player-id="${lp.id}" data-player-name="${escapeHTML(lp.playerName)}">Delete</button>` : ''}
-                `;
-                playersListEl.appendChild(li);
-            }
-        });
-    } else {
-        emptyNoticeEl.classList.remove('hidden');
-    }
-
-    // Attach event listeners for remove buttons
-    playersListEl.querySelectorAll('.remove-player-btn').forEach(btn => {
-        btn.onclick = (e) => removePlayerFromLeague(
-            Number(e.target.dataset.leagueId),
-            Number(e.target.dataset.playerId),
-            e.target.dataset.playerName
-        );
     });
   }
 
@@ -534,7 +440,13 @@ export async function initLeaguesPage() {
             if (!league.players) league.players = [];
             league.players.push(player);
             league.players.sort((a, b) => a.playerName.localeCompare(b.playerName));
-            renderPlayersForLeague(leagueId, league.players, allPlayersCache);
+            const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
+            if (card) {
+                renderRegistryPlayers(card, league.players, {
+                    isAuthorized,
+                    onRemovePlayer: (playerId, playerName) => removePlayerFromLeague(leagueId, playerId, playerName)
+                });
+            }
             updateLeagueHeaderStats(leagueId, league);
         }
     }
@@ -550,7 +462,13 @@ export async function initLeaguesPage() {
       const league = allLeagues.find(l => l.id === leagueId);
       if (league && league.players) {
           league.players = league.players.filter(p => p.id !== playerId);
-          renderPlayersForLeague(leagueId, league.players, allPlayersCache);
+          const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
+          if (card) {
+              renderRegistryPlayers(card, league.players, {
+                  isAuthorized,
+                  onRemovePlayer: (pId, pName) => removePlayerFromLeague(leagueId, pId, pName)
+              });
+          }
           updateLeagueHeaderStats(leagueId, league);
       }
     });
@@ -575,7 +493,33 @@ export async function initLeaguesPage() {
       const league = allLeagues.find(l => l.id === leagueId);
       if (league && league.events) {
           league.events = league.events.filter(e => e.id !== id);
-          renderEventsForLeague(leagueId, league.events, league.name);
+          const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
+          if (card) {
+              renderLeagueList(leaguesList, allLeagues, {
+                isAuthorized,
+                activeLeagueId: getActiveLeagueId(),
+                onHeaderClick: (lg) => {
+                  const currentActive = getActiveLeagueId();
+                  setActiveLeagueId(String(currentActive) === String(lg.id) ? null : lg.id);
+                  onFilterUpdate(allLeagues, filterInstance.getQuery());
+                },
+                onEditLeague: editLeague,
+                onAddEvent: showEventForm,
+                onDeleteLeague: deleteLeague,
+                onAddPlayer: addPlayerToLeague,
+                onAddTeam: addTeamToLeague,
+                onSetupEvent: (evId, lgId) => {
+                  setActiveLeagueId(lgId);
+                  setActiveEventId(evId);
+                  loadPage(ROUTE_PATHS.LEAGUE_SETUP({ leagueId: lgId, eventId: evId }));
+                },
+                onEditEvent: (lgId, lgName, ev) => showEventForm(lgId, lgName, ev),
+                onDeleteEvent: (evId, lgId, lgName) => deleteEvent(evId, lgId, lgName),
+                onRemoveTeam: (lgId, teamId, teamName) => removeTeamFromLeague(lgId, teamId, teamName),
+                onRemovePlayer: (lgId, playerId, playerName) => removePlayerFromLeague(lgId, playerId, playerName),
+                getParticipantMeta
+              });
+          }
           updateLeagueHeaderStats(leagueId, league);
       }
     });

@@ -11,7 +11,7 @@ This document identifies code quality issues, architectural debt, and refactorin
 | Severity | Count (Original) | Count (Remaining) | Description |
 |----------|------------------|-------------------|-------------|
 | 🔴 **High** | 6 | 0 | Bugs, security gaps, or correctness issues |
-| 🟡 **Medium** | 10 | 4 | Architectural debt, maintainability problems |
+| 🟡 **Medium** | 10 | 2 | Architectural debt, maintainability problems |
 | 🟢 **Low** | 7 | 2 | Style, cleanup, and minor improvements |
 
 ---
@@ -92,21 +92,19 @@ This document identifies code quality issues, architectural debt, and refactorin
 
 ---
 
-### M4. Large Page Module Files (God Objects) — `[OPEN]`
+### M4. Large Page Module Files (God Objects) — `[RESOLVED]`
 
-**Files:** `scripts/pages/leaguesPage.js` (677 lines), `scripts/pages/scoresPage.js` (713 lines), `scripts/pages/standingsPage.js` (581 lines), and `scripts/core/engines/BaseballEngine.js` (704 lines).
+**Files:** `scripts/pages/leaguesPage.js`, `scripts/pages/scoresPage.js`, `scripts/pages/standingsPage.js`, and `scripts/core/engines/BaseballEngine.js`.
 
-*   **Status**: Open. Modules still mix template creation, data loading, events, and validation.
-*   **Recommendation**: Extract reusable rendering functions (like list generators, dropdown renderers, and print utilities) into shared modules under `scripts/ui/`. (Roadmap Phase 3).
+*   **Status**: Fixed in v1.4.0. Extracted modular UI helpers, lists registry generators, autoscrollers, and sport-specific double-row scoreboard formats into dedicated modules under `scripts/ui/`. Page controllers and scoring calculation engines now focus purely on logic and data orchestration, reducing total file size and decoupling DOM manipulation.
 
 ---
 
-### M5. Monolithic CSS File — `[OPEN]`
+### M5. Monolithic CSS File — `[RESOLVED]`
 
-**File:** [`styles/styles.css`](file:///Users/kylevoorhees/Development/pinbowling/styles/styles.css) (39 KB)
+**File:** [`styles/styles.css`](file:///Users/kylevoorhees/Development/pinbowling/styles/styles.css)
 
-*   **Status**: Open. All core styling remains in a single sheet.
-*   **Recommendation**: Break into smaller modular stylesheets (variables, layouts, pages, branding themes) and merge or concatenate them during a build step. (Roadmap Phase 3).
+*   **Status**: Fixed in v1.4.0. Split into smaller modular stylesheets: `variables.css`, `layout.css`, `components.css`, `pages.css`, `tv-mode.css`, and `print.css`. Main `styles.css` is now a manifest stylesheet using native `@import` statements to pull in these modular sheets. Scoped standings mark formatting consolidated inside `golf.css`.
 
 ---
 
@@ -233,8 +231,8 @@ This document identifies code quality issues, architectural debt, and refactorin
 | 12 | Add class & method documentation blocks to services and helpers | `service/*.php`, `includes/Container.php` |
 | 13 | Configure SFTP ignored vendor files for production safety | `.vscode/sftp.json` |
 | 14 | Add PHPUnit tests for all service classes | `tests/service/` |
-| 15 | Split large page modules into focused sub-modules | `scripts/pages/` |
-| 16 | Split `styles.css` into logical partials | `styles/` |
+| 15 | Split large page modules into focused sub-modules — `[RESOLVED]` | `scripts/pages/` |
+| 16 | Split `styles.css` into logical partials — `[RESOLVED]` | `styles/` |
 | 17 | Reduce `config.php` responsibilities | `includes/config.php` |
 | 18 | Fix Playwright CI to include PHP/MySQL or use mocks | `.github/workflows/` |
 

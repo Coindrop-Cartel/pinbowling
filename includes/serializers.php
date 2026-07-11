@@ -13,8 +13,10 @@
 function serializePlayer($row) {
     return [
         'id' => isset($row['id']) ? (int)$row['id'] : null,
-        'playerName' => $row['player_name'] ?? null,
-        'ifpaId' => $row['ifpa_id'] ?? null,
+        // League join queries alias 'p.player_name as playerName', so the PDO row key
+        // may be 'playerName' (camelCase) rather than 'player_name'. Fall back to both.
+        'playerName' => $row['player_name'] ?? $row['playerName'] ?? null,
+        'ifpaId' => $row['ifpa_id'] ?? $row['ifpaId'] ?? null,
         'matchplayId' => $row['matchplay_id'] ?? null,
         'userRole' => $row['role'] ?? null,
         'username' => $row['username'] ?? null,

@@ -1,12 +1,12 @@
 import { PB_API } from '@services/api.js';
-import { filterPlayersForUser, getScoreAccessLevel, can } from '@services/auth.js';
-import { showAlert } from '@ui/dialogs.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, formatNumber, applyScoreFormatting, renderThresholdGrid, setCurrentPlayerId, setCurrentPlayerIdSilent, getCurrentPlayerId, escapeHTML } from '@scripts/utils.js';
+import { filterPlayersForUser, can } from '@services/auth.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, formatNumber, setCurrentPlayerId, setCurrentPlayerIdSilent, getCurrentPlayerId, escapeHTML } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildBaseballScoreMapForPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
+import { buildRoundRow } from '@ui/roundRow.js';
 
 /**
  * Logic for the Scores page: viewing and editing player scores across events.
@@ -133,211 +133,7 @@ export async function initScoresPage() {
   // Default engine
   let Engine = getScoringEngine('bowling');
 
-  /**
-   * Helper to create a formatted numeric input for pinball scores.
-   * @param {number} roundNumber 
-   * @param {number} ball 
-   * @param {number} machineId 
-   * @param {string|number} value 
-   * @param {string} placeholder 
-   * @param {Object} [options] Additional options.
-   * @param {boolean} [options.isOpponent=false] If true, marks as opponent (read-only) input.
-   * @returns {HTMLInputElement}
-   */
-  function createRollInput(roundNumber, ball, machineId, value = '', placeholder = '', { isOpponent = false } = {}) {
-    const input = document.createElement('input');
-    input.placeholder = placeholder || `Ball ${ball} cumulative`;
-    input.className = isOpponent ? 'roll-input opponent-input' : 'roll-input';
-    input.value = (value !== '' && value !== undefined) ? formatNumber(value) : '';
-    input.dataset.order = roundNumber;
-    // Opponent inputs use data-opponent-ball so buildScoreMapFromDOM ignores them
-    input.dataset[isOpponent ? 'opponentBall' : 'ball'] = ball;
-    input.dataset.machineId = machineId;
-    applyScoreFormatting(input);
 
-    if (isOpponent) {
-      input.readOnly = true;
-      input.classList.add('roll-input-readonly');
-      input.setAttribute('aria-disabled', 'true');
-      input.setAttribute('tabindex', '-1');
-    }
-
-    return input;
-  }
-
-  /**
-   * Constructs the HTML structure for a single round's input row.
-   * For baseball head-to-head matchups, also renders the opponent's ball scores
-   * as disabled/read-only inputs. Pitcher inputs always appear above Batter inputs.
-   * 
-   * @param {Object} round The machine configuration for this round.
-   * @param {Object} turnValues Existing scores from the database (if any).
-   * @param {boolean} [isLastRound=false] Whether to apply 10th-frame logic.
-   * @param {Object} targetPlayer The player being scored.
-   * @param {Object} [opponentScores=null] Opponent's ball scores for this round: { ball1, ball2, ball3 }.
-   * @returns {HTMLElement} The row element.
-   */
-  async function buildRoundRow(round, turnValues, isLastRound = false, targetPlayer = null, opponentScores = null, roundIndex = 0) {
-    const row = document.createElement('div'); // Centralized Security Logic
-    
-    let isTargetInRoster = false;
-    if (activeLeague) {
-      if (activeLeague.type === 'session') {
-        isTargetInRoster = true;
-      } else if (activeLeague.participants === 'team') {
-        isTargetInRoster = (activeLeague.teams || []).some(t => (t.members || []).some(m => String(m.id) === String(targetPlayer?.id)));
-      } else {
-        isTargetInRoster = (activeLeague.players || []).some(p => String(p.id) === String(targetPlayer?.id));
-      }
-    } else {
-      isTargetInRoster = true;
-    }
-
-    const { access: accessLevel, reason: msg, lockedBalls = {} } = await getScoreAccessLevel(currentUser, targetPlayer, turnValues, activeLeague?.type, isTargetInRoster);
-    const isAccessDenied = accessLevel === 'denied';
-    const hasLockedBalls = Object.keys(lockedBalls).length > 0;
-
-    row.className = 'round-row';
-    row.dataset.orderNumber = round.orderNumber;
-
-    const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
-    const rowContext = Engine.getRoundRowContext(round, getEngineContext(), { machines, roundIndex });
-    const displayRoundNumber = rowContext.displayRoundNumber ?? round.orderNumber;
-    const displayRoundLabel = rowContext.displayRoundLabel ?? Engine.getRoundLabel();
-    const roleHtml = rowContext.roleHtml ?? '';
-    const isPitcher = rowContext.isPitcher ?? false;
-    const opponentName = rowContext.opponentName ?? '';
-    const hasMatchup = !!rowContext.matchup;
-    
-    row.innerHTML = `
-      <div class="round-info">
-        <div class="round-label"><b>${escapeHTML(displayRoundLabel)} ${displayRoundNumber}:</b> ${escapeHTML(round.machineName)}</div>
-        ${roleHtml}
-        ${Engine.getRowSummaryHtml(round, formatNumber)}
-        ${bonusHtml}
-      </div>
-      <div class="target-details hidden">
-        <div class="small threshold-heading">Scoring Thresholds</div>
-        ${renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2)}
-      </div>
-      <div class="round-actions">
-        <!-- Always show opponent inputs container if there's a matchup -->
-        ${hasMatchup ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label pitcher-label">Pitcher:</span></div>` : ''}
-        <div class="round-inputs-container ${isAccessDenied ? 'round-inputs-disabled' : ''}">${hasMatchup ? `<span class="input-role-label">${isPitcher ? 'Pitcher:' : 'Batter:'}</span>` : ''}</div>
-        ${hasMatchup ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label batter-label">Batter:</span></div>` : ''}
-        <button class="save-round-button btn-mgmt" ${isAccessDenied ? 'hidden' : ''} disabled>Save</button>
-      </div>
-      ${isAccessDenied ? `
-        <div class="round-status-bar">
-          <span class="round-msg">${escapeHTML(msg)}</span>
-        </div>
-      ` : ''}
-    `;
-
-    const inputsContainer = row.querySelector('.round-inputs-container');
-    const saveBtn = row.querySelector('.save-round-button');
-    saveBtn.classList.add('btn-mgmt'); // Apply standardized button style
-
-    row.querySelector('.round-info').addEventListener('click', () => {
-      row.querySelector('.target-details').classList.toggle('hidden');
-    });
-    // Also allow clicking the target-details itself to collapse it
-    row.querySelector('.target-details').addEventListener('click', (e) => {
-      e.stopPropagation();
-      row.querySelector('.target-details').classList.add('hidden');
-    });
-
-    // --- Player's own editable inputs ---
-    for (let ball = 1; ball <= 3; ball += 1) {
-      const value = turnValues?.[`ball${ball}`] ?? '';
-      const placeholder = `Ball ${ball} cumulative`;
-      const isBallLocked = !!lockedBalls[`ball${ball}`];
-      
-      const input = createRollInput(round.orderNumber, ball, round.machineId, value, placeholder);
-      
-      if (isBallLocked) {
-        input.readOnly = true;
-        input.classList.add('ball-locked');
-        input.setAttribute('aria-disabled', 'true');
-        input.setAttribute('tabindex', '-1');
-        input.dataset.savedValue = value;
-      }
-
-      input.addEventListener('input', () => {
-        saveBtn.disabled = false;
-        saveBtn.classList.add('is-dirty');
-      });
-
-      inputsContainer.appendChild(input);
-    }
-
-    // --- Opponent's disabled inputs (baseball head-to-head only) ---
-    // Always render opponent inputs when there's a matchup, even if opponent hasn't entered scores yet
-    if (hasMatchup) {
-      const opponentContainer = row.querySelector('.opponent-inputs-container');
-      if (opponentContainer) {
-        for (let ball = 1; ball <= 3; ball += 1) {
-          const oppValue = opponentScores?.[`ball${ball}`];
-          const displayValue = (oppValue !== undefined && oppValue !== null && oppValue !== 0) ? oppValue : '';
-          const input = createRollInput(round.orderNumber, ball, round.machineId, displayValue, `Ball ${ball}`, { isOpponent: true });
-          opponentContainer.appendChild(input);
-        }
-      }
-    }
-
-    saveBtn.addEventListener('click', async () => {
-      const currentPlayerId = getCurrentPlayerId();
-      if (!currentPlayerId) return;
-
-      // Enforce per-ball locking: for locked balls, always use the original
-      // saved value from data-saved-value, ignoring any DOM tampering.
-      const getBallValue = (ballNum) => {
-        const input = row.querySelector(`[data-ball="${ballNum}"]`);
-        if (input && input.dataset.savedValue !== undefined) {
-          return Number(String(input.dataset.savedValue).replace(/\D/g, '')) || 0;
-        }
-        return Number(input?.value.replace(/\D/g, '')) || 0;
-      };
-
-      const ball1 = getBallValue(1);
-      const ball2 = getBallValue(2);
-      const ball3 = getBallValue(3);
-
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving...';
-
-      try {
-        await PB_API.scores.save({
-          playerId: Number(currentPlayerId),
-          orderNumber: Number(round.orderNumber),
-          eventId: Number(getActiveEventId()),
-          leagueId: Number(getActiveLeagueId()),
-          machineId: Number(round.machineId),
-          ball1,
-          ball2,
-          ball3,
-        });
-        saveBtn.classList.remove('is-dirty');
-        // Refresh allEventScores so opponent data is current for matchup-based formats
-        if (Engine.getMatchupDescription?.(1)) {
-          try {
-            allEventScores = await PB_API.scores.get(null, Number(getActiveEventId()));
-          } catch (e) {
-            console.warn('[ScoresPage] Failed to refresh allEventScores after save:', e);
-          }
-        }
-        renderCurrentResults();
-      } catch (err) {
-        const message = err?.message || String(err);
-        showAlert('Failed to save score: ' + message, 'Error');
-        saveBtn.disabled = false; // Re-enable so user can try again
-      } finally {
-        saveBtn.textContent = 'Save';
-      }
-    });
-
-    return row;
-  }
 
   /**
    * Populates the player dropdown.
@@ -468,8 +264,36 @@ export async function initScoresPage() {
         }
       }
 
-      // buildRoundRow is async, so we collect the promise and await below
-      pendingRows.push(buildRoundRow(round, turnValues, isLastRound, player, oppTurnValues, index));
+      pendingRows.push(buildRoundRow(round, turnValues, isLastRound, player, oppTurnValues, index, {
+        currentUser,
+        activeLeague,
+        machines,
+        engine: Engine,
+        engineContext: getEngineContext(),
+        getCurrentPlayerId,
+        saveScoreCallback: async (scoreData) => {
+          await PB_API.scores.save({
+            playerId: scoreData.playerId,
+            orderNumber: scoreData.orderNumber,
+            eventId: Number(getActiveEventId()),
+            leagueId: Number(getActiveLeagueId()),
+            machineId: scoreData.machineId,
+            ball1: scoreData.ball1,
+            ball2: scoreData.ball2,
+            ball3: scoreData.ball3,
+          });
+        },
+        refreshCallback: async () => {
+          if (Engine.getMatchupDescription?.(1)) {
+            try {
+              allEventScores = await PB_API.scores.get(null, Number(getActiveEventId()));
+            } catch (e) {
+              console.warn('[ScoresPage] Failed to refresh allEventScores after save:', e);
+            }
+          }
+          renderCurrentResults();
+        }
+      }));
     });
 
     const rows = await Promise.all(pendingRows);

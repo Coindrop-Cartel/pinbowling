@@ -4,9 +4,10 @@ import { getScoringEngine } from '@core/engine.js';
 import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { showDialog } from '@ui/dialogs.js';
 import { renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
-import { filterLeaguesForUser } from '@services/auth.js'; // Import for filtering
+import { filterLeaguesForUser } from '@services/auth.js';
 import { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer, groupScoresByPlayer, groupMatchupsByEvent } from '@services/normalizer.js';
 import { calculateSeasonSummary, calculateBaseballRecords } from '@services/seasonCalculator.js';
+import { TvModeManager } from '@ui/tvMode.js';
 
 /**
  * Logic for the Standings/Scoreboard page showing player rankings and season summaries.
@@ -34,24 +35,17 @@ export async function initStandingsPage() {
   }
 
   let tournamentSelector = null;
-  let isTvMode = false;
-  let refreshInterval = null;
-  let scrollInterval = null;
-  let wakeLock = null;
+  const tvModeManager = new TvModeManager({
+    refreshCallback: refresh,
+    fitScreenCallback: fitTVModeToScreen,
+    tvBtn,
+    isTvRoute
+  });
+
   let selectedPlayerIds = []; // Not preserved in localStorage per request
   let lastScoreState = new Map(); // Tracks playerId-orderNumber -> ballString for change detection
 
   let Engine = getScoringEngine('bowling');
-
-  /**
-   * Helper to stop all auto-scroll activity (animation frames or intervals).
-   */
-  const stopAutoScroll = () => {
-    if (scrollInterval) {
-      cancelAnimationFrame(scrollInterval);
-      scrollInterval = null;
-    }
-  };
 
   // Fetch initial data to check context
   const allLeagues = await PB_API.leagues.getAll(); // Use a more descriptive name
@@ -73,119 +67,14 @@ export async function initStandingsPage() {
   let lastEventId = initialEventId;
 
   if (tvBtn) {
-    tvBtn.addEventListener('click', toggleTvMode);
+    tvBtn.addEventListener('click', () => {
+      if (!getActiveEventId()) return;
+      tvModeManager.toggle();
+    });
   }
 
-  /**
-   * Toggles TV mode visuals, auto-refresh, and auto-scrolling.
-   * @param {Event|null} e - The click event if triggered by user.
-   * @param {boolean} skipFullscreen - If true, ignores the fullscreen request (prevents browser security errors).
-   */
-  async function toggleTvMode(e, skipFullscreen = false) {
-    if (!getActiveEventId()) return; // Cannot enter TV Mode without a selection
-
-    isTvMode = !isTvMode;
-    document.body.classList.toggle('tv-mode-active', isTvMode);
-    
-    if (isTvMode) {
-      tvBtn.textContent = 'Exit (Esc)';
-      fitTVModeToScreen();
-      // Update scores every 15 seconds
-      refreshInterval = setInterval(refresh, 15000);
-      startAutoScroll();
-      // Enter browser fullscreen if allowed by user gesture
-      if (document.documentElement.requestFullscreen && !skipFullscreen) {
-        document.documentElement.requestFullscreen().catch(err => {
-          console.warn('[TV Mode] Fullscreen request deferred or denied:', err.message);
-        });
-      }
-
-      // Request Screen Wake Lock to prevent the display from sleeping
-      if ('wakeLock' in navigator) {
-        try {
-          wakeLock = await navigator.wakeLock.request('screen');
-        } catch (err) {
-          console.error('[TV Mode] Wake Lock request failed:', err);
-        }
-      }
-    } else {
-      tvBtn.textContent = 'TV Mode';
-      clearInterval(refreshInterval);
-      stopAutoScroll();
-      window.scrollTo(0, 0);
-      if (document.fullscreenElement) document.exitFullscreen();
-
-      if (wakeLock) {
-        await wakeLock.release();
-        wakeLock = null;
-      }
-    }
-  }
-
-  // Exit TV mode on Escape key
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isTvMode) toggleTvMode();
-  });
-
-  // Re-acquire wake lock if the tab becomes visible again while in TV mode
-  document.addEventListener('visibilitychange', async () => {
-    if (isTvMode && document.visibilityState === 'visible' && 'wakeLock' in navigator) {
-      try {
-        wakeLock = await navigator.wakeLock.request('screen');
-      } catch (err) {
-        console.error('[TV Mode] Re-acquiring Wake Lock failed:', err);
-      }
-    }
-  });
-
-  // WORLD-CLASS PERFORMANCE: Cleanup Intervals and WakeLock (Section 3)
-  const cleanup = () => {
-    if (window.PB_DEBUG_MODE) console.log('[Standings] Cleaning up intervals and body classes');
-    if (refreshInterval) clearInterval(refreshInterval);
-    stopAutoScroll();
-    if (wakeLock) wakeLock.release().catch(() => {});
-    document.body.classList.remove('tv-mode-active');
-  };
   // SPA router fires pb:pageChanged when leaving the current context
-  document.addEventListener('pb:pageChanged', cleanup, { once: true });
-
-  function startAutoScroll() {
-    stopAutoScroll();
-
-    const pixelsPerSecond = 10; // Comfortable, readable, and smooth speed for TV
-    let lastTimestamp = null;
-    // Track fractional position to allow sub-pixel movement for high-refresh screens
-    let scrollAccumulator = window.scrollY;
-
-    function step(timestamp) {
-      if (!isTvMode) return;
-      
-      if (!lastTimestamp) {
-        lastTimestamp = timestamp;
-        scrollInterval = requestAnimationFrame(step);
-        return;
-      }
-
-      const elapsed = timestamp - lastTimestamp;
-      lastTimestamp = timestamp;
-
-      // Increment position based on time delta (ensures consistent speed across different monitors)
-      scrollAccumulator += (pixelsPerSecond * elapsed) / 1000;
-      window.scrollTo(0, Math.floor(scrollAccumulator));
-
-      // Check if we reached the bottom
-      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 2) {
-        stopAutoScroll();
-        setTimeout(() => {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-          setTimeout(startAutoScroll, 2000);
-        }, 5000);
-      } else {
-        scrollInterval = requestAnimationFrame(step);
-      }
-    }
-    scrollInterval = requestAnimationFrame(step);
-  }
+  document.addEventListener('pb:pageChanged', () => tvModeManager.cleanup(), { once: true });
 
   /**
    * Shows a multi-select dialog to filter which players are visible.
@@ -248,7 +137,7 @@ export async function initStandingsPage() {
   }
 
   function renderFilterUI(players) {
-    if (!playerFilterContainer || isTvMode) return;
+    if (!playerFilterContainer || tvModeManager.isTvMode) return;
     playerFilterContainer.innerHTML = '';
 
     const filterText = selectedPlayerIds.length > 0 
@@ -360,7 +249,7 @@ export async function initStandingsPage() {
   // Selection UI Toggles (matching the scores page behavior)
   let tournamentSummary, tournamentSummaryText, tournamentSelectorUI;
 
-  const refresh = async () => {
+  async function refresh() {
     const eventId = getActiveEventId();
     const leagueId = getActiveLeagueId();
 
@@ -377,7 +266,7 @@ export async function initStandingsPage() {
     if (tvBtn) {
       // Hide the manual toggle on the /tv route as it auto-activates upon selection
       tvBtn.classList.toggle('hidden', isTvRoute);
-      if (isTvRoute && !isTvMode) toggleTvMode(null, true);
+      if (isTvRoute && !tvModeManager.isTvMode) tvModeManager.toggle(true);
     }
     if (standingsEmpty) standingsEmpty.classList.add('hidden');
 
@@ -513,7 +402,7 @@ export async function initStandingsPage() {
               const scoreKey = `${res.player.id}-${t.orderNumber}`;
               const isNew = lastScoreState.has(scoreKey) && lastScoreState.get(scoreKey) !== currentScoreState.get(scoreKey);
               if (isNew) rowHasUpdate = true;
-              return `<td class="standings-round ${t.played ? 'has-score' : 'no-score'} ${(isTvMode && isNew) ? 'score-just-updated' : ''}"><div class="standings-mark">${t.displayMark}</div><div class="standings-round-score">${t.displayRoundTotal}</div></td>`;
+              return `<td class="standings-round ${t.played ? 'has-score' : 'no-score'} ${(tvModeManager.isTvMode && isNew) ? 'score-just-updated' : ''}"><div class="standings-mark">${t.displayMark}</div><div class="standings-round-score">${t.displayRoundTotal}</div></td>`;
             }).join('');
               return `<tr><td></td><td class="player-name-cell player-name-indent">${escapeHTML(res.player.playerName)}</td>${turnsHtml}<td class="standings-total ${rowHasUpdate ? 'score-just-updated' : ''}">${res.totalDisplay}</td></tr>`;
           }).join('');
@@ -546,7 +435,7 @@ export async function initStandingsPage() {
               const scoreKey = `${res.player.id}-${t.orderNumber}`;
               const isNew = lastScoreState.has(scoreKey) && lastScoreState.get(scoreKey) !== currentScoreState.get(scoreKey);
               if (isNew) rowHasUpdate = true;
-              return `<td class="standings-round ${t.played ? 'has-score' : 'no-score'} ${(isTvMode && isNew) ? 'score-just-updated' : ''}"><div class="standings-mark">${t.displayMark}</div><div class="standings-round-score">${t.displayRoundTotal}</div></td>`;
+              return `<td class="standings-round ${t.played ? 'has-score' : 'no-score'} ${(tvModeManager.isTvMode && isNew) ? 'score-just-updated' : ''}"><div class="standings-mark">${t.displayMark}</div><div class="standings-round-score">${t.displayRoundTotal}</div></td>`;
             }).join('');
 
           const rec = baseballRecordsMap?.[res.player.id];
@@ -570,7 +459,7 @@ export async function initStandingsPage() {
 
     if (standingsEmpty) standingsEmpty.classList.add('hidden');
     if (standingsWrapper) standingsWrapper.classList.remove('hidden');
-  };
+  }
 
   tournamentSelector = await initTournamentSelector('.tournament-selector-container', { 
     onRefresh: refresh, 

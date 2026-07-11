@@ -13,18 +13,17 @@ $engineMeta = [
         'roundLabel' => 'Frame',
         'turnHeaderPrefix' => 'Frame',
         'primaryTargetLabel' => 'Pin Baseline',
-        'value1Label' => 'Baseline Score',
-        'value2Label' => 'Multiplier',
-        'hint'  => "Enter the cumulative score after each ball. When you hit the baseline score you can stop entering scores for that frame and move on to the next frame.
-                    DO NOT ROLL EXTRA BALLS",
-        'lastFrameHint' => "",
+        'value1Label' => 'Strike',
+        'value2Label' => '1 pin',
+        'hint'  => "Enter the cumulative score after each ball. When you hit the strike score you can stop entering scores for that frame and move on to the next frame.
+                    DO NOT PLAY EXTRA BALLS",
+        'lastFrameHint' => "In the last frame, you can get up to 3 strikes. Keep playing until you hit the additional target scores or you run out of balls.",
         'thresholdStart' => 1, // Display ranks from 1 up to 10
         'thresholdEnd' => 10,
         'logic' => "Strokes 1, 2, or 3 are awarded based on which ball reached the Baseline Score. If the baseline is not met within three balls, 
-        a score of 4-10 is assigned based on the final cumulative score relative to the baseline scores for that frame and then scored relative to the multiplier value (-1, +2, etc).  
-        If you don't know how Bowling scoring works, I don't really know what to tell you, but I will say higher is better."
+        a score of 4-10 is assigned based on the final cumulative score relative to the strike scores for that frame and then lower bound score for 1 pin."
     ],
-    'golf' => [
+        'golf' => [
         'brand' => 'PinGolf',
         'logo'  => 'pingolf.png',
         'cta'   => "Let's Golf!",
@@ -40,8 +39,7 @@ $engineMeta = [
         'thresholdStart' => 3, // Display ranks from 3 up to 10
         'thresholdEnd' => 10,
         'logic' => "Strokes 1, 2, or 3 are awarded based on which ball reached the Target Score. If the target is not met within three balls, 
-        a score of 4-10 is assigned based on the final cumulative score relative the target scores for that hole and then scored relative to the par value (-1, +2, etc).  
-        If you don't know how Golf scoring works, I don't really know what to tell you, but I will say lower is better."
+        a score of 4-10 is assigned based on the final cumulative score relative the target scores for that hole and then scored relative to the par value."
     ],
     'baseball' => [
         'brand' => 'PinBaseball',
@@ -58,10 +56,10 @@ $engineMeta = [
         'lastFrameHint' => "",
         'thresholdStart' => 1, // Display ranks from 1 (1 run) up to 10
         'thresholdEnd' => 10,
-        'logic' => "Each inning pairs two players head-to-head. The batter scores runs by exceeding the pitcher's score across threshold tiers. 
-        Odd innings: Player 1 is the pitcher, Player 2 is the batter. Even innings: roles swap. 
-        The batter's runs per ball are determined by how many exponential tiers their score surpasses. Total runs = sum of best runs across 3 balls. 
-        If you don't know how Baseball scoring works, just know that more runs is better."
+        'logic' => "Each inning pairs two players head-to-head. Each machine takes the place of half an inning.  The scores are calucated by subtracting the
+                    pitcher's score from the batter's score and then seeing if that difference met any of the run thresholds for that ball.  The same
+                    run threshold can't be used more than once per inning.  If you get 1 run on ball 1, you must get 2 runs on ball 2 or 3 to get more runs.
+                    At the end of the game the total runs are added up and a winnder is determined."
     ]
 ];
 
