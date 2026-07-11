@@ -2,6 +2,9 @@
 
 namespace App\Service;
 
+/**
+ * Service managing team registration, team rosters, and league-to-team memberships.
+ */
 class TeamService {
     private DatabaseService $db;
 

@@ -4,6 +4,9 @@ namespace App\Service;
 
 use PDO;
 
+/**
+ * Service managing player CRUD operations, database queries, and role/profile updates.
+ */
 class PlayerService {
     private DatabaseService $db;
 

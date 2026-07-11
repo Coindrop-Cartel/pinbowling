@@ -2,6 +2,9 @@
 
 namespace App\Service;
 
+/**
+ * Service managing database maintenance, pruning old session-based leagues and abandoned guest players.
+ */
 class CleanupService {
     private DatabaseService $db;
 

@@ -2,6 +2,9 @@
 
 namespace App\Service;
 
+/**
+ * Service managing player scores, recording new scores, and bulk score cleanup.
+ */
 class ScoreService {
     private DatabaseService $db;
 

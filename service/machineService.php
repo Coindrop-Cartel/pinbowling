@@ -2,6 +2,9 @@
 
 namespace App\Service;
 
+/**
+ * Service managing the master registry of pinball machines and target score thresholds.
+ */
 class MachineService {
     private DatabaseService $db;
 

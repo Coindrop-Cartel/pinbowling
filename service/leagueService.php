@@ -4,6 +4,9 @@ namespace App\Service;
 
 use PDO;
 
+/**
+ * Service managing leagues, seasons, events, rosters, and event schedules/fixtures.
+ */
 class LeagueService {
     private DatabaseService $db;
 

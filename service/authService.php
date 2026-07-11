@@ -6,6 +6,9 @@ use PDO;
 use App\Service\DatabaseService;
 use App\Service\SettingsService;
 
+/**
+ * Service handling authentication, user accounts, claims, registration, and password management.
+ */
 class AuthService {
     private DatabaseService $db;
     private SettingsService $settings;

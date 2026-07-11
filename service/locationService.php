@@ -2,6 +2,9 @@
 
 namespace App\Service;
 
+/**
+ * Service managing locations (venues) and the association of pinball machines with specific locations.
+ */
 class LocationService {
     private DatabaseService $db;
 

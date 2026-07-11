@@ -23,10 +23,21 @@ class SiteContent {
                 <b>If given all this you feel like it was and that makes it a hard pass for you, I totally undersatnd.</b>",
     ];
 
+    /**
+     * Retrieve a specific site content string or branding metadata by key.
+     *
+     * @param string $key The branding key to retrieve.
+     * @return string|null The content string, or null if key does not exist.
+     */
     public static function get(string $key) {
         return self::$branding[$key] ?? null;
     }
 
+    /**
+     * Retrieve all site content and branding settings.
+     *
+     * @return array Entire key-value map of site branding metadata.
+     */
     public static function getAll(): array {
         return self::$branding;
     }

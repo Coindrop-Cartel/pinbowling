@@ -2,6 +2,9 @@
 
 namespace App\Service;
 
+/**
+ * Service managing head-to-head match fixtures (used primarily in the PinBaseball format).
+ */
 class MatchupService {
     private DatabaseService $db;
 
