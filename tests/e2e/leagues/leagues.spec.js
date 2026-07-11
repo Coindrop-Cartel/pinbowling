@@ -90,7 +90,7 @@ test.describe('League & Event Management', () => {
     await page.locator('#admin-nav-item').click();
     await page.click('#nav-maintenance');
 
-    await page.click('button:has-text("Run Database Cleanup")');
+    await page.click('button:has-text("Run Cleanup Script")');
     // Verify the custom dialog appears
     await expect(page.locator('.modal-card h2')).toContainText('Confirm Cleanup');
   });

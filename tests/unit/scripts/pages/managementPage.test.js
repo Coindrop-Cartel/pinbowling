@@ -69,6 +69,7 @@ describe('Management Page (managementPage.js)', () => {
     document.body.innerHTML = `
       <div id="management-auth-notice"></div>
       <div id="management-tools" class="hidden">
+        <div id="mgmt-action-summary"></div>
         <select id="mgmt-league-select"></select>
         <button id="mgmt-reset-pass-btn">Reset</button>
         <button id="mgmt-run-cleanup-btn">Cleanup</button>
@@ -150,12 +151,8 @@ describe('Management Page (managementPage.js)', () => {
     showConfirm.mockResolvedValue(true);
     showPrompt.mockResolvedValue('60');
     await initManagementPage();
-    // Find the cleanup action button from renderActionSummary
-    const calls = vi.mocked(renderActionSummary).mock.calls;
-    const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
-    const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
-    await cleanupAction.onclick();
-    expect(PB_API.system.runCleanup).toHaveBeenCalledWith(60);
+    document.getElementById('mgmt-run-cleanup-btn').click();
+    await vi.waitFor(() => expect(PB_API.system.runCleanup).toHaveBeenCalledWith(60));
     expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('3'), 'Success');
   });
   it('should cancel cleanup when prompt is dismissed', async () => {
@@ -164,10 +161,8 @@ describe('Management Page (managementPage.js)', () => {
     showConfirm.mockResolvedValue(true);
     showPrompt.mockResolvedValue(null);
     await initManagementPage();
-    const calls = vi.mocked(renderActionSummary).mock.calls;
-    const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
-    const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
-    await cleanupAction.onclick();
+    document.getElementById('mgmt-run-cleanup-btn').click();
+    await vi.waitFor(() => expect(showPrompt).toHaveBeenCalled());
     expect(PB_API.system.runCleanup).not.toHaveBeenCalled();
   });
   it('should cancel cleanup when confirmation is denied', async () => {
@@ -175,34 +170,27 @@ describe('Management Page (managementPage.js)', () => {
     Auth.can.mockResolvedValue(true);
     showConfirm.mockResolvedValue(false);
     await initManagementPage();
-    const calls = vi.mocked(renderActionSummary).mock.calls;
-    const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
-    const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
-    await cleanupAction.onclick();
+    document.getElementById('mgmt-run-cleanup-btn').click();
+    await vi.waitFor(() => expect(showConfirm).toHaveBeenCalled());
     expect(PB_API.system.runCleanup).not.toHaveBeenCalled();
   });
   it('should handle cleanup API error gracefully', async () => {
     PB_API.auth.me.mockResolvedValue({ role: 'admin' });
     Auth.can.mockResolvedValue(true);
     PB_API.system.runCleanup.mockRejectedValue(new Error('DB locked'));
-    vi.mocked(requireAdmin).mockResolvedValue(true); // requireAdmin is imported now
+    vi.mocked(requireAdmin).mockResolvedValue(true);
     showConfirm.mockResolvedValue(true);
     showPrompt.mockResolvedValue('30');
     await initManagementPage();
-    const calls = vi.mocked(renderActionSummary).mock.calls;
-    const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
-    const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
-    await cleanupAction.onclick();
-    expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('DB locked'), 'Error');
+    document.getElementById('mgmt-run-cleanup-btn').click();
+    await vi.waitFor(() => expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('DB locked'), 'Error'));
   });
   it('should hide cleanup button for non-admin users', async () => {
     PB_API.auth.me.mockResolvedValue({ role: 'td' });
     Auth.can.mockResolvedValue(true);
     await initManagementPage();
-    const calls = vi.mocked(renderActionSummary).mock.calls;
-    const summaryCall = calls.find(c => typeof c[1] === 'string' && c[1].includes('System Maintenance'));
-    const cleanupAction = summaryCall[2].find(a => a.text === 'Run Database Cleanup');
-    expect(cleanupAction.hidden).toBe(true);
+    const cleanupBtn = document.getElementById('mgmt-run-cleanup-btn');
+    expect(cleanupBtn.classList.contains('hidden')).toBe(true);
   });
   it('should dispatch pb:pageChanged event after login', async () => {
     Auth.can.mockResolvedValue(false);

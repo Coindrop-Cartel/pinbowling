@@ -13,6 +13,8 @@
   </section>
 
   <div id="management-tools" class="hidden">
+    <div id="mgmt-action-summary" class="mb-20"></div>
+
     <section class="card">
       <h2>Database Cleanup</h2>
       <p>Remove session leagues and associated data (scores, targets).</p>
@@ -32,8 +34,10 @@
             <tr><td><strong>PDO Drivers:</strong></td><td id="diag-pdo-drivers"></td></tr>
             <tr><td><strong>Connected Database Info:</strong></td><td id="diag-connected-db"></td></tr>
             <tr><td><strong>Configured DSN Info:</strong></td><td id="diag-configured-dsn"></td></tr>
+            <tr><td><strong>Configured User:</strong></td><td id="diag-configured-user"></td></tr>
             <tr><td><strong>.env File:</strong></td><td id="diag-env-status"></td></tr>
             <tr><td><strong>Database Tables:</strong></td><td id="diag-tables-list"></td></tr>
+            <tr id="diag-troubleshooting-row" class="hidden"><td style="color:red; font-weight:bold;">Troubleshooting:</td><td id="diag-troubleshooting-hints" style="color:#d9534f;"></td></tr>
           </tbody>
         </table>
       </div>

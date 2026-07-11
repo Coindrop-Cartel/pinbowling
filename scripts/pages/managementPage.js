@@ -48,14 +48,29 @@ export async function initManagementPage() {
     authNotice?.classList.add('hidden');
     toolsSection?.classList.remove('hidden');
 
-    renderActionSummary(toolsSection, `System Maintenance for ${escapeHTML(user.username)}`, [
-      { text: 'Run Database Cleanup', onclick: handleCleanup, hidden: user.role !== 'admin' }
-    ]);
+    const actionSummary = document.getElementById('mgmt-action-summary');
+    if (actionSummary) {
+      renderActionSummary(actionSummary, `System Maintenance for ${escapeHTML(user.username)}`, []);
+    }
+
+    const cleanupBtn = document.getElementById('mgmt-run-cleanup-btn');
+    if (cleanupBtn) {
+      if (user.role === 'admin') {
+        cleanupBtn.classList.remove('hidden');
+      } else {
+        cleanupBtn.classList.add('hidden');
+      }
+    }
 
     const diagSection = document.getElementById('mgmt-diagnostics-section');
     if (diagSection) {
       if (user.role === 'admin') {
         diagSection.classList.remove('hidden');
+        // Automatically fetch diagnostics when the admin tools are revealed
+        const loadDiagBtn = document.getElementById('mgmt-load-diag-btn');
+        if (loadDiagBtn) {
+          loadDiagBtn.click();
+        }
       } else {
         diagSection.classList.add('hidden');
       }
@@ -95,9 +110,37 @@ export async function initManagementPage() {
         const diag = await PB_API.system.fetchDiagnostics();
         
         const statusEl = document.getElementById('diag-status');
+        const tsRow = document.getElementById('diag-troubleshooting-row');
+        const tsHints = document.getElementById('diag-troubleshooting-hints');
+
         if (statusEl) {
-          statusEl.textContent = 'Connected';
-          statusEl.style.color = 'green';
+          if (diag.dbConnected) {
+            statusEl.textContent = 'Connected';
+            statusEl.style.color = 'green';
+            tsRow?.classList.add('hidden');
+          } else {
+            statusEl.textContent = 'Failed';
+            statusEl.style.color = 'red';
+            
+            // Build troubleshooting suggestions similar to db-test.php
+            if (tsRow && tsHints) {
+              const errStr = String(diag.dbError || '');
+              let hints = [];
+              if (errStr.includes('Access denied')) {
+                hints.push('Check DB_USER and DB_PASS in your .env file. If using root, you may need to configure a dedicated user for web access.');
+              }
+              if (errStr.includes('Connection refused') || errStr.includes('nosuchfile')) {
+                hints.push('If DB_HOST is localhost, try using 127.0.0.1. Also verify that the MySQL/MariaDB service is active and running.');
+              }
+              if (errStr.includes('Unknown database')) {
+                hints.push(`The database "${diag.configuredDatabase}" does not exist. Verify the name or create it via terminal.`);
+              }
+              hints.push(`Error Detail: ${errStr}`);
+              
+              tsHints.innerHTML = hints.map(h => `• ${escapeHTML(h)}`).join('<br>');
+              tsRow.classList.remove('hidden');
+            }
+          }
         }
         
         const phpEl = document.getElementById('diag-php-version');
@@ -107,16 +150,31 @@ export async function initManagementPage() {
         if (pdoEl) pdoEl.textContent = (diag.pdoDrivers || []).join(', ') || 'none';
         
         const connEl = document.getElementById('diag-connected-db');
-        if (connEl) connEl.textContent = `Host: ${diag.connectedHost} | Database: ${diag.connectedDatabase}`;
+        if (connEl) {
+          if (diag.dbConnected) {
+            connEl.textContent = `Host: ${diag.connectedHost} | Database: ${diag.connectedDatabase}`;
+          } else {
+            connEl.textContent = 'Disconnected';
+          }
+        }
         
         const configEl = document.getElementById('diag-configured-dsn');
         if (configEl) configEl.textContent = `Host: ${diag.configuredHost}:${diag.configuredPort} | Database: ${diag.configuredDatabase}`;
         
+        const userEl = document.getElementById('diag-configured-user');
+        if (userEl) userEl.textContent = diag.configuredUser || 'unknown';
+
         const envEl = document.getElementById('diag-env-status');
         if (envEl) envEl.textContent = diag.envFound ? 'Found' : 'Not Found';
         
         const tablesEl = document.getElementById('diag-tables-list');
-        if (tablesEl) tablesEl.textContent = (diag.tables || []).join(', ') || 'No tables found';
+        if (tablesEl) {
+          if (diag.dbConnected) {
+            tablesEl.textContent = (diag.tables || []).join(', ') || 'No tables found';
+          } else {
+            tablesEl.textContent = 'N/A (database offline)';
+          }
+        }
         
         diagResults?.classList.remove('hidden');
       } catch (err) {
@@ -145,6 +203,11 @@ export async function initManagementPage() {
         document.dispatchEvent(new CustomEvent('pb:pageChanged'));
       }
     });
+  }
+
+  const cleanupBtn = document.getElementById('mgmt-run-cleanup-btn');
+  if (cleanupBtn) {
+    cleanupBtn.addEventListener('click', handleCleanup);
   }
 
   // Perform an initial check on load. If no password is set or the user is already

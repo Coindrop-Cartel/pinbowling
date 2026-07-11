@@ -24,20 +24,34 @@ try {
         case 'GET':
             // Return system diagnostics info
             $dbConfig = \Configuration::getInstance()->getDbConfig();
-            $pdo = $container->get(\App\Service\DatabaseService::class)->getPdo();
-            
-            $stmt = $pdo->query('SELECT DATABASE() AS dbname, @@hostname AS hostname');
-            $info = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $dbConnected = false;
+            $dbError = null;
+            $connectedHost = 'unknown';
+            $connectedDatabase = 'unknown';
+            $tables = [];
 
-            $tables = $pdo->query('SHOW TABLES')->fetchAll(\PDO::FETCH_COLUMN);
+            try {
+                $pdo = $container->get(\App\Service\DatabaseService::class)->getPdo();
+                $stmt = $pdo->query('SELECT DATABASE() AS dbname, @@hostname AS hostname');
+                $info = $stmt->fetch(\PDO::FETCH_ASSOC);
+                $connectedHost = $info['hostname'] ?? 'unknown';
+                $connectedDatabase = $info['dbname'] ?? 'unknown';
+                $tables = $pdo->query('SHOW TABLES')->fetchAll(\PDO::FETCH_COLUMN);
+                $dbConnected = true;
+            } catch (\Exception $e) {
+                $dbError = $e->getMessage();
+            }
 
             sendJson([
                 'phpVersion' => PHP_VERSION,
                 'pdoDrivers' => \PDO::getAvailableDrivers(),
-                'connectedHost' => $info['hostname'] ?? 'unknown',
-                'connectedDatabase' => $info['dbname'] ?? 'unknown',
+                'dbConnected' => $dbConnected,
+                'dbError' => $dbError,
+                'connectedHost' => $connectedHost,
+                'connectedDatabase' => $connectedDatabase,
                 'configuredHost' => $dbConfig['host'],
                 'configuredPort' => $dbConfig['port'],
+                'configuredUser' => $dbConfig['user'],
                 'configuredDatabase' => $dbConfig['name'],
                 'envFound' => file_exists(__DIR__ . '/../.env'),
                 'tables' => $tables
