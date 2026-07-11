@@ -118,10 +118,7 @@ class Router {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        if (!function_exists('getCurrentUser')) {
-            return false;
-        }
-        $user = getCurrentUser();
+        $user = \App\Service\AuthService::getCurrentUser();
         if (!$user) {
             return false;
         }

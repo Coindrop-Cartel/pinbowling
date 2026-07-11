@@ -4,7 +4,8 @@
  */
 
 // Set global CORS headers to prevent NetworkErrors during preflighted requests (DELETE, PUT, etc.)
-header('Access-Control-Allow-Origin: *');
+$allowedOrigin = \Configuration::getInstance()->get(['ALLOWED_ORIGIN'], '*');
+header('Access-Control-Allow-Origin: ' . $allowedOrigin);
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-CSRF-TOKEN');
 

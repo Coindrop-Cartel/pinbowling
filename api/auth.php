@@ -5,9 +5,7 @@
  */
 
 // Ensure we have the DI container and services available
-if (!isset($GLOBALS['container'])) {
-    require_once __DIR__ . '/../includes/bootstrap.php';
-}
+require_once __DIR__ . '/../includes/bootstrap.php';
 
 $container = $GLOBALS['container'];
 $authService = $container->get(\App\Service\AuthService::class);

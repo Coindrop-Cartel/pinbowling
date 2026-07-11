@@ -1,21 +1,7 @@
 <?php
 
-require_once __DIR__ . '/Http/Request.php';
-require_once __DIR__ . '/Http/Response.php';
-require_once __DIR__ . '/Http/JsonResponse.php';
-require_once __DIR__ . '/Http/RedirectResponse.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/config.php';
-
-require_once __DIR__ . '/container.php';
-spl_autoload_register(function ($class) {
-    if (str_starts_with($class, 'App\\Service\\')) {
-        $name = str_replace('App\\Service\\', '', $class);
-        $file = __DIR__ . '/../service/' . $name . '.php';
-        if (file_exists($file)) {
-            require_once $file;
-        }
-    }
-});
 
 use App\Includes\Container;
 use App\Http\Request;

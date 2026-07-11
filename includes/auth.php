@@ -4,20 +4,35 @@
  */
 
 /**
- * Helper to get the currently authenticated user from the session.
+ * Consolidates the common routing security checks.
+ *
+ * @param array $allowedRoles If empty, permits any authenticated role.
+ * @param string $unauthorizedMessage Response message for 401.
  */
-function getCurrentUser() {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
+function authorizeRequest(array $allowedRoles, string $unauthorizedMessage) {
+    $apiSecret = Configuration::getInstance()->getApiSecret();
+    $providedSecret = getHeader('X-PB-Secret');
+
+    if ($providedSecret && $providedSecret === $apiSecret) {
+        return;
     }
-    return $_SESSION['user'] ?? null;
+
+    $user = \App\Service\AuthService::getCurrentUser();
+    if ($user && (empty($allowedRoles) || in_array($user['role'], $allowedRoles))) {
+        if (!verifyCsrfToken()) {
+            sendJson(['error' => 'CSRF validation failed'], 403);
+        }
+        return;
+    }
+
+    sendJson(['error' => $unauthorizedMessage], 401);
 }
 
 /**
  * Checks if the current user has permission to manage a specific league.
  */
 function canManageLeague($pdo, $leagueId) {
-    $user = getCurrentUser();
+    $user = \App\Service\AuthService::getCurrentUser();
     if (!$user) return false;
     if ($user['role'] === 'admin') return true;
     
@@ -36,21 +51,20 @@ function canManageLeague($pdo, $leagueId) {
  */
 function validateLeagueAccess($pdo, $leagueId) {
     $apiSecret = Configuration::getInstance()->getApiSecret();
-
     $providedSecret = getHeader('X-PB-Secret');
 
     // 1. Master Overrides: Session Role or API Secret
-    $user = getCurrentUser();
+    $user = \App\Service\AuthService::getCurrentUser();
     if ($user && ($user['role'] === 'admin' || $user['role'] === 'td')) {
-        if (!verifyCsrfToken()) sendJson(['error' => 'CSRF validation failed'], 403);
+        if (!verifyCsrfToken()) {
+            sendJson(['error' => 'CSRF validation failed'], 403);
+        }
         return;
     }
 
     if ($providedSecret && $providedSecret === $apiSecret) {
         return;
     }
-
-    // If we reach here and it's a restricted action, we'll rely on the specific service logic
 }
 
 /**
@@ -58,42 +72,14 @@ function validateLeagueAccess($pdo, $leagueId) {
  * Used for system-wide modifications like master machine/player editing.
  */
 function validateAdminAccess() {
-    $apiSecret = Configuration::getInstance()->getApiSecret();
-
-    $providedSecret = getHeader('X-PB-Secret');
-
-    if ($providedSecret && $providedSecret === $apiSecret) {
-        return;
-    }
-    
-    $user = getCurrentUser();
-    if ($user && $user['role'] === 'admin') {
-        if (!verifyCsrfToken()) sendJson(['error' => 'CSRF validation failed'], 403);
-        return;
-    }
-
-    sendJson(['error' => 'Unauthorized: Admin access required'], 401);
+    authorizeRequest(['admin'], 'Unauthorized: Admin access required');
 }
 
 /**
  * Verifies that the user is at least a TD or has master credentials.
  */
 function validateTDAccess() {
-    $apiSecret = Configuration::getInstance()->getApiSecret();
-
-    $providedSecret = getHeader('X-PB-Secret');
-
-    if ($providedSecret && $providedSecret === $apiSecret) {
-        return;
-    }
-    
-    $user = getCurrentUser();
-    if ($user && ($user['role'] === 'admin' || $user['role'] === 'td')) {
-        if (!verifyCsrfToken()) sendJson(['error' => 'CSRF validation failed'], 403);
-        return;
-    }
-
-    sendJson(['error' => 'Unauthorized: TD or Admin access required'], 401);
+    authorizeRequest(['admin', 'td'], 'Unauthorized: TD or Admin access required');
 }
 
 /**
@@ -101,15 +87,5 @@ function validateTDAccess() {
  * the server-side API_SECRET OR checks for a valid authenticated session.
  */
 function validateSessionOrSecret() {
-    $apiSecret = Configuration::getInstance()->getApiSecret();
-    $providedSecret = getHeader('X-PB-Secret');
-    if ($providedSecret === $apiSecret) {
-        return;
-    }
-    $user = getCurrentUser();
-    if ($user) {
-        if (!verifyCsrfToken()) sendJson(['error' => 'CSRF validation failed'], 403);
-        return;
-    }
-    sendJson(['error' => 'Unauthorized: Invalid or missing authentication'], 401);
+    authorizeRequest([], 'Unauthorized: Invalid or missing authentication');
 }

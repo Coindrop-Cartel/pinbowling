@@ -550,9 +550,22 @@ export class ScoringEngine {
    */
   async renderRoundRow(round, turnValues, isLastRound, targetPlayer, roundContext) {
     const row = document.createElement('div');
-    // Copy the entire old body of buildRoundRow here …
-    // Use `roundContext.roleHtml`, `roundContext.displayRoundNumber` etc. if present.
-    // Attach listeners (input → dirty flag, save button click).
+    row.className = 'round-row';
+    row.dataset.orderNumber = round?.orderNumber || 0;
+
+    const displayRoundNumber = roundContext?.displayRoundNumber ?? round?.orderNumber ?? '';
+    const displayRoundLabel = roundContext?.displayRoundLabel ?? this.getRoundLabel();
+    const machineName = round?.machineName || '';
+
+    row.innerHTML = `
+      <div class="round-info">
+        <div class="round-label"><b>${escapeHTML(displayRoundLabel)} ${displayRoundNumber}:</b> ${escapeHTML(machineName)}</div>
+        ${roundContext?.roleHtml ?? ''}
+      </div>
+      <div class="round-actions">
+        <div class="round-inputs-container"></div>
+      </div>
+    `;
     return row;
   }
   

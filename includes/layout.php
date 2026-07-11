@@ -19,8 +19,7 @@
       "@services/": "<?php echo versionedAsset($baseUrl . '/scripts/services/'); ?>",
       "@ui/": "<?php echo versionedAsset($baseUrl . '/scripts/ui/'); ?>",
       "@core/": "<?php echo versionedAsset($baseUrl . '/scripts/core/'); ?>",
-      "@pages/": "<?php echo versionedAsset($baseUrl . '/scripts/pages/'); ?>",
-      "@constants/": "<?php echo $baseUrl; ?>/constants/"
+      "@pages/": "<?php echo versionedAsset($baseUrl . '/scripts/pages/'); ?>"
     }
   }
   </script>

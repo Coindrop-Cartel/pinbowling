@@ -1,10 +1,662 @@
 openapi: 3.0.0
 info:
   title: PinBowling API
-  description: API for managing pinball-to-bowling scores, leagues, and events.
-  version: 1.0.0
+  description: API for managing pinball-to-sport scores, leagues, events, players, locations, teams, and matchups.
+  version: 1.3.6
 servers:
   - url: /api
+paths:
+  /auth.php:
+    get:
+      summary: Get the currently logged-in user session
+      parameters:
+        - name: task
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [me]
+      responses:
+        '200':
+          description: User info or null if unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    post:
+      summary: Authentication operations
+      parameters:
+        - name: task
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [login, logout, register, reset, forgot, reset_with_token]
+        - name: id
+          in: query
+          description: User ID (required only for reset password task)
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string }
+                password: { type: string }
+                playerName: { type: string }
+                email: { type: string }
+                confirmClaim: { type: boolean }
+                token: { type: string }
+      responses:
+        '200':
+          description: Success response
+        '400':
+          description: Invalid input parameters
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Unauthorized
+
+  /league.php:
+    get:
+      summary: Retrieve leagues or events (fixtures)
+      parameters:
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [league, fixture]
+            default: league
+        - name: id
+          in: query
+          description: League ID to fetch details
+          schema:
+            type: integer
+        - name: leagueId
+          in: query
+          description: Filter events/fixtures by League ID
+          schema:
+            type: integer
+        - name: type
+          in: query
+          description: Filter leagues by type (standard, session)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of leagues, league details, or list of events
+    post:
+      summary: Create league, event, or add player to league roster
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [league, fixture, member]
+            default: league
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/LeagueCreate'
+                - $ref: '#/components/schemas/EventCreate'
+                - type: object
+                  required: [leagueId, playerId]
+                  properties:
+                    leagueId: { type: integer }
+                    playerId: { type: integer }
+      responses:
+        '200':
+          description: Created successfully
+        '400':
+          description: Missing or invalid parameters
+    put:
+      summary: Update league or event (fixture) details
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: League or Event ID
+          schema:
+            type: integer
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [league, fixture]
+            default: league
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/LeagueUpdate'
+                - $ref: '#/components/schemas/EventCreate'
+      responses:
+        '200':
+          description: Updated successfully
+    delete:
+      summary: Remove league, event, or player from roster
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: query
+          description: League or Event ID
+          schema:
+            type: integer
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [league, fixture, member]
+            default: league
+        - name: leagueId
+          in: query
+          description: League ID (required for member task)
+          schema:
+            type: integer
+        - name: playerId
+          in: query
+          description: Player ID (required for member task)
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Deleted successfully
+
+  /machine.php:
+    get:
+      summary: Retrieve master machines or target scores for an event/league
+      parameters:
+        - name: leagueId
+          in: query
+          schema:
+            type: integer
+        - name: eventId
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of master machines or targets
+    post:
+      summary: Create master machine, save target scores, or bulk reorder
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [machine, sort]
+            default: machine
+        - name: eventId
+          in: query
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/MachineCreate'
+                - type: array
+                  items:
+                    $ref: '#/components/schemas/TargetScoreCreate'
+                - type: array
+                  items:
+                    type: object
+                    required: [id, order_number]
+                    properties:
+                      id: { type: integer }
+                      order_number: { type: integer }
+      responses:
+        '200':
+          description: Success
+    put:
+      summary: Update master machine details or target scores
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: query
+          description: Master machine ID (for machine update)
+          schema:
+            type: integer
+        - name: eventId
+          in: query
+          description: Event ID (for targets update)
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/MachineCreate'
+                - $ref: '#/components/schemas/TargetScoreCreate'
+      responses:
+        '200':
+          description: Success
+    delete:
+      summary: Delete master machine or event target scores
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: query
+          description: Master machine ID
+          schema:
+            type: integer
+        - name: eventId
+          in: query
+          description: Event ID (required to delete event targets)
+          schema:
+            type: integer
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [machine, threshold]
+            default: machine
+      responses:
+        '200':
+          description: Deleted successfully
+
+  /player.php:
+    get:
+      summary: Retrieve all players or self-profile
+      responses:
+        '200':
+          description: Player details list or individual player details
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/Player'
+                  - $ref: '#/components/schemas/Player'
+    post:
+      summary: Register a new player
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlayerCreate'
+      responses:
+        '200':
+          description: Player created successfully
+        '409':
+          description: Player name already exists
+    put:
+      summary: Update player details or role
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: Player or User ID
+          schema:
+            type: integer
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [player, role]
+            default: player
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/PlayerUpdate'
+                - type: object
+                  required: [role]
+                  properties:
+                    role: { type: string, enum: [player, td, admin] }
+      responses:
+        '200':
+          description: Updated successfully
+    delete:
+      summary: Delete player permanently
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Deleted successfully
+
+  /location.php:
+    get:
+      summary: Retrieve venues or mapped machines
+      parameters:
+        - name: id
+          in: query
+          schema:
+            type: integer
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [location, units]
+            default: location
+        - name: locationId
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Location details, location list, or mapped location machines
+    post:
+      summary: Create location or map machine to venue
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [location, units]
+            default: location
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/LocationCreate'
+                - $ref: '#/components/schemas/LocationMachineMapping'
+      responses:
+        '201':
+          description: Created location
+        '200':
+          description: Machine mapped successfully
+    put:
+      summary: Update location details or mapped machine configuration
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: query
+          description: Location ID (for location update)
+          schema:
+            type: integer
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [location, units]
+            default: location
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/LocationCreate'
+                - $ref: '#/components/schemas/LocationMachineMapping'
+      responses:
+        '200':
+          description: Success
+    delete:
+      summary: Delete location or remove machine mapping
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: query
+          description: Location ID
+          schema:
+            type: integer
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [location, units]
+            default: location
+        - name: locationId
+          in: query
+          schema:
+            type: integer
+        - name: machineId
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+
+  /score.php:
+    get:
+      summary: Retrieve scores
+      parameters:
+        - name: eventId
+          in: query
+          schema:
+            type: integer
+        - name: playerId
+          in: query
+          schema:
+            type: integer
+        - name: leagueId
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+    post:
+      summary: Save a round score
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreEntry'
+      responses:
+        '200':
+          description: Saved successfully
+    delete:
+      summary: Clear scores
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: eventId
+          in: query
+          schema:
+            type: integer
+        - name: playerId
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+
+  /team.php:
+    get:
+      summary: Retrieve all teams
+      responses:
+        '200':
+          description: Success
+    post:
+      summary: Create team, assign member, or add to league
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [team, member, league]
+            default: team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/TeamCreate'
+                - type: object
+                  required: [teamId, playerId]
+                  properties:
+                    teamId: { type: integer }
+                    playerId: { type: integer }
+                - type: object
+                  required: [leagueId, teamId]
+                  properties:
+                    leagueId: { type: integer }
+                    teamId: { type: integer }
+      responses:
+        '200':
+          description: Success
+    put:
+      summary: Update team details
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamCreate'
+      responses:
+        '200':
+          description: Success
+    delete:
+      summary: Delete team, remove member, or remove league association
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: query
+          schema:
+            type: integer
+        - name: task
+          in: query
+          schema:
+            type: string
+            enum: [team, member, league]
+            default: team
+        - name: teamId
+          in: query
+          schema:
+            type: integer
+        - name: playerId
+          in: query
+          schema:
+            type: integer
+        - name: leagueId
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+
+  /matchup.php:
+    get:
+      summary: Retrieve matchups for an event
+      parameters:
+        - name: eventId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+    post:
+      summary: Save event matchups
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/MatchupEntry'
+                - type: array
+                  items:
+                    $ref: '#/components/schemas/MatchupEntry'
+      responses:
+        '200':
+          description: Success
+    delete:
+      summary: Delete matchups for an event
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: eventId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+
+  /cleanup.php:
+    post:
+      summary: Clean up old session leagues
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                days: { type: integer }
+      responses:
+        '200':
+          description: Cleanup completed
+    put:
+      summary: Clean up abandoned players
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Cleanup completed
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -15,358 +667,229 @@ components:
       type: apiKey
       in: header
       name: X-LEAGUE-PASSWORD
-paths:
-  /leagues.php:
-    get:
-      summary: Retrieve leagues or events
-      parameters:
-        - name: action
-          in: query
-          schema: { type: string, enum: [league, event] }
-        - name: id
-          in: query
-          description: League ID
-          schema: { type: integer }
-        - name: leagueId
-          in: query
-          description: Filter events by League ID
-          schema: { type: integer }
-      responses:
-        '200':
-          description: Success
-    post:
-      summary: Create league, event, or add player to roster
-      security: [{ ApiKeyAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              oneOf:
-                - $ref: '#/components/schemas/League'
-                - $ref: '#/components/schemas/Event'
-                - $ref: '#/components/schemas/RosterAssignment'
-      parameters:
-        - name: action
-          in: query
-          schema: { type: string, enum: [league, event, player] }
-      responses:
-        '200':
-          description: Created
-    put:
-      summary: Update league or event details
-      security: [{ ApiKeyAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              oneOf:
-                - $ref: '#/components/schemas/LeagueUpdate'
-                - $ref: '#/components/schemas/Event'
-      parameters:
-        - name: id
-          in: query
-          required: true
-          schema: { type: integer }
-        - name: action
-          in: query
-          schema: { type: string, enum: [league, event] }
-      responses:
-        '200':
-          description: Updated
-  /machines.php:
-    get:
-      summary: Retrieve machines or target scores
-      parameters:
-        - name: leagueId
-          in: query
-          schema: { type: integer }
-        - name: eventId
-          in: query
-          schema: { type: integer }
-      responses:
-        '200':
-          description: Success
-    post:
-      summary: Manage machine registry or target thresholds
-      security: [{ ApiKeyAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              oneOf:
-                - $ref: '#/components/schemas/Machine'
-                - $ref: '#/components/schemas/TargetScore'
-                - type: array
-                  items:
-                    $ref: '#/components/schemas/ReorderItem'
-      parameters:
-        - name: action
-          in: query
-          schema: { type: string, enum: [league, event, player] }
-      responses:
-        '200':
-          description: Success
-    put:
-      summary: Update machine name or target thresholds
-      security: [{ ApiKeyAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              oneOf:
-                - $ref: '#/components/schemas/Machine'
-                - $ref: '#/components/schemas/TargetScore'
-      parameters:
-        - name: id
-          in: query
-          required: true
-          schema: { type: integer }
-        - name: action
-          in: query
-          schema: { type: string, enum: [machine, target, reorder] }
-      responses:
-        '200':
-          description: Success
-  /players.php:
-    get:
-      summary: Retrieve players
-      responses:
-        '200':
-          description: Success
-    post:
-      summary: Create new player
-      security: [{ ApiKeyAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Player'
-      responses:
-        '200':
-          description: Success
-    put:
-      summary: Update player details
-      security: [{ ApiKeyAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Player'
-      parameters:
-        - name: id
-          in: query
-          required: true
-          schema: { type: integer }
-      responses:
-        '200':
-          description: Updated
-    delete:
-      summary: Delete player and scores
-      security: [{ ApiKeyAuth: [] }]
-      parameters:
-        - name: id
-          in: query
-          required: true
-          schema: { type: integer }
-      responses:
-        '200':
-          description: Deleted
-  /locations.php:
-    get:
-      summary: Retrieve venues or machine mappings
-      parameters:
-        - name: action
-          in: query
-          schema: { type: string, enum: [location, machine] }
-        - name: id
-          in: query
-          description: Location ID (for single view)
-          schema: { type: integer }
-        - name: locationId
-          in: query
-          description: Filter machines by Location ID
-          schema: { type: integer }
-      responses:
-        '200':
-          description: Success
-    post:
-      summary: Create location or map machine to venue
-      security: [{ ApiKeyAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              oneOf:
-                - $ref: '#/components/schemas/Location'
-                - $ref: '#/components/schemas/LocationMachineMapping'
-      parameters:
-        - name: action
-          in: query
-          schema: { type: string, enum: [location, machine] }
-      responses:
-        '200':
-          description: Success
-    put:
-      summary: Update location details
-      security: [{ ApiKeyAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Location'
-      parameters:
-        - name: id
-          in: query
-          required: true
-          schema: { type: integer }
-      responses:
-        '200':
-          description: Updated
-    delete:
-      summary: Remove location or machine mapping
-      security: [{ ApiKeyAuth: [] }]
-      parameters:
-        - name: id
-          in: query
-          required: true
-      responses:
-        '200':
-          description: Deleted
-  /scores.php:
-    get:
-      summary: Retrieve scores for sessions, events, or leagues
-      parameters:
-        - name: playerId
-          in: query
-          schema: { type: integer }
-        - name: eventId
-          in: query
-          schema: { type: integer }
-        - name: leagueId
-          in: query
-          schema: { type: integer }
-      responses:
-        '200':
-          description: Success
-        '400':
-          description: Missing eventId or leagueId
-    post:
-      summary: Save a score for a specific round
-      security: 
-        - ApiKeyAuth: []
-        - LeagueAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ScoreEntry'
-      responses:
-        '200':
-          description: Saved
-    delete:
-      summary: Clear scores for a player in an event
-      security: [{ ApiKeyAuth: [] }]
-      parameters:
-        - name: playerId
-          in: query
-          required: true
-      responses:
-        '200':
-          description: Deleted
-
   schemas:
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        player_id: { type: integer, nullable: true }
+        username: { type: string }
+        role: { type: string }
+        created_at: { type: string }
+        player_name: { type: string, nullable: true }
+
     League:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        type: { type: string, enum: [standard, session] }
+        participants: { type: string, enum: [individual, team, head2head] }
+        startDate: { type: string, format: date, nullable: true }
+        scoringFormat: { type: string, enum: [bowling, golf, baseball] }
+        seasonScoring: { type: string, enum: [cumulative, weekly] }
+        dropLowestWeeks: { type: integer }
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/Player'
+        teams:
+          type: array
+          items:
+            $ref: '#/components/schemas/Team'
+
+    LeagueCreate:
       type: object
       required: [name]
       properties:
         name: { type: string }
-        start_date: { type: string, format: date }
-        password: { type: string, description: "Optional league password" }
+        startDate: { type: string, format: date }
+        type: { type: string, enum: [standard, session] }
+        participants: { type: string, enum: [individual, team, head2head] }
+        scoringFormat: { type: string, enum: [bowling, golf, baseball] }
+        seasonScoring: { type: string, enum: [cumulative, weekly] }
+        dropLowestWeeks: { type: integer }
+
     LeagueUpdate:
       type: object
+      required: [name]
       properties:
         name: { type: string }
-        start_date: { type: string, format: date }
-        reset_password: { type: boolean }
-        password: { type: string }
+        startDate: { type: string, format: date }
+        participants: { type: string, enum: [individual, team, head2head] }
+        scoringFormat: { type: string, enum: [bowling, golf, baseball] }
+        seasonScoring: { type: string, enum: [cumulative, weekly] }
+        dropLowestWeeks: { type: integer }
+
     Event:
-      type: object
-      required: [league_id, event_name]
-      properties:
-        league_id: { type: integer }
-        location_id: { type: integer }
-        event_name: { type: string }
-        event_date: { type: string, format: date }
-    RosterAssignment:
-      type: object
-      required: [league_id, player_id]
-      properties:
-        league_id: { type: integer }
-        player_id: { type: integer }
-    Machine:
-      type: object
-      required: [machine_name]
-      properties:
-        machine_name: { type: string }
-    TargetScore:
-      type: object
-      required: [event_id, machine_id, order_number, values]
-      properties:
-        event_id: { type: integer }
-        machine_id: { type: integer }
-        order_number: { type: integer }
-        values:
-          type: object
-          additionalProperties: { type: integer }
-          description: "Keys 1-10 representing bowling pins"
-    ReorderItem:
       type: object
       properties:
         id: { type: integer }
-        order_number: { type: integer }
+        leagueId: { type: integer }
+        locationId: { type: integer, nullable: true }
+        eventName: { type: string }
+        eventDate: { type: string, format: date, nullable: true }
+        scoringFormat: { type: string, enum: [bowling, golf, baseball] }
+        locationName: { type: string, nullable: true }
+
+    EventCreate:
+      type: object
+      required: [leagueId, eventName]
+      properties:
+        leagueId: { type: integer }
+        eventName: { type: string }
+        eventDate: { type: string, format: date }
+        locationId: { type: integer }
+        scoringFormat: { type: string, enum: [bowling, golf, baseball] }
+
     Player:
       type: object
-      required: [player_name]
       properties:
-        player_name: { type: string }
-        ifpa_id: { type: string }
-        matchplay_id: { type: string }
+        id: { type: integer }
+        playerName: { type: string }
+        ifpaId: { type: string, nullable: true }
+        matchplayId: { type: string, nullable: true }
+        userRole: { type: string, nullable: true }
+        username: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        userId: { type: integer, nullable: true }
+
+    PlayerCreate:
+      type: object
+      required: [playerName]
+      properties:
+        playerName: { type: string }
+        ifpaId: { type: string }
+        matchplayId: { type: string }
+
+    PlayerUpdate:
+      type: object
+      properties:
+        playerName: { type: string }
+        ifpaId: { type: string }
+        matchplayId: { type: string }
+        username: { type: string }
+        email: { type: string }
+
     Location:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        city: { type: string, nullable: true }
+        state: { type: string, nullable: true }
+        machines:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocationMachine'
+
+    LocationCreate:
       type: object
       required: [name]
       properties:
         name: { type: string }
         city: { type: string }
         state: { type: string }
+
+    LocationMachine:
+      type: object
+      properties:
+        id: { type: integer }
+        locationId: { type: integer }
+        machineId: { type: integer }
+        machineName: { type: string }
+        note: { type: string, nullable: true }
+        format: { type: string }
+        targetEasy: { type: integer }
+        targetMed: { type: integer }
+        targetHard: { type: integer }
+        scores: { type: object }
+
     LocationMachineMapping:
       type: object
-      required: [location_id, machine_id, values]
+      required: [locationId, machineId]
       properties:
-        location_id: { type: integer }
-        machine_id: { type: integer }
-        values:
-          type: object
-          additionalProperties: { type: integer }
+        locationId: { type: integer }
+        machineId: { type: integer }
+        format: { type: string }
+        note: { type: string }
         target_easy: { type: integer }
         target_med: { type: integer }
         target_hard: { type: integer }
+
+    Machine:
+      type: object
+      properties:
+        id: { type: integer }
+        machineName: { type: string }
+        year: { type: integer, nullable: true }
+        manufacturer: { type: string, nullable: true }
+
+    MachineCreate:
+      type: object
+      required: [machineName]
+      properties:
+        machineName: { type: string }
+        year: { type: integer }
+        manufacturer: { type: string }
+
+    TargetScoreCreate:
+      type: object
+      required: [machineId, orderNumber]
+      properties:
+        machineId: { type: integer }
+        orderNumber: { type: integer }
+        value1: { type: integer }
+        value2: { type: number }
+        values:
+          type: object
+          additionalProperties: { type: integer }
+
     ScoreEntry:
       type: object
-      required: [eventId, playerId, order_number, machineId]
+      required: [eventId, playerId, machineId, orderNumber]
       properties:
         eventId: { type: integer }
         playerId: { type: integer }
-        order_number: { type: integer }
         machineId: { type: integer }
+        orderNumber: { type: integer }
         ball1: { type: integer }
         ball2: { type: integer }
         ball3: { type: integer }
+
+    Team:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        city: { type: string, nullable: true }
+        state: { type: string, nullable: true }
+        members:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              playerName: { type: string }
+
+    TeamCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        city: { type: string }
+        state: { type: string }
+
+    MatchupEntry:
+      type: object
+      required: [eventId, orderNumber, playerId, machineId, playerOrder]
+      properties:
+        eventId: { type: integer }
+        orderNumber: { type: integer }
+        playerId: { type: integer }
+        machineId: { type: integer }
+        playerOrder: { type: integer }

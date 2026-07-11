@@ -51,6 +51,15 @@ export async function initManagementPage() {
     renderActionSummary(toolsSection, `System Maintenance for ${escapeHTML(user.username)}`, [
       { text: 'Run Database Cleanup', onclick: handleCleanup, hidden: user.role !== 'admin' }
     ]);
+
+    const diagSection = document.getElementById('mgmt-diagnostics-section');
+    if (diagSection) {
+      if (user.role === 'admin') {
+        diagSection.classList.remove('hidden');
+      } else {
+        diagSection.classList.add('hidden');
+      }
+    }
   };
 
   /**
@@ -74,6 +83,56 @@ export async function initManagementPage() {
       };
     }
   };
+
+  const loadDiagBtn = document.getElementById('mgmt-load-diag-btn');
+  const diagResults = document.getElementById('mgmt-diag-results');
+
+  if (loadDiagBtn) {
+    loadDiagBtn.addEventListener('click', async () => {
+      loadDiagBtn.disabled = true;
+      loadDiagBtn.textContent = 'Loading...';
+      try {
+        const diag = await PB_API.system.fetchDiagnostics();
+        
+        const statusEl = document.getElementById('diag-status');
+        if (statusEl) {
+          statusEl.textContent = 'Connected';
+          statusEl.style.color = 'green';
+        }
+        
+        const phpEl = document.getElementById('diag-php-version');
+        if (phpEl) phpEl.textContent = diag.phpVersion || 'unknown';
+        
+        const pdoEl = document.getElementById('diag-pdo-drivers');
+        if (pdoEl) pdoEl.textContent = (diag.pdoDrivers || []).join(', ') || 'none';
+        
+        const connEl = document.getElementById('diag-connected-db');
+        if (connEl) connEl.textContent = `Host: ${diag.connectedHost} | Database: ${diag.connectedDatabase}`;
+        
+        const configEl = document.getElementById('diag-configured-dsn');
+        if (configEl) configEl.textContent = `Host: ${diag.configuredHost}:${diag.configuredPort} | Database: ${diag.configuredDatabase}`;
+        
+        const envEl = document.getElementById('diag-env-status');
+        if (envEl) envEl.textContent = diag.envFound ? 'Found' : 'Not Found';
+        
+        const tablesEl = document.getElementById('diag-tables-list');
+        if (tablesEl) tablesEl.textContent = (diag.tables || []).join(', ') || 'No tables found';
+        
+        diagResults?.classList.remove('hidden');
+      } catch (err) {
+        const statusEl = document.getElementById('diag-status');
+        if (statusEl) {
+          statusEl.textContent = 'Failed';
+          statusEl.style.color = 'red';
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        showAlert('Failed to fetch system diagnostics: ' + message, 'Error');
+      } finally {
+        loadDiagBtn.disabled = false;
+        loadDiagBtn.textContent = 'Fetch Diagnostics';
+      }
+    });
+  }
 
   if (loginBtn) {
     // Use addEventListener for better reliability and wrap the call 

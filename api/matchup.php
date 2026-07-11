@@ -12,44 +12,46 @@ try {
     
     $method = $_SERVER['REQUEST_METHOD'];
 
-    // GET: Retrieve matchups for an event
-    if ($method === 'GET') {
-        $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
-        if (!$eventId) {
-            sendJson(['error' => 'eventId query parameter is required'], 400);
-        }
+    switch ($method) {
+        case 'GET':
+            $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
+            if (!$eventId) {
+                sendJson(['error' => 'eventId query parameter is required'], 400);
+            }
 
-        $matchups = $matchupService->getEventMatchups($eventId);
-        sendJson(array_map('serializeMatchup', $matchups));
-    }
+            $matchups = $matchupService->getEventMatchups($eventId);
+            sendJson(array_map('serializeMatchup', $matchups));
+            break;
 
-    // POST: Save matchups
-    if ($method === 'POST') {
-        validateTDAccess();
-        
-        $input = getJsonInput();
-        if (empty($input)) {
-            sendJson(['error' => 'Request body is empty'], 400);
-        }
+        case 'POST':
+            validateTDAccess();
+            
+            $input = getJsonInput();
+            if (empty($input)) {
+                sendJson(['error' => 'Request body is empty'], 400);
+            }
 
-        // Standardize input as list
-        $matchups = isset($input[0]) ? $input : [$input];
+            // Standardize input as list
+            $matchups = isset($input[0]) ? $input : [$input];
 
-        $matchupService->saveMatchups($matchups);
-        sendJson(['success' => true]);
-    }
+            $matchupService->saveMatchups($matchups);
+            sendJson(['success' => true]);
+            break;
 
-    // DELETE: Delete matchups
-    if ($method === 'DELETE') {
-        validateTDAccess();
-        
-        $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
-        if (!$eventId) {
-            sendJson(['error' => 'eventId query parameter is required'], 400);
-        }
+        case 'DELETE':
+            validateTDAccess();
+            
+            $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
+            if (!$eventId) {
+                sendJson(['error' => 'eventId query parameter is required'], 400);
+            }
 
-        $matchupService->deleteEventMatchups($eventId);
-        sendJson(['success' => true]);
+            $matchupService->deleteEventMatchups($eventId);
+            sendJson(['success' => true]);
+            break;
+
+        default:
+            sendJson(['error' => 'Unsupported request method'], 405);
     }
 
 } catch (Exception $e) {

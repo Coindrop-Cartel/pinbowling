@@ -3,7 +3,7 @@
  * Pre-render Auth State: To prevent FOUC (Flash of Unauthenticated Content),
  * we check the session immediately and render the logged-in UI on the server.
  */
-$user = function_exists('getCurrentUser') ? getCurrentUser() : null;
+$user = \App\Service\AuthService::getCurrentUser();
 $role = $user['role'] ?? 'unregistered';
 $isManagement = in_array($role, ['admin', 'td', 'player']);
 $userId = $user ? "user-" . ($user['id'] ?? 'auth') : 'guest';

@@ -188,5 +188,6 @@ export const PB_API = {
     // Cleanup is a destructive, state-changing operation; the backend only
     // accepts POST (session league cleanup) or PUT (abandoned players).
     runCleanup: (days) => fetchJSON('api/cleanup.php' + (days ? `?days=${days}` : ''), { method: 'POST' }),
+    fetchDiagnostics: () => fetchJSON('api/cleanup.php'),
   }
 };
