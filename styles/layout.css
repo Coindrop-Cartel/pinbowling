@@ -104,6 +104,30 @@
   min-width: 280px;
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 15px;
+}
+
+.kofi-header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--pb-primary);
+  color: var(--pb-white);
+  text-decoration: none;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  border-radius: 4px;
+  line-height: 1;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.kofi-cup-icon {
+  height: 14px;
+  width: auto;
+  display: block;
 }
 
 .auth-header-wrapper {

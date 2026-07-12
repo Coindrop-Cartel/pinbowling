@@ -13,7 +13,7 @@ class SiteContent {
         'aiDisclosure' => "AI was used in the development of this site.  The design, structure, layout and logos were all designed and reviewed by a human (one human to be specific),
                 but I also don't want to be misleading about the fact that it was used to help generate backend code, stardized pages and track down issues and syntax.  
         <br><br>
-        <b>If given all this you feel like it was and that makes it a hard pass for you, I totally understand.</b>",
+        <b>If given all this it makes it a hard pass for you, I totally understand.</b>",
     ];
 
     /**

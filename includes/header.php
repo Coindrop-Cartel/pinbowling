@@ -38,6 +38,10 @@ $displayName = htmlspecialchars($user['player_name'] ?? ($user['username'] ?? 'U
       </li>
     </ul>
     <div id="auth-header-container" class="auth-header" data-auth-state="<?php echo $userId; ?>">
+      <a href="https://ko-fi.com/kylevoorhees" target="_blank" class="kofi-header-btn">
+        <img src="https://storage.ko-fi.com/cdn/cup-border.png" alt="Ko-fi" class="kofi-cup-icon">
+        <span>Tip</span>
+      </a>
       <?php if ($user): ?>
         <div class="auth-header-wrapper">
           <span class="auth-user-greeting">Hi, <?php echo $displayName; ?></span>
@@ -49,13 +53,3 @@ $displayName = htmlspecialchars($user['player_name'] ?? ($user['username'] ?? 'U
     </div>
   </div>
 </nav>
-
-<script src='https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'></script>
-<script>
-  kofiWidgetOverlay.draw('kylevoorhees', {
-    'type': 'floating-chat',
-    'floating-chat.donateButton.text': 'Tip',
-    'floating-chat.donateButton.background-color': '#323842',
-    'floating-chat.donateButton.text-color': '#fff'
-  });
-</script>
