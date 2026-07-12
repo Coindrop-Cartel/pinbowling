@@ -135,9 +135,11 @@ export async function initMachinesPage() {
       
       // Initialize format details
       editingScores = {};
-      baselineFormatSelect.value = 'bowling';
-      baselineFormatSelect.dataset.prevFormat = 'bowling';
-      updateBaselineFieldsForFormat('bowling');
+      if (baselineFormatSelect) {
+        baselineFormatSelect.value = 'bowling';
+        baselineFormatSelect.dataset.prevFormat = 'bowling';
+        updateBaselineFieldsForFormat('bowling');
+      }
     } else {
       resetForm();
     }

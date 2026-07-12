@@ -23,6 +23,8 @@ vi.mock('@services/auth.js', () => ({
 vi.mock('@scripts/utils.js', () => ({
   loadPage: vi.fn(),
   escapeHTML: vi.fn(str => str),
+  formatNumber: vi.fn(num => String(num)),
+  applyScoreFormatting: vi.fn(),
 }));
 
 const uiMocks = vi.hoisted(() => ({
@@ -73,6 +75,25 @@ describe('Machines Page (machinesPage.js)', () => {
           <input id="machine-name" />
           <div id="machine-metadata-row" class="hidden">
             <input id="machine-manufacturer" />
+          </div>
+          <div id="machine-baseline-scores-row" class="hidden">
+            <select id="baseline-format">
+              <option value="bowling">Bowling</option>
+              <option value="golf">Golf</option>
+              <option value="baseball">Baseball</option>
+            </select>
+            <div class="form-row">
+              <label>Easy</label>
+              <input id="baseline-easy" />
+            </div>
+            <div class="form-row">
+              <label>Medium</label>
+              <input id="baseline-med" />
+            </div>
+            <div class="form-row">
+              <label>Hard</label>
+              <input id="baseline-hard" />
+            </div>
           </div>
           <div class="form-actions hidden">
             <button id="save-machine-button"></button>
