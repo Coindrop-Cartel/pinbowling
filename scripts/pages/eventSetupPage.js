@@ -380,7 +380,7 @@ export async function initEventSetupPage() {
           btn.onclick = () => {
             const type = btn.dataset.type;
             const format = eventMatch?.scoringFormat || league?.scoringFormat || 'bowling';
-            const match = currentSuggestedMachines.find(m => String(m.id) === String(round.machineId) && m.format === format);
+            const match = currentSuggestedMachines.find(m => String(m.machineId || m.id) === String(round.machineId) && m.format === format);
             const val = match ? match['target' + type.charAt(0).toUpperCase() + type.slice(1)] : null;
             if (val) {
               s10.value = formatNumber(val);

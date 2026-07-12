@@ -671,6 +671,26 @@ try {
         echo "users reset token columns migration already applied.\n";
     }
 
+    // Create machine_scores table
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'create_machine_scores_table'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `machine_scores` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `machine_id` INT NOT NULL,
+            `format` VARCHAR(50) DEFAULT 'bowling',
+            `target_easy` BIGINT DEFAULT 0,
+            `target_med` BIGINT DEFAULT 0,
+            `target_hard` BIGINT DEFAULT 0,
+            UNIQUE KEY `unique_machine_score_format` (`machine_id`, `format`),
+            CONSTRAINT `fk_ms_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('create_machine_scores_table')")->execute();
+        echo "✓ machine_scores table migration applied successfully.\n";
+    } else {
+        echo "machine_scores table migration already applied.\n";
+    }
+
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
 } catch (PDOException $e) {
     echo "\n✗ Migration failed: " . $e->getMessage() . "\n";

@@ -679,8 +679,10 @@ describe('Locations Management Page (locationsPage.js)', () => {
       ]);
       await initLocationsPage();
       const badge = document.querySelector('.badge');
-      expect(badge).not.toBeNull();
-      expect(badge.textContent).toBe('golf');
+      expect(badge).toBeNull();
+      
+      const machineContainer = document.getElementById('mach-for-loc-1');
+      expect(machineContainer.textContent).toContain('golf: E: 3 | M: 4 | H: 5');
     });
   });
 });

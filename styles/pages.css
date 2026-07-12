@@ -463,6 +463,53 @@
 
 /* Mobile Responsiveness for Pages and scoring */
 @media (max-width: 768px) {
+  .summary-box {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .summary-box button {
+    align-self: flex-end;
+  }
+
+  .generator-options {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .play-action-buttons {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .list-item-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .list-item-row .small-action-buttons {
+    align-self: flex-end;
+  }
+
+  .header-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .header-bar .action-buttons {
+    align-self: flex-end;
+  }
+
+  .row-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
   .round-row {
     flex-direction: column;
     align-items: stretch;

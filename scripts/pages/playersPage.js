@@ -51,6 +51,7 @@ export async function initPlayersPage() {
 
   let allPlayers = []; // Cache players for editing
   let filterInstance = null;
+  let expandedPlayerId = null;
 
   // Setup "Create Player" toggle
   const ifpaRow = document.getElementById('player-ifpa-row');
@@ -78,6 +79,11 @@ export async function initPlayersPage() {
   createToggle.className = 'secondary btn-mgmt mt-10 hidden';
   createToggle.textContent = 'Create New Player';
   playerNameInput.after(createToggle);
+
+  if (!currentUser) {
+    if (createToggle) createToggle.classList.add('hidden');
+    if (playerFormCard) playerFormCard.classList.add('hidden');
+  }
 
   // Standardize the primary form action button
   if (savePlayerButton) {
@@ -125,10 +131,6 @@ export async function initPlayersPage() {
               <strong>${escapeHTML(p.playerName)}</strong>
               ${displayRole ? `<span class="badge">${escapeHTML(displayRole)}</span>` : ''}
             </div>
-            <div class="action-buttons">
-              ${canEdit ? `<button type="button" class="edit-player-btn secondary btn-row">Edit</button>` : ''}
-              ${isAdmin ? `<button type="button" class="delete-player-btn-inline btn-row">Delete</button>` : ''}
-            </div>
           </div>
         `;
 
@@ -139,8 +141,14 @@ export async function initPlayersPage() {
             ${p.ifpaId ? `<div><strong>IFPA ID:</strong> ${escapeHTML(p.ifpaId)}</div>` : ''}
             ${p.matchplayId ? `<div><strong>MatchPlay ID:</strong> ${escapeHTML(p.matchplayId)}</div>` : ''}
             ${!p.ifpaId && !p.matchplayId ? '<div class="muted-italic">No external IDs linked.</div>' : ''}
+            <div class="small-action-buttons mt-10">
+              ${canEdit ? `<button type="button" class="edit-player-btn secondary btn-row">Edit</button>` : ''}
+              ${isAdmin ? `<button type="button" class="delete-player-btn-inline btn-row">Delete</button>` : ''}
+            </div>
           </div>
         `;
+
+        const isExpanded = String(p.id) === String(expandedPlayerId);
 
         const row = createExpandableRow(playerList, {
           id: p.id,
@@ -148,7 +156,11 @@ export async function initPlayersPage() {
           className: 'player-item-row',
           headerHtml,
           contentHtml,
-          isExpanded: false
+          isExpanded,
+          onHeaderClick: () => {
+            expandedPlayerId = (expandedPlayerId === p.id) ? null : p.id;
+            filterInstance.performFilter();
+          }
         });
 
         const editBtn = row.querySelector('.edit-player-btn');

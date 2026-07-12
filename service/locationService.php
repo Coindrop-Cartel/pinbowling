@@ -24,11 +24,16 @@ class LocationService {
         $locations = $stmt->fetchAll();
 
         $machinesStmt = $pdo->query(
-            'SELECT lm.*, m.machine_name, lms.target_easy, lms.target_med, lms.target_hard, lms.format
+            "SELECT lm.*, m.machine_name,
+                    COALESCE(NULLIF(lms.target_easy, 0), ms.target_easy, 0) AS target_easy,
+                    COALESCE(NULLIF(lms.target_med, 0), ms.target_med, 0) AS target_med,
+                    COALESCE(NULLIF(lms.target_hard, 0), ms.target_hard, 0) AS target_hard,
+                    COALESCE(lms.format, ms.format, 'bowling') AS format
              FROM location_machines lm 
              JOIN machines m ON lm.machine_id = m.id 
              LEFT JOIN location_machine_scores lms ON lms.location_machine_id = lm.id
-             ORDER BY lm.location_id ASC'
+             LEFT JOIN machine_scores ms ON ms.machine_id = lm.machine_id AND ms.format = COALESCE(lms.format, 'bowling')
+             ORDER BY lm.location_id ASC"
         );
         $allMachines = $machinesStmt->fetchAll();
 
@@ -62,11 +67,16 @@ class LocationService {
         }
 
         $stmt = $pdo->prepare(
-            'SELECT lm.*, m.machine_name, lms.target_easy, lms.target_med, lms.target_hard, lms.format
+            "SELECT lm.*, m.machine_name,
+                    COALESCE(NULLIF(lms.target_easy, 0), ms.target_easy, 0) AS target_easy,
+                    COALESCE(NULLIF(lms.target_med, 0), ms.target_med, 0) AS target_med,
+                    COALESCE(NULLIF(lms.target_hard, 0), ms.target_hard, 0) AS target_hard,
+                    COALESCE(lms.format, ms.format, 'bowling') AS format
              FROM location_machines lm 
              JOIN machines m ON lm.machine_id = m.id 
              LEFT JOIN location_machine_scores lms ON lms.location_machine_id = lm.id
-             WHERE lm.location_id = ?'
+             LEFT JOIN machine_scores ms ON ms.machine_id = lm.machine_id AND ms.format = COALESCE(lms.format, 'bowling')
+             WHERE lm.location_id = ?"
         );
         $stmt->execute([$locationId]);
         $location['machines'] = $stmt->fetchAll();
@@ -85,20 +95,30 @@ class LocationService {
         
         if ($locationId) {
             $stmt = $pdo->prepare(
-                'SELECT lm.*, m.machine_name, lms.target_easy, lms.target_med, lms.target_hard, lms.format
+                "SELECT lm.*, m.machine_name,
+                        COALESCE(NULLIF(lms.target_easy, 0), ms.target_easy, 0) AS target_easy,
+                        COALESCE(NULLIF(lms.target_med, 0), ms.target_med, 0) AS target_med,
+                        COALESCE(NULLIF(lms.target_hard, 0), ms.target_hard, 0) AS target_hard,
+                        COALESCE(lms.format, ms.format, 'bowling') AS format
                  FROM location_machines lm 
                  JOIN machines m ON lm.machine_id = m.id 
                  LEFT JOIN location_machine_scores lms ON lms.location_machine_id = lm.id
-                 WHERE lm.location_id = ?'
+                 LEFT JOIN machine_scores ms ON ms.machine_id = lm.machine_id AND ms.format = COALESCE(lms.format, 'bowling')
+                 WHERE lm.location_id = ?"
             );
             $stmt->execute([$locationId]);
         } else {
             $stmt = $pdo->query(
-                'SELECT lm.*, m.machine_name, lms.target_easy, lms.target_med, lms.target_hard, lms.format
+                "SELECT lm.*, m.machine_name,
+                        COALESCE(NULLIF(lms.target_easy, 0), ms.target_easy, 0) AS target_easy,
+                        COALESCE(NULLIF(lms.target_med, 0), ms.target_med, 0) AS target_med,
+                        COALESCE(NULLIF(lms.target_hard, 0), ms.target_hard, 0) AS target_hard,
+                        COALESCE(lms.format, ms.format, 'bowling') AS format
                  FROM location_machines lm 
                  JOIN machines m ON lm.machine_id = m.id 
                  LEFT JOIN location_machine_scores lms ON lms.location_machine_id = lm.id
-                 ORDER BY lm.location_id ASC'
+                 LEFT JOIN machine_scores ms ON ms.machine_id = lm.machine_id AND ms.format = COALESCE(lms.format, 'bowling')
+                 ORDER BY lm.location_id ASC"
             );
         }
         

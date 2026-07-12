@@ -73,6 +73,11 @@ function serializeLocationMachinesGrouped(array $rows): array {
             'targetHard' => (int)($row['target_hard'] ?? 0),
         ];
     }
+    foreach ($grouped as &$g) {
+        if (empty($g['scores'])) {
+            $g['scores'] = (object)[];
+        }
+    }
     return array_values($grouped);
 }
 
@@ -129,15 +134,49 @@ function serializeScore($row) {
 }
 
 /**
- * Normalizes a master machine registry row.
+ * Groups flat master machine rows (from a JOIN with machine_scores)
+ * into machine objects with a `scores` map keyed by format.
  */
-function serializeMasterMachine($row) {
-    return [
-        'id' => (int)$row['id'],
-        'machineName' => $row['machine_name'],
-        'year' => $row['year'] ? (int)$row['year'] : null,
-        'manufacturer' => $row['manufacturer'] ?? null
-    ];
+function serializeMasterMachinesGrouped(array $rows): array {
+    $grouped = [];
+    foreach ($rows as $row) {
+        $mId = (int)$row['id'];
+        if (!isset($grouped[$mId])) {
+            $grouped[$mId] = [
+                'id' => $mId,
+                'machineName' => $row['machine_name'],
+                'year' => $row['year'] ? (int)$row['year'] : null,
+                'manufacturer' => $row['manufacturer'] ?? null,
+                'scores' => [],
+            ];
+        }
+        if (isset($row['format']) && $row['format'] !== null) {
+            $fmt = $row['format'];
+            $grouped[$mId]['scores'][$fmt] = [
+                'targetEasy' => (int)($row['target_easy'] ?? 0),
+                'targetMed' => (int)($row['target_med'] ?? 0),
+                'targetHard' => (int)($row['target_hard'] ?? 0),
+            ];
+        }
+    }
+    foreach ($grouped as &$g) {
+        if (empty($g['scores'])) {
+            $g['scores'] = (object)[];
+        }
+    }
+    return array_values($grouped);
+}
+
+/**
+ * Normalizes a master machine registry row/rows.
+ */
+function serializeMasterMachine($rows) {
+    if (empty($rows)) return null;
+    if (!isset($rows[0]) || !is_array($rows[0])) {
+        $rows = [$rows];
+    }
+    $grouped = serializeMasterMachinesGrouped($rows);
+    return $grouped[0] ?? null;
 }
 
 /**

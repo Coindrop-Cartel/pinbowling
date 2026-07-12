@@ -29,7 +29,7 @@ try {
             } else {
                 // Get master machine list
                 $machines = $machineService->getAllMachines();
-                sendJson(array_map('serializeMasterMachine', $machines));
+                sendJson(serializeMasterMachinesGrouped($machines));
             }
             break;
 
@@ -69,7 +69,8 @@ try {
                 $machine = $machineService->createMachine(
                     $input['machineName'],
                     $input['year'] ?? null,
-                    $input['manufacturer'] ?? null
+                    $input['manufacturer'] ?? null,
+                    $input['scores'] ?? null
                 );
                 sendJson(serializeMasterMachine($machine));
             }
@@ -96,7 +97,8 @@ try {
                     $id,
                     $input['machineName'] ?? null,
                     $input['year'] ?? null,
-                    $input['manufacturer'] ?? null
+                    $input['manufacturer'] ?? null,
+                    $input['scores'] ?? null
                 );
             }
             

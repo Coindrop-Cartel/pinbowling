@@ -283,7 +283,7 @@ export async function initLocationsPage() {
         : `<small>E: ${formatNumber(m.targetEasy)} | M: ${formatNumber(m.targetMed)} | H: ${formatNumber(m.targetHard)}</small>`;
       item.innerHTML = `
         <span>
-          <strong class="small">${escapeHTML(m.machineName)} ${formatBadges}</strong><br>
+          <strong class="small">${escapeHTML(m.machineName)}</strong><br>
           ${scoreLines}
         </span>
         <div class="small-action-buttons">

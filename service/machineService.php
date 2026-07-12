@@ -19,7 +19,10 @@ class MachineService {
      */
     public function getAllMachines(): array {
         $stmt = $this->db->getPdo()->query(
-            'SELECT id, machine_name, year, manufacturer FROM machines ORDER BY machine_name ASC'
+            'SELECT m.id, m.machine_name, m.year, m.manufacturer, ms.format, ms.target_easy, ms.target_med, ms.target_hard
+             FROM machines m
+             LEFT JOIN machine_scores ms ON ms.machine_id = m.id
+             ORDER BY m.machine_name ASC'
         );
         return $stmt->fetchAll();
     }
@@ -28,14 +31,39 @@ class MachineService {
      * Get a specific machine.
      *
      * @param int $machineId
-     * @return array|false
+     * @return array
      */
-    public function getMachine(int $machineId) {
+    public function getMachine(int $machineId): array {
         $stmt = $this->db->query(
-            'SELECT * FROM machines WHERE id = ?',
+            'SELECT m.id, m.machine_name, m.year, m.manufacturer, ms.format, ms.target_easy, ms.target_med, ms.target_hard
+             FROM machines m
+             LEFT JOIN machine_scores ms ON ms.machine_id = m.id
+             WHERE m.id = ?',
             [$machineId]
         );
-        return $stmt->fetch();
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Save machine scores helper.
+     *
+     * @param int $machineId
+     * @param array $scores
+     */
+    public function saveMachineScores(int $machineId, array $scores): void {
+        $pdo = $this->db->getPdo();
+        foreach ($scores as $format => $targets) {
+            $easy = (int)($targets['targetEasy'] ?? $targets['target_easy'] ?? 0);
+            $med = (int)($targets['targetMed'] ?? $targets['target_med'] ?? 0);
+            $hard = (int)($targets['targetHard'] ?? $targets['target_hard'] ?? 0);
+            
+            $stmt = $pdo->prepare(
+                'INSERT INTO machine_scores (machine_id, format, target_easy, target_med, target_hard)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE target_easy = VALUES(target_easy), target_med = VALUES(target_med), target_hard = VALUES(target_hard)'
+            );
+            $stmt->execute([$machineId, $format, $easy, $med, $hard]);
+        }
     }
 
     /**
@@ -44,17 +72,23 @@ class MachineService {
      * @param string $machineName
      * @param int|null $year
      * @param string|null $manufacturer
+     * @param array|null $scores Optional baseline target scores
      * @return array Created machine
      */
-    public function createMachine(string $machineName, ?int $year = null, ?string $manufacturer = null): array {
+    public function createMachine(string $machineName, ?int $year = null, ?string $manufacturer = null, ?array $scores = null): array {
         $pdo = $this->db->getPdo();
         
         $stmt = $pdo->prepare(
             'INSERT INTO machines (machine_name, year, manufacturer) VALUES (?, ?, ?)'
         );
         $stmt->execute([$machineName, $year, $manufacturer]);
+        $machineId = (int)$pdo->lastInsertId();
         
-        return $this->getMachine((int)$pdo->lastInsertId());
+        if ($scores) {
+            $this->saveMachineScores($machineId, $scores);
+        }
+        
+        return $this->getMachine($machineId);
     }
 
     /**
@@ -64,9 +98,10 @@ class MachineService {
      * @param string|null $machineName
      * @param int|null $year
      * @param string|null $manufacturer
+     * @param array|null $scores Optional baseline target scores
      * @return array Updated machine
      */
-    public function updateMachine(int $machineId, ?string $machineName = null, ?int $year = null, ?string $manufacturer = null): array {
+    public function updateMachine(int $machineId, ?string $machineName = null, ?int $year = null, ?string $manufacturer = null, ?array $scores = null): array {
         $pdo = $this->db->getPdo();
         
         $fields = [];
@@ -90,6 +125,10 @@ class MachineService {
             $sql = "UPDATE machines SET " . implode(", ", $fields) . " WHERE id = ?";
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
+        }
+        
+        if ($scores !== null) {
+            $this->saveMachineScores($machineId, $scores);
         }
         
         return $this->getMachine($machineId);
