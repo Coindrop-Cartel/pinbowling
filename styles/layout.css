@@ -2,7 +2,7 @@
 
 /* Header & Navigation Layout */
 .navbar {
-  background: var(--pb-white);
+  background: var(--pb-header-bg);
   border-bottom: 5px solid var(--pb-primary);
   padding: 0;
   position: sticky;
@@ -26,7 +26,7 @@
   align-items: center;
   gap: 12px;
   text-decoration: none;
-  color: var(--pb-black);
+  color: var(--pb-header-text);
   font-weight: 900;
   text-transform: uppercase;
   font-size: 1.5rem;
@@ -56,7 +56,7 @@
 }
 
 .nav-link {
-  color: var(--pb-black);
+  color: var(--pb-header-text);
   text-decoration: none;
   font-weight: 900;
   text-transform: uppercase;
@@ -120,7 +120,7 @@
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  color: var(--pb-black);
+  color: var(--pb-header-text);
   vertical-align: middle;
   padding-bottom: 1px;
 }

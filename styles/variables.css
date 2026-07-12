@@ -7,6 +7,10 @@
   --pb-gray: #f4f4f4;
   --pb-border: 4px solid var(--pb-black);
   --pb-shadow: 8px 8px 0px rgba(0,0,0,0.2);
+
+    /* New Header-specific variables */
+  --pb-header-bg: var(--pb-primary, #000000); /* Falls back to black) */
+  --pb-header-text: var(--pb-white);          /* White text */
 }
 
 * {

@@ -569,4 +569,10 @@ export class ScoringEngine {
     return row;
   }
   
+  /**
+   * Returns the header logo image.
+   * @returns {string}
+   */
+  getHeaderLogoImage() { return this.config.headerLogo || this.getLogoImage(); }
+
 }

@@ -24,14 +24,23 @@ export function applyPreferredTheme(overrideFormat) {
     mainLogo.src = `${basePath}main-site-logo-${engine.getBrandName().toLowerCase()}.png`;
   }
 
-  // Update dynamic logos (header/nav)
-  const logoImgs = document.querySelectorAll('.nav-logo img, .header-logo img, .site-logo img, #site-logo');
-  logoImgs.forEach(img => {
-    const lastSlash = img.src.lastIndexOf('/');
-    const basePath = lastSlash !== -1 ? img.src.substring(0, lastSlash + 1) : '';
-    img.src = basePath + engine.getLogoImage();
-    img.alt = engine.getBrandName() + ' Logo';
-  });
+// Update dynamic logos (general page logos)
+const logoImgs = document.querySelectorAll('.header-logo img, .site-logo img, #site-logo');
+logoImgs.forEach(img => {
+  const lastSlash = img.src.lastIndexOf('/');
+  const basePath = lastSlash !== -1 ? img.src.substring(0, lastSlash + 1) : '';
+  img.src = basePath + engine.getLogoImage();
+  img.alt = engine.getBrandName() + ' Logo';
+});
+
+// Update navigation/header logo specifically
+const navLogoImg = document.querySelector('.nav-logo img');
+if (navLogoImg) {
+  const lastSlash = navLogoImg.src.lastIndexOf('/');
+  const basePath = lastSlash !== -1 ? navLogoImg.src.substring(0, lastSlash + 1) : '';
+  navLogoImg.src = basePath + engine.getHeaderLogoImage();
+  navLogoImg.alt = engine.getBrandName() + ' Logo';
+}
 
   // Update nav brand name spans (if present)
   document.querySelectorAll('.nav-logo span').forEach(span => {

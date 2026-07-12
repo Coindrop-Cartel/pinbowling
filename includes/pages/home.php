@@ -29,11 +29,6 @@
     <p id="scoring-logic-text"><?php echo $active['logic']; ?></p>
   </section>
  
-  <section class="card" data-testid="about-project-card">
-    <h2>About the Project</h2>
-    <p><?php echo $aboutProject; ?></p>
-  </section>
- 
   <section class="card" data-testid="ai-disclosure-card">
     <h2>AI Disclosure</h2>
     <p><?php echo $aiDisclosure; ?></p>
