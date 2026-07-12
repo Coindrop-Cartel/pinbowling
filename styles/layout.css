@@ -463,9 +463,7 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
   }
 
   .hero-logo-btn {
-    width: 60%;
-    max-width: 220px;
-    height: auto;
+    height: 100%;
   }
 
   .hero-logo-btn[hidden] {
@@ -483,7 +481,6 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
     font-size: 1.5rem;
     font-weight: 700;
     line-height: 1;
-    color: var(--pb-black, #000);
     background: var(--pb-white, #fff);
     border: 2px solid var(--pb-gray, #ccc);
     border-radius: 50%;
