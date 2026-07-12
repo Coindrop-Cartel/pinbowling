@@ -61,9 +61,9 @@ describe('Branding Utilities (branding.js)', () => {
       expect(document.body.classList.contains('theme-bowling')).toBe(true);
     });
     it('should update logo images and alt text', () => {
-      document.body.innerHTML = `<div class="nav-logo"><img src="/images/old.png" /></div><div class="header-logo"><img src="/images/old.png" /></div>`;
+      document.body.innerHTML = `<div class="header-logo"><img src="/images/old.png" /></div>`;
       applyPreferredTheme('bowling');
-      const imgs = document.querySelectorAll('.nav-logo img, .header-logo img');
+      const imgs = document.querySelectorAll('.header-logo img');
       imgs.forEach(img => {
         expect(img.src).toContain('logo-bowling.png');
         expect(img.alt).toBe('PinBowling Logo');
@@ -95,9 +95,9 @@ describe('Branding Utilities (branding.js)', () => {
       expect(document.body.classList.contains('theme-golf')).toBe(true);
     });
     it('should handle logo src with no slash gracefully', () => {
-      document.body.innerHTML = `<div class="nav-logo"><img src="logo.png" /></div>`;
+      document.body.innerHTML = `<div class="header-logo"><img src="logo.png" /></div>`;
       applyPreferredTheme('bowling');
-      const img = document.querySelector('.nav-logo img');
+      const img = document.querySelector('.header-logo img');
       expect(img.src).toContain('logo-bowling.png');
     });
     it('should update site-logo img and #site-logo elements', () => {

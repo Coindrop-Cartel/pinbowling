@@ -60,6 +60,7 @@ $siteSlogan  = SiteContent::get('siteSlogan');
 $heroIntroText = SiteContent::get('heroIntroText');
 $aboutProject = SiteContent::get('aboutProject');
 $aiDisclosure = SiteContent::get('aiDisclosure');
+$mainSiteLogo = SiteContent::get('mainSiteLogo');
 
 // --- Database Configuration (derived from Configuration singleton) ---
 $dbConfig = $config->getDbConfig();

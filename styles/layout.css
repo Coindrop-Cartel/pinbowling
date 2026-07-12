@@ -37,7 +37,6 @@
 
 .nav-logo img {
   height: 60px;
-  width: 60px;
   object-fit: contain;
   flex-shrink: 0;
   display: block;
@@ -362,17 +361,18 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
 .content-muted { font-size: 0.85rem; color: #666; }
 .content-muted-col { font-size: 0.85rem; color: #666; display: flex; flex-direction: column; gap: 4px; }
 
-/* Mobile Responsiveness for Layouts */
 @media (max-width: 768px) {
   .nav-container {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: center;
     min-height: auto;
-    padding: 10px 15px;
-    gap: 5px;
+    padding: 15px;
+    gap: 12px;
   }
 
   .nav-logo {
-    flex: 1;
+    display: flex;
+    justify-content: center;
     order: 1;
     font-size: 1.2rem;
     min-width: unset;
@@ -380,7 +380,6 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
 
   .nav-logo img {
     height: 56px;
-    width: 56px;
   }
 
   .nav-logo span {
@@ -390,11 +389,13 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
   #auth-header-container {
     order: 2;
     display: flex;
+    justify-content: center;
     align-items: center;
     gap: 8px;
     font-size: 0.8rem;
     white-space: nowrap;
     min-width: unset;
+    width: 100%;
   }
 
   #header-logout-btn, #header-login-btn {
@@ -405,13 +406,12 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
   .nav-links {
     width: 100%;
     order: 3;
-    justify-content: flex-start;
-    overflow-x: auto;
-    white-space: nowrap;
-    padding-bottom: 8px;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    -webkit-overflow-scrolling: touch;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 0 0 8px 0;
+    margin: 0;
   }
 
   .dropdown-content {
@@ -504,4 +504,65 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
     flex: 1 1 auto;
     justify-content: center;
   }
+
+}
+
+/* Accordion Component - Collapsible Sections */
+.accordion-card {
+  background: var(--pb-header-bg) !important;
+  color: var(--pb-white, #fff) !important;
+  padding: 0 !important; /* Override standard card padding to prevent layout issues when closed */
+  overflow: hidden;
+}
+
+/* Hide default markers on details/summary for all browsers */
+.accordion-card summary {
+  list-style: none !important;
+  list-style-type: none !important;
+  cursor: pointer;
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  padding: 20px 30px;
+}
+
+.accordion-card summary::-webkit-details-marker,
+.accordion-card summary::marker {
+  display: none !important;
+}
+
+/* Heading color inside summary should inherit white text */
+.accordion-card summary h2 {
+  margin: 0;
+  display: inline-block;
+  color: var(--pb-white, #fff) !important;
+}
+
+/* Custom indicator symbol (+ / -) */
+.accordion-card summary::after {
+  content: '+';
+  font-size: 1.8rem;
+  font-weight: bold;
+  line-height: 1;
+  color: var(--pb-white, #fff);
+  transition: transform 0.2s ease;
+}
+
+/* Change indicator to minus when open */
+.accordion-card[open] summary::after {
+  content: '−';
+}
+
+/* Content block styling (white background, black text) */
+.accordion-card .accordion-content {
+  background: var(--pb-white, #fff);
+  color: var(--pb-black, #000);
+  padding: 30px;
+  border-top: var(--pb-border);
+}
+
+.accordion-card .accordion-content p {
+  color: var(--pb-black, #000) !important;
+  margin: 0;
 }

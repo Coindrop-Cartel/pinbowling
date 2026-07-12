@@ -1,9 +1,6 @@
 <?php $pageTitle = 'Home'; ?>
 <main class="page-container">
   <header class="hero-section">
-    <!-- New main site logo -->
-    <img src="images/main-site-logo-<?php echo strtolower($active['brand']); ?>.png" alt="<?php echo $siteBrand; ?>" class="main-site-logo">
- 
     <!-- Format selection and action buttons in a card -->
     <div class="card hero-brand-selector">
       <p class="hero-intro-text"><?php echo $heroIntroText; ?></p>
@@ -24,13 +21,17 @@
     </div>
   </header>
  
-  <section class="card" data-testid="scoring-logic-card">
-    <h2>Scoring Logic</h2>
-    <p id="scoring-logic-text"><?php echo $active['logic']; ?></p>
-  </section>
+<details name="home-accordion" class="card accordion-card" data-testid="scoring-logic-card">
+    <summary><h2>Scoring Logic</h2></summary>
+    <div class="accordion-content">
+      <p id="scoring-logic-text"><?php echo $active['logic']; ?></p>
+    </div>
+  </details>
  
-  <section class="card" data-testid="ai-disclosure-card">
-    <h2>AI Disclosure</h2>
-    <p><?php echo $aiDisclosure; ?></p>
-  </section>
+  <details name="home-accordion" class="card accordion-card" data-testid="ai-disclosure-card">
+    <summary><h2>AI Disclosure</h2></summary>
+    <div class="accordion-content">
+      <p><?php echo $aiDisclosure; ?></p>
+    </div>
+  </details>
 </main>

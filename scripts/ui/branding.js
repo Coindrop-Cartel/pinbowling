@@ -33,15 +33,6 @@ logoImgs.forEach(img => {
   img.alt = engine.getBrandName() + ' Logo';
 });
 
-// Update navigation/header logo specifically
-const navLogoImg = document.querySelector('.nav-logo img');
-if (navLogoImg) {
-  const lastSlash = navLogoImg.src.lastIndexOf('/');
-  const basePath = lastSlash !== -1 ? navLogoImg.src.substring(0, lastSlash + 1) : '';
-  navLogoImg.src = basePath + engine.getHeaderLogoImage();
-  navLogoImg.alt = engine.getBrandName() + ' Logo';
-}
-
   // Update nav brand name spans (if present)
   document.querySelectorAll('.nav-logo span').forEach(span => {
     span.textContent = engine.getBrandName();

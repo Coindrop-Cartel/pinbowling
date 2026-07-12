@@ -13,8 +13,7 @@ $displayName = htmlspecialchars($user['player_name'] ?? ($user['username'] ?? 'U
 <nav class="navbar">
   <div class="nav-container">
     <a href="<?php echo rtrim($baseUrl, '/') . '/'; ?>" class="nav-logo" data-route="HOME">
-      <img src="<?php echo versionedAsset($baseUrl . '/images/' . ($active['headerLogo'] ?? $active['logo'])); ?>" alt="<?php echo $active['brand']; ?> Logo">
-      <span><?php echo $active['brand']; ?></span>
+      <img src="<?php echo versionedAsset($baseUrl . '/images/' . $mainSiteLogo); ?>" alt="Pinball and Stuff Logo">
     </a>
     <ul class="nav-links">
       <li id="play-nav-item" class="nav-item"><a href="<?php echo $baseUrl; ?>/play" class="nav-link" data-route="PLAY"><?php echo $active['cta']; ?></a></li>
@@ -38,10 +37,6 @@ $displayName = htmlspecialchars($user['player_name'] ?? ($user['username'] ?? 'U
       </li>
     </ul>
     <div id="auth-header-container" class="auth-header" data-auth-state="<?php echo $userId; ?>">
-      <a href="https://ko-fi.com/kylevoorhees" target="_blank" class="kofi-header-btn">
-        <img src="https://storage.ko-fi.com/cdn/cup-border.png" alt="Ko-fi" class="kofi-cup-icon">
-        <span>Tip</span>
-      </a>
       <?php if ($user): ?>
         <div class="auth-header-wrapper">
           <span class="auth-user-greeting">Hi, <?php echo $displayName; ?></span>
@@ -50,6 +45,10 @@ $displayName = htmlspecialchars($user['player_name'] ?? ($user['username'] ?? 'U
       <?php else: ?>
         <button id="header-login-btn">Login</button>
       <?php endif; ?>
+      <a href="https://ko-fi.com/kylevoorhees" target="_blank" class="kofi-header-btn">
+        <img src="https://storage.ko-fi.com/cdn/cup-border.png" alt="Ko-fi" class="kofi-cup-icon">
+        <span>Tip</span>
+      </a>
     </div>
   </div>
 </nav>

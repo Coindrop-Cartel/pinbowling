@@ -26,7 +26,14 @@ test.describe('Home Page', () => {
   });
 
   test('should display scoring logic section', async ({ page }) => {
+    const scoringCard = page.locator('[data-testid="scoring-logic-card"]');
     const scoringText = page.locator('#scoring-logic-text');
+    
+    // Should be collapsed/hidden by default
+    await expect(scoringText).toBeHidden();
+    
+    // Click the summary to expand it
+    await scoringCard.locator('summary').click();
     await expect(scoringText).toBeVisible();
     await expect(scoringText).not.toBeEmpty();
   });
@@ -46,8 +53,15 @@ test.describe('Home Page', () => {
     await expect(page.getByTestId('tournament-context-area')).toBeVisible();
   });
 
-  test('should display About and AI Disclosure sections', async ({ page }) => {
-    await expect(page.locator('h2', { hasText: /about the project/i })).toBeVisible();
-    await expect(page.locator('h2', { hasText: /ai disclosure/i })).toBeVisible();
+  test('should display AI Disclosure section when expanded', async ({ page }) => {
+    const disclosureCard = page.locator('[data-testid="ai-disclosure-card"]');
+    const disclosureText = disclosureCard.locator('p');
+    
+    // Should be collapsed/hidden by default
+    await expect(disclosureText).toBeHidden();
+    
+    // Click the summary to expand it
+    await disclosureCard.locator('summary').click();
+    await expect(disclosureText).toBeVisible();
   });
 });
