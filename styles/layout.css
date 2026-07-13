@@ -2,6 +2,7 @@
 
 /* Header & Navigation Layout */
 .navbar {
+  --pb-header-bg: var(--pb-primary, #000000);
   background: var(--pb-header-bg);
   border-bottom: 5px solid var(--pb-primary);
   padding: 0;
@@ -66,7 +67,7 @@
 }
 
 .nav-link:hover, .dropdown:hover .dropbtn, .nav-link.active, .dropbtn.active {
-  background: var(--pb-primary) !important;
+  background: var(--pb-header-hover-bg, var(--pb-primary)) !important;
   color: var(--pb-white) !important;
 }
 
@@ -111,8 +112,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: var(--pb-primary);
-  color: var(--pb-white);
+  background-color: var(--pb-white) !important;
+  color: var(--pb-primary);
   text-decoration: none;
   padding: 8px 12px;
   font-size: 0.85rem;
@@ -150,8 +151,8 @@
 
 #header-logout-btn, 
 #header-login-btn {
-  background-color: var(--pb-black);
-  color: var(--pb-white);
+  background-color: var(--pb-white) !important;
+  color: var(--pb-primary);
   border: none;
   padding: 8px 16px;
   font-size: 0.85rem;
@@ -172,7 +173,6 @@
   font-size: 0.6rem;
   vertical-align: middle;
   margin-left: 4px;
-  opacity: 0.7;
 }
 
 .dropdown-content a {
@@ -202,6 +202,7 @@
   max-width: 1800px;
   margin: 40px auto;
   padding: 0 20px;
+  flex: 1 0 auto; /* Grow to fill space and push footer to the bottom */
 }
 
 .page-container:has(#standings-wrapper) {
@@ -219,7 +220,7 @@
   flex-direction: column;
   align-items: center;
   gap: 40px;
-  margin-bottom: 40px;
+  margin-bottom: 10px;
   position: relative;
 }
 
@@ -509,6 +510,7 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
   color: var(--pb-white, #fff) !important;
   padding: 0 !important; /* Override standard card padding to prevent layout issues when closed */
   overflow: hidden;
+  margin-bottom: 10px;
 }
 
 /* Hide default markers on details/summary for all browsers */
@@ -520,7 +522,7 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
   justify-content: space-between;
   align-items: center;
   user-select: none;
-  padding: 20px 30px;
+  padding: 8px 16px; /* Reduced from 20px 30px */
 }
 
 .accordion-card summary::-webkit-details-marker,
@@ -533,32 +535,51 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
   margin: 0;
   display: inline-block;
   color: var(--pb-white, #fff) !important;
+  font-size: 1.05rem; /* Reduced font size to make the summary row smaller */
+  font-weight: 800;
 }
 
-/* Custom indicator symbol (+ / -) */
+/* Custom indicator symbol (▼ / ▲) */
 .accordion-card summary::after {
-  content: '+';
-  font-size: 1.8rem;
+  content: '▼';
+  font-size: 0.8rem;
   font-weight: bold;
   line-height: 1;
   color: var(--pb-white, #fff);
   transition: transform 0.2s ease;
 }
 
-/* Change indicator to minus when open */
+/* Change indicator to up triangle when open */
 .accordion-card[open] summary::after {
-  content: '−';
+  content: '▲';
 }
 
 /* Content block styling (white background, black text) */
 .accordion-card .accordion-content {
   background: var(--pb-white, #fff);
   color: var(--pb-black, #000);
-  padding: 30px;
+  padding: 15px 20px; /* Reduced from 30px */
   border-top: var(--pb-border);
 }
 
 .accordion-card .accordion-content p {
   color: var(--pb-black, #000) !important;
   margin: 0;
+}
+
+/* Footer Layout */
+.site-footer {
+  background: var(--pb-header-bg);
+  border-top: var(--pb-border);
+  color: var(--pb-white, #fff);
+  text-align: center;
+  padding: 8px 15px;
+  margin-top: 40px;
+}
+
+.site-footer p {
+  margin: 0;
+  font-weight: 500;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
 }

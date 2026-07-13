@@ -29,6 +29,10 @@
 
   <?php echo $pageContent; ?>
 
+  <footer class="site-footer">
+    <p>@2026 PinballAndStuff.com</p>
+  </footer>
+
   <script src="<?php echo versionedAsset($baseUrl . '/js-config.php'); ?>"></script>
   <script type="module" src="<?php echo versionedAsset($baseUrl . '/scripts/main.js'); ?>"></script>
 </body>

@@ -13,11 +13,21 @@
   --pb-header-text: var(--pb-white);          /* White text */
 }
 
+.theme-bowling, .theme-golf, .theme-baseball {
+  --pb-header-bg: var(--pb-primary);
+  --pb-shadow-color: color-mix(in srgb, var(--pb-primary), #000000 25%);
+  --pb-shadow: 6px 6px 0px var(--pb-shadow-color);
+  --pb-header-hover-bg: var(--pb-shadow-color);
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
   max-width: 100vw;
   overflow-x: hidden;
   background-color: var(--pb-white);
