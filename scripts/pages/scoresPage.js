@@ -1,6 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { filterPlayersForUser, can, PERMISSIONS } from '@services/auth.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, formatNumber, setCurrentPlayerId, setCurrentPlayerIdSilent, getCurrentPlayerId, escapeHTML, getActiveMatchupId, setActiveMatchupIdSilent, loadPage } from '@scripts/utils.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActiveEventIdSilent, formatNumber, setCurrentPlayerIdSilent, getCurrentPlayerId, escapeHTML, getActiveMatchupId, setActiveMatchupIdSilent, loadPage } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildBaseballScoreMapForPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
@@ -62,17 +62,18 @@ export async function initScoresPage() {
 
   // The "summary" eventId is a virtual ID used for the Season Summary scoreboard.
   // Scores must be entered for specific events, so we clear it if it persists from navigation.
+  // Silent: we are mid-initialization; dispatching pb:pageChanged would re-trigger initApp().
   if (initialEventId === 'summary') {
-    setActiveEventId('');
+    setActiveEventIdSilent('');
     initialEventId = '';
   }
 
   if (initialLeagueId && !initialEventId) {
     const active = allLeaguesCache.find(l => String(l.id) === String(initialLeagueId)); // Use the full cache
     if (active && active.type !== 'standard') {
-      setActiveLeagueId('');
+      setActiveLeagueIdSilent('');
       initialLeagueId = '';
-      setActiveEventId('');
+      setActiveEventIdSilent('');
       initialEventId = '';
     }
   }
@@ -156,15 +157,22 @@ export async function initScoresPage() {
       selectablePlayers = [];
 
       const activeMatchupId = getActiveMatchupId();
-      if (activeMatchupId) {
+      const isMatchupContext = !!activeMatchupId;
+      if (isMatchupContext) {
         const matchup = eventMatchups[0];
         selectablePlayers = [];
         if (matchup) {
+          // Matchup players are always selectable — they're the ones being scored.
+          // Do NOT filter them by registration status; unregistered users need to
+          // be able to select unregistered players to enter scores, and spectators
+          // need to be able to select either player to view their scores.
           if (matchup.awayPlayerId) {
-            selectablePlayers.push({ id: matchup.awayPlayerId, playerName: matchup.awayPlayerName });
+            const awayPlayer = allPlayers.find(p => String(p.id) === String(matchup.awayPlayerId));
+            selectablePlayers.push(awayPlayer || { id: matchup.awayPlayerId, playerName: matchup.awayPlayerName });
           }
           if (matchup.homePlayerId) {
-            selectablePlayers.push({ id: matchup.homePlayerId, playerName: matchup.homePlayerName });
+            const homePlayer = allPlayers.find(p => String(p.id) === String(matchup.homePlayerId));
+            selectablePlayers.push(homePlayer || { id: matchup.homePlayerId, playerName: matchup.homePlayerName });
           }
         }
       } else if (leagueId) {
@@ -185,8 +193,12 @@ export async function initScoresPage() {
         selectablePlayers = allPlayers;
       }
 
-      // Requirement: Unregistered users can only select players that are unregistered guests
-      selectablePlayers = filterPlayersForUser(selectablePlayers, currentUser);
+      // Requirement: Unregistered users can only select players that are unregistered guests.
+      // EXCEPTION: In a matchup context, both players are always selectable so that
+      // unregistered players can be selected for score entry and spectators can view scores.
+      if (!isMatchupContext) {
+        selectablePlayers = filterPlayersForUser(selectablePlayers, currentUser);
+      }
 
       // If a playerId is in the URL, ensure they are at least in the selectable list 
       // for the current session, even if the roster fetch hasn't updated yet.
@@ -206,9 +218,11 @@ export async function initScoresPage() {
             placeholder: selectablePlayers.length === 0 ? 'No players configured' : 'Select a player',
             onSelect: async (val) => {
               if (!val) {
-                setCurrentPlayerId('');
+                setCurrentPlayerIdSilent('');
               } else {
-                setCurrentPlayerId(val);
+                // Silent: we explicitly call refreshPlayerSelection() below,
+                // so avoid the full initApp() re-init from pb:pageChanged.
+                setCurrentPlayerIdSilent(val);
               }
               await refreshPlayerSelection();
             }
@@ -338,7 +352,8 @@ export async function initScoresPage() {
         const isInRoster = allPlayersCache.some(p => String(p.id) === String(currentUser.player_id));
         if (isInRoster) {
             activePlayerId = String(currentUser.player_id);
-            setCurrentPlayerId(activePlayerId);
+            // Silent: avoid pb:pageChanged loop during auto-selection within refresh()
+            setCurrentPlayerIdSilent(activePlayerId);
             if (playerSelect) playerSelect.value = activePlayerId;
             // Update search input text if exists
             const search = document.getElementById('player-search');
@@ -350,7 +365,8 @@ export async function initScoresPage() {
     // Default to first matchup player if none selected
     if (!activePlayerId && activeMatchupId && selectablePlayers && selectablePlayers.length > 0) {
       activePlayerId = String(selectablePlayers[0].id);
-      setCurrentPlayerId(activePlayerId);
+      // Silent: avoid pb:pageChanged loop during auto-selection within refresh()
+      setCurrentPlayerIdSilent(activePlayerId);
       if (playerSelect) playerSelect.value = activePlayerId;
       const search = document.getElementById('player-search');
       if (search) search.value = selectablePlayers[0].playerName;
@@ -390,20 +406,41 @@ export async function initScoresPage() {
       resultsCard.classList.remove('hidden');
 
       if (isSpectator) {
-        // Hide player selectors and display spectator mode details
-        playerSelectionCard.classList.add('hidden');
+        // Keep the player selection card visible so spectators can switch between
+        // the two matchup players to view their scores. Hide the per-player summary
+        // (with "Change" button) since the selection card already provides switching.
         playerSummary?.classList.add('hidden');
         
-        warning.innerHTML = `<strong>Spectator Mode:</strong> Viewing matchup in progress between ${escapeHTML(matchup.awayPlayerName || 'BYE')} and ${escapeHTML(matchup.homePlayerName)}.`;
+        const awayName = matchup?.awayPlayerName || 'BYE';
+        const homeName = matchup?.homePlayerName || 'Unknown';
+        warning.innerHTML = `<strong>Spectator Mode:</strong> Viewing matchup in progress between ${escapeHTML(awayName)} and ${escapeHTML(homeName)}.`;
         warning.classList.remove('hidden');
         
-        // Disable input editing for spectators
-        roundsInput.querySelectorAll('input').forEach((input) => {
-          input.disabled = true;
-          input.readOnly = true;
-        });
-        const saveBtns = roundsInput.querySelectorAll('.save-round-button');
-        saveBtns.forEach(btn => btn.style.display = 'none');
+        // Determine if the currently selected player is editable by this spectator.
+        // Unregistered users can only enter scores for unregistered (guest) players.
+        // Registered players' scores are view-only for spectators.
+        const selectedPlayerObj = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
+        const isSelectedPlayerUnregistered = !selectedPlayerObj?.userId;
+        const canEditSelected = isSelectedPlayerUnregistered;
+
+        if (canEditSelected) {
+          // Unregistered guest player — allow score entry
+          warning.innerHTML += ' <span class="meta-muted">(You may enter scores for this unregistered player.)</span>';
+          roundsInput.querySelectorAll('input').forEach((input) => {
+            input.disabled = false;
+            input.readOnly = false;
+          });
+          const saveBtns = roundsInput.querySelectorAll('.save-round-button');
+          saveBtns.forEach(btn => btn.style.display = '');
+        } else {
+          // Registered player — view only
+          roundsInput.querySelectorAll('input').forEach((input) => {
+            input.disabled = true;
+            input.readOnly = true;
+          });
+          const saveBtns = roundsInput.querySelectorAll('.save-round-button');
+          saveBtns.forEach(btn => btn.style.display = 'none');
+        }
       } else {
         warning.classList.add('hidden');
         playerSummary?.classList.remove('hidden');
@@ -478,14 +515,16 @@ export async function initScoresPage() {
       if (matchup) {
         eventId = String(matchup.eventId ?? matchup.event_id);
         leagueId = String(matchup.leagueId ?? matchup.league_id);
-        setActiveEventId(eventId);
-        setActiveLeagueId(leagueId);
+        // Use silent variants to avoid dispatching pb:pageChanged, which would
+        // re-trigger initApp() -> initScoresPage() -> refresh() in an infinite loop.
+        setActiveEventIdSilent(eventId);
+        setActiveLeagueIdSilent(leagueId);
       }
     }
 
     if (!eventId) {
       if (getCurrentPlayerId()) {
-        setCurrentPlayerId('');
+        setCurrentPlayerIdSilent('');
       }
       const playerSearch = document.getElementById('player-search');
       if (playerSearch) playerSearch.value = '';
@@ -508,7 +547,7 @@ export async function initScoresPage() {
         const playerSearch = document.getElementById('player-search');
         if (playerSearch) playerSearch.value = '';
         if (playerSelect) playerSelect.value = '';
-        setCurrentPlayerId('');
+        setCurrentPlayerIdSilent('');
       }
       lastEventId = eventId;
       lastLeagueId = leagueId;
@@ -725,8 +764,10 @@ export async function initScoresPage() {
             btn.onclick = () => {
               const matchupId = Number(btn.dataset.matchupId);
               const evId = Number(btn.dataset.eventId);
-              setActiveLeagueId(league.id);
-              setActiveEventId(evId);
+              // loadPage() updates the URL and dispatches pb:pageChanged, so use
+              // silent variants here to avoid a redundant mid-navigation re-init.
+              setActiveLeagueIdSilent(league.id);
+              setActiveEventIdSilent(evId);
               loadPage(ROUTE_PATHS.SCORES({ eventId: evId, leagueId: league.id, matchupId }));
             };
           });

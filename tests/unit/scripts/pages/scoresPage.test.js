@@ -25,6 +25,8 @@ vi.mock('@scripts/utils.js', () => ({
   getActiveLeagueId: vi.fn(),
   setActiveEventId: vi.fn(),
   setActiveLeagueId: vi.fn(),
+  setActiveEventIdSilent: vi.fn(),
+  setActiveLeagueIdSilent: vi.fn(),
   getCurrentPlayerId: vi.fn(),
   setCurrentPlayerId: vi.fn(),
   setCurrentPlayerIdSilent: vi.fn(),
@@ -291,7 +293,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
     Utils.getActiveLeagueId.mockReturnValue('1');
     Utils.getActiveEventId.mockReturnValue('summary');
     await initScoresPage();
-    expect(Utils.setActiveEventId).toHaveBeenCalledWith('');
+    expect(Utils.setActiveEventIdSilent).toHaveBeenCalledWith('');
   });
 
   it('should resolve and render player selection for team participant leagues', async () => {

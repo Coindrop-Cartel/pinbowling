@@ -69,12 +69,38 @@ export function setActiveLeagueId(id) {
   setUrlParam('leagueId', id);
 }
 
+/**
+ * Sets the active league ID in the URL without dispatching pb:pageChanged.
+ * Use this when the caller is already inside the target page and does not
+ * need the full app re-initialization that pb:pageChanged triggers.
+ * @param {string|null} id
+ */
+export function setActiveLeagueIdSilent(id) {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set('leagueId', id);
+  else url.searchParams.delete('leagueId');
+  window.history.replaceState({}, '', url);
+}
+
 /** @returns {string|null} The currently active event ID from the URL. */
 export const getActiveEventId = () => getUrlParam('eventId');
 
 /** @param {string|null} id - Sets the active event ID in the URL. */
 export function setActiveEventId(id) {
   setUrlParam('eventId', id);
+}
+
+/**
+ * Sets the active event ID in the URL without dispatching pb:pageChanged.
+ * Use this when the caller is already inside the target page and does not
+ * need the full app re-initialization that pb:pageChanged triggers.
+ * @param {string|null} id
+ */
+export function setActiveEventIdSilent(id) {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set('eventId', id);
+  else url.searchParams.delete('eventId');
+  window.history.replaceState({}, '', url);
 }
 
 /** @returns {string|null} The currently active player ID from the URL. */

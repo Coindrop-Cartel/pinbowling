@@ -22,9 +22,10 @@ try {
                 }
                 
                 $innings = $matchupService->getMatchupInnings($eventMatchupId);
-                $matchupInfo['innings'] = array_map('serializeMatchup', $innings);
+                $serialized = serializeEventMatchup($matchupInfo);
+                $serialized['innings'] = array_map('serializeMatchup', $innings);
                 
-                sendJson($matchupInfo);
+                sendJson($serialized);
             } else {
                 $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
                 if (!$eventId) {

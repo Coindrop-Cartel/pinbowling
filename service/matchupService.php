@@ -65,7 +65,7 @@ class MatchupService {
                     w.player_name as winner_name
              FROM event_matchups em
              JOIN events e ON em.event_id = e.id
-             JOIN players p1 ON em.home_player_id = p1.id
+             LEFT JOIN players p1 ON em.home_player_id = p1.id
              LEFT JOIN players p2 ON em.away_player_id = p2.id
              LEFT JOIN players w ON em.winner_id = w.id
              WHERE em.id = ?',
