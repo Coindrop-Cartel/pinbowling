@@ -5,10 +5,12 @@ namespace App\Service;
 /**
  * Service managing player scores, recording new scores, and bulk score cleanup.
  */
-class ScoreService {
+class ScoreService
+{
     private DatabaseService $db;
 
-    public function __construct(DatabaseService $db) {
+    public function __construct(DatabaseService $db)
+    {
         $this->db = $db;
     }
 
@@ -18,7 +20,8 @@ class ScoreService {
      * @param int $leagueId
      * @return array
      */
-    public function getLeagueScores(int $leagueId): array {
+    public function getLeagueScores(int $leagueId): array
+    {
         $stmt = $this->db->query(
             'SELECT s.id, s.player_id, s.event_id, s.event_matchup_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
              FROM scores s
@@ -38,7 +41,8 @@ class ScoreService {
      * @param int|null $playerId Optional filter by player
      * @return array
      */
-    public function getEventScores(int $eventId, ?int $playerId = null): array {
+    public function getEventScores(int $eventId, ?int $playerId = null): array
+    {
         if ($playerId) {
             $stmt = $this->db->query(
                 'SELECT s.id, s.player_id, s.event_id, s.event_matchup_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
@@ -67,7 +71,8 @@ class ScoreService {
      * @param int $eventMatchupId
      * @return array
      */
-    public function getMatchupScores(int $eventMatchupId): array {
+    public function getMatchupScores(int $eventMatchupId): array
+    {
         $stmt = $this->db->query(
             'SELECT s.id, s.player_id, s.event_id, s.event_matchup_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
              FROM scores s
@@ -92,8 +97,16 @@ class ScoreService {
      * @param int|null $eventMatchupId
      * @return bool
      */
-    public function saveScore(int $eventId, int $playerId, int $machineId, int $orderNumber, 
-                             ?int $ball1 = null, ?int $ball2 = null, ?int $ball3 = null, ?int $eventMatchupId = null): bool {
+    public function saveScore(
+        int $eventId,
+        int $playerId,
+        int $machineId,
+        int $orderNumber,
+        ?int $ball1 = null,
+        ?int $ball2 = null,
+        ?int $ball3 = null,
+        ?int $eventMatchupId = null
+    ): bool {
         $pdo = $this->db->getPdo();
 
         // 1. Get the league_id from the event
@@ -116,13 +129,13 @@ class ScoreService {
         if (!$stmt->fetchColumn()) {
             throw new \Exception('Player is not registered in this league.');
         }
-        
+
         $stmt = $pdo->prepare(
             'INSERT INTO scores (event_id, event_matchup_id, player_id, machine_id, order_number, ball1, ball2, ball3)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE ball1 = VALUES(ball1), ball2 = VALUES(ball2), ball3 = VALUES(ball3)'
         );
-        
+
         $stmt->execute([$eventId, $eventMatchupId, $playerId, $machineId, $orderNumber, $ball1, $ball2, $ball3]);
 
         // If eventMatchupId is set, check if we need to auto-calculate the total/winner of the matchup
@@ -138,14 +151,16 @@ class ScoreService {
      *
      * @param int $eventMatchupId
      */
-    private function updateMatchupTotals(int $eventMatchupId): void {
+    private function updateMatchupTotals(int $eventMatchupId): void
+    {
         $pdo = $this->db->getPdo();
 
         // Fetch event matchup details
         $stmt = $pdo->prepare('SELECT * FROM event_matchups WHERE id = ?');
         $stmt->execute([$eventMatchupId]);
         $matchup = $stmt->fetch();
-        if (!$matchup) return;
+        if (!$matchup)
+            return;
 
         // Fetch detailed matchup slots (machine config, player roles)
         $stmt = $pdo->prepare('SELECT * FROM matchups WHERE event_matchup_id = ? ORDER BY order_number ASC, player_order ASC');
@@ -154,11 +169,11 @@ class ScoreService {
 
         // Fetch all scores submitted for this matchup
         $scores = $this->getMatchupScores($eventMatchupId);
-        
+
         // Structure scores by player and order_number (inning)
         $scoreMap = [];
         foreach ($scores as $s) {
-            $scoreMap[(int)$s['player_id']][(int)$s['order_number']] = $s;
+            $scoreMap[(int) $s['player_id']][(int) $s['order_number']] = $s;
         }
 
         // Fetch machines in this matchup to get target score thresholds
@@ -172,16 +187,16 @@ class ScoreService {
         $machines = $stmt->fetchAll();
         $machineMap = [];
         foreach ($machines as $mac) {
-            $machineMap[(int)$mac['order_number']] = $mac;
+            $machineMap[(int) $mac['order_number']] = $mac;
         }
 
         // Calculate runs for home and away
-        $homeId = (int)$matchup['home_player_id'];
-        $awayId = (int)$matchup['away_player_id'];
+        $homeId = (int) $matchup['home_player_id'];
+        $awayId = (int) $matchup['away_player_id'];
 
         $homeRuns = 0;
         $awayRuns = 0;
-        
+
         // Baseball top/bottom innings
         // Odd slot indexes: Player 1 (Home) is batter (player_order = 1), Player 2 (Away) is pitcher (player_order = 2)
         // Even slot indexes: Player 2 (Away) is batter (player_order = 2), Player 1 (Home) is pitcher (player_order = 1)
@@ -189,7 +204,7 @@ class ScoreService {
         // Group slots by order_number (inning)
         $inningSlots = [];
         foreach ($slots as $sl) {
-            $inningSlots[(int)$sl['order_number']][(int)$sl['player_order']] = $sl;
+            $inningSlots[(int) $sl['order_number']][(int) $sl['player_order']] = $sl;
         }
 
         // Check how many innings are played
@@ -199,7 +214,8 @@ class ScoreService {
         for ($inning = 1; $inning <= $inningsCount; $inning++) {
             $homeSlot = $inningSlots[$inning][1] ?? null;
             $awaySlot = $inningSlots[$inning][2] ?? null;
-            if (!$homeSlot || !$awaySlot) continue;
+            if (!$homeSlot || !$awaySlot)
+                continue;
 
             $homeEntry = $scoreMap[$homeId][$inning] ?? ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
             $awayEntry = $scoreMap[$awayId][$inning] ?? ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
@@ -282,56 +298,57 @@ class ScoreService {
     /**
      * Handles playoff bracket progression and next round advancement when a playoff matchup finishes.
      */
-    private function handlePlayoffAdvancement(int $eventMatchupId): void {
+    private function handlePlayoffAdvancement(int $eventMatchupId): void
+    {
         $pdo = $this->db->getPdo();
-        
+
         $stmt = $pdo->prepare('SELECT em.*, e.league_id FROM event_matchups em JOIN events e ON em.event_id = e.id WHERE em.id = ?');
         $stmt->execute([$eventMatchupId]);
         $matchup = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$matchup || !$matchup['round_name']) {
             return;
         }
-        
-        $eventId = (int)$matchup['event_id'];
-        $leagueId = (int)$matchup['league_id'];
+
+        $eventId = (int) $matchup['event_id'];
+        $leagueId = (int) $matchup['league_id'];
         $roundName = $matchup['round_name'];
-        $seriesId = (int)$matchup['series_id'];
-        $gameNumber = (int)$matchup['game_number'];
-        $homePlayerId = (int)$matchup['home_player_id'];
-        $awayPlayerId = (int)$matchup['away_player_id'];
-        
+        $seriesId = (int) $matchup['series_id'];
+        $gameNumber = (int) $matchup['game_number'];
+        $homePlayerId = (int) $matchup['home_player_id'];
+        $awayPlayerId = (int) $matchup['away_player_id'];
+
         $leagueStmt = $pdo->prepare('SELECT playoff_series_length, innings_per_game FROM leagues WHERE id = ?');
         $leagueStmt->execute([$leagueId]);
         $league = $leagueStmt->fetch(\PDO::FETCH_ASSOC);
-        $seriesLength = (int)($league['playoff_series_length'] ?? 1);
-        $inningsPerGame = (int)($league['innings_per_game'] ?? 2);
-        
+        $seriesLength = (int) ($league['playoff_series_length'] ?? 1);
+        $inningsPerGame = (int) ($league['innings_per_game'] ?? 2);
+
         $seriesStmt = $pdo->prepare(
             'SELECT winner_id FROM event_matchups 
              WHERE event_id = ? AND round_name = ? AND series_id = ? AND status = \'completed\''
         );
         $seriesStmt->execute([$eventId, $roundName, $seriesId]);
         $games = $seriesStmt->fetchAll(\PDO::FETCH_ASSOC);
-        
+
         $homeWins = 0;
         $awayWins = 0;
         foreach ($games as $g) {
-            $winId = isset($g['winner_id']) ? (int)$g['winner_id'] : null;
+            $winId = isset($g['winner_id']) ? (int) $g['winner_id'] : null;
             if ($winId === $homePlayerId) {
                 $homeWins++;
             } elseif ($winId === $awayPlayerId) {
                 $awayWins++;
             }
         }
-        
-        $clinchCount = (int)ceil($seriesLength / 2);
+
+        $clinchCount = (int) ceil($seriesLength / 2);
         $seriesWinnerId = null;
         if ($homeWins >= $clinchCount) {
             $seriesWinnerId = $homePlayerId;
         } elseif ($awayWins >= $clinchCount) {
             $seriesWinnerId = $awayPlayerId;
         }
-        
+
         if ($seriesWinnerId !== null) {
             $expectedSeriesCount = 1;
             if ($roundName === 'Quarterfinals') {
@@ -339,20 +356,20 @@ class ScoreService {
             } elseif ($roundName === 'Semifinals') {
                 $expectedSeriesCount = 2;
             }
-            
+
             $allRoundStmt = $pdo->prepare(
                 'SELECT series_id, winner_id, home_player_id, away_player_id FROM event_matchups 
                  WHERE event_id = ? AND round_name = ? AND status = \'completed\''
             );
             $allRoundStmt->execute([$eventId, $roundName]);
             $allRoundGames = $allRoundStmt->fetchAll(\PDO::FETCH_ASSOC);
-            
+
             $seriesWinners = [];
             foreach ($allRoundGames as $g) {
-                $sId = (int)$g['series_id'];
-                $hId = (int)$g['home_player_id'];
-                $aId = (int)$g['away_player_id'];
-                
+                $sId = (int) $g['series_id'];
+                $hId = (int) $g['home_player_id'];
+                $aId = (int) $g['away_player_id'];
+
                 if (!isset($seriesWinners[$sId])) {
                     $specStmt = $pdo->prepare(
                         'SELECT winner_id FROM event_matchups 
@@ -360,18 +377,18 @@ class ScoreService {
                     );
                     $specStmt->execute([$eventId, $roundName, $sId]);
                     $specGames = $specStmt->fetchAll(\PDO::FETCH_ASSOC);
-                    
+
                     $sHomeWins = 0;
                     $sAwayWins = 0;
                     foreach ($specGames as $sg) {
-                        $sgWinId = isset($sg['winner_id']) ? (int)$sg['winner_id'] : null;
+                        $sgWinId = isset($sg['winner_id']) ? (int) $sg['winner_id'] : null;
                         if ($sgWinId === $hId) {
                             $sHomeWins++;
                         } elseif ($sgWinId === $aId) {
                             $sAwayWins++;
                         }
                     }
-                    
+
                     if ($sHomeWins >= $clinchCount) {
                         $seriesWinners[$sId] = $hId;
                     } elseif ($sAwayWins >= $clinchCount) {
@@ -379,7 +396,7 @@ class ScoreService {
                     }
                 }
             }
-            
+
             if (count($seriesWinners) === $expectedSeriesCount) {
                 if ($roundName === 'Quarterfinals') {
                     $this->advanceToPlayoffRound($leagueId, 'Semifinals', [
@@ -397,17 +414,17 @@ class ScoreService {
             }
         } else {
             $nextGameNumber = $gameNumber + 1;
-            
+
             $insertStmt = $pdo->prepare(
                 'INSERT INTO event_matchups (event_id, home_player_id, away_player_id, status, game_number, round_name, series_id)
                  VALUES (?, ?, ?, \'pending\', ?, ?, ?)'
             );
             $insertStmt->execute([$eventId, $homePlayerId, $awayPlayerId, $nextGameNumber, $roundName, $seriesId]);
-            $nextEventMatchupId = (int)$pdo->lastInsertId();
-            
+            $nextEventMatchupId = (int) $pdo->lastInsertId();
+
             $machinesStmt = $pdo->query('SELECT id FROM machines');
             $allMachineIds = $machinesStmt->fetchAll(\PDO::FETCH_COLUMN);
-            
+
             $neededMachines = $inningsPerGame * 2;
             $matchupMachines = [];
             $shuffledMachines = $allMachineIds;
@@ -420,12 +437,12 @@ class ScoreService {
                     }
                 }
             }
-            
+
             $matchupStmt = $pdo->prepare(
                 'INSERT INTO matchups (event_id, event_matchup_id, order_number, player_id, machine_id, player_order)
                  VALUES (?, ?, ?, ?, ?, ?)'
             );
-            
+
             for ($inning = 1; $inning <= $inningsPerGame; $inning++) {
                 $topMachineId = $matchupMachines[($inning - 1) * 2];
                 $matchupStmt->execute([
@@ -436,7 +453,7 @@ class ScoreService {
                     $topMachineId,
                     1
                 ]);
-                
+
                 $bottomMachineId = $matchupMachines[($inning - 1) * 2 + 1];
                 $matchupStmt->execute([
                     $eventId,
@@ -453,24 +470,25 @@ class ScoreService {
     /**
      * Helper to create next round events and matches.
      */
-    private function advanceToPlayoffRound(int $leagueId, string $nextRoundName, array $pairings, int $inningsPerGame, int $seriesLength): void {
+    private function advanceToPlayoffRound(int $leagueId, string $nextRoundName, array $pairings, int $inningsPerGame, int $seriesLength): void
+    {
         $pdo = $this->db->getPdo();
-        
+
         $eventStmt = $pdo->prepare('INSERT INTO events (league_id, event_name, status, scoring_format) VALUES (?, ?, \'pending\', \'baseball\')');
         $eventStmt->execute([$leagueId, "Playoffs: " . $nextRoundName]);
-        $nextEventId = (int)$pdo->lastInsertId();
-        
+        $nextEventId = (int) $pdo->lastInsertId();
+
         $machinesStmt = $pdo->query('SELECT id FROM machines');
         $allMachineIds = $machinesStmt->fetchAll(\PDO::FETCH_COLUMN);
-        
+
         foreach ($pairings as $pair) {
             $stmt = $pdo->prepare(
                 'INSERT INTO event_matchups (event_id, home_player_id, away_player_id, status, game_number, round_name, series_id)
                  VALUES (?, ?, ?, \'pending\', 1, ?, ?)'
             );
             $stmt->execute([$nextEventId, $pair['home'], $pair['away'], $nextRoundName, $pair['series_id']]);
-            $eventMatchupId = (int)$pdo->lastInsertId();
-            
+            $eventMatchupId = (int) $pdo->lastInsertId();
+
             $neededMachines = $inningsPerGame * 2;
             $matchupMachines = [];
             $shuffledMachines = $allMachineIds;
@@ -483,12 +501,12 @@ class ScoreService {
                     }
                 }
             }
-            
+
             $matchupStmt = $pdo->prepare(
                 'INSERT INTO matchups (event_id, event_matchup_id, order_number, player_id, machine_id, player_order)
                  VALUES (?, ?, ?, ?, ?, ?)'
             );
-            
+
             for ($inning = 1; $inning <= $inningsPerGame; $inning++) {
                 $topMachineId = $matchupMachines[($inning - 1) * 2];
                 $matchupStmt->execute([
@@ -499,7 +517,7 @@ class ScoreService {
                     $topMachineId,
                     1
                 ]);
-                
+
                 $bottomMachineId = $matchupMachines[($inning - 1) * 2 + 1];
                 $matchupStmt->execute([
                     $nextEventId,
@@ -516,31 +534,33 @@ class ScoreService {
     /**
      * Inning half run calculator helper.
      */
-    private function calculateRunsForInningHalf(array $target, array $batterEntry, array $pitcherEntry): int {
-        $b1 = (int)($batterEntry['ball1'] ?? 0);
-        $b2 = (int)($batterEntry['ball2'] ?? 0);
-        $b3 = (int)($batterEntry['ball3'] ?? 0);
+    private function calculateRunsForInningHalf(array $target, array $batterEntry, array $pitcherEntry): int
+    {
+        $b1 = (int) ($batterEntry['ball1'] ?? 0);
+        $b2 = (int) ($batterEntry['ball2'] ?? 0);
+        $b3 = (int) ($batterEntry['ball3'] ?? 0);
 
-        $p1 = (int)($pitcherEntry['ball1'] ?? 0);
-        $p2 = (int)($pitcherEntry['ball2'] ?? 0);
-        $p3 = (int)($pitcherEntry['ball3'] ?? 0);
+        $p1 = (int) ($pitcherEntry['ball1'] ?? 0);
+        $p2 = (int) ($pitcherEntry['ball2'] ?? 0);
+        $p3 = (int) ($pitcherEntry['ball3'] ?? 0);
 
         $batterScores = [$b1, $b2, $b3];
         $pitcherScores = [$p1, $p2, $p3];
 
         $runsAccumulated = 0;
-        $val1 = (int)($target['value1'] ?? 5000000);
-        $val2 = (float)($target['value2'] ?? 1.5);
+        $val1 = (int) ($target['value1'] ?? 5000000);
+        $val2 = (float) ($target['value2'] ?? 1.5);
 
         // Build thresholds
         $thresholds = [];
         for ($rank = 1; $rank <= 10; $rank++) {
-            $thresholds[$rank] = (int)round($val1 * pow($val2, $rank - 1));
+            $thresholds[$rank] = (int) round($val1 * pow($val2, $rank - 1));
         }
 
         for ($i = 0; $i < 3; $i++) {
             $diff = $batterScores[$i] - $pitcherScores[$i];
-            if ($diff <= 0) continue;
+            if ($diff <= 0)
+                continue;
 
             $totalPossibleRuns = 0;
             // Find max rank matching the diff
@@ -564,7 +584,8 @@ class ScoreService {
      * @param int $scoreId
      * @return bool
      */
-    public function deleteScore(int $scoreId): bool {
+    public function deleteScore(int $scoreId): bool
+    {
         $pdo = $this->db->getPdo();
         $stmt = $pdo->prepare('DELETE FROM scores WHERE id = ?');
         return $stmt->execute([$scoreId]);
@@ -576,7 +597,8 @@ class ScoreService {
      * @param int $playerId
      * @return bool
      */
-    public function deletePlayerScores(int $playerId): bool {
+    public function deletePlayerScores(int $playerId): bool
+    {
         $pdo = $this->db->getPdo();
         $stmt = $pdo->prepare('DELETE FROM scores WHERE player_id = ?');
         return $stmt->execute([$playerId]);
@@ -588,7 +610,8 @@ class ScoreService {
      * @param int $eventId
      * @return bool
      */
-    public function deleteEventScores(int $eventId): bool {
+    public function deleteEventScores(int $eventId): bool
+    {
         $pdo = $this->db->getPdo();
         $stmt = $pdo->prepare('DELETE FROM scores WHERE event_id = ?');
         return $stmt->execute([$eventId]);
@@ -601,7 +624,8 @@ class ScoreService {
      * @param int $playerId
      * @return bool
      */
-    public function deletePlayerEventScores(int $eventId, int $playerId): bool {
+    public function deletePlayerEventScores(int $eventId, int $playerId): bool
+    {
         $pdo = $this->db->getPdo();
         $stmt = $pdo->prepare('DELETE FROM scores WHERE event_id = ? AND player_id = ?');
         return $stmt->execute([$eventId, $playerId]);

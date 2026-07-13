@@ -9,19 +9,19 @@ require_once __DIR__ . '/../includes/bootstrap.php';
 try {
     $container = $GLOBALS['container'];
     $scoreService = $container->get(\App\Service\ScoreService::class);
-    
+
     $method = $_SERVER['REQUEST_METHOD'];
     $input = getJsonInput();
 
     switch ($method) {
         case 'GET':
-            $eventMatchupId = isset($_GET['eventMatchupId']) ? (int)$_GET['eventMatchupId'] : 0;
+            $eventMatchupId = isset($_GET['eventMatchupId']) ? (int) $_GET['eventMatchupId'] : 0;
             if ($eventMatchupId) {
                 $scores = $scoreService->getMatchupScores($eventMatchupId);
             } else {
-                $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
-                $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
-                $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
+                $eventId = isset($_GET['eventId']) ? (int) $_GET['eventId'] : 0;
+                $playerId = isset($_GET['playerId']) ? (int) $_GET['playerId'] : 0;
+                $leagueId = isset($_GET['leagueId']) ? (int) $_GET['leagueId'] : 0;
 
                 if (!$eventId && !$leagueId) {
                     sendJson(['error' => 'eventId, leagueId, or eventMatchupId query parameter is required'], 400);
@@ -45,22 +45,22 @@ try {
             validateSessionOrSecret();
 
             $scoreService->saveScore(
-                (int)$input['eventId'],
-                (int)$input['playerId'],
-                (int)$input['machineId'],
-                (int)$input['orderNumber'],
+                (int) $input['eventId'],
+                (int) $input['playerId'],
+                (int) $input['machineId'],
+                (int) $input['orderNumber'],
                 $input['ball1'] ?? null,
                 $input['ball2'] ?? null,
                 $input['ball3'] ?? null,
-                isset($input['eventMatchupId']) ? (int)$input['eventMatchupId'] : null
+                isset($input['eventMatchupId']) ? (int) $input['eventMatchupId'] : null
             );
 
             sendJson(['success' => true]);
             break;
 
         case 'DELETE':
-            $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
-            $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
+            $eventId = isset($_GET['eventId']) ? (int) $_GET['eventId'] : 0;
+            $playerId = isset($_GET['playerId']) ? (int) $_GET['playerId'] : 0;
 
             validateAdminAccess();
 
