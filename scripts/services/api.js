@@ -126,10 +126,11 @@ export const PB_API = {
   },
 
   scores: {
-    get: (playerId, eventId, leagueId) => {
-      if (!eventId && !leagueId) return [];
+    get: (playerId, eventId, leagueId, eventMatchupId) => {
+      if (!eventId && !leagueId && !eventMatchupId) return [];
       let url = 'api/score.php?';
-      if (leagueId) url += `leagueId=${leagueId}`;
+      if (eventMatchupId) url += `eventMatchupId=${eventMatchupId}`;
+      else if (leagueId) url += `leagueId=${leagueId}`;
       else url += `eventId=${eventId}${playerId ? `&playerId=${playerId}` : ''}`;
       return fetchJSON(url);
     },
@@ -138,7 +139,10 @@ export const PB_API = {
   },
 
   matchups: {
-    get: (eventId) => fetchJSON(`api/matchup.php?eventId=${eventId}`),
+    get: (eventId, eventMatchupId) => {
+      if (eventMatchupId) return fetchJSON(`api/matchup.php?eventMatchupId=${eventMatchupId}`);
+      return fetchJSON(`api/matchup.php?eventId=${eventId}`);
+    },
     save: (matchups) => fetchJSON('api/matchup.php', { method: 'POST', body: JSON.stringify(matchups) }),
     clear: (eventId) => fetchJSON(`api/matchup.php?eventId=${eventId}`, { method: 'DELETE' }),
   },
@@ -151,6 +155,9 @@ export const PB_API = {
     delete: (id) => fetchJSON(`api/league.php?id=${id}`, { method: 'DELETE' }),
     addPlayer: (leagueId, playerId) => fetchJSON('api/league.php?task=member', { method: 'POST', body: JSON.stringify({ leagueId, playerId }) }),
     removePlayer: (leagueId, playerId) => fetchJSON(`api/league.php?task=member&leagueId=${leagueId}&playerId=${playerId}`, { method: 'DELETE' }),
+    startSeason: (leagueId) => fetchJSON('api/league.php?task=start_season', { method: 'POST', body: JSON.stringify({ leagueId }) }),
+    updateSeason: (leagueId) => fetchJSON('api/league.php?task=update_season', { method: 'POST', body: JSON.stringify({ leagueId }) }),
+    startPlayoffs: (leagueId, seeds, seriesLength) => fetchJSON('api/league.php?task=start_playoffs', { method: 'POST', body: JSON.stringify({ leagueId, seeds, seriesLength }) }),
   },
 
   events: {

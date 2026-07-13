@@ -804,4 +804,50 @@ describe('calculateSeasonSummary', () => {
       expect(rowByTeamId['t2'].eventTotals[100]).toBeNull();
     });
   });
+
+  describe('baseball H2H tiebreakers', () => {
+    it('should sort standings using head-to-head, run differential, and total runs in that priority', () => {
+      const league = makeLeague({ scoringFormat: 'baseball' });
+      const players = [
+        { id: 1, playerName: 'Player 1' },
+        { id: 2, playerName: 'Player 2' },
+        { id: 3, playerName: 'Player 3' }
+      ];
+      const events = [{ id: 100 }, { id: 101 }];
+      
+      const matchupsByEvent = {
+        100: [
+          { event_id: 100, awayPlayerId: 1, homePlayerId: 2, awayRuns: 5, homeRuns: 3, status: 'completed' }
+        ],
+        101: [
+          { event_id: 101, awayPlayerId: 2, homePlayerId: 3, awayRuns: 4, homeRuns: 2, status: 'completed' },
+          { event_id: 101, awayPlayerId: 3, homePlayerId: 1, awayRuns: 5, homeRuns: 4, status: 'completed' }
+        ]
+      };
+
+      const targetsByEvent = {};
+      const scoresByEventAndPlayer = {};
+      const engine = createMockEngine();
+
+      const result = calculateSeasonSummary({
+        league,
+        players,
+        events,
+        targetsByEvent,
+        scoresByEventAndPlayer,
+        matchupsByEvent,
+        engine
+      });
+
+      expect(result.rows).toHaveLength(3);
+      expect(result.rows[0].entity.id).toBe(1);
+      expect(result.rows[1].entity.id).toBe(2);
+      expect(result.rows[2].entity.id).toBe(3);
+
+      expect(result.rows[0].record.wins).toBe(1);
+      expect(result.rows[0].record.losses).toBe(1);
+      expect(result.rows[0].record.runDiff).toBe(1);
+      expect(result.rows[0].record.totalRuns).toBe(9);
+    });
+  });
 });

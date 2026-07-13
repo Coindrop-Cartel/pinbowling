@@ -14,13 +14,26 @@ try {
 
     switch ($method) {
         case 'GET':
-            $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
-            if (!$eventId) {
-                sendJson(['error' => 'eventId query parameter is required'], 400);
-            }
+            $eventMatchupId = isset($_GET['eventMatchupId']) ? (int)$_GET['eventMatchupId'] : 0;
+            if ($eventMatchupId) {
+                $matchupInfo = $matchupService->getEventMatchup($eventMatchupId);
+                if (!$matchupInfo) {
+                    sendJson(['error' => 'Matchup not found'], 404);
+                }
+                
+                $innings = $matchupService->getMatchupInnings($eventMatchupId);
+                $matchupInfo['innings'] = array_map('serializeMatchup', $innings);
+                
+                sendJson($matchupInfo);
+            } else {
+                $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
+                if (!$eventId) {
+                    sendJson(['error' => 'eventId or eventMatchupId query parameter is required'], 400);
+                }
 
-            $matchups = $matchupService->getEventMatchups($eventId);
-            sendJson(array_map('serializeMatchup', $matchups));
+                $matchups = $matchupService->getEventMatchups($eventId);
+                sendJson(array_map('serializeMatchup', $matchups));
+            }
             break;
 
         case 'POST':

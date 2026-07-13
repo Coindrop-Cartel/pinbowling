@@ -94,6 +94,10 @@ function serializeLeague($row) {
         'scoringFormat' => $row['scoring_format'] ?? 'bowling',
         'seasonScoring' => $row['season_scoring'] ?? 'weekly',
         'dropLowestWeeks' => (int)($row['drop_lowest_weeks'] ?? 0),
+        'weeksInSeason' => isset($row['weeks_in_season']) ? (int)$row['weeks_in_season'] : null,
+        'inningsPerGame' => isset($row['innings_per_game']) ? (int)$row['innings_per_game'] : 2,
+        'status' => $row['status'] ?? 'setup',
+        'playoffSeriesLength' => isset($row['playoff_series_length']) ? (int)$row['playoff_series_length'] : 1,
         'events' => isset($row['events']) ? array_map('serializeEvent', $row['events']) : [],
         'players' => isset($row['players']) ? array_map('serializePlayer', $row['players']) : [],
         'teams' => isset($row['teams']) ? array_map('serializeTeam', $row['teams']) : []
@@ -111,7 +115,8 @@ function serializeEvent($row) {
         'eventName' => $row['event_name'],
         'eventDate' => $row['event_date'] ?? null,
         'scoringFormat' => $row['scoring_format'] ?? 'bowling',
-        'locationName' => $row['location_name'] ?? null
+        'locationName' => $row['location_name'] ?? null,
+        'matchups' => isset($row['matchups']) ? array_map('serializeEventMatchup', $row['matchups']) : []
     ];
 }
 
@@ -123,6 +128,7 @@ function serializeScore($row) {
         'id' => (int)$row['id'],
         'playerId' => (int)$row['player_id'],
         'eventId' => (int)($row['event_id'] ?? 0),
+        'eventMatchupId' => (isset($row['event_matchup_id']) && $row['event_matchup_id'] !== null) ? (int)$row['event_matchup_id'] : null,
         'orderNumber' => (int)$row['order_number'],
         'machineId' => (int)$row['machine_id'],
         'machineName' => $row['machine_name'] ?? null,
@@ -234,11 +240,34 @@ function serializeMatchup($row) {
     return [
         'id' => (int)$row['id'],
         'eventId' => (int)$row['event_id'],
+        'eventMatchupId' => (isset($row['event_matchup_id']) && $row['event_matchup_id'] !== null) ? (int)$row['event_matchup_id'] : null,
         'orderNumber' => (int)$row['order_number'],
         'playerId' => (int)$row['player_id'],
         'machineId' => (int)$row['machine_id'],
         'playerOrder' => (int)($row['player_order'] ?? 1),
         'playerName' => $row['player_name'] ?? null,
         'machineName' => $row['machine_name'] ?? null
+    ];
+}
+
+/**
+ * Normalizes an event matchup database row.
+ */
+function serializeEventMatchup($row) {
+    return [
+        'id' => (int)$row['id'],
+        'eventId' => (int)$row['event_id'],
+        'leagueId' => isset($row['league_id']) ? (int)$row['league_id'] : null,
+        'homePlayerId' => (int)$row['home_player_id'],
+        'awayPlayerId' => (isset($row['away_player_id']) && $row['away_player_id'] !== null) ? (int)$row['away_player_id'] : null,
+        'homePlayerName' => $row['home_player_name'] ?? null,
+        'awayPlayerName' => $row['away_player_name'] ?? null,
+        'homeRuns' => (int)($row['home_runs'] ?? 0),
+        'awayRuns' => (int)($row['away_runs'] ?? 0),
+        'winnerId' => (isset($row['winner_id']) && $row['winner_id'] !== null) ? (int)$row['winner_id'] : null,
+        'status' => $row['status'] ?? 'pending',
+        'gameNumber' => (int)($row['game_number'] ?? 1),
+        'roundName' => $row['round_name'] ?? null,
+        'seriesId' => isset($row['series_id']) ? (int)$row['series_id'] : null
     ];
 }

@@ -691,6 +691,110 @@ try {
         echo "machine_scores table migration already applied.\n";
     }
 
+    // Baseball Season & Head-to-Head leagues migration
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'baseball_season_head2head'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+
+        // 1. Alter leagues table
+        $checkWeeks = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'weeks_in_season'")->fetch();
+        if (!$checkWeeks) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `weeks_in_season` INT DEFAULT NULL AFTER `drop_lowest_weeks`");
+        }
+        $checkInnings = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'innings_per_game'")->fetch();
+        if (!$checkInnings) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `innings_per_game` INT NOT NULL DEFAULT 2 AFTER `weeks_in_season`");
+        }
+        $checkStatus = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'status'")->fetch();
+        if (!$checkStatus) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `status` ENUM('setup', 'active', 'completed') DEFAULT 'setup' AFTER `innings_per_game`");
+        }
+        $checkPlayoffLength = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'playoff_series_length'")->fetch();
+        if (!$checkPlayoffLength) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `playoff_series_length` INT DEFAULT 1 AFTER `status`");
+        }
+
+        // 2. Create event_matchups table
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `event_matchups` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `event_id` INT NOT NULL,
+            `home_player_id` INT NOT NULL,
+            `away_player_id` INT DEFAULT NULL,
+            `home_runs` INT DEFAULT 0,
+            `away_runs` INT DEFAULT 0,
+            `winner_id` INT DEFAULT NULL,
+            `status` ENUM('pending', 'completed') DEFAULT 'pending',
+            `game_number` INT DEFAULT 1,
+            `round_name` VARCHAR(50) DEFAULT NULL,
+            `series_id` INT DEFAULT NULL,
+            CONSTRAINT `fk_em_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
+            CONSTRAINT `fk_em_home` FOREIGN KEY (`home_player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+            CONSTRAINT `fk_em_away` FOREIGN KEY (`away_player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+            CONSTRAINT `fk_em_winner` FOREIGN KEY (`winner_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        $checkRoundName = $pdo->query("SHOW COLUMNS FROM `event_matchups` LIKE 'round_name'")->fetch();
+        if (!$checkRoundName) {
+            $pdo->exec("ALTER TABLE `event_matchups` ADD COLUMN `round_name` VARCHAR(50) DEFAULT NULL AFTER `game_number`");
+        }
+        $checkSeriesId = $pdo->query("SHOW COLUMNS FROM `event_matchups` LIKE 'series_id'")->fetch();
+        if (!$checkSeriesId) {
+            $pdo->exec("ALTER TABLE `event_matchups` ADD COLUMN `series_id` INT DEFAULT NULL AFTER `round_name`");
+        }
+
+        // 3. Alter matchups table
+        $checkEMId = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'event_matchup_id'")->fetch();
+        if (!$checkEMId) {
+            $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `event_matchup_id` INT DEFAULT NULL AFTER `event_id`");
+            $pdo->exec("ALTER TABLE `matchups` ADD CONSTRAINT `fk_matchup_event_matchup` FOREIGN KEY (`event_matchup_id`) REFERENCES `event_matchups` (`id`) ON DELETE CASCADE");
+        }
+        
+        $keys = $pdo->query("SHOW INDEX FROM `matchups` WHERE Key_name = 'unique_matchup'")->fetchAll();
+        if (count($keys) > 0) {
+            $pdo->exec("ALTER TABLE `matchups` DROP INDEX `unique_matchup`");
+        }
+        
+        $checkMatchKey = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'match_key'")->fetch();
+        if (!$checkMatchKey) {
+            $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `match_key` VARCHAR(100) GENERATED ALWAYS AS (
+                IF(`event_matchup_id` IS NULL, 
+                   CONCAT('evt_', `event_id`, '_rnd_', `order_number`), 
+                   CONCAT('mch_', `event_matchup_id`, '_rnd_', `order_number`)
+                )
+            ) STORED");
+            $pdo->exec("ALTER TABLE `matchups` ADD UNIQUE KEY `unique_matchups_key` (`player_order`, `match_key`)");
+        }
+
+        // 4. Alter scores table
+        $checkEMIdScore = $pdo->query("SHOW COLUMNS FROM `scores` LIKE 'event_matchup_id'")->fetch();
+        if (!$checkEMIdScore) {
+            $pdo->exec("ALTER TABLE `scores` ADD COLUMN `event_matchup_id` INT DEFAULT NULL AFTER `event_id`");
+            $pdo->exec("ALTER TABLE `scores` ADD CONSTRAINT `fk_score_event_matchup` FOREIGN KEY (`event_matchup_id`) REFERENCES `event_matchups` (`id`) ON DELETE CASCADE");
+        }
+        
+        $keysScore = $pdo->query("SHOW INDEX FROM `scores` WHERE Key_name = 'unique_player_round'")->fetchAll();
+        if (count($keysScore) > 0) {
+            $pdo->exec("ALTER TABLE `scores` DROP INDEX `unique_player_round`");
+        }
+        
+        $checkMatchKeyScore = $pdo->query("SHOW COLUMNS FROM `scores` LIKE 'match_key'")->fetch();
+        if (!$checkMatchKeyScore) {
+            $pdo->exec("ALTER TABLE `scores` ADD COLUMN `match_key` VARCHAR(100) GENERATED ALWAYS AS (
+                IF(`event_matchup_id` IS NULL, 
+                   CONCAT('evt_', `event_id`, '_rnd_', `order_number`), 
+                   CONCAT('mch_', `event_matchup_id`, '_rnd_', `order_number`)
+                )
+            ) STORED");
+            $pdo->exec("ALTER TABLE `scores` ADD UNIQUE KEY `unique_scores_key` (`player_id`, `match_key`)");
+        }
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('baseball_season_head2head')")->execute();
+        echo "✓ Baseball Season & Head-to-Head leagues migration applied successfully.\n";
+    } else {
+        echo "Baseball Season & Head-to-Head leagues migration already applied.\n";
+    }
+
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
 } catch (PDOException $e) {
     echo "\n✗ Migration failed: " . $e->getMessage() . "\n";

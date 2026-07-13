@@ -15,18 +15,23 @@ try {
 
     switch ($method) {
         case 'GET':
-            $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
-            $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
-            $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
-
-            if (!$eventId && !$leagueId) {
-                sendJson(['error' => 'eventId or leagueId query parameter is required'], 400);
-            }
-
-            if ($leagueId) {
-                $scores = $scoreService->getLeagueScores($leagueId);
+            $eventMatchupId = isset($_GET['eventMatchupId']) ? (int)$_GET['eventMatchupId'] : 0;
+            if ($eventMatchupId) {
+                $scores = $scoreService->getMatchupScores($eventMatchupId);
             } else {
-                $scores = $scoreService->getEventScores($eventId, $playerId ? $playerId : null);
+                $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
+                $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
+                $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
+
+                if (!$eventId && !$leagueId) {
+                    sendJson(['error' => 'eventId, leagueId, or eventMatchupId query parameter is required'], 400);
+                }
+
+                if ($leagueId) {
+                    $scores = $scoreService->getLeagueScores($leagueId);
+                } else {
+                    $scores = $scoreService->getEventScores($eventId, $playerId ? $playerId : null);
+                }
             }
 
             sendJson(array_map('serializeScore', $scores));
@@ -46,7 +51,8 @@ try {
                 (int)$input['orderNumber'],
                 $input['ball1'] ?? null,
                 $input['ball2'] ?? null,
-                $input['ball3'] ?? null
+                $input['ball3'] ?? null,
+                isset($input['eventMatchupId']) ? (int)$input['eventMatchupId'] : null
             );
 
             sendJson(['success' => true]);

@@ -10,7 +10,8 @@ vi.mock('@services/api.js', () => ({
       update: vi.fn(),
       delete: vi.fn(),
       addPlayer: vi.fn(),
-      removePlayer: vi.fn()
+      removePlayer: vi.fn(),
+      updateSeason: vi.fn()
     },
     players: {
       getAll: vi.fn()
@@ -79,6 +80,7 @@ const uiMocks = vi.hoisted(() => ({
   showDialog: vi.fn(),
   getFormatBadgeHtml: vi.fn((f) => `<span>${f || 'bowling'}</span>`),
   applyPreferredTheme: vi.fn(),
+  createSkeletonLoader: vi.fn(() => ({ remove: vi.fn() })),
   createExpandableRow: vi.fn((container, options) => {
     const row = document.createElement('div');
     row.className = options.className || '';
@@ -683,5 +685,34 @@ describe('Leagues Page (leaguesPage.js)', () => {
     expect(small.textContent).toContain('Individual');
     expect(small.textContent).toContain('Players: 1');
     expect(small.textContent).toContain('Cumulative');
+  });
+
+  it('should prompt for confirmation and update season when Update Season is clicked', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const mockLeague = { 
+      id: 1, 
+      name: 'L1', 
+      participants: 'head2head', 
+      status: 'active', 
+      players: [{ id: 1, playerName: 'P1' }], 
+      events: [{ id: 100, eventName: 'Week 1', matchups: [] }] 
+    };
+    PB_API.leagues.getAll.mockResolvedValue([mockLeague]);
+    PB_API.players.getAll.mockResolvedValue([]);
+    showConfirm.mockResolvedValue(true);
+
+    const { setActiveLeagueId } = await import('@scripts/utils.js');
+    setActiveLeagueId(1);
+
+    await initLeaguesPage();
+
+    const updateBtn = document.querySelector('.update-season-btn');
+    expect(updateBtn).not.toBeNull();
+    updateBtn.click();
+
+    expect(showConfirm).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(PB_API.leagues.updateSeason).toHaveBeenCalledWith(1);
+    });
   });
 });

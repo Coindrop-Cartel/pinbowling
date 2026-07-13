@@ -221,9 +221,16 @@ export async function initTournamentSelector(container, { onRefresh, typeFilter 
   const eventWrapper = target.querySelector('.event-select-wrapper');
   const populateEvents = (leagueId, selectedEventId) => {
     const isStandingsPage = !!document.getElementById('standings-body');
-    eventSelect.innerHTML = `<option value="">Select Event</option>${isStandingsPage && leagueId ? '<option value="summary">Season Summary</option>' : ''}`;
-    if (!leagueId) { eventWrapper.classList.add('hidden'); eventSelect.value = ''; return; }
     const league = allLeagues.find(l => String(l.id) === String(leagueId));
+    const isH2H = league?.participants === 'head2head';
+    
+    const labelEl = eventWrapper.querySelector('label');
+    if (labelEl) {
+      labelEl.textContent = isH2H ? 'Select Week' : 'Event';
+    }
+    
+    eventSelect.innerHTML = `<option value="">${isH2H ? 'Select Week' : 'Select Event'}</option>${isStandingsPage && leagueId ? '<option value="summary">Season Summary</option>' : ''}`;
+    if (!leagueId) { eventWrapper.classList.add('hidden'); eventSelect.value = ''; return; }
     const events = league?.events || [];
     if (events.length === 0 && !isStandingsPage) { eventWrapper.classList.add('hidden'); return; }
     eventWrapper.classList.remove('hidden');

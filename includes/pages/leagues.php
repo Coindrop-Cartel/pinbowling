@@ -20,6 +20,7 @@
           <select id="league-participants" data-testid="league-participants-select">
             <option value="individual" selected>Individual</option>
             <option value="team">Team</option>
+            <option value="head2head">Head to Head</option>
           </select>
         </div>
         <div id="league-format-row" data-testid="league-format-row" class="form-row hidden">
@@ -33,6 +34,19 @@
         <div id="league-drop-weeks-row" data-testid="league-drop-weeks-row" class="form-row hidden">
           <label for="league-drop-weeks">Drop Lowest Weeks</label>
           <input id="league-drop-weeks" data-testid="league-drop-weeks-input" type="number" min="0" value="0" />
+        </div>
+        <div id="league-weeks-in-season-row" data-testid="league-weeks-in-season-row" class="form-row hidden">
+          <label for="league-weeks-in-season">Weeks in Season</label>
+          <input id="league-weeks-in-season" data-testid="league-weeks-in-season-input" type="number" min="1" value="8" />
+        </div>
+        <div id="league-innings-per-game-row" data-testid="league-innings-per-game-row" class="form-row hidden">
+          <label for="league-innings-per-game">Innings per Game</label>
+          <select id="league-innings-per-game" data-testid="league-innings-per-game-select">
+            <option value="2" selected>2 Innings</option>
+            <option value="4">4 Innings</option>
+            <option value="6">6 Innings</option>
+            <option value="9">9 Innings</option>
+          </select>
         </div>
         <div class="form-actions hidden" data-testid="league-form-actions">
           <button type="submit" id="create-league-btn" data-testid="create-league-button" class="btn-mgmt" disabled>Create League</button>

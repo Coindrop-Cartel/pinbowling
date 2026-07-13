@@ -3,9 +3,9 @@ import { isManagementAuthorized, runAuthorizedLeagueAction } from '@services/aut
 import { getCookie, getActiveLeagueId, setActiveLeagueId, setActiveEventId, loadPage, escapeHTML } from '@scripts/utils.js';
 import { SCORING_FORMATS } from '@core/engine.js';
 import { applyPreferredTheme } from '@ui/branding.js';
-import { setupLiveFilter } from '@ui/selectors.js';
+import { setupLiveFilter, createSkeletonLoader } from '@ui/selectors.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
-import { showPlayerSelectionDialog, showConfirm } from '@ui/dialogs.js';
+import { showPlayerSelectionDialog, showConfirm, showDialog } from '@ui/dialogs.js';
 import { renderLeagueList, renderRegistryTeams, renderRegistryPlayers } from '@ui/lists.js';
 
 /**
@@ -54,6 +54,10 @@ export async function initLeaguesPage() {
   const participantsRow = document.getElementById('league-participants-row');
   const leagueDropLowestInput = document.getElementById('league-drop-weeks');
   const dropLowestRow = document.getElementById('league-drop-weeks-row');
+  const leagueWeeksInput = document.getElementById('league-weeks-in-season');
+  const weeksRow = document.getElementById('league-weeks-in-season-row');
+  const leagueInningsInput = document.getElementById('league-innings-per-game');
+  const inningsRow = document.getElementById('league-innings-per-game-row');
 
   const getParticipantMeta = (league) => {
     if (league?.participants === 'team') return { mode: 'Team', countLabel: 'Teams', count: league.teams?.length || 0, listLabel: 'Teams', emptyLabel: 'teams' };
@@ -61,20 +65,45 @@ export async function initLeaguesPage() {
     return { mode: 'Individual', countLabel: 'Players', count: league?.players?.length || 0, listLabel: 'Roster', emptyLabel: 'players' };
   };
 
-  const syncParticipantDefault = () => {
-    if (!leagueParticipantsInput || editingLeagueId) return;
-    if (leagueFormatInput?.value === 'baseball') leagueParticipantsInput.value = 'head2head';
+  const handleParticipantsChange = () => {
+    if (!leagueParticipantsInput) return;
+    const isH2H = leagueParticipantsInput.value === 'head2head';
+    if (isH2H) {
+      if (leagueFormatInput) {
+        leagueFormatInput.value = 'baseball';
+        leagueFormatInput.disabled = true;
+      }
+      seasonScoringRow?.classList.add('hidden');
+      dropLowestRow?.classList.add('hidden');
+      weeksRow?.classList.remove('hidden');
+      inningsRow?.classList.remove('hidden');
+    } else {
+      if (leagueFormatInput) {
+        leagueFormatInput.disabled = false;
+        if (!editingLeagueId) {
+          leagueFormatInput.value = getCookie('pb_preferred_format') || 'bowling';
+        }
+      }
+      if (!dateRow.classList.contains('hidden')) {
+        seasonScoringRow?.classList.remove('hidden');
+        dropLowestRow?.classList.remove('hidden');
+      }
+      weeksRow?.classList.add('hidden');
+      inningsRow?.classList.add('hidden');
+    }
   };
+
+  if (leagueParticipantsInput) {
+    leagueParticipantsInput.addEventListener('change', handleParticipantsChange);
+  }
 
   if (leagueFormatInput) {
     const preferredFormat = getCookie('pb_preferred_format') || 'bowling';
     leagueFormatInput.innerHTML = SCORING_FORMATS
-      .filter(f => f.value !== 'baseball') // Exclude baseball for leagues
       .map(f => 
         `<option value="${f.value}" ${f.value === preferredFormat ? 'selected' : ''}>${f.label}</option>`
       ).join('');
     leagueFormatInput.onchange = () => {
-      syncParticipantDefault();
       applyPreferredTheme(leagueFormatInput.value);
     };
   }
@@ -99,6 +128,8 @@ export async function initLeaguesPage() {
   if (participantsRow) participantsRow.classList.add('hidden');
   if (seasonScoringRow) seasonScoringRow.classList.add('hidden');
   if (dropLowestRow) dropLowestRow.classList.add('hidden');
+  if (weeksRow) weeksRow.classList.add('hidden');
+  if (inningsRow) inningsRow.classList.add('hidden');
   if (actionsRow) actionsRow.classList.add('hidden');
 
   // REVEAL-ONLY: Only show the management card if authorized.
@@ -116,8 +147,7 @@ export async function initLeaguesPage() {
         dateRow.classList.remove('hidden');
         formatRow.classList.remove('hidden');
         if (participantsRow) participantsRow.classList.remove('hidden');
-        if (seasonScoringRow) seasonScoringRow.classList.remove('hidden');
-        if (dropLowestRow) dropLowestRow.classList.remove('hidden');
+        handleParticipantsChange();
         actionsRow.classList.remove('hidden');
         createToggle.classList.replace('mt-10', 'mt-0');
         actionsRow.appendChild(createToggle);
@@ -140,7 +170,11 @@ export async function initLeaguesPage() {
     if (participantsRow) participantsRow.classList.add('hidden');
     if (seasonScoringRow) seasonScoringRow.classList.add('hidden');
     if (dropLowestRow) dropLowestRow.classList.add('hidden');
+    if (weeksRow) weeksRow.classList.add('hidden');
+    if (inningsRow) inningsRow.classList.add('hidden');
     actionsRow.classList.add('hidden');
+
+    if (leagueFormatInput) leagueFormatInput.disabled = false;
 
     if (createToggle) {
       createToggle.textContent = 'Create League';
@@ -158,6 +192,8 @@ export async function initLeaguesPage() {
     if (leagueParticipantsInput) leagueParticipantsInput.value = league.participants || 'individual';
     if (leagueSeasonScoringInput) leagueSeasonScoringInput.value = league.seasonScoring || 'weekly';
     if (leagueDropLowestInput) leagueDropLowestInput.value = league.dropLowestWeeks || 0;
+    if (leagueWeeksInput) leagueWeeksInput.value = league.weeksInSeason || 8;
+    if (leagueInningsInput) leagueInningsInput.value = league.inningsPerGame || 2;
 
     createBtn.textContent = 'Update League';
     if (leagueFormTitle) leagueFormTitle.textContent = `Edit League: ${league.name}`;
@@ -165,8 +201,8 @@ export async function initLeaguesPage() {
     dateRow.classList.remove('hidden');
     formatRow.classList.remove('hidden');
     if (participantsRow) participantsRow.classList.remove('hidden');
-    if (seasonScoringRow) seasonScoringRow.classList.remove('hidden');
-    if (dropLowestRow) dropLowestRow.classList.remove('hidden');
+    
+    handleParticipantsChange();
     actionsRow.classList.remove('hidden');
     
     if (createToggle) {
@@ -222,6 +258,8 @@ export async function initLeaguesPage() {
         onRemovePlayer: (leagueId, playerId, playerName) => {
           removePlayerFromLeague(leagueId, playerId, playerName);
         },
+        onStartPlayoffs: startPlayoffsFlow,
+        onUpdateSeason: updateSeasonFlow,
         getParticipantMeta
       });
     }
@@ -283,6 +321,8 @@ export async function initLeaguesPage() {
     const participants = leagueParticipantsInput?.value || 'individual';
     const seasonScoring = leagueSeasonScoringInput?.value || 'weekly';
     const dropLowestWeeks = parseInt(leagueDropLowestInput?.value || '0', 10);
+    const weeksInSeason = leagueWeeksInput ? parseInt(leagueWeeksInput.value, 10) : null;
+    const inningsPerGame = leagueInningsInput ? parseInt(leagueInningsInput.value, 10) : 2;
 
     if (!isAuthorized) return;
 
@@ -290,7 +330,16 @@ export async function initLeaguesPage() {
     createBtn.textContent = 'Saving...';
 
     try {
-      const payload = { name, startDate: date, scoringFormat, participants, seasonScoring, dropLowestWeeks };
+      const payload = { 
+        name, 
+        startDate: date, 
+        scoringFormat, 
+        participants, 
+        seasonScoring, 
+        dropLowestWeeks,
+        weeksInSeason,
+        inningsPerGame
+      };
       if (editingLeagueId) {
         await PB_API.leagues.update(editingLeagueId, payload);
       } else {
@@ -415,6 +464,26 @@ export async function initLeaguesPage() {
     const league = allLeagues.find(l => l.id === leagueId);
     if (!league) return;
     
+    if (league.participants === 'head2head' && league.status === 'active') {
+      const weeksInSeason = league.weeksInSeason || 8;
+      const midpoint = Math.ceil(weeksInSeason / 2);
+      
+      const completedWeeks = (league.events || []).filter(e => 
+        e.matchups && e.matchups.length > 0 && e.matchups.every(m => m.status === 'completed')
+      ).length;
+      
+      if (completedWeeks >= midpoint) {
+        alert(`Roster additions are disabled after the midway point of the season (Week ${midpoint}).`);
+        return;
+      }
+      
+      const proceed = await showConfirm(
+        `WARNING: Adding a player mid-season (Week ${completedWeeks + 1}) will create an imbalanced schedule. Future matchups will NOT be automatically rescheduled. Do you wish to proceed?`,
+        'Confirm Mid-Season Addition'
+      );
+      if (!proceed) return;
+    }
+
     const playersInLeague = new Set((league.players || []).map(p => p.id));
     const availablePlayers = allPlayersCache.filter(p => !playersInLeague.has(p.id));
 
@@ -449,6 +518,148 @@ export async function initLeaguesPage() {
             }
             updateLeagueHeaderStats(leagueId, league);
         }
+    }
+  }
+
+  async function startPlayoffsFlow(leagueId) {
+    const league = allLeagues.find(l => l.id === leagueId);
+    if (!league) return;
+    
+    const maxQualifiers = league.players ? league.players.length : 0;
+    if (maxQualifiers < 2) {
+      await showDialog({
+        title: 'Cannot Start Playoffs',
+        message: 'You need at least 2 players in the roster to start the playoffs.'
+      });
+      return;
+    }
+    
+    const container = document.createElement('div');
+    container.className = 'playoff-setup-form';
+    
+    let optionsHtml = '';
+    if (maxQualifiers >= 2) optionsHtml += '<option value="2" selected>Top 2</option>';
+    if (maxQualifiers >= 4) optionsHtml += '<option value="4">Top 4</option>';
+    if (maxQualifiers >= 8) optionsHtml += '<option value="8">Top 8</option>';
+    
+    container.innerHTML = `
+      <div class="form-row mb-10">
+        <label for="playoff-qualifiers" style="font-weight: bold; display: block; margin-bottom: 5px;">Qualifying Players:</label>
+        <select id="playoff-qualifiers" class="input-standard" style="width: 100%; padding: 6px;">
+          ${optionsHtml}
+        </select>
+      </div>
+      <div class="form-row mb-10">
+        <label for="playoff-series-length" style="font-weight: bold; display: block; margin-bottom: 5px;">Series Format:</label>
+        <select id="playoff-series-length" class="input-standard" style="width: 100%; padding: 6px;">
+          <option value="1">Single Game (Best of 1)</option>
+          <option value="3" selected>Best of 3 (First to 2 wins)</option>
+          <option value="5">Best of 5 (First to 3 wins)</option>
+        </select>
+      </div>
+    `;
+    
+    const confirmed = await showDialog({
+      title: 'Configure Playoff Postseason',
+      message: 'Choose how many players qualify and the series length for matchups.',
+      confirmText: 'Generate Playoff Bracket',
+      cancelText: 'Cancel',
+      customElement: container
+    });
+    
+    if (confirmed !== true) return;
+    
+    const qualifierCount = Number(container.querySelector('#playoff-qualifiers').value);
+    const seriesLength = Number(container.querySelector('#playoff-series-length').value);
+    
+    const loader = createSkeletonLoader(leaguesList, { count: 3 });
+    try {
+      const [rawScores, allLeagueTargets] = await Promise.all([
+        PB_API.scores.get(null, null, leagueId),
+        PB_API.machines.getTargets(null, leagueId)
+      ]);
+      
+      const { getScoringEngine } = await import('@core/engine.js');
+      const { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer } = await import('@services/normalizer.js');
+      const { calculateSeasonSummary } = await import('@services/seasonCalculator.js');
+      
+      const format = league.scoringFormat || 'baseball';
+      const engine = getScoringEngine(format);
+      const players = league.players || [];
+      const events = league.events || [];
+      
+      const matchupsByEvent = {};
+      events.forEach(e => {
+        matchupsByEvent[e.id] = e.matchups || [];
+      });
+      
+      const normalizedLeagueTargets = normalizeTargets(allLeagueTargets);
+      const targetsByEvent = groupTargetsByEvent(normalizedLeagueTargets);
+      const normalizedScores = normalizeScores(rawScores);
+      const scoresByEventAndPlayer = groupScoresByEventAndPlayer(normalizedScores);
+      
+      const summary = calculateSeasonSummary({
+        league,
+        players,
+        events,
+        targetsByEvent,
+        scoresByEventAndPlayer,
+        matchupsByEvent,
+        engine
+      });
+      
+      const sortedPlayerIds = (summary.rows || []).map(r => r.entity.id);
+      const seeds = sortedPlayerIds.slice(0, qualifierCount);
+      
+      if (seeds.length < qualifierCount) {
+        throw new Error('Not enough players have recorded stats to seed the bracket.');
+      }
+      
+      await PB_API.leagues.startPlayoffs(leagueId, seeds, seriesLength);
+      
+      await refresh();
+      
+      await showDialog({
+        title: 'Playoffs Started!',
+        message: 'Playoff bracket generated successfully. View the playoff round to play matchups.'
+      });
+    } catch (err) {
+      console.error(err);
+      await showDialog({
+        title: 'Error starting playoffs',
+        message: err.message || 'An error occurred.'
+      });
+    } finally {
+      loader.remove();
+    }
+  }
+
+  async function updateSeasonFlow(leagueId) {
+    const league = allLeagues.find(l => l.id === leagueId);
+    if (!league) return;
+    
+    const proceed = await showConfirm(
+      `Are you sure you want to update the season schedule for "${league.name}"? This will delete all pending (unplayed) matchups, and recreate them using the current roster. This action cannot be undone.`,
+      'Update Season'
+    );
+    if (!proceed) return;
+    
+    const loader = createSkeletonLoader(leaguesList, { count: 3 });
+    try {
+      await PB_API.leagues.updateSeason(leagueId);
+      await refresh();
+      await showDialog({
+        title: 'Season Updated',
+        message: 'The regular season schedule has been updated with the current roster.'
+      });
+    } catch (err) {
+      console.error(err);
+      await showDialog({
+        title: 'Error updating season',
+        message: err.message || 'An error occurred.'
+      });
+    } finally {
+      loader.remove();
     }
   }
 
@@ -517,6 +728,8 @@ export async function initLeaguesPage() {
                 onDeleteEvent: (evId, lgId, lgName) => deleteEvent(evId, lgId, lgName),
                 onRemoveTeam: (lgId, teamId, teamName) => removeTeamFromLeague(lgId, teamId, teamName),
                 onRemovePlayer: (lgId, playerId, playerName) => removePlayerFromLeague(lgId, playerId, playerName),
+                onStartPlayoffs: startPlayoffsFlow,
+                onUpdateSeason: updateSeasonFlow,
                 getParticipantMeta
               });
           }

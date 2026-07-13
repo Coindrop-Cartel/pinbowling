@@ -61,13 +61,41 @@ try {
                     if ($playerUserId !== null) validateTDAccess();
                 }
 
-                if ($meta['scoring_format'] === 'baseball') {
+                if ($meta['scoring_format'] === 'baseball' && $meta['type'] === 'session') {
                     if ($leagueService->getLeaguePlayerCount($leagueId) >= 2) {
                         sendJson(['error' => 'Baseball sessions are limited to 2 players'], 400);
                     }
                 }
 
                 $leagueService->addPlayerToLeague($leagueId, $playerId);
+                sendJson(['success' => true]);
+
+            } elseif ($task === 'start_season') {
+                validateTDAccess();
+                if (empty($input['leagueId'])) {
+                    sendJson(['error' => 'leagueId is required'], 400);
+                }
+                $leagueService->startSeason((int)$input['leagueId']);
+                sendJson(['success' => true]);
+
+            } elseif ($task === 'update_season') {
+                validateTDAccess();
+                if (empty($input['leagueId'])) {
+                    sendJson(['error' => 'leagueId is required'], 400);
+                }
+                $leagueService->updateSeason((int)$input['leagueId']);
+                sendJson(['success' => true]);
+
+            } elseif ($task === 'start_playoffs') {
+                validateTDAccess();
+                if (empty($input['leagueId']) || empty($input['seeds']) || empty($input['seriesLength'])) {
+                    sendJson(['error' => 'leagueId, seeds, and seriesLength are required'], 400);
+                }
+                $leagueService->startPlayoffs(
+                    (int)$input['leagueId'],
+                    $input['seeds'],
+                    (int)$input['seriesLength']
+                );
                 sendJson(['success' => true]);
 
             } elseif ($task === 'fixture') {
@@ -96,7 +124,9 @@ try {
                     $input['participants'] ?? 'individual',
                     $input['scoringFormat'] ?? 'bowling',
                     $input['seasonScoring'] ?? 'weekly',
-                    (int)($input['dropLowestWeeks'] ?? 0)
+                    (int)($input['dropLowestWeeks'] ?? 0),
+                    isset($input['weeksInSeason']) ? (int)$input['weeksInSeason'] : null,
+                    (int)($input['inningsPerGame'] ?? 2)
                 );
                 if (!$league) sendJson(['error' => 'League created but could not be retrieved.'], 500);
                 sendJson(serializeLeague($league));
@@ -127,7 +157,9 @@ try {
                     $input['participants'] ?? 'individual',
                     $input['scoringFormat'] ?? 'bowling',
                     $input['seasonScoring'] ?? 'weekly',
-                    (int)($input['dropLowestWeeks'] ?? 0)
+                    (int)($input['dropLowestWeeks'] ?? 0),
+                    isset($input['weeksInSeason']) ? (int)$input['weeksInSeason'] : null,
+                    (int)($input['inningsPerGame'] ?? 2)
                 );
                 if (!$league) sendJson(['error' => 'Resource updated but could not be retrieved.'], 500);
                 sendJson(serializeLeague($league));

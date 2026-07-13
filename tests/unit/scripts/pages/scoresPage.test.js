@@ -16,6 +16,7 @@ vi.mock('@services/api.js', () => ({
     players: { getAll: vi.fn().mockResolvedValue([]) },
     machines: { getTargets: vi.fn() },
     scores: { get: vi.fn(), save: vi.fn() },
+    matchups: { get: vi.fn(), save: vi.fn() },
   },
 }));
 
@@ -27,6 +28,8 @@ vi.mock('@scripts/utils.js', () => ({
   getCurrentPlayerId: vi.fn(),
   setCurrentPlayerId: vi.fn(),
   setCurrentPlayerIdSilent: vi.fn(),
+  getActiveMatchupId: vi.fn(),
+  setActiveMatchupIdSilent: vi.fn(),
   formatNumber: (n) => String(n),
   applyScoreFormatting: vi.fn(),
   renderThresholdGrid: vi.fn(() => 'Grid'),
@@ -60,10 +63,13 @@ vi.mock('@core/engine.js', () => ({
     getRoundLabel: () => 'Frame',
     getPrimaryTargetLabel: () => 'Strike',
     getBonusTargetHtml: () => '',
-    getRoundRowContext: () => '',
-    getRequiredEventData: () => '',
-    enrichScoreMap: () => '',
-    renderResults: () => '',
+    getRoundRowContext: () => ({}),
+    getRequiredEventData: (eventId, api) => ({
+      eventMatchups: api.matchups?.get ? Promise.resolve(api.matchups.get(eventId)).then(r => r || []).catch(() => []) : Promise.resolve([]),
+      allEventScores: api.scores?.get ? Promise.resolve(api.scores.get(null, Number(eventId))).then(r => r || []).catch(() => []) : Promise.resolve([])
+    }),
+    enrichScoreMap: (sm) => sm || ({}),
+    renderResults: () => ({}),
     getRowSummaryHtml: vi.fn(() => '<div>Summary</div>'),
     getMarkFormatting: vi.fn((mark) => (mark === 10 ? 'golf-eagle' : '')),
     formatMark: vi.fn((turn) => turn.mark),
@@ -138,6 +144,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
          <div id="results-empty"></div>
       </div>
       <div id="player-warning" class="hidden"></div>
+      <div id="matchups-schedule-container" class="hidden"><ul class="week-matchups-list"></ul></div>
     `;
 
     vi.clearAllMocks();
@@ -323,5 +330,88 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
     const input1 = document.querySelector('[data-ball="1"]');
     expect(input1.readOnly).toBe(true);
     expect(input1.classList.contains('ball-locked')).toBe(true);
+  });
+
+  it('should render schedule list on scores page for head-to-head league when no matchup is active', async () => {
+    Utils.getActiveLeagueId.mockReturnValue('1');
+    Utils.getActiveEventId.mockReturnValue('101');
+    Utils.getActiveMatchupId.mockReturnValue('');
+
+    PB_API.leagues.getAll.mockResolvedValue([
+      { 
+        id: 1, 
+        name: 'H2H League', 
+        participants: 'head2head', 
+        scoringFormat: 'baseball',
+        events: [{ 
+          id: 101, 
+          eventName: 'Week 1',
+          matchups: [
+            { id: 50, eventId: 101, homePlayerId: 10, homePlayerName: 'Home P', awayPlayerId: 20, awayPlayerName: 'Away P', status: 'pending' }
+          ]
+        }] 
+      }
+    ]);
+    PB_API.matchups.get.mockImplementation((eventId, eventMatchupId) => {
+      if (eventMatchupId) {
+        return Promise.resolve({
+          id: 50, eventId: 101, homePlayerId: 10, homePlayerName: 'Home P', awayPlayerId: 20, awayPlayerName: 'Away P', status: 'pending',
+          innings: [{ id: 1, orderNumber: 1, machineId: 5, machineName: 'M1' }]
+        });
+      }
+      return Promise.resolve([
+        { id: 50, eventId: 101, homePlayerId: 10, homePlayerName: 'Home P', awayPlayerId: 20, awayPlayerName: 'Away P', status: 'pending' }
+      ]);
+    });
+
+    await initScoresPage();
+
+    const scheduleContainer = document.getElementById('matchups-schedule-container');
+    expect(scheduleContainer.classList.contains('hidden')).toBe(false);
+    expect(scheduleContainer.innerHTML).toContain('Away P');
+    expect(scheduleContainer.innerHTML).toContain('Home P');
+  });
+
+  it('should render spectator mode notice and disable inputs when spectator tries to view matchup', async () => {
+    Utils.getActiveLeagueId.mockReturnValue('1');
+    Utils.getActiveEventId.mockReturnValue('101');
+    Utils.getActiveMatchupId.mockReturnValue('50');
+    Utils.getCurrentPlayerId.mockReturnValue('30');
+
+    PB_API.leagues.getAll.mockResolvedValue([
+      { 
+        id: 1, 
+        name: 'H2H League', 
+        participants: 'head2head', 
+        scoringFormat: 'baseball',
+        events: [{ id: 101, eventName: 'Week 1' }] 
+      }
+    ]);
+    PB_API.matchups.get.mockImplementation((eventId, eventMatchupId) => {
+      if (eventMatchupId) {
+        return Promise.resolve({
+          id: 50, eventId: 101, homePlayerId: 10, homePlayerName: 'Home P', awayPlayerId: 20, awayPlayerName: 'Away P', status: 'pending',
+          innings: [{ id: 1, orderNumber: 1, machineId: 5, machineName: 'M1' }]
+        });
+      }
+      return Promise.resolve([
+        { id: 50, eventId: 101, homePlayerId: 10, homePlayerName: 'Home P', awayPlayerId: 20, awayPlayerName: 'Away P', status: 'pending' }
+      ]);
+    });
+    PB_API.auth.me.mockResolvedValue({ player_id: 30 });
+    const { can } = await import('@services/auth.js');
+    can.mockResolvedValue(false);
+
+    getScoreAccessLevel.mockResolvedValueOnce({
+      access: 'denied',
+      reason: 'Spectator',
+      lockedBalls: {}
+    });
+
+    await initScoresPage();
+
+    const warningEl = document.getElementById('player-warning');
+    expect(warningEl.classList.contains('hidden')).toBe(false);
+    expect(warningEl.textContent).toContain('Spectator Mode');
   });
 });

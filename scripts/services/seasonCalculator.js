@@ -16,39 +16,74 @@ import { groupTargetsByEvent, buildScoreMapFromRows, groupScoresByPlayer, buildB
  */
 export function calculateBaseballRecords(players, events, matchupsByEvent, scoresByEventAndPlayer, targetsByEvent, engine) {
   const records = {};
-  players.forEach(p => { records[p.id] = { wins: 0, losses: 0, ties: 0, winRate: 0 }; });
+  players.forEach(p => { 
+    records[p.id] = { 
+      wins: 0, 
+      losses: 0, 
+      ties: 0, 
+      winRate: 0,
+      runDiff: 0,
+      totalRuns: 0,
+      headToHead: {}
+    }; 
+  });
 
   events.forEach(event => {
     const matchups = matchupsByEvent[event.id] || [];
-    const eventTargets = targetsByEvent[event.id] || [];
+    matchups.forEach(m => {
+      if (m.status !== 'completed') return;
 
-    matchups.forEach(matchup => {
-      const p1Id = Number(matchup.player1_id || matchup.player1Id);
-      const p2Id = Number(matchup.player2_id || matchup.player2Id);
+      const p1Id = Number(m.awayPlayerId ?? m.away_player_id);
+      const p2Id = Number(m.homePlayerId ?? m.home_player_id);
 
-      const p1Scores = scoresByEventAndPlayer[event.id]?.[p1Id] || [];
-      const p2Scores = scoresByEventAndPlayer[event.id]?.[p2Id] || [];
+      // If it's a bye week, ignore for records calculation
+      if (!p1Id || !p2Id) return;
 
-      if (p1Scores.length === 0 || p2Scores.length === 0) return;
+      const r1 = Number(m.awayRuns ?? m.away_runs ?? 0);
+      const r2 = Number(m.homeRuns ?? m.home_runs ?? 0);
 
-      const eventScoresByPlayer = scoresByEventAndPlayer[event.id] || {};
-      const p1ScoreMap = buildBaseballScoreMapForPlayer(p1Id, eventScoresByPlayer, matchups);
-      const p2ScoreMap = buildBaseballScoreMapForPlayer(p2Id, eventScoresByPlayer, matchups);
+      if (records[p1Id]) {
+        records[p1Id].totalRuns += r1;
+        records[p1Id].runDiff += (r1 - r2);
+      }
+      if (records[p2Id]) {
+        records[p2Id].totalRuns += r2;
+        records[p2Id].runDiff += (r2 - r1);
+      }
 
-      const { total: p1Total } = engine.calculateTurnResults(eventTargets, p1ScoreMap);
-      const { total: p2Total } = engine.calculateTurnResults(eventTargets, p2ScoreMap);
-
-      const cmp = engine.compareScores(p1Total, p2Total);
-      if (cmp > 0) {
-        // p1 wins (higher is better in baseball — more runs)
-        if (records[p1Id]) records[p1Id].wins++;
-        if (records[p2Id]) records[p2Id].losses++;
-      } else if (cmp < 0) {
-        if (records[p1Id]) records[p1Id].losses++;
-        if (records[p2Id]) records[p2Id].wins++;
+      if (r1 > r2) {
+        if (records[p1Id]) {
+          records[p1Id].wins++;
+          records[p1Id].headToHead[p2Id] = records[p1Id].headToHead[p2Id] || { wins: 0, losses: 0, ties: 0 };
+          records[p1Id].headToHead[p2Id].wins++;
+        }
+        if (records[p2Id]) {
+          records[p2Id].losses++;
+          records[p2Id].headToHead[p1Id] = records[p2Id].headToHead[p1Id] || { wins: 0, losses: 0, ties: 0 };
+          records[p2Id].headToHead[p1Id].losses++;
+        }
+      } else if (r2 > r1) {
+        if (records[p1Id]) {
+          records[p1Id].losses++;
+          records[p1Id].headToHead[p2Id] = records[p1Id].headToHead[p2Id] || { wins: 0, losses: 0, ties: 0 };
+          records[p1Id].headToHead[p2Id].losses++;
+        }
+        if (records[p2Id]) {
+          records[p2Id].wins++;
+          records[p2Id].headToHead[p1Id] = records[p2Id].headToHead[p1Id] || { wins: 0, losses: 0, ties: 0 };
+          records[p2Id].headToHead[p1Id].wins++;
+        }
       } else {
-        if (records[p1Id]) records[p1Id].ties++;
-        if (records[p2Id]) records[p2Id].ties++;
+        if (records[p1Id]) {
+          records[p1Id].ties++;
+          records[p1Id].headToHead[p2Id] = records[p1Id].headToHead[p2Id] || { wins: 0, losses: 0, ties: 0 };
+          records[p1Id].headToHead[p2Id].ties++;
+        }
+        if (records[p2Id]) {
+          records[p2Id].ties++;
+          records[p2Id].headToHead[p1Id] = records[p2Id].headToHead[p1Id] || { wins: 0, losses: 0, ties: 0 };
+          records[p2Id].headToHead[p1Id].ties++;
+        }
       }
     });
   });
@@ -81,11 +116,6 @@ export function calculateBaseballRecords(players, events, matchupsByEvent, score
  * @param {Object} params.engine - ScoringEngine instance with `calculateTurnResults`, `compareScores`, and `formatTotalScore` methods.
  * @param {string[]} [params.selectedPlayerIds=[]] - Array of player IDs to filter the results.
  * @returns {Object} The calculated season summary.
- * @returns {boolean} returns.isTeamLeague - Indicates if the league is team-based.
- * @returns {Array} returns.rows - Sorted summary rows.
- * @returns {Object} returns.rows[].entity - The player or team object.
- * @returns {Object<number, {displayValue: string, isDropped: boolean}|null>} returns.rows[].eventTotals - Totals keyed by event ID.
- * @returns {number} returns.rows[].totalSeasonPoints - Aggregate points after applying drop-weeks.
  */
 export function calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, matchupsByEvent = {}, engine, selectedPlayerIds = [] }) {
   const isTeamLeague = league?.participants === 'team';
@@ -197,7 +227,7 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
 
     // Drop lowest
     const dropCount = Number(league?.dropLowestWeeks || 0);
-    let scoresToSum = [...individualScores]; // Create a mutable copy for sorting and splicing
+    let scoresToSum = [...individualScores];
     if (dropCount > 0 && individualScores.length > 0) {
       scoresToSum.sort((a, b) => {
         if (league?.seasonScoring === 'weekly') return b.value - a.value;
@@ -231,10 +261,27 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
   }
 
   rows.sort((a, b) => {
-    // For baseball, sort by win rate first, then by total runs as tiebreaker
+    // For baseball, sort by win rate, then head-to-head, then run diff, then total runs
     if (isBaseball && a.record && b.record) {
       const rateDiff = b.record.winRate - a.record.winRate;
       if (Math.abs(rateDiff) > 0.001) return rateDiff;
+
+      // H2H tiebreaker
+      const aAgainstB = a.record.headToHead[b.entity.id];
+      const aWins = aAgainstB ? aAgainstB.wins : 0;
+      const bAgainstA = b.record.headToHead[a.entity.id];
+      const bWins = bAgainstA ? bAgainstA.wins : 0;
+      if (aWins !== bWins) {
+        return bWins - aWins;
+      }
+
+      // Run differential
+      const runDiffDiff = b.record.runDiff - a.record.runDiff;
+      if (runDiffDiff !== 0) return runDiffDiff;
+
+      // Total runs
+      const totalRunsDiff = b.record.totalRuns - a.record.totalRuns;
+      if (totalRunsDiff !== 0) return totalRunsDiff;
     }
     if (league?.seasonScoring === 'weekly') return b.totalSeasonPoints - a.totalSeasonPoints;
     return engine.compareScores(a.totalSeasonPoints, b.totalSeasonPoints);

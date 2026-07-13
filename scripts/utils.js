@@ -98,6 +98,22 @@ export function setCurrentPlayerIdSilent(playerId) {
   window.history.replaceState({}, '', url);
 }
 
+/** @returns {string|null} The currently active matchup ID from the URL. */
+export const getActiveMatchupId = () => getUrlParam('matchupId');
+
+/** @param {string|null} id - Sets the active matchup ID in the URL. */
+export function setActiveMatchupId(id) {
+  setUrlParam('matchupId', id);
+}
+
+/** Sets the active matchup ID in the URL silently. */
+export function setActiveMatchupIdSilent(id) {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set('matchupId', id);
+  else url.searchParams.delete('matchupId');
+  window.history.replaceState({}, '', url);
+}
+
 /**
  * Formats a number with locale-specific thousands separators.
  * @param {number} num 

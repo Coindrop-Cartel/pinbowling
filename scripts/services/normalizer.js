@@ -164,6 +164,7 @@ export function buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchup
     const sibling = (matchups || []).find(
       m => Number(m.orderNumber ?? m.order_number) === matchupOrderNumber
         && Number(m.playerOrder ?? m.player_order) !== Number(matchup.playerOrder ?? matchup.player_order)
+        && (m.eventMatchupId ?? m.event_matchup_id) === (matchup.eventMatchupId ?? matchup.event_matchup_id)
     );
     const opponentId = sibling ? Number(sibling.playerId ?? sibling.player_id) : 0;
     const opponentScores = scoresByPlayer?.[opponentId] || scoresByPlayer?.[String(opponentId)] || [];

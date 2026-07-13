@@ -29,6 +29,10 @@
       </div>
     </section>
     <div id="player-warning" data-testid="player-warning-notice" class="notice hidden"></div>
+    <section id="matchups-schedule-container" class="card hidden mb-5 card-pad">
+      <h2 class="mt-0" style="color: #1976d2;">Weekly Matchups</h2>
+      <ul class="week-matchups-list list-unstyled" style="margin-top: 10px; padding: 0;"></ul>
+    </section>
     <section id="scoring-card" data-testid="scoring-card" class="card hidden mb-5 card-pad">
       <h2 class="mt-0">Enter Scores</h2>
       <div id="scoring-instruction-notice" data-testid="scoring-instruction-notice" class="hint hidden small-hint"></div>
