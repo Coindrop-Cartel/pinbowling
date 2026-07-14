@@ -139,10 +139,25 @@ export function groupMatchupsByEvent(matchups) {
 }
 
 /**
+ * Flattens a list of event-matchup wrappers into a single array of inning rows.
+ *
+ * The API always returns matchups as a list of wrapper objects, each with an
+ * `innings` array (this is true for both league sessions and one-off sessions).
+ * This helper extracts all inning rows from every wrapper into a flat list so
+ * callers can iterate innings without checking two different data shapes.
+ *
+ * @param {Object[]} eventMatchups Array of event-matchup wrapper objects.
+ * @returns {Object[]} Flat array of inning/matchup row objects.
+ */
+export function flattenMatchupInnings(eventMatchups) {
+  return (eventMatchups || []).flatMap(em => em.innings || (Array.isArray(em) ? em : []));
+}
+
+/**
  * Builds a baseball score map for a player, including opponent scores.
  * @param {number|string} playerId
  * @param {Object<number, Object[]>} scoresByPlayer
- * @param {Object[]} matchups
+ * @param {Object[]} matchups Event-matchup wrappers (each with `.innings`), or a flat array of inning rows.
  * @returns {Object}
  */
 export function buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchups) {
@@ -151,7 +166,8 @@ export function buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchup
   const scoreMap = buildScoreMapFromRows(playerScores);
   const opponent = {};
 
-  const playerMatchups = (matchups || [])
+  const innings = flattenMatchupInnings(matchups);
+  const playerMatchups = innings
     .filter(m => Number(m.playerId ?? m.player_id) === id)
     .sort((a, b) => Number(a.orderNumber ?? a.order_number) - Number(b.orderNumber ?? b.order_number));
 
@@ -161,7 +177,7 @@ export function buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchup
   playerMatchups.forEach(matchup => {
     const matchupOrderNumber = Number(matchup.orderNumber ?? matchup.order_number);
     // Find the sibling row (same orderNumber/inning, different playerOrder) to get the opponent.
-    const sibling = (matchups || []).find(
+    const sibling = innings.find(
       m => Number(m.orderNumber ?? m.order_number) === matchupOrderNumber
         && Number(m.playerOrder ?? m.player_order) !== Number(matchup.playerOrder ?? matchup.player_order)
         && (m.eventMatchupId ?? m.event_matchup_id) === (matchup.eventMatchupId ?? matchup.event_matchup_id)

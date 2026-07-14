@@ -1,6 +1,6 @@
 import { ScoringEngine } from '../ScoringEngine.js';
 import { formatNumber, escapeHTML } from '../../utils.js';
-import { buildBaseballScoreMapForPlayer } from '../../services/normalizer.js';
+import { buildBaseballScoreMapForPlayer, flattenMatchupInnings } from '../../services/normalizer.js';
 import { renderBaseballScoreboard } from '../../ui/scoreboard.js';
 
 /**
@@ -495,24 +495,30 @@ formatMark(turn, scoreOverride = null) {
     // viewing either their own machine OR the opponent's machine for the inning.
     // So we find the inning (orderNumber) that contains round.machineId, then
     // resolve the player's matchup and the opponent (sibling) within that inning.
+    //
+    // The API always returns eventMatchups as a list of wrapper objects, each
+    // with an `innings` array (true for both league and one-off sessions). We
+    // flatten all innings into a single list so we only have to search one place.
+    const innings = flattenMatchupInnings(eventMatchups);
 
     // Step 1: Find any matchup row whose machineId matches this round's machine.
     // That tells us which inning (orderNumber) this machine belongs to.
-    const machineMatch = eventMatchups.find(
+    const machineMatch = innings.find(
       m => Number(m.machineId ?? m.machine_id) === Number(round.machineId)
     );
     const inningOrderNumber = machineMatch ? Number(machineMatch.orderNumber ?? machineMatch.order_number) : null;
 
     // Step 2: Within that inning, find the current player's matchup row.
     const matchup = inningOrderNumber !== null
-      ? eventMatchups.find(
+      ? innings.find(
           m => Number(m.orderNumber ?? m.order_number) === inningOrderNumber
             && Number(m.playerId ?? m.player_id) === currentPlayerId
         )
       : null;
+
     // Sibling row = same inning, different playerOrder (the opponent).
     const sibling = inningOrderNumber !== null
-      ? eventMatchups.find(
+      ? innings.find(
           m => Number(m.orderNumber ?? m.order_number) === inningOrderNumber
             && Number(m.playerId ?? m.player_id) !== currentPlayerId
         )
@@ -523,7 +529,7 @@ formatMark(turn, scoreOverride = null) {
     //              Bottom of inning = Home bats, Away pitches.
     // Determine whether this machine is the Top or Bottom half.
     // In our generator, playerOrder 1 is always the Top machine.
-    const topMatchup = eventMatchups.find(
+    const topMatchup = innings.find(
       m => Number(m.orderNumber ?? m.order_number) === inningOrderNumber && Number(m.playerOrder ?? m.player_order) === 1
     );
     const isTop = topMatchup ? Number(topMatchup.machineId ?? topMatchup.machine_id) === Number(round.machineId) : true;

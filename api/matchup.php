@@ -33,7 +33,57 @@ try {
                 }
 
                 $matchups = $matchupService->getEventMatchups($eventId);
-                sendJson(array_map('serializeMatchup', $matchups));
+
+                // Normalize the response shape so callers always receive a list
+                // of event-matchup wrappers, each with an `innings` array — the
+                // same structure returned when fetching by eventMatchupId.
+                //
+                // League sessions already store parent event_matchups rows and
+                // child matchups rows linked via event_matchup_id; those are
+                // grouped under their parent. One-off sessions have no parent
+                // rows (event_matchup_id is NULL), so we synthesize a single
+                // wrapper around all of their innings.
+                $grouped = [];
+                $ungrouped = [];
+                foreach ($matchups as $row) {
+                    $emId = $row['event_matchup_id'] ?? null;
+                    if ($emId !== null) {
+                        $grouped[(int)$emId][] = $row;
+                    } else {
+                        $ungrouped[] = $row;
+                    }
+                }
+
+                $result = [];
+                foreach ($grouped as $emId => $inningRows) {
+                    $emInfo = $matchupService->getEventMatchup($emId);
+                    $serialized = $emInfo
+                        ? serializeEventMatchup($emInfo)
+                        : ['id' => $emId, 'eventId' => $eventId];
+                    $serialized['innings'] = array_map('serializeMatchup', $inningRows);
+                    $result[] = $serialized;
+                }
+                if (!empty($ungrouped)) {
+                    $result[] = [
+                        'id' => null,
+                        'eventId' => $eventId,
+                        'leagueId' => null,
+                        'homePlayerId' => 0,
+                        'awayPlayerId' => 0,
+                        'homePlayerName' => null,
+                        'awayPlayerName' => null,
+                        'homeRuns' => 0,
+                        'awayRuns' => 0,
+                        'winnerId' => null,
+                        'status' => 'pending',
+                        'gameNumber' => 1,
+                        'roundName' => null,
+                        'seriesId' => null,
+                        'innings' => array_map('serializeMatchup', $ungrouped)
+                    ];
+                }
+
+                sendJson($result);
             }
             break;
 

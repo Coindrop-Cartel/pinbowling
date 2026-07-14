@@ -1,5 +1,6 @@
 import { escapeHTML } from '@scripts/utils.js';
 import { ScoringEngine } from '@core/ScoringEngine.js';
+import { flattenMatchupInnings } from '@services/normalizer.js';
 
 /**
  * Renders the head-to-head scoreboard grid for Baseball (PinBaseball).
@@ -23,10 +24,11 @@ export function renderBaseballScoreboard(calcResult, machines, scoreMap, context
   }
 
   const currentPlayerId = Number(getCurrentPlayerId());
-  const myMatchups = eventMatchups.filter(m => Number(m.playerId) === currentPlayerId);
+  const innings = flattenMatchupInnings(eventMatchups);
+  const myMatchups = innings.filter(m => Number(m.playerId) === currentPlayerId);
   const opponentIds = [...new Set(
     myMatchups.flatMap(m =>
-      eventMatchups
+      innings
         .filter(s => Number(s.orderNumber) === Number(m.orderNumber) && Number(s.playerOrder) !== Number(m.playerOrder))
         .map(s => Number(s.playerId))
     )

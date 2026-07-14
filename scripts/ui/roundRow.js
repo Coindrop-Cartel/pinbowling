@@ -76,13 +76,13 @@ export async function buildRoundRow(round, turnValues, isLastRound = false, targ
   row.dataset.orderNumber = round.orderNumber;
 
   const bonusHtml = engine.getBonusTargetHtml(round, isLastRound, formatNumber);
-  const rowContext = engine.getRoundRowContext(round, engineContext, { machines, roundIndex });
+  const rowContext = engine.getRoundRowContext(round, engineContext);
   const displayRoundNumber = rowContext.displayRoundNumber ?? round.orderNumber;
   const displayRoundLabel = rowContext.displayRoundLabel ?? engine.getRoundLabel();
   const roleHtml = rowContext.roleHtml ?? '';
   const isPitcher = rowContext.isPitcher ?? false;
   const hasMatchup = !!rowContext.matchup;
-  
+
   row.innerHTML = `
     <div class="round-info">
       <div class="round-label"><b>${escapeHTML(displayRoundLabel)} ${displayRoundNumber}:</b> ${escapeHTML(round.machineName)}</div>
@@ -95,9 +95,9 @@ export async function buildRoundRow(round, turnValues, isLastRound = false, targ
       ${renderThresholdGrid(engine.filterThresholds(round.values), formatNumber, engine, round.value1, round.value2)}
     </div>
     <div class="round-actions">
-      ${hasMatchup ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label pitcher-label">Pitcher:</span></div>` : ''}
+      ${hasMatchup && !isPitcher ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label pitcher-label">Pitcher:</span></div>` : ''}
       <div class="round-inputs-container ${isAccessDenied ? 'round-inputs-disabled' : ''}">${hasMatchup ? `<span class="input-role-label">${isPitcher ? 'Pitcher:' : 'Batter:'}</span>` : ''}</div>
-      ${hasMatchup ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label batter-label">Batter:</span></div>` : ''}
+      ${hasMatchup && isPitcher ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label batter-label">Batter:</span></div>` : ''}
       <button class="save-round-button btn-mgmt" ${isAccessDenied ? 'hidden' : ''} disabled>Save</button>
     </div>
     ${isAccessDenied ? `
@@ -142,13 +142,21 @@ export async function buildRoundRow(round, turnValues, isLastRound = false, targ
   }
 
   if (hasMatchup) {
-    const opponentContainer = row.querySelector('.opponent-inputs-container');
-    if (opponentContainer) {
-      for (let ball = 1; ball <= 3; ball += 1) {
-        const oppValue = opponentScores?.[`ball${ball}`];
-        const displayValue = (oppValue !== undefined && oppValue !== null && oppValue !== 0) ? oppValue : '';
-        const input = createRollInput(round.orderNumber, ball, round.machineId, displayValue, `Ball ${ball}`, { isOpponent: true });
-        opponentContainer.appendChild(input);
+    const opponentContainers = row.querySelectorAll('.opponent-inputs-container');
+    if (opponentContainers.length > 0) {
+      // In a baseball matchup, there are two opponent containers (one for pitcher, one for batter)
+      // but only one is actually the opponent for the current player in this specific round.
+      // We need to find the one that corresponds to the opposite role.
+      const isPitcher = rowContext.isPitcher ?? false;
+      const targetContainerSelector = isPitcher ? '.batter-label' : '.pitcher-label';
+      const opponentContainer = Array.from(opponentContainers).find(c => c.querySelector(targetContainerSelector));
+      if (opponentContainer) {
+        for (let ball = 1; ball <= 3; ball += 1) {
+          const oppValue = opponentScores?.[`ball${ball}`];
+          const displayValue = (oppValue !== undefined && oppValue !== null && oppValue !== 0) ? oppValue : '';
+          const input = createRollInput(round.orderNumber, ball, round.machineId, displayValue, `Ball ${ball}`, { isOpponent: true });
+          opponentContainer.appendChild(input);
+        }
       }
     }
   }
