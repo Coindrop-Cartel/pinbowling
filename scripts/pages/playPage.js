@@ -1,6 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { can, PERMISSIONS, filterPlayersForUser } from '@services/auth.js';
 import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
 import { getCookie, formatNumber, applyScoreFormatting, parseFormattedNumber, loadPage, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { createExpandableRow, setupSortableList, createSearchableSelect } from '@ui/selectors.js';
@@ -40,16 +41,16 @@ export async function initPlayPage() {
   const sessionsCard = document.getElementById('qp-sessions-card');
   let allPlayersCache = [];
   let todayEvents = [];
-  let currentSessionFormat = getCookie('pb_preferred_format') || 'bowling';
+  let currentSessionFormat = ScoringFormats.resolve(getCookie('pb_preferred_format'));
 
   // Populate session format dropdown from central list
   if (formatSelect) {
     formatSelect.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
-    formatSelect.value = getCookie('pb_preferred_format') || 'bowling';
+    formatSelect.value = ScoringFormats.resolve(getCookie('pb_preferred_format'));
   }
 
   const updateRoundOptions = () => {
-    currentSessionFormat = formatSelect?.value || 'bowling';
+    currentSessionFormat = ScoringFormats.resolve(formatSelect?.value);
     const engine = getScoringEngine(currentSessionFormat);
     const roundLabel = engine.getRoundLabel();
     applyPreferredTheme(currentSessionFormat);
@@ -78,7 +79,7 @@ export async function initPlayPage() {
     sessionLeagues.forEach(league => {
       const matches = (league.events || []).filter(e => e.eventDate === today);
       matches.forEach(event => {
-        const format = event.scoringFormat || league.scoringFormat || 'bowling';
+        const format = ScoringFormats.resolve(event.scoringFormat || league.scoringFormat);
         todayEvents.push({ ...event, leagueId: league.id, roster: league.players || [], scoringFormat: format });
       });
     });
@@ -289,7 +290,7 @@ export async function initPlayPage() {
     const frameCount = Number(document.getElementById('qp-frames').value);
     const difficulty = document.getElementById('qp-difficulty').value;
     const globalScaling = document.getElementById('qp-scaling').value;
-    currentSessionFormat = formatSelect?.value || 'bowling';
+    currentSessionFormat = ScoringFormats.resolve(formatSelect?.value);
     const engine = getScoringEngine(currentSessionFormat);
 
     const locMachines = await PB_API.locations.getMachines(locId);

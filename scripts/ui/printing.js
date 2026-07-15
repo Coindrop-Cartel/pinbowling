@@ -1,13 +1,14 @@
 import { getScoringEngine } from '@core/engine.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
 import { formatNumber, escapeHTML } from '@scripts/utils.js';
 
 /**
  * Generates large printable signs showing target scores for each machine.
  * @param {Array<import('@scripts/types.js').Machine>} machines - The machines to print target scores for.
- * @param {string} [format='bowling'] - The scoring format ('bowling' or 'golf').
+ * @param {string} [format=ScoringFormats.DEFAULT] - The scoring format ('bowling' or 'golf').
  * @returns {void}
  */
-export function printMachineScores(machines, format = 'bowling') {
+export function printMachineScores(machines, format = ScoringFormats.DEFAULT) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) return alert('Please allow popups to print.');
 
@@ -65,10 +66,10 @@ export function printMachineScores(machines, format = 'bowling') {
  * @param {Array<import('@scripts/types.js').Machine>} machines - The machines to include on the score sheet.
  * @param {string} leagueName - The league name displayed in the header.
  * @param {string} eventName - The event name displayed in the header.
- * @param {string} [format='bowling'] - The scoring format ('bowling' or 'golf').
+ * @param {string} [format=ScoringFormats.DEFAULT] - The scoring format ('bowling' or 'golf').
  * @returns {void}
  */
-export function printBlankScoreSheet(machines, leagueName, eventName, format = 'bowling') {
+export function printBlankScoreSheet(machines, leagueName, eventName, format = ScoringFormats.DEFAULT) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) return alert('Please allow popups to print.');
 

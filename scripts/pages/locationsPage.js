@@ -1,6 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { createExpandableRow } from '@ui/selectors.js';
 import { getScoringEngine } from '@core/engine.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
 import { formatNumber, applyScoreFormatting, escapeHTML } from '@scripts/utils.js';
 import { showConfirm } from '@ui/dialogs.js';
 import { requireAdmin } from '@services/auth.js';
@@ -260,7 +261,7 @@ export async function initLocationsPage() {
       ...m,
       machineName: m.machineName || m.machine_name,
       machineId: m.machineId || m.machine_id,
-      format: m.format || 'bowling',
+      format: ScoringFormats.resolve(m.format),
       targetEasy: m.targetEasy ?? m.target_easy ?? 0,
       targetMed: m.targetMed ?? m.target_med ?? 0,
       targetHard: m.targetHard ?? m.target_hard ?? 0,
@@ -322,8 +323,8 @@ export async function initLocationsPage() {
     machineFormCard.innerHTML = `<h2>Loading Machine Details...</h2>`;
 
     const allMachines = await PB_API.machines.getAll();
-    const formats = ['bowling', 'golf', 'baseball'];
-    const currentFormat = existing?.format || 'bowling';
+    const formats = [...ScoringFormats.ALL];
+    const currentFormat = ScoringFormats.resolve(existing?.format);
 
     /**
      * Updates the target score fields and labels to match the selected format.

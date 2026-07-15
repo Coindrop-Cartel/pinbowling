@@ -1,4 +1,5 @@
 import { getScoringEngine } from '@core/engine.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
 import { getCookie } from '@scripts/utils.js';
 
 /**
@@ -8,7 +9,7 @@ import { getCookie } from '@scripts/utils.js';
  * @param {string} [overrideFormat] - Force a specific format, ignoring cookies.
  */
 export function applyPreferredTheme(overrideFormat) {
-  const preferred = overrideFormat || getCookie('pb_preferred_format') || 'bowling';
+  const preferred = ScoringFormats.resolve(overrideFormat || getCookie('pb_preferred_format'));
   const engine = getScoringEngine(preferred);
 
   // Clear any previous theme classes and apply the current engine's theme

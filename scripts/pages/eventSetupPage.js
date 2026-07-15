@@ -5,6 +5,7 @@ import { loadPage, getActiveEventId, getActiveLeagueId, renderPreview, formatNum
 import { applyPreferredTheme } from '@ui/branding.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
 import { getScoringEngine } from '@core/engine.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
 import { printMachineScores } from '@ui/printing.js';
 import { createSearchableSelect, setupSortableList, createExpandableRow, initReadOnlyTournamentDisplay } from '@ui/selectors.js';
 import { normalizeTargets } from '@services/normalizer.js';
@@ -85,7 +86,7 @@ export async function initEventSetupPage() {
       if (!eventId) return alert('Select an event first.');
       const leagues = await PB_API.leagues.getAll();
       const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
-      printMachineScores(eventTargets, league?.scoringFormat || 'bowling');
+      printMachineScores(eventTargets, ScoringFormats.resolve(league?.scoringFormat));
     });
   }
 
@@ -144,7 +145,7 @@ export async function initEventSetupPage() {
   }
 
   const updateQuickFillState = (machineName) => {
-    const format = eventMatch?.scoringFormat || league?.scoringFormat || 'bowling';
+    const format = ScoringFormats.resolve(eventMatch?.scoringFormat || league?.scoringFormat);
     const match = currentSuggestedMachines.find(m => m.machineName === machineName && m.format === format);
     selectedMachineTargets = match ? { easy: match.targetEasy, med: match.targetMed, hard: match.targetHard } : null;
     
@@ -379,7 +380,7 @@ export async function initEventSetupPage() {
         row.querySelectorAll('.qfill').forEach(btn => {
           btn.onclick = () => {
             const type = btn.dataset.type;
-            const format = eventMatch?.scoringFormat || league?.scoringFormat || 'bowling';
+            const format = ScoringFormats.resolve(eventMatch?.scoringFormat || league?.scoringFormat);
             const match = currentSuggestedMachines.find(m => String(m.machineId || m.id) === String(round.machineId) && m.format === format);
             const val = match ? match['target' + type.charAt(0).toUpperCase() + type.slice(1)] : null;
             if (val) {

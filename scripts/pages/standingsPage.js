@@ -1,6 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, escapeHTML } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
 import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { showDialog } from '@ui/dialogs.js';
 import { renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
@@ -45,7 +46,7 @@ export async function initStandingsPage() {
   let selectedPlayerIds = []; // Not preserved in localStorage per request
   let lastScoreState = new Map(); // Tracks playerId-orderNumber -> ballString for change detection
 
-  let Engine = getScoringEngine('bowling');
+  let Engine = getScoringEngine(ScoringFormats.DEFAULT);
 
   // Fetch initial data to check context
   const allLeagues = await PB_API.leagues.getAll(); // Use a more descriptive name
@@ -162,10 +163,10 @@ export async function initStandingsPage() {
       PB_API.teams.getAll()
     ]);
     const league = leagues.find(l => String(l.id) === String(leagueId));
-    const format = league?.scoringFormat || 'bowling';
+    const format = ScoringFormats.resolve(league?.scoringFormat);
     const engine = getScoringEngine(format);
     const isTeamLeague = league?.participants === 'team';
-    const isBaseball = format === 'baseball';
+    const isBaseball = format === ScoringFormats.BASEBALL;
 
     applyPreferredTheme(format);
     const loader = createSkeletonLoader(standingsBody, { type: 'table', count: 10 });
@@ -318,7 +319,7 @@ export async function initStandingsPage() {
     const event = eventId === 'summary' ? { eventName: 'Season Summary' } : league?.events.find(e => String(e.id) === String(eventId));
     
     // Priority: Event Format > League Format > Default
-    const format = event?.scoringFormat || league?.scoringFormat || 'bowling';
+    const format = ScoringFormats.resolve(event?.scoringFormat || league?.scoringFormat);
     Engine = getScoringEngine(format);
     applyPreferredTheme(format);
 

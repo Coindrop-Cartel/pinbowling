@@ -1,7 +1,8 @@
 import { ScoringEngine } from '../ScoringEngine.js';
 import { formatNumber, escapeHTML } from '../../utils.js';
-import { buildBaseballScoreMapForPlayer, flattenMatchupInnings } from '../../services/normalizer.js';
+import { buildBaseballScoreMapForPlayer } from '../../services/normalizer.js';
 import { renderBaseballScoreboard } from '../../ui/scoreboard.js';
+import { buildRoundRobinMatchups, resolveInningRole } from '../../services/matchupBuilder.js';
 
 /**
  * Implementation of Baseball-style scoring logic (PinBaseball).
@@ -367,43 +368,7 @@ formatMark(turn, scoreOverride = null) {
    * @returns {Array<{orderNumber: number, playerId: number, playerOrder: number, machineId: number}>}
    */
   generateMatchupPayload(players, inningCount, machines) {
-    if (!players || players.length < 2 || inningCount < 1) return [];
-
-    // Build all unique pairings (round-robin)
-    const pairings = [];
-    for (let i = 0; i < players.length; i++) {
-      for (let j = i + 1; j < players.length; j++) {
-        pairings.push({ player1Id: players[i].id, player2Id: players[j].id });
-      }
-    }
-
-    const matchups = [];
-    for (let inning = 0; inning < inningCount; inning++) {
-      const pairing = pairings[inning % pairings.length];
-      const orderNumber = inning + 1;
-
-      // Each inning has 2 machines: top (even index) and bottom (odd index)
-      const topMachine = machines[inning * 2] || machines[0];
-      const bottomMachine = machines[inning * 2 + 1] || machines[1] || topMachine;
-
-      // Home player (player_order 1) on the top machine
-      matchups.push({
-        orderNumber,
-        playerId: pairing.player1Id,
-        playerOrder: 1,
-        machineId: topMachine.machineId || topMachine.id
-      });
-
-      // Away player (player_order 2) on the bottom machine
-      matchups.push({
-        orderNumber,
-        playerId: pairing.player2Id,
-        playerOrder: 2,
-        machineId: bottomMachine.machineId || bottomMachine.id
-      });
-    }
-
-    return matchups;
+    return buildRoundRobinMatchups(players, inningCount, machines);
   }
 
   formatTotalScore(total) {
@@ -489,74 +454,24 @@ formatMark(turn, scoreOverride = null) {
   getRoundRowContext(round, context) {
     const { eventMatchups, getCurrentPlayerId } = context;
     const currentPlayerId = Number(getCurrentPlayerId());
-
-    // Each baseball inning has 2 machines (top + bottom). Each player has ONE
-    // matchup row per inning, on their own machine. The current player may be
-    // viewing either their own machine OR the opponent's machine for the inning.
-    // So we find the inning (orderNumber) that contains round.machineId, then
-    // resolve the player's matchup and the opponent (sibling) within that inning.
-    //
-    // The API always returns eventMatchups as a list of wrapper objects, each
-    // with an `innings` array (true for both league and one-off sessions). We
-    // flatten all innings into a single list so we only have to search one place.
-    const innings = flattenMatchupInnings(eventMatchups);
-
-    // Step 1: Find any matchup row whose machineId matches this round's machine.
-    // That tells us which inning (orderNumber) this machine belongs to.
-    const machineMatch = innings.find(
-      m => Number(m.machineId ?? m.machine_id) === Number(round.machineId)
+    const { matchup, isPitcher, opponentName, displayRoundNumber, role } = resolveInningRole(
+      currentPlayerId,
+      round.machineId,
+      eventMatchups
     );
-    const inningOrderNumber = machineMatch ? Number(machineMatch.orderNumber ?? machineMatch.order_number) : null;
-
-    // Step 2: Within that inning, find the current player's matchup row.
-    const matchup = inningOrderNumber !== null
-      ? innings.find(
-          m => Number(m.orderNumber ?? m.order_number) === inningOrderNumber
-            && Number(m.playerId ?? m.player_id) === currentPlayerId
-        )
-      : null;
-
-    // Sibling row = same inning, different playerOrder (the opponent).
-    const sibling = inningOrderNumber !== null
-      ? innings.find(
-          m => Number(m.orderNumber ?? m.order_number) === inningOrderNumber
-            && Number(m.playerId ?? m.player_id) !== currentPlayerId
-        )
-      : null;
-
-    // playerOrder 1 = Home, 2 = Away.
-    // In baseball: Top of inning = Away bats, Home pitches.
-    //              Bottom of inning = Home bats, Away pitches.
-    // Determine whether this machine is the Top or Bottom half.
-    // In our generator, playerOrder 1 is always the Top machine.
-    const topMatchup = innings.find(
-      m => Number(m.orderNumber ?? m.order_number) === inningOrderNumber && Number(m.playerOrder ?? m.player_order) === 1
-    );
-    const isTop = topMatchup ? Number(topMatchup.machineId ?? topMatchup.machine_id) === Number(round.machineId) : true;
-
-    const isHome = matchup ? Number(matchup.playerOrder ?? matchup.player_order) === 1 : true;
-    // isPitcher reflects the CURRENT player's role on this machine, not the
-    // machine owner's role. The current player may be viewing the opponent's
-    // machine for the inning, so we use the current player's home/away status.
-    // Home pitches on Top, bats on Bottom. Away is the inverse.
-    // Top (playerOrder 1) = Home pitches, Away bats.
-    // Bottom (playerOrder 2) = Away pitches, Home bats.
-    const isPitcher = isHome ? isTop : !isTop;
-    const opponentName = sibling ? (sibling.playerName ?? sibling.player_name) : '';
-    const roleHtml = matchup ? `
+    // When no matchup is found, the helper returns an empty string for
+    // `displayRoundNumber`.  The UI and tests expect the round number to be
+    // displayed in that case, so fall back to the round's order number.
+    const roundNumber = round.orderNumber ?? 1;
+    const finalDisplayRoundNumber = matchup ? displayRoundNumber : roundNumber;
+    const roleHtml = matchup
+      ? `
         <div class="baseball-role-row">
-          <span class="role-label ${isPitcher ? 'pitcher' : 'batter'}">${isPitcher ? 'Pitcher' : 'Batter'}</span>
+          <span class="role-label ${role === 'pitcher' ? 'pitcher' : 'batter'}">${role === 'pitcher' ? 'Pitcher' : 'Batter'}</span>
           <span class="meta-muted">vs ${escapeHTML(opponentName)}</span>
         </div>
-      ` : '';
-
-    let displayRoundNumber = round.orderNumber;
-    if (matchup) {
-      const inningNumber = Number(matchup.orderNumber ?? matchup.order_number);
-      const positionLabel = isTop ? 'Top' : 'Bottom';
-      displayRoundNumber = `${positionLabel} of ${inningNumber}`;
-    }
-
-    return { matchup, isPitcher, opponentName, displayRoundNumber, roleHtml };
+      `
+      : '';
+    return { matchup, isPitcher, opponentName, displayRoundNumber: finalDisplayRoundNumber, roleHtml };
   }
 }

@@ -4,6 +4,7 @@ import { showConfirm, showAlert } from '@ui/dialogs.js';
 import { requireAdmin } from '@services/auth.js';
 import { escapeHTML, formatNumber, applyScoreFormatting } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
 
 /**
  * Logic for managing pinball machines and their target score values.
@@ -81,7 +82,7 @@ export async function initMachinesPage() {
 
   if (baselineFormatSelect) {
     baselineFormatSelect.addEventListener('change', (e) => {
-      const oldFmt = baselineFormatSelect.dataset.prevFormat || 'bowling';
+      const oldFmt = ScoringFormats.resolve(baselineFormatSelect.dataset.prevFormat);
       editingScores[oldFmt] = {
         targetEasy: Number(baselineEasyInput.value.replace(/\D/g, '')) || 0,
         targetMed: Number(baselineMedInput.value.replace(/\D/g, '')) || 0,
@@ -136,9 +137,9 @@ export async function initMachinesPage() {
       // Initialize format details
       editingScores = {};
       if (baselineFormatSelect) {
-        baselineFormatSelect.value = 'bowling';
-        baselineFormatSelect.dataset.prevFormat = 'bowling';
-        updateBaselineFieldsForFormat('bowling');
+        baselineFormatSelect.value = ScoringFormats.DEFAULT;
+        baselineFormatSelect.dataset.prevFormat = ScoringFormats.DEFAULT;
+        updateBaselineFieldsForFormat(ScoringFormats.DEFAULT);
       }
     } else {
       resetForm();
@@ -252,9 +253,9 @@ export async function initMachinesPage() {
     // Load existing scores and initialize the baseline fields
     editingScores = m.scores && !Array.isArray(m.scores) ? JSON.parse(JSON.stringify(m.scores)) : {};
     if (baselineFormatSelect) {
-      baselineFormatSelect.value = 'bowling';
-      baselineFormatSelect.dataset.prevFormat = 'bowling';
-      updateBaselineFieldsForFormat('bowling');
+      baselineFormatSelect.value = ScoringFormats.DEFAULT;
+      baselineFormatSelect.dataset.prevFormat = ScoringFormats.DEFAULT;
+      updateBaselineFieldsForFormat(ScoringFormats.DEFAULT);
     }
 
     // Expand fields for editing

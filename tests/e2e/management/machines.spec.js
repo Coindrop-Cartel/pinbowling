@@ -31,7 +31,11 @@ test.describe('Machine Registry', () => {
     if (createdMachineName && isAdmin) {
       const row = page.locator('.machine-registry-item', { hasText: createdMachineName });
       if (await row.count() > 0) {
-        await row.locator('.delete-mach-btn').click();
+        // Expand the machine row to reveal the delete button
+        await row.click();
+        const deleteBtn = row.locator('.delete-mach-btn');
+        await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await deleteBtn.click();
         await page.locator('.modal-card button', { hasText: 'Yes, Proceed' }).click();
         await expect(row).toBeHidden();
       }

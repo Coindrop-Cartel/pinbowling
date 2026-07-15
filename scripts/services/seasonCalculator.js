@@ -1,4 +1,5 @@
 import { groupTargetsByEvent, buildScoreMapFromRows, groupScoresByPlayer, buildBaseballScoreMapForPlayer } from '@services/normalizer.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
 
 /**
  * Calculate head-to-head win/loss records for baseball format.
@@ -119,7 +120,7 @@ export function calculateBaseballRecords(players, events, matchupsByEvent, score
  */
 export function calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, matchupsByEvent = {}, engine, selectedPlayerIds = [] }) {
   const isTeamLeague = league?.participants === 'team';
-  const isBaseball = league?.scoringFormat === 'baseball';
+  const isBaseball = league?.scoringFormat === ScoringFormats.BASEBALL;
 
   const getScoreMapForPlayer = (eventId, playerId, scores) => {
     if (!isBaseball) return buildScoreMapFromRows(scores);

@@ -30,11 +30,19 @@ test.describe('Event Setup Page', () => {
     const count = await leagueRows.count();
 
     if (count > 0) {
-      await leagueRows.first().click();
+      // Find the first league that is of type "Individual".
+      const individualLeague = leagueRows.filter({ hasText: 'Individual' }).first();
+      const individualCount = await individualLeague.count();
+      if (individualCount > 0) {
+        await individualLeague.click();
+      } else {
+        // Fallback to the first league if no Individual type is found.
+        await leagueRows.first().click();
+      }
 
       // Look for a setup-event-btn or add-event-btn
-      const setupBtn = leagueRows.first().locator('.setup-event-btn');
-      const addEventBtn = leagueRows.first().locator('.add-event-btn');
+      const setupBtn = individualLeague.locator('.setup-event-btn');
+      const addEventBtn = individualLeague.locator('.add-event-btn');
 
       if (await setupBtn.count() > 0) {
         await setupBtn.first().click();
@@ -46,7 +54,7 @@ test.describe('Event Setup Page', () => {
         await page.getByRole('button', { name: 'Save Event' }).click();
 
         // Now find the setup button for the new event
-        const newSetupBtn = leagueRows.first().locator('.setup-event-btn');
+        const newSetupBtn = individualLeague.locator('.setup-event-btn');
         if (await newSetupBtn.count() > 0) {
           await newSetupBtn.last().click();
         }

@@ -2,6 +2,7 @@ import { PB_API } from '@services/api.js';
 import { isManagementAuthorized, runAuthorizedLeagueAction } from '@services/auth.js';
 import { getCookie, getActiveLeagueId, setActiveLeagueId, setActiveEventId, loadPage, escapeHTML } from '@scripts/utils.js';
 import { SCORING_FORMATS } from '@core/engine.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { setupLiveFilter, createSkeletonLoader } from '@ui/selectors.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
@@ -70,7 +71,7 @@ export async function initLeaguesPage() {
     const isH2H = leagueParticipantsInput.value === 'head2head';
     if (isH2H) {
       if (leagueFormatInput) {
-        leagueFormatInput.value = 'baseball';
+        leagueFormatInput.value = ScoringFormats.BASEBALL;
         leagueFormatInput.disabled = true;
       }
       seasonScoringRow?.classList.add('hidden');
@@ -81,7 +82,7 @@ export async function initLeaguesPage() {
       if (leagueFormatInput) {
         leagueFormatInput.disabled = false;
         if (!editingLeagueId) {
-          leagueFormatInput.value = getCookie('pb_preferred_format') || 'bowling';
+          leagueFormatInput.value = ScoringFormats.resolve(getCookie('pb_preferred_format'));
         }
       }
       if (!dateRow.classList.contains('hidden')) {
@@ -98,7 +99,7 @@ export async function initLeaguesPage() {
   }
 
   if (leagueFormatInput) {
-    const preferredFormat = getCookie('pb_preferred_format') || 'bowling';
+    const preferredFormat = ScoringFormats.resolve(getCookie('pb_preferred_format'));
     leagueFormatInput.innerHTML = SCORING_FORMATS
       .map(f => 
         `<option value="${f.value}" ${f.value === preferredFormat ? 'selected' : ''}>${f.label}</option>`
@@ -153,6 +154,7 @@ export async function initLeaguesPage() {
         actionsRow.appendChild(createToggle);
         createToggle.textContent = 'Cancel';
         if (leagueFormatInput) applyPreferredTheme(leagueFormatInput.value);
+        if (!leagueDateInput.value) leagueDateInput.value = new Date().toISOString().split('T')[0];
       }
     };
     // Only reveal toggle after logic is bound
@@ -181,14 +183,14 @@ export async function initLeaguesPage() {
       createToggle.classList.replace('mt-0', 'mt-10');
       leagueNameInput.after(createToggle);
     }
-    applyPreferredTheme(getCookie('pb_preferred_format') || 'bowling');
+    applyPreferredTheme(ScoringFormats.resolve(getCookie('pb_preferred_format')));
   }
 
   function editLeague(league) {
     editingLeagueId = league.id;
     leagueNameInput.value = league.name;
     leagueDateInput.value = league.startDate || '';
-    leagueFormatInput.value = league.scoringFormat || 'bowling';
+    leagueFormatInput.value = ScoringFormats.resolve(league.scoringFormat);
     if (leagueParticipantsInput) leagueParticipantsInput.value = league.participants || 'individual';
     if (leagueSeasonScoringInput) leagueSeasonScoringInput.value = league.seasonScoring || 'weekly';
     if (leagueDropLowestInput) leagueDropLowestInput.value = league.dropLowestWeeks || 0;
@@ -583,7 +585,7 @@ export async function initLeaguesPage() {
       const { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer } = await import('@services/normalizer.js');
       const { calculateSeasonSummary } = await import('@services/seasonCalculator.js');
       
-      const format = league.scoringFormat || 'baseball';
+      const format = ScoringFormats.resolve(league.scoringFormat);
       const engine = getScoringEngine(format);
       const players = league.players || [];
       const events = league.events || [];
@@ -746,13 +748,13 @@ export async function initLeaguesPage() {
     document.getElementById('event-league-id').value = leagueId;
     document.getElementById('event-id').value = event ? event.id : '';
     document.getElementById('event-name').value = event ? event.eventName : '';
-    document.getElementById('event-date').value = event ? (event.eventDate || '') : '';
+    document.getElementById('event-date').value = event ? (event.eventDate || '') : new Date().toISOString().split('T')[0];
 
     // Populate and default the scoring format dropdown
     const formatSelect = document.getElementById('event-scoring-format');
     if (formatSelect) {
       formatSelect.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
-      const format = event?.scoringFormat || getCookie('pb_preferred_format') || 'bowling';
+      const format = ScoringFormats.resolve(event?.scoringFormat || getCookie('pb_preferred_format'));
       formatSelect.value = format;
       applyPreferredTheme(format);
     }
@@ -774,7 +776,7 @@ export async function initLeaguesPage() {
 
   document.getElementById('cancel-event-edit').onclick = () => {
     eventFormCard.classList.add('hidden');
-    applyPreferredTheme(getCookie('pb_preferred_format') || 'bowling');
+    applyPreferredTheme(ScoringFormats.resolve(getCookie('pb_preferred_format')));
   };
 
   document.getElementById('event-form').onsubmit = async (e) => {
@@ -793,7 +795,7 @@ export async function initLeaguesPage() {
       leagueId: leagueId, 
       eventName: name, 
       eventDate: date,
-      scoringFormat: formatValue || 'bowling',
+      scoringFormat: ScoringFormats.resolve(formatValue),
       locationId: locationValue ? Number(locationValue) : null
     };
 
@@ -822,7 +824,7 @@ export async function initLeaguesPage() {
           renderEventsForLeague(Number(leagueId), league.events, league.name);
           updateLeagueHeaderStats(Number(leagueId), league);
       }
-      applyPreferredTheme(getCookie('pb_preferred_format') || 'bowling');
+      applyPreferredTheme(ScoringFormats.resolve(getCookie('pb_preferred_format')));
     } catch (err) {
       console.error('Event save failed:', err);
       alert(`Failed to save event: ${err.message}`);

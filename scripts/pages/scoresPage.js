@@ -2,6 +2,7 @@ import { PB_API } from '@services/api.js';
 import { filterPlayersForUser, can, PERMISSIONS } from '@services/auth.js';
 import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActiveEventIdSilent, formatNumber, setCurrentPlayerIdSilent, getCurrentPlayerId, escapeHTML, getActiveMatchupId, setActiveMatchupIdSilent, loadPage } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildBaseballScoreMapForPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
 import { applyPreferredTheme } from '@ui/branding.js';
@@ -86,7 +87,7 @@ export async function initScoresPage() {
   let allPlayersCache = [];
   let selectablePlayers = [];
   let machines = [];
-  let activeFormat = 'bowling';
+  let activeFormat = ScoringFormats.DEFAULT;
   let eventMatchups = [];
   let allEventScores = [];
 
@@ -135,7 +136,7 @@ export async function initScoresPage() {
   };
 
   // Default engine
-  let Engine = getScoringEngine('bowling');
+  let Engine = getScoringEngine(ScoringFormats.DEFAULT);
 
 
 
@@ -577,7 +578,7 @@ export async function initScoresPage() {
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
     const event = league?.events?.find(e => String(e.id) === String(eventId));
 
-    const format = event?.scoringFormat || league?.scoringFormat || 'bowling';
+    const format = ScoringFormats.resolve(event?.scoringFormat || league?.scoringFormat);
     activeFormat = format;
     Engine = getScoringEngine(format);
 

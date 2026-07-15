@@ -305,7 +305,7 @@ export function renderLeagueList(container, filteredLeagues, {
       </div>
       ${bracketHtml}
       <div class="action-buttons">
-        ${isAuthorized && league.status === 'setup' ? '<button class="start-season-btn primary btn-row">Start Season</button>' : ''}
+        ${isAuthorized && isH2H && league.status === 'setup' ? '<button class="start-season-btn primary btn-row">Start Season</button>' : ''}
         ${isAuthorized && showStartPlayoffsBtn ? `<button class="start-playoffs-btn primary btn-row" data-league-id="${league.id}">Start Playoffs</button>` : ''}
         ${isAuthorized && isH2H && league.status === 'active' ? `<button class="update-season-btn primary btn-row" data-league-id="${league.id}">Update Season</button>` : ''}
         ${isAuthorized ? '<button class="edit-league-btn secondary btn-row">Edit League</button>' : ''}

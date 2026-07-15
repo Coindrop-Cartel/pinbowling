@@ -29,7 +29,11 @@ test.describe('Player Management', () => {
     if (createdPlayerName && isAdmin) {
       const row = page.locator('.player-item-row', { hasText: createdPlayerName });
       if (await row.count() > 0) {
-        await row.locator('.delete-player-btn-inline').click();
+        // Expand the player row to reveal the delete button
+        await row.click();
+        const deleteBtn = row.locator('.delete-player-btn-inline');
+        await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await deleteBtn.click();
         await page.locator('.modal-card button', { hasText: 'Yes, Proceed' }).click();
         await expect(row).toBeHidden();
       }

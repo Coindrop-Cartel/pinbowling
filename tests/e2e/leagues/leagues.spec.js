@@ -39,9 +39,11 @@ test.describe('League & Event Management', () => {
       const leagueRow = page.locator('.league-registry-item', { hasText: createdLeagueName });
       if (await leagueRow.count() > 0) {
 
-        // The delete button is inside the expandable content
-        await leagueRow.click(); 
-        await leagueRow.locator('.delete-league-btn').click();
+        // Expand the league row to reveal the delete button
+        await leagueRow.click();
+        const deleteBtn = leagueRow.locator('.delete-league-btn');
+        await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
+        await deleteBtn.click();
 
         // Handle the custom confirmation modal
         await page.locator('.modal-card button', { hasText: 'Yes, Proceed' }).click();
