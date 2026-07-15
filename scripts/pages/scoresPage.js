@@ -347,10 +347,16 @@ export async function initScoresPage() {
     let activePlayerId = await renderPlayerSelect();
     const activeMatchupId = getActiveMatchupId();
     
-    // Auto-select logged in user if they are in the roster and no one is selected yet
+    // Auto-select logged in user if they are in the roster and no one is selected yet.
+    // In a matchup context, only auto-select if the user is one of the two participants.
     if (!activePlayerId && currentUser?.player_id) {
         const isInRoster = allPlayersCache.some(p => String(p.id) === String(currentUser.player_id));
-        if (isInRoster) {
+        const isMatchupParticipant = activeMatchupId && eventMatchups[0] && (
+            String(eventMatchups[0].homePlayerId) === String(currentUser.player_id) ||
+            String(eventMatchups[0].awayPlayerId) === String(currentUser.player_id)
+        );
+        // Skip auto-selection in matchup context if user is not a participant
+        if (isInRoster && (!activeMatchupId || isMatchupParticipant)) {
             activePlayerId = String(currentUser.player_id);
             // Silent: avoid pb:pageChanged loop during auto-selection within refresh()
             setCurrentPlayerIdSilent(activePlayerId);
@@ -385,7 +391,6 @@ export async function initScoresPage() {
     }
 
     const player = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
-    playerSelectorUI?.classList.add('hidden');
 
     const loader = createSkeletonLoader(roundsInput, { count: 5 });
     try {
@@ -400,16 +405,20 @@ export async function initScoresPage() {
         String(matchup.awayPlayerId) === String(currentUser.player_id)
       );
       const isTD = await can(PERMISSIONS.UPDATE_ANY_SCORE);
-      const isSpectator = activeMatchupId && !isParticipant && !isTD;
+      const isSpectator = activeMatchupId && !isParticipant;
 
       scoringCard.classList.remove('hidden');
       resultsCard.classList.remove('hidden');
 
       if (isSpectator) {
-        // Keep the player selection card visible so spectators can switch between
-        // the two matchup players to view their scores. Hide the per-player summary
-        // (with "Change" button) since the selection card already provides switching.
-        playerSummary?.classList.add('hidden');
+        // Show the compact player summary with a "Change" button, just like
+        // non-spectator mode. The selector dropdown stays hidden until "Change"
+        // is clicked, which reveals it so the spectator can switch players.
+        playerSelectorUI?.classList.add('hidden');
+        playerSummary?.classList.remove('hidden');
+        renderActionSummary(playerSummary, `Player: ${player?.playerName || 'Selected'}`, [
+          { text: 'Change', onclick: handlePlayerChange }
+        ]);
         
         const awayName = matchup?.awayPlayerName || 'BYE';
         const homeName = matchup?.homePlayerName || 'Unknown';
@@ -417,11 +426,11 @@ export async function initScoresPage() {
         warning.classList.remove('hidden');
         
         // Determine if the currently selected player is editable by this spectator.
-        // Unregistered users can only enter scores for unregistered (guest) players.
-        // Registered players' scores are view-only for spectators.
+        // Unregistered (guest) players can be edited by anyone.
+        // Registered players can be edited by TDs/admins, but are view-only for others.
         const selectedPlayerObj = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
         const isSelectedPlayerUnregistered = !selectedPlayerObj?.userId;
-        const canEditSelected = isSelectedPlayerUnregistered;
+        const canEditSelected = isSelectedPlayerUnregistered || isTD;
 
         if (canEditSelected) {
           // Unregistered guest player — allow score entry
