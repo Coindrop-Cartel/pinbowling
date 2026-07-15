@@ -643,8 +643,10 @@ describe('BaseballEngine', () => {
   // ── getRoundRowContext ───────────────────────────────────────────────
   test('getRoundRowContext - away player is batter when viewing home top machine', () => {
     const matchups = [
-      { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
-      { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' }
+      { innings: [
+        { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
+        { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' }
+      ]}
     ];
     const context = { eventMatchups: matchups, getCurrentPlayerId: () => 2 };
     const round = { machineId: 10, orderNumber: 1 };
@@ -659,8 +661,10 @@ describe('BaseballEngine', () => {
 
   test('getRoundRowContext - away player is pitcher when viewing own bottom machine', () => {
     const matchups = [
-      { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
-      { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' }
+      { innings: [
+        { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
+        { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' }
+      ]}
     ];
     const context = { eventMatchups: matchups, getCurrentPlayerId: () => 2 };
     const round = { machineId: 11, orderNumber: 1 };
@@ -673,8 +677,10 @@ describe('BaseballEngine', () => {
 
   test('getRoundRowContext - home player is pitcher when viewing own top machine', () => {
     const matchups = [
-      { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
-      { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' }
+      { innings: [
+        { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
+        { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' }
+      ]}
     ];
     const context = { eventMatchups: matchups, getCurrentPlayerId: () => 1 };
     const round = { machineId: 10, orderNumber: 1 };
@@ -689,8 +695,10 @@ describe('BaseballEngine', () => {
 
   test('getRoundRowContext - home player is batter when viewing away bottom machine', () => {
     const matchups = [
-      { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
-      { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' }
+      { innings: [
+        { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
+        { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' }
+      ]}
     ];
     const context = { eventMatchups: matchups, getCurrentPlayerId: () => 1 };
     const round = { machineId: 11, orderNumber: 1 };
@@ -797,8 +805,10 @@ describe('BaseballEngine', () => {
 
     const context = {
       eventMatchups: [
-        { playerId: 1, orderNumber: 1, playerOrder: 1 }, // Player 1 home
-        { playerId: 2, orderNumber: 1, playerOrder: 2 }, // Player 2 away
+        { innings: [
+          { playerId: 1, orderNumber: 1, playerOrder: 1 }, // Player 1 home
+          { playerId: 2, orderNumber: 1, playerOrder: 2 }, // Player 2 away
+        ]}
       ],
       allPlayersCache: [
         { id: 1, playerName: 'Player One' },
@@ -870,7 +880,9 @@ describe('BaseballEngine', () => {
 
     const context = {
       eventMatchups: [
-        { playerId: 1, orderNumber: 1, playerOrder: 1 }, // Player 1 home, no opponent
+        { innings: [
+          { playerId: 1, orderNumber: 1, playerOrder: 1 }, // Player 1 home, no opponent
+        ]}
       ],
       allPlayersCache: [], // Empty cache to trigger fallback names
       getCurrentPlayerId: () => '1',
@@ -928,7 +940,9 @@ describe('BaseballEngine', () => {
 
     const context = {
       eventMatchups: [
-        { playerId: 2, orderNumber: 1, playerOrder: 2 }, // Player 2 away, no home team
+        { innings: [
+          { playerId: 2, orderNumber: 1, playerOrder: 2 }, // Player 2 away, no home team
+        ]}
       ],
       allPlayersCache: [], // Empty cache to trigger fallback names
       getCurrentPlayerId: () => '2',
