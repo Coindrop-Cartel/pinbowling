@@ -7,7 +7,9 @@ import { createSearchableSelect, renderActionSummary, initTournamentSelector, cr
 import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildBaseballScoreMapForPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
-import { buildRoundRow } from '@ui/roundRow.js';
+import { buildRoundRow } from '../renderers/roundRowRenderer.js';
+import { FormatBranding } from '@services/scoringFormatBranding.js';
+import { renderStandardScoreboard, renderBaseballScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
 
 /**
@@ -51,6 +53,10 @@ export async function initScoresPage() {
     })
   ]);
   const user = userResult;
+
+  // Guard: If we are no longer on the Scores page, abort initialization
+  if (!document.getElementById('rounds-input')) return;
+
   allLeaguesCache = leaguesFromApi; // Update the module-level cache
   // Requirement: Unregistered users only see leagues that have at least one guest player.
   // The initialLeagues filtering logic here is now handled by initTournamentSelector.
@@ -271,7 +277,6 @@ export async function initScoresPage() {
 
     // Enrich with opponent data for baseball head-to-head matchups
     const enriched = Engine.enrichScoreMap(scoreMap, getEngineContext());
-    const opponentScores = enriched.opponent || {};
     
     const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
@@ -280,21 +285,10 @@ export async function initScoresPage() {
 
     machines.forEach((round, index) => {
       const isLastRound = round.orderNumber === maxOrder;
-      const turnValues = scoreMap[String(round.orderNumber)];
-      const oppTurnValues = opponentScores[String(round.orderNumber)] || null;
 
-      // Inject last-frame specific hint if defined for this format
-      if (isLastRound) {
-        const lfHint = Engine.getLastFrameHint?.();
-        if (lfHint) {
-          const hintDiv = document.createElement('div');
-          hintDiv.className = 'hint small';
-          hintDiv.innerHTML = lfHint;
-          fragment.appendChild(hintDiv);
-        }
-      }
 
-      pendingRows.push(buildRoundRow(round, turnValues, isLastRound, player, oppTurnValues, index, {
+
+      pendingRows.push(buildRoundRow(round, enriched, isLastRound, player, index, {
         currentUser,
         activeLeague,
         machines,
@@ -334,7 +328,20 @@ export async function initScoresPage() {
     });
 
     const rows = await Promise.all(pendingRows);
-    rows.forEach(row => fragment.appendChild(row));
+    rows.forEach((row, index) => {
+      const isLastRound = (index === rows.length - 1);
+      if (isLastRound) {
+        const branding = FormatBranding.get(activeFormat);
+        const lfHint = branding.lastFrameHint;
+        if (lfHint) {
+          const hintDiv = document.createElement('div');
+          hintDiv.className = 'hint small';
+          hintDiv.innerHTML = lfHint;
+          fragment.appendChild(hintDiv);
+        }
+      }
+      fragment.appendChild(row);
+    });
 
     roundsInput.innerHTML = '';
     roundsInput.appendChild(fragment);
@@ -501,13 +508,21 @@ export async function initScoresPage() {
     const scoreMap = getScoreMapFromInputs();
     const calcResult = Engine.calculateTurnResults(machines, scoreMap);
 
-    Engine.renderResults(calcResult, machines, scoreMap, getEngineContext(), {
-      resultsPanel,
-      resultsBody,
-      totalScore,
-      resultsEmpty,
-      escapeHTML
-    });
+    if (activeFormat === ScoringFormats.BASEBALL) {
+      renderBaseballScoreboard(calcResult, machines, scoreMap, getEngineContext(), {
+        resultsPanel,
+        resultsBody,
+        totalScore,
+        resultsEmpty
+      }, Engine);
+    } else {
+      renderStandardScoreboard(calcResult, {
+        resultsPanel,
+        resultsBody,
+        totalScore,
+        resultsEmpty
+      });
+    }
   }
 
   /**
@@ -640,17 +655,18 @@ export async function initScoresPage() {
 
     activeLeague = league;
     applyPreferredTheme(format);
+    const branding = FormatBranding.get(format);
 
     // Update the scoring section title using the Engine's specific terminology (Frame vs Hole)
     const scoringHeader = scoringCard.querySelector('h2');
     if (scoringHeader) {
-      scoringHeader.textContent = `Enter ${Engine.getRoundLabel()} Scores`;
+      scoringHeader.textContent = `Enter ${branding.roundLabel} Scores`;
     }
 
     // Update the general hint text based on the active engine
     const scoringHint = document.getElementById('scoring-hint');
     if (scoringHint) {
-      scoringHint.textContent = Engine.getScoringHint();
+      scoringHint.textContent = branding.scoringHint;
     }
 
     machines = machinesNormalized;
@@ -807,7 +823,7 @@ export async function initScoresPage() {
     if (resultsTableHeader) {
       const roundHeader = resultsTableHeader.querySelector('th:first-child');
       if (roundHeader) {
-        roundHeader.textContent = Engine.getRoundLabel();
+        roundHeader.textContent = branding.roundLabel;
       }
     }
   };

@@ -38,25 +38,7 @@ export class BowlingEngine extends ScoringEngine {
     return { t1, t2 };
   }
 
-  /**
-   * Generates format-specific HTML for bonus targets.
-   * Specifically used in Bowling to show the extra point thresholds for the 10th frame.
-   * 
-   * @param {Object} round The round definition.
-   * @param {boolean} isLastRound Whether this is the final frame.
-   * @param {Function} formatFn Numeric formatting helper.
-   * @returns {string} HTML string.
-   */
-  getBonusTargetHtml(round, isLastRound, formatFn) {
-    if (!isLastRound || !round.values || !round.values[10]) return '';
-    const { t1, t2 } = this.getBonusTargets(round);
-    return `
-      <div class="bonus-targets">
-        <div><b>XX:</b> ${formatFn(t1)}</div>
-        <div><b>XXX:</b> ${formatFn(t2)}</div>
-      </div>
-    `;
-  }
+
 
   /**
    * Bowling-specific target summary for the printable blank score sheet.

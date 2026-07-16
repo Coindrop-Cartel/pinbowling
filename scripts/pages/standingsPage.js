@@ -48,9 +48,11 @@ export async function initStandingsPage() {
 
   let Engine = getScoringEngine(ScoringFormats.DEFAULT);
 
-  // Fetch initial data to check context
   const allLeagues = await PB_API.leagues.getAll(); // Use a more descriptive name
   const currentUser = await PB_API.auth.me(); // Fetch current user for filtering
+
+  // Guard: If we are no longer on the Standings page, abort initialization
+  if (!document.getElementById('standings-body')) return;
 
   // If we arrive at standings without an eventId (Standard Nav entry), 
   // we must ensure we aren't "leaking" a session league into the standard scoreboard.

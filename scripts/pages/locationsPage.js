@@ -18,6 +18,10 @@ import { requireAdmin } from '@services/auth.js';
  */
 export async function initLocationsPage() {
   const currentUser = await PB_API.auth.me();
+
+  // Guard: If we are no longer on the Locations page, abort initialization
+  if (!document.getElementById('location-form')) return;
+
   const isAdmin = currentUser && currentUser.role === 'admin';
   const isTD = currentUser && currentUser.role === 'td';
   const hasElevatedPrivileges = isAdmin || isTD;

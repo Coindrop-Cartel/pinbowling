@@ -257,7 +257,22 @@ export function renderPreview(highScoreInput, lowScoreInput, previewValues, Engi
 
   let html = renderThresholdGrid(Engine.filterThresholds(values), formatNumber, Engine, highScore, lowScore);
 
-  const bonusHtml = Engine.getBonusTargetHtml({ values }, isLastRound, formatNumber, currentScaling);
+  let bonusHtml = '';
+  if (isLastRound && typeof Engine.getBonusTargets === 'function') {
+    const targets = Engine.getBonusTargets({ values });
+    if (targets) {
+      const parts = [];
+      if (targets.t1 !== undefined) {
+        parts.push(`Target 1: <strong>${formatNumber(targets.t1)}</strong>`);
+      }
+      if (targets.t2 !== undefined) {
+        parts.push(`Target 2: <strong>${formatNumber(targets.t2)}</strong>`);
+      }
+      if (parts.length > 0) {
+        bonusHtml = `<span class="bonus-preview-targets">${parts.join(' | ')}</span>`;
+      }
+    }
+  }
   if (bonusHtml) {
     html += `<br>${bonusHtml}`;
   }

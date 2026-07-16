@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ScoringEngine } from '@core/ScoringEngine.js';
+import { renderStandardScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
+import { FormatBranding } from '@services/scoringFormatBranding.js';
 
 /**
  * Unit tests for the base ScoringEngine class.
@@ -220,65 +222,44 @@ describe('ScoringEngine (Base Class)', () => {
   });
 
   // ── Config-based getters with defaults ───────────────────────────────
-  describe('config-based getters', () => {
+  describe('config-based getters and branding', () => {
     it('should provide default implementations for optional utility methods', () => {
       expect(engine.getBonusTargets()).toEqual({ t1: 0, t2: 0 });
-      expect(engine.getBonusTargetHtml()).toBe('');
     });
 
-    it('should provide standard default terminology', () => {
+    it('should provide standard default terminology on engine', () => {
       expect(engine.getRoundLabel()).toBe('Round');
       expect(engine.getTurnHeaderPrefix()).toBe('Round');
       expect(engine.getPrimaryTargetLabel()).toBe('Target');
     });
 
-    it('should use config values when provided', () => {
+    it('should use config values for engine rules when provided', () => {
       const e = new ScoringEngine({
         roundLabel: 'Frame',
         turnHeaderPrefix: 'Frame',
         primaryTargetLabel: 'Strike',
-        hint: 'Aim for strikes',
-        lastFrameHint: 'Bonus balls',
-        themeClass: 'bowling-theme',
-        logo: 'bowl.png',
-        brand: 'PinBowling',
-        cta: 'Bowl!',
-        logic: 'Standard bowling',
-        value1Label: 'Strike Score',
-        value2Label: '1-Pin Score',
         thresholdStart: 10,
         thresholdEnd: 1
       });
       expect(e.getRoundLabel()).toBe('Frame');
       expect(e.getTurnHeaderPrefix()).toBe('Frame');
       expect(e.getPrimaryTargetLabel()).toBe('Strike');
-      expect(e.getScoringHint()).toBe('Aim for strikes');
-      expect(e.getLastFrameHint()).toBe('Bonus balls');
-      expect(e.getThemeClass()).toBe('bowling-theme');
-      expect(e.getLogoImage()).toBe('bowl.png');
-      expect(e.getBrandName()).toBe('PinBowling');
-      expect(e.getPlayActionLabel()).toBe('Bowl!');
-      expect(e.getScoringDescription()).toBe('Standard bowling');
-      expect(e.getValue1Label()).toBe('Strike Score');
-      expect(e.getValue2Label()).toBe('1-Pin Score');
       expect(e.getThresholdStart()).toBe(10);
       expect(e.getThresholdEnd()).toBe(1);
     });
 
-    it('should fall back to defaults when config is empty', () => {
+    it('should fall back to defaults when config is empty on engine', () => {
       const e = new ScoringEngine();
-      expect(e.getScoringHint()).toBe('');
-      expect(e.getLastFrameHint()).toBe('');
-      expect(e.getThemeClass()).toBe('');
-      expect(e.getLogoImage()).toBe('logo.png');
-      expect(e.getBrandName()).toBe('PinBowling');
-      expect(e.getPlayActionLabel()).toBe('Play');
-      expect(e.getScoringDescription()).toBe('');
-      expect(e.getValue1Label()).toBe('High Score');
-      expect(e.getValue2Label()).toBe('Low Score');
-      expect(e.getThresholdPrefix()).toBe('Value');
       expect(e.getThresholdStart()).toBe(10);
       expect(e.getThresholdEnd()).toBe(1);
+    });
+
+    it('should retrieve correct presentational config from FormatBranding', () => {
+      const bowlingBranding = FormatBranding.get('bowling');
+      expect(bowlingBranding.brandName).toBe('PinBowling');
+      expect(bowlingBranding.logoImage).toBe('pinbowling.png');
+      expect(bowlingBranding.playActionLabel).toBe("Let's Bowl!");
+      expect(bowlingBranding.themeClass).toBe('theme-bowling');
     });
   });
 
@@ -315,19 +296,19 @@ describe('ScoringEngine (Base Class)', () => {
     });
   });
 
-  // ── getRowSummaryHtml ────────────────────────────────────────────────
-  describe('getRowSummaryHtml', () => {
-    it('should render primary target label with formatted value', () => {
+  // ── getRowSummaryData ────────────────────────────────────────────────
+  describe('getRowSummaryData', () => {
+    it('should return primary target label and value', () => {
       const e = new ScoringEngine({ primaryTargetLabel: 'Strike' });
-      const html = e.getRowSummaryHtml({ value1: 10000 }, (v) => v.toLocaleString());
-      expect(html).toContain('<b>Strike:</b>');
-      expect(html).toContain('10,000');
+      const data = e.getRowSummaryData({ value1: 10000 });
+      expect(data.label).toBe('Strike');
+      expect(data.value).toBe(10000);
     });
 
     it('should use default "Target" label when not configured', () => {
-      const html = engine.getRowSummaryHtml({ value1: 5000 }, (v) => String(v));
-      expect(html).toContain('<b>Target:</b>');
-      expect(html).toContain('5000');
+      const data = engine.getRowSummaryData({ value1: 5000 });
+      expect(data.label).toBe('Target');
+      expect(data.value).toBe(5000);
     });
   });
 
@@ -429,7 +410,7 @@ describe('ScoringEngine (Base Class)', () => {
         totalDisplay: '10'
       };
 
-      engine.renderResults(calcResult, [], {}, {}, domRefs);
+      renderStandardScoreboard(calcResult, domRefs);
 
       expect(mockTable.classList.remove).toHaveBeenCalledWith('hidden');
       expect(mockExistingGrid.remove).toHaveBeenCalled();
@@ -440,33 +421,14 @@ describe('ScoringEngine (Base Class)', () => {
       expect(domRefs.resultsPanel.classList.remove).toHaveBeenCalledWith('hidden');
     });
 
-    it('getPreviewRowHtml should return structured HTML content', () => {
+    it('getPreviewRowData should return structured preview data', () => {
       const frame = { machineName: 'M1', value1: 100, value2: 10, scaling: 'flat', values: {} };
-      const formatFn = (v) => `F_${v}`;
-      const escapeFn = (s) => `E_${s}`;
-      const renderGridFn = vi.fn().mockReturnValue('GRID_HTML');
-
-      const result = engine.getPreviewRowHtml(frame, 0, true, 'temp1', formatFn, escapeFn, renderGridFn);
-
-      expect(result.headerHtml).toContain('E_M1');
-      expect(result.headerHtml).toContain('F_100');
-      expect(result.headerHtml).toContain('F_10');
-      expect(result.contentHtml).toContain('GRID_HTML');
-      expect(renderGridFn).toHaveBeenCalled();
+      const result = engine.getPreviewRowData(frame);
+      expect(result.value1).toBe(100);
+      expect(result.value2).toBe(10);
     });
 
-    it('getThresholdGridHtml should render notice or active grid', () => {
-      // Empty values case
-      expect(engine.getThresholdGridHtml(null, (v) => v)).toContain('Enter scores to see thresholds');
-      expect(engine.getThresholdGridHtml({}, (v) => v)).toContain('Enter scores to see thresholds');
 
-      // Active values case
-      const values = { 10: 10000, 1: 1000 };
-      const html = engine.getThresholdGridHtml(values, (v) => `F_${v}`, 10000, 1000);
-      expect(html).toContain('threshold-grid');
-      expect(html).toContain('F_10000');
-      expect(html).toContain('F_1000');
-    });
 
     it('getQuickFillValues should return correct parsed values', () => {
       const machineData = { targetEasy: 100, targetMed: 200, targetHard: 300 };

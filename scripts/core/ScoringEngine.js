@@ -87,12 +87,7 @@ export class ScoringEngine {
    */
   getBonusTargets() { return { t1: 0, t2: 0 }; }
 
-  /**
-   * Returns HTML representation for secondary targets (e.g. bonus frames).
-   * @param {Object} round - The round data.
-   * @returns {string}
-   */
-  getBonusTargetHtml() { return ''; }
+
 
   /**
    * Returns the HTML summary of target information for a single round/machine
@@ -151,35 +146,15 @@ export class ScoringEngine {
   getRoundCountOptions() { return [10]; }
 
   /**
-   * Returns the general scoring hint shown to players.
-   * @returns {string}
-   */
-  getScoringHint() { return this.config.hint || ''; }
-
-  /**
-   * Returns specific instructions for the final turn of a game.
-   * @returns {string}
-   */
-  getLastFrameHint() { return this.config.lastFrameHint || ''; }
-
-  // UI Branding and Meta Properties
-  getThemeClass() { return this.config.themeClass || ''; }
-  getLogoImage() { return this.config.logo || 'logo.png'; }
-  getBrandName() { return this.config.brand || 'PinBowling'; }
-  getPlayActionLabel() { return this.config.cta || 'Play'; }
-  getScoringDescription() { return this.config.logic || ''; }
-  getValue1Label() { return this.config.value1Label || 'High Score'; }
-  getValue2Label() { return this.config.value2Label || 'Low Score'; }
-  getThresholdPrefix() { return 'Value'; }
-
-  /**
-   * Returns the primary target summary HTML for a scoring row.
+   * Returns the primary target summary data for a scoring row.
    * @param {Object} round 
-   * @param {Function} formatFn 
-   * @returns {string}
+   * @returns {Object}
    */
-  getRowSummaryHtml(round, formatFn) {
-    return `<div class="strike-target"><b>${escapeHTML(this.getPrimaryTargetLabel())}:</b> ${formatFn(round.value1)}</div>`;
+  getRowSummaryData(round) {
+    return {
+      label: this.getPrimaryTargetLabel(),
+      value: round.value1
+    };
   }
 
   /**
@@ -195,59 +170,15 @@ export class ScoringEngine {
   getThresholdEnd() { return this.config.thresholdEnd ?? 1; }     // Default to Bowling
 
   /**
-   * Returns the HTML for a frame preview row in the session generator.
-   * Baseball overrides this to show "Top/Bottom of Inning N" headers.
+   * Returns the structured data for a frame preview row.
    * @param {Object} frame The frame data object.
-   * @param {number} index Zero-based index.
-   * @param {boolean} isExpanded Whether the row is expanded.
-   * @param {string} expandedTempId The tempId of the expanded row.
-   * @param {Function} formatFn Number formatting function.
-   * @param {Function} escapeFn HTML escaping function.
-   * @param {Function} renderGridFn renderThresholdGrid function.
-   * @returns {{headerHtml: string, contentHtml: string}}
+   * @returns {Object}
    */
-  getPreviewRowHtml(frame, index, isExpanded, expandedTempId, formatFn, escapeFn, renderGridFn) {
-    const headerHtml = `
-      <div class="flex gap-12 w-100 wrap">
-        <div class="flex gap-12 flex-1 min-250 align-center">
-          <div class="drag-handle">☰</div>
-          <span class="round-number">${this.getRoundDisplayLabel(index)}</span>
-          <span class="machine-name-display">${escapeFn(frame.machineName)}</span>
-        </div>
-        <div class="flex gap-12 wrap justify-end" onclick="event.stopPropagation()">
-          <div class="flex gap-6 min-140 flex-1 align-center">
-            <label class="small value-label">${this.getValue1Label()}:</label>
-            <input type="text" class="score10-input score-input" value="${formatFn(frame.value1)}">
-          </div>
-          <div class="flex gap-6 min-140 flex-1 align-center">
-            <label class="small value-label">${this.getValue2Label()}:</label>
-            <input type="text" class="score1-input score-input" value="${formatFn(frame.value2)}">
-          </div>
-        </div>
-      </div>
-    `;
-
-    const contentHtml = `
-      <div class="form-row">
-        <label class="small">Change Machine</label>
-        <input type="text" class="row-machine-search" placeholder="Filter machines...">
-        <select class="row-machine-select"></select>
-      </div>
-      <div class="flex-between mb-10">
-        <div class="flex gap-6">
-           <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
-           <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
-           <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
-        </div>
-        <div class="flex gap-4">
-           <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
-           <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
-        </div>
-      </div>
-      <div class="preview-values-container">${renderGridFn(this.filterThresholds(frame.values), formatFn, this, frame.value1, frame.value2)}</div>
-    `;
-
-    return { headerHtml, contentHtml };
+  getPreviewRowData(frame) {
+    return {
+      value1: frame.value1,
+      value2: frame.value2
+    };
   }
 
   /**
@@ -295,38 +226,7 @@ export class ScoringEngine {
     return isMajor ? 'threshold-major' : 'threshold-minor';
   }
 
-  /**
-   * Returns HTML for a threshold grid display, showing all ranks and their corresponding values.
-   * @param {Object} values Map of rank to score value.
-   * @param {Function} formatNumber Function to format numeric values for display.
-   * @param {number} value1 Primary context value (e.g. high score).
-   * @param {number} value2 Secondary context value (e.g. low score).
-   * @returns {string}
-   */
-  getThresholdGridHtml(values, formatNumber, value1 = 0, value2 = 0) {
-    if (!values || Object.keys(values).length === 0) return '<div class="notice">Enter scores to see thresholds.</div>';
-    const prefix = this.getThresholdPrefix();
 
-    const ranksToDisplay = this.getThresholdRange()
-      .filter(rank => values[rank] !== undefined);
-
-    return `
-      <div class="threshold-grid-container">
-        ${prefix ? `<div class="threshold-prefix">${prefix}:</div>` : ''}
-        <div class="threshold-grid">
-          ${ranksToDisplay
-            .map(rank => {
-              const val = values[rank];
-              const label = this.getThresholdLabel(rank, value1, value2);
-              const rowClass = this.getThresholdRowClass(rank, value1, value2);
-              return `<div class="threshold-row ${rowClass}"><strong>${label}:</strong> ${formatNumber(val)}</div>`;
-            })
-            .join('')
-          }
-        </div>
-      </div>
-    `;
-  }
 
   /**
    * Calculates quick-fill suggested values for a machine.
@@ -438,52 +338,6 @@ export class ScoringEngine {
    */
   enrichScoreMap(scoreMap, context) {
     return scoreMap;
-  }
-
-  /**
-   * Renders the results panel content for this format.
-   * Default implementation renders a standard table of turn results.
-   * Baseball overrides this to render a head-to-head scoreboard grid.
-   *
-   * @param {{turnResults: Array, totalDisplay: string}} calcResult Output from calculateTurnResults.
-   * @param {Array} machines Target definitions for the event.
-   * @param {Object} scoreMap The enriched score map used for calculation.
-   * @param {Object} context Format-specific context data (same keys as enrichScoreMap).
-   * @param {Object} domRefs DOM element references for the results panel.
-   * @param {HTMLElement} domRefs.resultsPanel The results panel container.
-   * @param {HTMLElement} domRefs.resultsBody The table body for standard results.
-   * @param {HTMLElement} domRefs.totalScore The total score display element.
-   * @param {HTMLElement} domRefs.resultsEmpty The empty-state element.
-   * @param {Function} domRefs.escapeHTML HTML escaping utility.
-   */
-  renderResults(calcResult, machines, scoreMap, context, domRefs) {
-    const { turnResults, totalDisplay } = calcResult;
-    const { resultsPanel, resultsBody, totalScore, resultsEmpty, escapeHTML: escHTML } = domRefs;
-
-    // Show the standard table (may have been hidden by a previous format)
-    const resultsTable = resultsPanel.querySelector('table.data-table');
-    if (resultsTable) resultsTable.classList.remove('hidden');
-
-    // Remove any format-specific grid from a previous render
-    const existingGrid = resultsPanel.querySelector('.scoreboard-grid');
-    if (existingGrid) existingGrid.remove();
-
-    resultsBody.innerHTML = turnResults
-      .map(result => {
-        return `
-          <tr>
-            <td>${result.orderNumber}</td>
-            <td>${result.machineName}</td>
-            <td>${result.displayMark}</td>
-            <td>${result.displayRunningTotal}</td>
-          </tr>
-        `;
-      })
-      .join('');
-
-    totalScore.textContent = totalDisplay;
-    resultsEmpty.classList.add('hidden');
-    resultsPanel.classList.remove('hidden');
   }
 
   /**

@@ -1,7 +1,6 @@
 import { ScoringEngine } from '../ScoringEngine.js';
 import { formatNumber, escapeHTML } from '../../utils.js';
 import { buildBaseballScoreMapForPlayer } from '../../services/normalizer.js';
-import { renderBaseballScoreboard } from '../../ui/scoreboard.js';
 import { buildRoundRobinMatchups, resolveInningRole } from '../../services/matchupBuilder.js';
 
 /**
@@ -308,42 +307,13 @@ formatMark(turn, scoreOverride = null) {
   }
 
   /**
-   * Returns baseball-specific preview row HTML for the session generator.
-   * Uses a simplified header without value1/value2 labels since innings
-   * use consistent baseline/multiplier across both halves.
+   * Returns baseball-specific preview row data for the session generator.
    */
-  getPreviewRowHtml(frame, index, _isExpanded, _expandedTempId, formatFn, escapeFn, renderGridFn) {
-    const headerHtml = `
-      <div class="flex gap-12 w-100 wrap matchup-inning">
-        <div class="flex gap-12 flex-1 min-250 align-center">
-          <div class="drag-handle">☰</div>
-          <span class="round-number">${this.getRoundDisplayLabel(index)}</span>
-          <span class="machine-name-display">${escapeFn(frame.machineName)}</span>
-        </div>
-      </div>
-    `;
-
-    const contentHtml = `
-      <div class="form-row">
-        <label class="small">Change Machine</label>
-        <input type="text" class="row-machine-search" placeholder="Filter machines...">
-        <select class="row-machine-select"></select>
-      </div>
-      <div class="flex-between mb-10">
-        <div class="flex gap-6">
-           <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
-           <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
-           <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
-        </div>
-        <div class="flex gap-4">
-           <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
-           <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
-        </div>
-      </div>
-      <div class="preview-values-container">${renderGridFn(this.filterThresholds(frame.values), formatFn, this, frame.value1, frame.value2)}</div>
-    `;
-
-    return { headerHtml, contentHtml };
+  getPreviewRowData(frame) {
+    return {
+      value1: frame.value1,
+      value2: frame.value2
+    };
   }
 
   /**
@@ -427,9 +397,7 @@ formatMark(turn, scoreOverride = null) {
    * @param {Object} context Baseball-specific context.
    * @param {Object} domRefs DOM element references for the results panel.
    */
-  renderResults(calcResult, machines, scoreMap, context, domRefs) {
-    renderBaseballScoreboard(calcResult, machines, scoreMap, context, domRefs, this);
-  }
+
 
   /**
    * Builds a baseball score map for a player including opponent scores.
@@ -464,14 +432,6 @@ formatMark(turn, scoreOverride = null) {
     // displayed in that case, so fall back to the round's order number.
     const roundNumber = round.orderNumber ?? 1;
     const finalDisplayRoundNumber = matchup ? displayRoundNumber : roundNumber;
-    const roleHtml = matchup
-      ? `
-        <div class="baseball-role-row">
-          <span class="role-label ${role === 'pitcher' ? 'pitcher' : 'batter'}">${role === 'pitcher' ? 'Pitcher' : 'Batter'}</span>
-          <span class="meta-muted">vs ${escapeHTML(opponentName)}</span>
-        </div>
-      `
-      : '';
-    return { matchup, isPitcher, opponentName, displayRoundNumber: finalDisplayRoundNumber, roleHtml };
+    return { matchup, isPitcher, opponentName, displayRoundNumber: finalDisplayRoundNumber, role };
   }
 }

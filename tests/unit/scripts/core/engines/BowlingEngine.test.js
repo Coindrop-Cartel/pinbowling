@@ -160,21 +160,7 @@ describe('BowlingEngine', () => {
     expect(targets.t2).toBe(22500);
   });
 
-  test('getBonusTargetHtml', () => {
-    const round = { values: { 10: 10000 } };
-    const formatFn = (val) => `val:${val}`;
 
-    // Not last round
-    expect(engine.getBonusTargetHtml(round, false, formatFn)).toBe('');
-    
-    // Last round
-    const html = engine.getBonusTargetHtml(round, true, formatFn);
-    expect(html).toContain('XX:');
-    expect(html).toContain('XXX:');
-
-    // Missing values
-    expect(engine.getBonusTargetHtml({ values: {} }, true, formatFn)).toBe('');
-  });
 
   test('buildRoundValues - Interpolation', () => {
     const values = engine.buildRoundValues(10000, 1000);
@@ -567,26 +553,6 @@ describe('BowlingEngine', () => {
       const round = mockRound(1);
       const result = engine._getRelativePins(round, 500, 4000);
       expect(result).toBe(0);
-    });
-  });
-  describe('getBonusTargetHtml - comprehensive', () => {
-    test('returns empty string when not last round', () => {
-      const round = { values: { 10: 10000 } };
-      expect(engine.getBonusTargetHtml(round, false, (v) => v)).toBe('');
-    });
-    test('returns empty string when values is missing', () => {
-      expect(engine.getBonusTargetHtml({}, true, (v) => v)).toBe('');
-    });
-    test('returns HTML with formatted values for last round', () => {
-      const round = { values: { 1: 1000, 10: 10000 } };
-      const html = engine.getBonusTargetHtml(round, true, (v) => v);
-      expect(html).toContain('XX:');
-      expect(html).toContain('XXX:');
-    });
-    test('passes scalingType to getBonusTargets', () => {
-      const round = { values: { 1: 1000, 2: 2000, 9: 9000, 10: 10000 } };
-      const html = engine.getBonusTargetHtml(round, true, (v) => v, 'curved');
-      expect(html).toContain('XX:');
     });
   });
 });

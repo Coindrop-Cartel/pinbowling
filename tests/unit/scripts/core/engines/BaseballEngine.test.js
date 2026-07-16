@@ -1,5 +1,7 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import { BaseballEngine } from '@core/engines/BaseballEngine.js';
+import { FormatBranding } from '@services/scoringFormatBranding.js';
+import { renderBaseballScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
 
 describe('BaseballEngine', () => {
   beforeEach(() => {
@@ -172,13 +174,14 @@ describe('BaseballEngine', () => {
 
   // ── Metadata Getters ─────────────────────────────────────────────────
   test('Metadata Getters', () => {
-    expect(engine.getRoundLabel()).toBe('Inning');
-    expect(engine.getTurnHeaderPrefix()).toBe('Inning');
-    expect(engine.getPrimaryTargetLabel()).toBe('Run Baseline');
-    expect(engine.getPlayActionLabel()).toBe('Play Ball!');
-    expect(engine.getBrandName()).toBe('PinBaseball');
-    expect(engine.getValue1Label()).toBe('Baseline Score');
-    expect(engine.getValue2Label()).toBe('Multiplier');
+    const branding = FormatBranding.get('baseball');
+    expect(branding.roundLabel).toBe('Inning');
+    expect(branding.turnHeaderPrefix).toBe('Inning');
+    expect(branding.primaryTargetLabel).toBe('Run Baseline');
+    expect(branding.playActionLabel).toBe('Play Ball!');
+    expect(branding.brandName).toBe('PinBaseball');
+    expect(branding.value1Label).toBe('Baseline Score');
+    expect(branding.value2Label).toBe('Multiplier');
     expect(engine.getRoundCountOptions()).toEqual([2, 4, 6, 9]);
     expect(engine.formatTotalScore(3)).toBe('3 R');
   });
@@ -656,7 +659,7 @@ describe('BaseballEngine', () => {
     expect(result.isPitcher).toBe(false);
     expect(result.opponentName).toBe('Kyle');
     expect(result.displayRoundNumber).toContain('Top of 1');
-    expect(result.roleHtml).toContain('Batter');
+    expect(result.role).toBe('batter');
   });
 
   test('getRoundRowContext - away player is pitcher when viewing own bottom machine', () => {
@@ -672,7 +675,7 @@ describe('BaseballEngine', () => {
     // Current player 2 is away (playerOrder 2). Viewing the Bottom machine (their own).
     // Away pitches on Bottom → current player is the Pitcher.
     expect(result.isPitcher).toBe(true);
-    expect(result.roleHtml).toContain('Pitcher');
+    expect(result.role).toBe('pitcher');
   });
 
   test('getRoundRowContext - home player is pitcher when viewing own top machine', () => {
@@ -690,7 +693,7 @@ describe('BaseballEngine', () => {
     expect(result.isPitcher).toBe(true);
     expect(result.opponentName).toBe('Brian');
     expect(result.displayRoundNumber).toContain('Top of 1');
-    expect(result.roleHtml).toContain('Pitcher');
+    expect(result.role).toBe('pitcher');
   });
 
   test('getRoundRowContext - home player is batter when viewing away bottom machine', () => {
@@ -708,7 +711,7 @@ describe('BaseballEngine', () => {
     expect(result.isPitcher).toBe(false);
     expect(result.opponentName).toBe('Brian');
     expect(result.displayRoundNumber).toContain('Bottom of 1');
-    expect(result.roleHtml).toContain('Batter');
+    expect(result.role).toBe('batter');
   });
 
   test('getRoundRowContext - no matchup found returns defaults', () => {
@@ -718,12 +721,12 @@ describe('BaseballEngine', () => {
     expect(result.matchup).toBeNull();
     expect(result.isPitcher).toBe(true);
     expect(result.opponentName).toBe('');
-    expect(result.roleHtml).toBe('');
+    expect(result.role).toBe('pitcher');
     expect(result.displayRoundNumber).toBe(1);
   });
 
-  // ── getPreviewRowHtml ─────────────────────────────────────────────────
-  test('getPreviewRowHtml - returns header and content HTML', () => {
+  // ── getPreviewRowData ─────────────────────────────────────────────────
+  test('getPreviewRowData - returns structured preview data', () => {
     const frame = {
       machineName: 'Godzilla',
       scaling: 'curved',
@@ -731,13 +734,9 @@ describe('BaseballEngine', () => {
       value1: 5000000,
       value2: 1.5
     };
-    const escapeFn = (s) => String(s);
-    const formatFn = (n) => Number(n).toLocaleString();
-    const renderGridFn = () => '<div>grid</div>';
-    const result = engine.getPreviewRowHtml(frame, 0, false, null, formatFn, escapeFn, renderGridFn);
-    expect(result.headerHtml).toContain('Top of Inning 1');
-    expect(result.headerHtml).toContain('Godzilla');
-    expect(result.contentHtml).toContain('preview-values-container');
+    const result = engine.getPreviewRowData(frame);
+    expect(result.value1).toBe(5000000);
+    expect(result.value2).toBe(1.5);
   });
 
   // ── buildRoundValues scalingType ignored ──────────────────────────────
@@ -773,7 +772,7 @@ describe('BaseballEngine', () => {
 
     // We don't need to spy on ScoringEngine.prototype.renderResults if we just want to ensure it doesn't crash
     // and follows the fallback path.
-    engine.renderResults(calcResult, machines, scoreMap, context, domRefs);
+    renderBaseballScoreboard(calcResult, machines, scoreMap, context, domRefs, engine);
     expect(domRefs.resultsPanel.classList.add).not.toHaveBeenCalled();
   });
 
@@ -846,7 +845,7 @@ describe('BaseballEngine', () => {
       escapeHTML: (s) => s
     };
 
-    engine.renderResults(calcResult, machines, scoreMap, context, domRefs);
+    renderBaseballScoreboard(calcResult, machines, scoreMap, context, domRefs, engine);
 
     // Verify mock interactions
     expect(mockTable.classList.add).toHaveBeenCalledWith('hidden');
@@ -913,7 +912,7 @@ describe('BaseballEngine', () => {
       escapeHTML: (s) => s
     };
 
-    engine.renderResults(calcResult, machines, scoreMap, context, domRefs);
+    renderBaseballScoreboard(calcResult, machines, scoreMap, context, domRefs, engine);
 
     // Verify insertion fallback (no total-score div)
     expect(domRefs.resultsPanel.insertAdjacentHTML).toHaveBeenCalledWith('beforeend', expect.stringContaining('scoreboard-grid'));
@@ -973,7 +972,7 @@ describe('BaseballEngine', () => {
       escapeHTML: (s) => s
     };
 
-    engine.renderResults(calcResult, machines, scoreMap, context, domRefs);
+    renderBaseballScoreboard(calcResult, machines, scoreMap, context, domRefs, engine);
 
     // Away defaults to 'You' (because current player is player 2), Home defaults to 'Home' (because it's missing)
     expect(domRefs.totalScore.innerHTML).toContain('You 7');

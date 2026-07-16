@@ -1,5 +1,6 @@
 import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
+import { FormatBranding } from '@services/scoringFormatBranding.js';
 import { formatNumber, escapeHTML } from '@scripts/utils.js';
 
 /**
@@ -77,7 +78,7 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = S
   const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
   const instructions = `
-    <p class="muted small threshold-row">${Engine.getScoringHint() || 'Enter your score after each ball until you hit the target score, or run out of balls.'}</p>
+    <p class="muted small threshold-row">${FormatBranding.get(format).scoringHint || 'Enter your score after each ball until you hit the target score, or run out of balls.'}</p>
   `;
 
   // This is the main header for the entire sheet
@@ -102,7 +103,7 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = S
   // Now, iterate through machines to create individual frame/hole sections
   const machineSectionsHtml = machines.map((m) => {
     const isLast = m.orderNumber === maxOrder;
-    const lfHint = isLast ? Engine.getLastFrameHint() : null;
+    const lfHint = isLast ? FormatBranding.get(format).lastFrameHint : null;
     let targetsHtml = Engine.getPrintTargetSummaryHtml(m, isLast, formatNumber);
 
     return `

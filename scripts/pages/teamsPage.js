@@ -16,6 +16,10 @@ import { escapeHTML } from '@scripts/utils.js';
  */
 export async function initTeamsPage() {
   const isAuthorized = await isManagementAuthorized();
+
+  // Guard: If we are no longer on the Teams page, abort initialization
+  if (!document.getElementById('team-form')) return;
+
   const teamForm = document.getElementById('team-form');
   const teamFormTitle = document.getElementById('team-form-title');
   const teamIdInput = document.getElementById('team-id');
@@ -44,6 +48,10 @@ export async function initTeamsPage() {
         PB_API.teams.getAll(),
         PB_API.players.getAll()
       ]);
+
+      // Guard: If we are no longer on the Teams page, abort re-render
+      if (!document.getElementById('team-form')) return;
+
       allTeams.length = 0;
       allTeams.push(...teams);
       allPlayersCache = players;

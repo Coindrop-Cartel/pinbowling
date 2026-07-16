@@ -64,7 +64,6 @@ vi.mock('@core/engine.js', () => ({
     calculateTurnResults: vi.fn(() => ({ turnResults: [], total: 0 })),
     getRoundLabel: () => 'Frame',
     getPrimaryTargetLabel: () => 'Strike',
-    getBonusTargetHtml: () => '',
     getRoundRowContext: () => ({}),
     getRequiredEventData: (eventId, api) => ({
       eventMatchups: api.matchups?.get ? Promise.resolve(api.matchups.get(eventId)).then(r => r || []).catch(() => []) : Promise.resolve([]),
@@ -73,6 +72,8 @@ vi.mock('@core/engine.js', () => ({
     enrichScoreMap: (sm) => sm || ({}),
     renderResults: () => ({}),
     getRowSummaryHtml: vi.fn(() => '<div>Summary</div>'),
+    getRowSummaryData: vi.fn(() => ({ label: 'Strike', value: 1000 })),
+    getBonusTargets: vi.fn(() => ({ t1: 0, t2: 0 })),
     getMarkFormatting: vi.fn((mark) => (mark === 10 ? 'golf-eagle' : '')),
     formatMark: vi.fn((turn) => turn.mark),
     filterThresholds: vi.fn(v => v),
@@ -83,6 +84,22 @@ vi.mock('@core/engine.js', () => ({
 
 vi.mock('@ui/printing.js', () => ({
   printBlankScoreSheet: vi.fn(),
+}));
+
+vi.mock('@services/scoringFormatBranding.js', () => ({
+  FormatBranding: {
+    get: vi.fn(() => ({
+      brandName: 'PinBowling',
+      logoImage: 'logo.png',
+      playActionLabel: 'Play',
+      themeClass: 'theme-bowling',
+      roundLabel: 'Frame',
+      turnHeaderPrefix: 'Frame',
+      primaryTargetLabel: 'Strike',
+      scoringHint: 'Aim for strikes',
+      lastFrameHint: ''
+    }))
+  }
 }));
 
 vi.mock('@ui/dialogs.js', async (importOriginal) => {

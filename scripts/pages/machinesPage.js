@@ -23,6 +23,9 @@ export async function initMachinesPage() {
     PB_API.machines.getAll()
   ]);
 
+  // Guard: If we are no longer on the Machines page, abort initialization
+  if (!document.getElementById('machine-form')) return;
+
   const isAdmin = currentUser && currentUser.role === 'admin';
   const isTD = currentUser && currentUser.role === 'td';
   const hasElevatedPrivileges = isAdmin || isTD;

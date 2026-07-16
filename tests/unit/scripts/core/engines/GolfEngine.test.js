@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import { GolfEngine } from '@core/engines/GolfEngine.js';
+import { FormatBranding } from '@services/scoringFormatBranding.js';
 
 describe('GolfEngine', () => {
   beforeEach(() => {
@@ -266,12 +267,23 @@ describe('GolfEngine', () => {
     expect(engine.getThresholdPrefix()).toBe('Strokes');
   });
 
-  // ── getRowSummaryHtml ────────────────────────────────────────────────
-  test('getRowSummaryHtml - shows target score and par', () => {
+  // ── getRowSummaryData ────────────────────────────────────────────────
+  test('getRowSummaryData - returns structured summary data', () => {
     const round = { values: { 3: 10000 }, value1: 10000, value2: 3 };
-    const html = engine.getRowSummaryHtml(round, (v) => String(v));
-    expect(html).toContain('<b>Target Score:</b> 10000');
-    expect(html).toContain('<b>Par:</b> 3');
+    const result = engine.getRowSummaryData(round);
+    expect(result.label).toBe('Target Score');
+    expect(result.value).toBe(10000);
+    expect(result.label2).toBe('Par');
+    expect(result.value2).toBe(3);
+  });
+
+  // ── getPrintTargetSummaryHtml ────────────────────────────────────────
+  test('getPrintTargetSummaryHtml - returns target score for ball 3 and par', () => {
+    const hole = mockHole(1, 10000000, 4);
+    const html = engine.getPrintTargetSummaryHtml(hole, false, (n) => Number(n).toLocaleString());
+    const expectedTarget = hole.values[3];
+    expect(html).toContain(`Target Score: <strong>${expectedTarget.toLocaleString()}</strong>`);
+    expect(html).toContain('Par: <strong>4</strong>');
   });
 
   // ── getThresholdRowClass ─────────────────────────────────────────────
@@ -302,13 +314,14 @@ describe('GolfEngine', () => {
 
   // ── Metadata Getters ─────────────────────────────────────────────────
   test('Metadata Getters', () => {
-    expect(engine.getRoundLabel()).toBe('Hole');
-    expect(engine.getTurnHeaderPrefix()).toBe('Hole');
-    expect(engine.getPrimaryTargetLabel()).toBe('Par');
-    expect(engine.getPlayActionLabel()).toBe("Let's Golf!");
-    expect(engine.getBrandName()).toBe('PinGolf');
-    expect(engine.getValue1Label()).toBe('Target Score');
-    expect(engine.getValue2Label()).toBe('Par');
+    const branding = FormatBranding.get('golf');
+    expect(branding.roundLabel).toBe('Hole');
+    expect(branding.turnHeaderPrefix).toBe('Hole');
+    expect(branding.primaryTargetLabel).toBe('Par');
+    expect(branding.playActionLabel).toBe("Let's Golf!");
+    expect(branding.brandName).toBe('PinGolf');
+    expect(branding.value1Label).toBe('Target Score');
+    expect(branding.value2Label).toBe('Par');
   });
 
   test('Default GolfEngine getters (no config)', () => {
@@ -316,7 +329,5 @@ describe('GolfEngine', () => {
     expect(e.getRoundLabel()).toBe('Hole');
     expect(e.getTurnHeaderPrefix()).toBe('Hole');
     expect(e.getPrimaryTargetLabel()).toBe('Par');
-    expect(e.getValue1Label()).toBe('Target Score');
-    expect(e.getValue2Label()).toBe('Par');
   });
 });

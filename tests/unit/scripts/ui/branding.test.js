@@ -5,30 +5,31 @@ import { getCookie } from '@scripts/utils.js'; // Keep this import
 vi.mock('@scripts/utils.js', () => ({ getCookie: vi.fn(() => 'bowling'), }));
 
 // Dynamic mock for getScoringEngine to return format-specific values (moved to top-level)
-const { getScoringEngineMock } = vi.hoisted(() => ({
-  getScoringEngineMock: vi.fn((format = 'bowling') => ({
-    getBrandName: vi.fn(() => {
-      if (format === 'golf') return 'PinGolf';
-      return 'PinBowling';
-    }),
-    getLogoImage: vi.fn(() => {
-      if (format === 'golf') return 'logo-golf.png';
-      return 'logo-bowling.png';
-    }),
-    getPlayActionLabel: vi.fn(() => {
-      if (format === 'golf') return 'Play Golf';
-      return 'Bowl Now';
-    }),
-    getScoringDescription: vi.fn(() => {
-      if (format === 'golf') return 'Golf-style scoring';
-      return 'Bowling-style scoring';
-    }),
-    getThemeClass: vi.fn(() => `theme-${format}`),
-  })),
+const { getBrandingMock } = vi.hoisted(() => ({
+  getBrandingMock: vi.fn((format = 'bowling') => {
+    if (format === 'golf') {
+      return {
+        brandName: 'PinGolf',
+        logoImage: 'logo-golf.png',
+        playActionLabel: 'Play Golf',
+        scoringDescription: 'Golf-style scoring',
+        themeClass: 'theme-golf'
+      };
+    }
+    return {
+      brandName: 'PinBowling',
+      logoImage: 'logo-bowling.png',
+      playActionLabel: 'Bowl Now',
+      scoringDescription: 'Bowling-style scoring',
+      themeClass: 'theme-bowling'
+    };
+  })
 }));
 
-vi.mock('@core/engine.js', () => ({
-  getScoringEngine: getScoringEngineMock,
+vi.mock('@services/scoringFormatBranding.js', () => ({
+  FormatBranding: {
+    get: getBrandingMock
+  }
 }));
 
 describe('Branding Utilities (branding.js)', () => {

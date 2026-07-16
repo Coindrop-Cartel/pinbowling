@@ -30,6 +30,10 @@ export async function initPlayersPage() {
   } finally {
     loader.remove();
   }
+
+  // Guard: If we are no longer on the Players page, abort initialization
+  if (!document.getElementById('player-list')) return;
+
   const isAdmin = currentUser && currentUser.role === 'admin';
   const isTD = currentUser && currentUser.role === 'td';
   const hasElevatedPrivileges = isAdmin || isTD;

@@ -39,13 +39,17 @@ export class GolfEngine extends ScoringEngine {
    * This helps players understand the primary goal of the hole.
    * 
    * @param {Object} round 
-   * @param {Function} formatFn 
-   * @returns {string}
+   * @returns {Object}
    */
-  getRowSummaryHtml(round, formatFn) {
+  getRowSummaryData(round) {
     const goal = round.values?.[3] || round.values?.['3'] || round.value1 || 0;
     const par = round.value2 || 3;
-    return `<div class="strike-target"><b>Target Score:</b> ${formatFn(goal)} &nbsp;&nbsp; <b>Par:</b> ${par}</div>`;
+    return {
+      label: 'Target Score',
+      value: goal,
+      label2: 'Par',
+      value2: par
+    };
   }
 
   /**
@@ -53,8 +57,9 @@ export class GolfEngine extends ScoringEngine {
    * Shows the Target Score and Par for the hole.
    */
   getPrintTargetSummaryHtml(machine, _isLastRound, formatNumberFn) {
+    const goal = machine.values?.[3] || machine.values?.['3'] || machine.value1 || 0;
     return `
-        <span>Target Score: <strong>${formatNumberFn(machine.values[machine.value2] || machine.value1)}</strong></span>
+        <span>Target Score: <strong>${formatNumberFn(goal)}</strong></span>
         <span class="ml-15">Par: <strong>${machine.value2}</strong></span>
       `;
   }

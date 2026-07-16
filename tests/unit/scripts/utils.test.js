@@ -6,7 +6,6 @@ const mockEngine = {
   buildRoundValues: vi.fn(),
   getBonusTargets: vi.fn(),
   getRoundLabel: vi.fn(),
-  getBonusTargetHtml: vi.fn(),
   filterThresholds: vi.fn((v) => v),
   getThresholdLabel: vi.fn((r) => {
     if (Number(r) === 10) return 'High';
@@ -69,7 +68,6 @@ describe('Utility Functions (utils.js)', () => {
     });
     mockEngine.getBonusTargets.mockReturnValue({ t1: 13000, t2: 16900 });
     mockEngine.getRoundLabel.mockReturnValue('Frame');
-    mockEngine.getBonusTargetHtml.mockReturnValue('');
 
     vi.clearAllMocks();
   });
@@ -348,31 +346,26 @@ describe('Utility Functions (utils.js)', () => {
     });
 
     it('should include bonus targets if isLastRound is true and values[10] exists', () => {
-      mockEngine.getBonusTargetHtml.mockImplementation((round, isLast, formatFn) => {
-        return isLast ? `<div><strong>Target 1:</strong> ${formatFn(13000)}</div>` : '';
-      });
+      mockEngine.getBonusTargets.mockReturnValue({ t1: 13000, t2: 19500 });
 
       Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine(), true);
-      expect(previewValues.innerHTML).toContain('<strong>Target 1:</strong>');
-      expect(previewValues.innerHTML).toContain('13,000');
+      expect(previewValues.innerHTML).toContain('Target 1: <strong>13,000</strong>');
+      expect(previewValues.innerHTML).toContain('Target 2: <strong>19,500</strong>');
     });
 
     it('should not include bonus targets if isLastRound is false', () => {
-      mockEngine.getBonusTargetHtml.mockReturnValue('');
+      mockEngine.getBonusTargets.mockReturnValue({ t1: 13000, t2: 19500 });
       Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine(), false);
-      expect(previewValues.innerHTML).not.toContain('<strong>Target 1:</strong>');
+      expect(previewValues.innerHTML).not.toContain('Target 1:');
     });
 
-    it('should pass currentScaling to buildRoundValues and getBonusTargetHtml', () => {
+    it('should pass currentScaling to buildRoundValues and values to getBonusTargets', () => {
       mockEngineBuildRoundValues.mockReturnValue({ 10: 10000, 1: 1000 });
-      mockEngine.getBonusTargetHtml.mockReturnValue('');
-      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine(), false, 1.5);
+      mockEngine.getBonusTargets.mockReturnValue({ t1: 15000, t2: 22500 });
+      Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine(), true, 1.5);
       expect(mockEngineBuildRoundValues).toHaveBeenCalledWith(10000, 1000, 1.5);
-      expect(mockEngine.getBonusTargetHtml).toHaveBeenCalledWith(
-        expect.objectContaining({ values: { 10: 10000, 1: 1000 } }),
-        false,
-        expect.any(Function),
-        1.5
+      expect(mockEngine.getBonusTargets).toHaveBeenCalledWith(
+        expect.objectContaining({ values: { 10: 10000, 1: 1000 } })
       );
     });
 
@@ -380,7 +373,7 @@ describe('Utility Functions (utils.js)', () => {
       highScoreInput.value = '10,000';
       lowScoreInput.value = '1,000';
       mockEngineBuildRoundValues.mockReturnValue({ 10: 10000, 1: 1000 });
-      mockEngine.getBonusTargetHtml.mockReturnValue('');
+      mockEngine.getBonusTargets.mockReturnValue({ t1: 15000, t2: 22500 });
       Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine());
       expect(mockEngineBuildRoundValues).toHaveBeenCalledWith(10000, 1000, undefined);
     });
@@ -388,7 +381,6 @@ describe('Utility Functions (utils.js)', () => {
     it('should call filterThresholds with the built values', () => {
       const values = { 10: 10000, 5: 5000, 1: 1000 };
       mockEngineBuildRoundValues.mockReturnValue(values);
-      mockEngine.getBonusTargetHtml.mockReturnValue('');
       Utils.renderPreview(highScoreInput, lowScoreInput, previewValues, getScoringEngine());
       expect(mockEngine.filterThresholds).toHaveBeenCalledWith(values);
     });

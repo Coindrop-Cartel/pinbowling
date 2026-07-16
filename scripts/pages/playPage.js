@@ -7,6 +7,7 @@ import { applyPreferredTheme } from '@ui/branding.js';
 import { createExpandableRow, setupSortableList, createSearchableSelect } from '@ui/selectors.js';
 import { showDialog, showPlayerSelectionDialog } from '@ui/dialogs.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
+import { renderPreviewRow } from '@scripts/renderers/roundRowRenderer.js';
 import { generateSessionName, selectRandomMachines, getTargetScoreForDifficulty } from '@services/sessionGenerator.js';
 
 /**
@@ -195,6 +196,9 @@ export async function initPlayPage() {
     PB_API.locations.getAll(),
     refreshSessionsData()
   ]);
+
+  // Guard: If we are no longer on the Play page, abort initialization
+  if (!document.getElementById('quick-play-form')) return;
 
   locationsCache = locations;
   locationsCache.forEach(loc => {
@@ -386,8 +390,8 @@ export async function initPlayPage() {
       const isExpanded = expandedTempId === frame.tempId;
       const engine = getScoringEngine(currentSessionFormat);
 
-      const { headerHtml, contentHtml } = engine.getPreviewRowHtml(
-        frame, index, isExpanded, expandedTempId,
+      const { headerHtml, contentHtml } = renderPreviewRow(
+        engine, frame, index, isExpanded,
         formatNumber, escapeHTML, renderThresholdGrid
       );
 

@@ -47,6 +47,8 @@ vi.mock('@scripts/utils.js', async (importOriginal) => {
     ...actual,
     setActiveLeagueId: vi.fn((id) => { mockLeagueState.activeId = id; }),
     setActiveEventId: vi.fn(),
+    setActiveLeagueIdSilent: vi.fn((id) => { mockLeagueState.activeId = id; }),
+    setActiveEventIdSilent: vi.fn(),
     getActiveLeagueId: vi.fn(() => mockLeagueState.activeId),
     loadPage: vi.fn(),
     getCookie: vi.fn(() => 'bowling'), // Mock getCookie to return a default value for tests
@@ -655,10 +657,10 @@ describe('Leagues Page (leaguesPage.js)', () => {
     const setupBtn = document.querySelector('.setup-event-btn');
     setupBtn.click();
 
-    const { setActiveLeagueId, setActiveEventId, loadPage } = await import('@scripts/utils.js'); // Changed navigateTo to loadPage
-    expect(setActiveLeagueId).toHaveBeenCalledWith(1);
-    expect(setActiveEventId).toHaveBeenCalledWith(50);
-    expect(loadPage).toHaveBeenCalledWith(ROUTE_PATHS.LEAGUE_SETUP({ leagueId: 1, eventId: 50 })); // Changed assertion
+    const { setActiveLeagueIdSilent, setActiveEventIdSilent, loadPage } = await import('@scripts/utils.js');
+    expect(setActiveLeagueIdSilent).toHaveBeenCalledWith(1);
+    expect(setActiveEventIdSilent).toHaveBeenCalledWith(50);
+    expect(loadPage).toHaveBeenCalledWith(ROUTE_PATHS.LEAGUE_SETUP({ leagueId: 1, eventId: 50 }));
   });
 
   it('should update league header stats for team leagues', async () => {

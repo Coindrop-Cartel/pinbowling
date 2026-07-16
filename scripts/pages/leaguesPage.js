@@ -1,6 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { isManagementAuthorized, runAuthorizedLeagueAction } from '@services/auth.js';
-import { getCookie, getActiveLeagueId, setActiveLeagueId, setActiveEventId, loadPage, escapeHTML } from '@scripts/utils.js';
+import { getCookie, getActiveLeagueId, setActiveLeagueId, setActiveEventId, setActiveLeagueIdSilent, setActiveEventIdSilent, loadPage, escapeHTML } from '@scripts/utils.js';
 import { SCORING_FORMATS } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 import { applyPreferredTheme } from '@ui/branding.js';
@@ -35,6 +35,9 @@ export async function initLeaguesPage() {
     ]);
   } catch (err) { console.error('Initialization failed:', err); }
 
+  // Guard: If we are no longer on the Leagues page, abort initialization
+  if (!document.getElementById('leagues-list')) return;
+
   const leagueNameInput = document.getElementById('league-name');
   const leagueDateInput = document.getElementById('league-start-date');
   const createBtn = document.getElementById('create-league-btn');
@@ -46,7 +49,7 @@ export async function initLeaguesPage() {
   let editingLeagueId = null;
 
   // Setup "Create League" toggle behavior
-  const dateRow = leagueDateInput.closest('.form-row');
+  const dateRow = leagueDateInput ? leagueDateInput.closest('.form-row') : null;
   const formatRow = document.getElementById('league-format-row');
   const leagueFormatInput = document.getElementById('league-scoring-format');
   const leagueSeasonScoringInput = document.getElementById('league-season-scoring');
@@ -85,7 +88,7 @@ export async function initLeaguesPage() {
           leagueFormatInput.value = ScoringFormats.resolve(getCookie('pb_preferred_format'));
         }
       }
-      if (!dateRow.classList.contains('hidden')) {
+      if (dateRow && !dateRow.classList.contains('hidden')) {
         seasonScoringRow?.classList.remove('hidden');
         dropLowestRow?.classList.remove('hidden');
       }
@@ -244,8 +247,8 @@ export async function initLeaguesPage() {
         onAddPlayer: addPlayerToLeague,
         onAddTeam: addTeamToLeague,
         onSetupEvent: (eventId, leagueId) => {
-          setActiveLeagueId(leagueId);
-          setActiveEventId(eventId);
+          setActiveLeagueIdSilent(leagueId);
+          setActiveEventIdSilent(eventId);
           loadPage(ROUTE_PATHS.LEAGUE_SETUP({ leagueId, eventId }));
         },
         onEditEvent: (leagueId, leagueName, ev) => {
@@ -379,8 +382,8 @@ export async function initLeaguesPage() {
     eventsListEl.querySelectorAll('.setup-event-btn').forEach(btn => {
       btn.onclick = () => {
         const eventId = Number(btn.dataset.eventId);
-        setActiveLeagueId(leagueId);
-        setActiveEventId(eventId);
+        setActiveLeagueIdSilent(leagueId);
+        setActiveEventIdSilent(eventId);
         loadPage(ROUTE_PATHS.LEAGUE_SETUP({ leagueId, eventId }));
       };
     });
@@ -722,8 +725,8 @@ export async function initLeaguesPage() {
                 onAddPlayer: addPlayerToLeague,
                 onAddTeam: addTeamToLeague,
                 onSetupEvent: (evId, lgId) => {
-                  setActiveLeagueId(lgId);
-                  setActiveEventId(evId);
+                  setActiveLeagueIdSilent(lgId);
+                  setActiveEventIdSilent(evId);
                   loadPage(ROUTE_PATHS.LEAGUE_SETUP({ leagueId: lgId, eventId: evId }));
                 },
                 onEditEvent: (lgId, lgName, ev) => showEventForm(lgId, lgName, ev),

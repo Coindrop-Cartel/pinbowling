@@ -63,6 +63,11 @@ const engineMock = vi.hoisted(() => ({
     headerHtml: `<div class="header"><span>${index}</span><span>${frame.machineName}</span></div>`,
     contentHtml: '<div class="content">content</div>'
   })),
+  getPreviewRowData: vi.fn((frame) => ({
+    value1: frame.value1,
+    value2: frame.value2
+  })),
+  getBonusTargets: vi.fn(() => ({ t1: 0, t2: 0 })),
   generateMatchupPayload: vi.fn(() => []),
 }));
 
@@ -85,6 +90,15 @@ vi.mock('@scripts/utils.js', () => ({
   getCookie: vi.fn(() => 'bowling'),
   loadPage: vi.fn(),
   escapeHTML: vi.fn(str => str),
+}));
+
+vi.mock('@scripts/renderers/roundRowRenderer.js', () => ({
+  renderPreviewRow: vi.fn((engine, frame, index, isExpanded, formatNumber, escapeHTML, renderThresholdGrid) => {
+    if (engine && engine.getPreviewRowHtml) {
+      return engine.getPreviewRowHtml(frame, index, isExpanded, null, formatNumber, escapeHTML, renderThresholdGrid);
+    }
+    return { headerHtml: '', contentHtml: '' };
+  })
 }));
 
 const uiMocks = vi.hoisted(() => ({

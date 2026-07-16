@@ -6,6 +6,7 @@ import { applyPreferredTheme } from '@ui/branding.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
 import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
+import { FormatBranding } from '@services/scoringFormatBranding.js';
 import { printMachineScores } from '@ui/printing.js';
 import { createSearchableSelect, setupSortableList, createExpandableRow, initReadOnlyTournamentDisplay } from '@ui/selectors.js';
 import { normalizeTargets } from '@services/normalizer.js';
@@ -34,6 +35,9 @@ export async function initEventSetupPage() {
     return;
   }
 
+  // Guard: If we are no longer on the Event Setup page, abort initialization
+  if (!document.getElementById('round-form')) return;
+
   const configCard = document.getElementById('config-card');
   const orderInput = document.getElementById('order-number');
   const displayOrder = document.getElementById('display-order');
@@ -54,6 +58,7 @@ export async function initEventSetupPage() {
   let expandedTargetId = null;
   let isListDirty = false;
   let originalEventTargets = [];
+  let activeFormat = ScoringFormats.DEFAULT;
   const printMachinesBtn = document.getElementById('print-machines-btn');
   let machineSearch;
 
@@ -255,8 +260,18 @@ export async function initEventSetupPage() {
     const maxOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.orderNumber)) : 0;
 
     eventTargets.forEach((round) => {
-      const bonusHtml = Engine.getBonusTargetHtml(round, round.orderNumber === maxOrder, formatNumber);
+      let bonusHtml = '';
+      if (round.orderNumber === maxOrder) {
+        const bonusTargets = Engine.getBonusTargets?.(round);
+        if (bonusTargets && (bonusTargets.t1 || bonusTargets.t2)) {
+          bonusHtml = `
+            <span>Target 1: ${formatNumber(bonusTargets.t1)}</span>
+            <span>Target 2: ${formatNumber(bonusTargets.t2)}</span>
+          `;
+        }
+      }
       const isExpanded = expandedTargetId === round.id;
+      const branding = FormatBranding.get(activeFormat);
 
 
       // Detect scaling from data to sync inline toggles
@@ -294,11 +309,11 @@ export async function initEventSetupPage() {
           </div>
           <div class="flex gap-12 wrap justify-end" onclick="event.stopPropagation()">
             <div class="flex gap-6 min-140 flex-1 align-center">
-              <label class="small value-label">${Engine.getValue1Label()}:</label>
+              <label class="small value-label">${branding.value1Label}:</label>
               <input type="text" class="score10-input score-input" value="${formatNumber(round.value1)}">
             </div>
             <div class="flex gap-6 min-140 flex-1 align-center">
-              <label class="small value-label">${Engine.getValue2Label()}:</label>
+              <label class="small value-label">${branding.value2Label}:</label>
               <input type="text" class="score1-input score-input" value="${formatNumber(round.value2)}">
             </div>
           </div>
@@ -447,13 +462,15 @@ export async function initEventSetupPage() {
     eventMatch = league?.events?.find(e => String(e.id) === String(eventId));
 
     const format = eventMatch?.scoringFormat || league?.scoringFormat;
+    activeFormat = ScoringFormats.resolve(format);
     Engine = getScoringEngine(format);
     applyPreferredTheme(format);
     score1Input.dataset.allowDecimal = Engine.getValue2AllowsDecimal?.() === true ? 'true' : 'false';
 
-    // Update UI labels based on the scoring engine
-    if (labelHigh) labelHigh.textContent = Engine.getValue1Label();
-    if (labelLow) labelLow.textContent = Engine.getValue2Label();
+    // Update UI labels based on the scoring format branding
+    const branding = FormatBranding.get(activeFormat);
+    if (labelHigh) labelHigh.textContent = branding.value1Label;
+    if (labelLow) labelLow.textContent = branding.value2Label;
 
     const defaults = Engine.getInitialValues();
     score10Input.placeholder = `e.g. ${formatNumber(defaults.value1)}`;

@@ -6,7 +6,7 @@
  * @typedef {Object} ScoringEngine
  * @property {function(number, number, number=): Object<string, number>} buildRoundValues
  * @property {function(Object<string, number>): Object<string, number>} filterThresholds
- * @property {function(Object, boolean, function, number=): string} getBonusTargetHtml
+ * @property {function(Object): {t1: number, t2: number}} [getBonusTargets]
  * @property {function(): (a: [string, any], b: [string, any]) => number} getThresholdSort
  * @property {function(string|number, number, number): string} getThresholdLabel
  * @property {function(string|number, number, number): string} getThresholdRowStyle
