@@ -58,7 +58,6 @@ function serializeLocationMachinesGrouped(array $rows): array {
                 'locationId' => isset($row['location_id']) ? (int)$row['location_id'] : null,
                 'machineId' => (int)$row['machine_id'],
                 'machineName' => $row['machine_name'] ?? null,
-                'note' => $row['note'] ?? null,
                 'format' => $row['format'] ?? 'bowling',
                 'targetEasy' => (int)($row['target_easy'] ?? 0),
                 'targetMed' => (int)($row['target_med'] ?? 0),

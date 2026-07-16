@@ -170,7 +170,6 @@ function initializeDatabaseSchema($pdo) {
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `location_id` INT NOT NULL,
         `machine_id` INT NOT NULL,
-        `note` TEXT DEFAULT NULL,
         UNIQUE KEY `unique_location_machine` (`location_id`, `machine_id`),
         CONSTRAINT `fk_lm_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_lm_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
@@ -793,6 +792,30 @@ try {
         echo "✓ Baseball Season & Head-to-Head leagues migration applied successfully.\n";
     } else {
         echo "Baseball Season & Head-to-Head leagues migration already applied.\n";
+    }
+
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'clean_unused_tables_and_columns'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        // 1. Drop score_history table if exists
+        $pdo->exec("DROP TABLE IF EXISTS `score_history`");
+        
+        // 2. Drop note column from location_machines if exists
+        $hasNote = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'note'")->fetch();
+        if ($hasNote) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `note`");
+        }
+        
+        // 3. Drop created_at column from users if exists
+        $hasCreatedAt = $pdo->query("SHOW COLUMNS FROM `users` LIKE 'created_at'")->fetch();
+        if ($hasCreatedAt) {
+            $pdo->exec("ALTER TABLE `users` DROP COLUMN `created_at`");
+        }
+        
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('clean_unused_tables_and_columns')")->execute();
+        echo "✓ Cleaned up unused tables/columns (score_history, location_machines.note, users.created_at) successfully.\n";
+    } else {
+        echo "Cleanup of unused tables/columns already applied.\n";
     }
 
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
