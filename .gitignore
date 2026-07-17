@@ -27,7 +27,6 @@ sftp.json
 
 # Database
 sql/
-*.sql
 
 # PHP
 db-test.php
