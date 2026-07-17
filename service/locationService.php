@@ -216,23 +216,10 @@ class LocationService {
      */
     public function addMachineToLocation(int $locationId, int $machineId, array $data = []): bool {
         $pdo = $this->db->getPdo();
-        $allowed = ['note'];
 
-        $cols = ['location_id', 'machine_id'];
-        $placeholders = ['?', '?'];
-        $params = [$locationId, $machineId];
-
-        foreach ($data as $key => $value) {
-            if (in_array($key, $allowed)) {
-                $cols[] = "`$key`";
-                $placeholders[] = '?';
-                $params[] = $value;
-            }
-        }
-
-        $sql = 'INSERT INTO location_machines (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $placeholders) . ')';
+        $sql = 'INSERT INTO location_machines (location_id, machine_id) VALUES (?, ?)';
         $stmt = $pdo->prepare($sql);
-        $result = $stmt->execute($params);
+        $result = $stmt->execute([$locationId, $machineId]);
 
         if ($result) {
             $locationMachineId = (int)$pdo->lastInsertId();
@@ -260,24 +247,6 @@ class LocationService {
      */
     public function updateLocationMachine(int $locationId, int $machineId, array $data): bool {
         $pdo = $this->db->getPdo();
-        $allowed = ['note'];
-
-        $fields = [];
-        $params = [];
-        foreach ($data as $key => $value) {
-            if (in_array($key, $allowed)) {
-                $fields[] = "`$key` = ?";
-                $params[] = $value;
-            }
-        }
-
-        if (!empty($fields)) {
-            $params[] = $locationId;
-            $params[] = $machineId;
-            $sql = "UPDATE location_machines SET " . implode(', ', $fields) . " WHERE location_id = ? AND machine_id = ?";
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-        }
 
         // Upsert scores into location_machine_scores
         $format = $data['format'] ?? 'bowling';

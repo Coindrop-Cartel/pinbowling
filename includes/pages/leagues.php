@@ -31,6 +31,14 @@
           <label for="league-season-scoring">Season Scoring</label>
           <select id="league-season-scoring" data-testid="league-season-scoring-select"></select>
         </div>
+        <div id="league-weekly-points-row" data-testid="league-weekly-points-row" class="form-row hidden">
+          <label for="league-weekly-points">Weekly Points (Optional)</label>
+          <input id="league-weekly-points" data-testid="league-weekly-points-input" type="number" min="0" placeholder="Defaults to Player Count" />
+        </div>
+        <div id="league-point-spread-row" data-testid="league-point-spread-row" class="form-row hidden">
+          <label for="league-point-spread">Point Spread (Optional)</label>
+          <input id="league-point-spread" data-testid="league-point-spread-input" type="number" min="1" placeholder="Defaults to 1" />
+        </div>
         <div id="league-drop-weeks-row" data-testid="league-drop-weeks-row" class="form-row hidden">
           <label for="league-drop-weeks">Drop Lowest Weeks</label>
           <input id="league-drop-weeks" data-testid="league-drop-weeks-input" type="number" min="0" value="0" />

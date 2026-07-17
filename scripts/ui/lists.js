@@ -157,7 +157,9 @@ export function renderLeagueList(container, filteredLeagues, {
   onRemovePlayer,
   onStartPlayoffs,
   onUpdateSeason,
-  getParticipantMeta
+  onPrintSeasonResults,
+  getParticipantMeta,
+  skipScroll
 }) {
   container.innerHTML = '';
   
@@ -308,6 +310,7 @@ export function renderLeagueList(container, filteredLeagues, {
         ${isAuthorized && isH2H && league.status === 'setup' ? '<button class="start-season-btn primary btn-row">Start Season</button>' : ''}
         ${isAuthorized && showStartPlayoffsBtn ? `<button class="start-playoffs-btn primary btn-row" data-league-id="${league.id}">Start Playoffs</button>` : ''}
         ${isAuthorized && isH2H && league.status === 'active' ? `<button class="update-season-btn primary btn-row" data-league-id="${league.id}">Update Season</button>` : ''}
+        ${isAuthorized ? `<button class="print-season-results-btn secondary btn-row" data-league-id="${league.id}">Print Season Results</button>` : ''}
         ${isAuthorized ? '<button class="edit-league-btn secondary btn-row">Edit League</button>' : ''}
         ${isAuthorized ? '<button class="delete-league-btn btn-row">Delete League</button>' : ''}
       </div>
@@ -367,6 +370,13 @@ export function renderLeagueList(container, filteredLeagues, {
           if (onUpdateSeason) onUpdateSeason(league.id);
         };
       }
+
+      const printSeasonResultsBtn = row.querySelector('.print-season-results-btn');
+      if (printSeasonResultsBtn) {
+        printSeasonResultsBtn.onclick = () => {
+          if (onPrintSeasonResults) onPrintSeasonResults(league.id);
+        };
+      }
       
       const addEventBtn = row.querySelector('.add-event-btn');
       if (addEventBtn) addEventBtn.onclick = () => onAddEvent(league.id, league.name);
@@ -405,7 +415,9 @@ export function renderLeagueList(container, filteredLeagues, {
 
     if (shouldExpand && !row.dataset.scrolled) {
       row.dataset.scrolled = "true";
-      setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      if (!skipScroll) {
+        setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      }
     }
   });
 }

@@ -6,7 +6,7 @@ import { ScoringFormats } from '@services/scoringFormat.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildBaseballScoreMapForPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
 import { applyPreferredTheme } from '@ui/branding.js';
-import { printBlankScoreSheet } from '@ui/printing.js';
+import { printBlankScoreSheet, printScoreSheet } from '@ui/printing.js';
 import { buildRoundRow } from '../renderers/roundRowRenderer.js';
 import { FormatBranding } from '@services/scoringFormatBranding.js';
 import { renderStandardScoreboard, renderBaseballScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
@@ -96,6 +96,26 @@ export async function initScoresPage() {
   let activeFormat = ScoringFormats.DEFAULT;
   let eventMatchups = [];
   let allEventScores = [];
+  let activeEvent = null;
+  let summaryTitle = '';
+
+  function updateTournamentSummary() {
+    const activePlayerId = getCurrentPlayerId();
+    const player = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
+    
+    renderActionSummary(tournamentSummary, summaryTitle, [
+      { text: 'Change', onclick: handleTournamentChange },
+      {
+        text: 'Print Score Sheet',
+        onclick: () => {
+          const scoreMap = getScoreMapFromInputs();
+          printScoreSheet(machines, activeLeague?.name, activeEvent?.eventName, activeFormat, player, scoreMap, resultsPanel ? resultsPanel.innerHTML : '');
+        },
+        hidden: !player || machines.length === 0 || !!getActiveMatchupId()
+      },
+      { text: 'Print Blank Score Sheet', onclick: () => printBlankScoreSheet(machines, activeLeague?.name, activeEvent?.eventName, activeFormat), hidden: machines.length === 0 || !!getActiveMatchupId() }
+    ]);
+  }
 
   const handleTournamentChange = () => {
     setActiveMatchupIdSilent('');
@@ -395,6 +415,7 @@ export async function initScoresPage() {
         playerSelectorUI.classList.remove('hidden');
         playerSummary.classList.add('hidden');
       }
+      updateTournamentSummary();
       return;
     }
 
@@ -468,6 +489,7 @@ export async function initScoresPage() {
       }
 
       renderCurrentResults();
+      updateTournamentSummary();
     } finally {
       loader.remove();
     }
@@ -632,8 +654,10 @@ export async function initScoresPage() {
       });
     }
 
+    activeLeague = league;
+    activeEvent = event;
+
     const isSession = league?.type === 'session';
-    let summaryTitle = '';
     if (activeMatchupId && eventMatchups.length > 0) {
       const matchup = eventMatchups[0];
       summaryTitle = `
@@ -648,12 +672,8 @@ export async function initScoresPage() {
     }
 
     tournamentSelectorUI.classList.add('hidden');
-    renderActionSummary(tournamentSummary, summaryTitle, [
-      { text: 'Change', onclick: handleTournamentChange },
-      { text: 'Print Blank Score Sheet', onclick: () => printBlankScoreSheet(machines, league?.name, event?.eventName, format), hidden: eventTargets.length === 0 || !!activeMatchupId }
-    ]);
+    updateTournamentSummary();
 
-    activeLeague = league;
     applyPreferredTheme(format);
     const branding = FormatBranding.get(format);
 

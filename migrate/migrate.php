@@ -70,7 +70,9 @@ function initializeDatabaseSchema($pdo) {
         `start_date` DATE DEFAULT NULL,
         `scoring_format` VARCHAR(50) DEFAULT 'bowling',
         `season_scoring` ENUM('cumulative', 'weekly') DEFAULT 'weekly',
-        `drop_lowest_weeks` INT DEFAULT 0
+        `drop_lowest_weeks` INT DEFAULT 0,
+        `weekly_points` INT DEFAULT NULL,
+        `point_spread` INT DEFAULT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `teams` (
@@ -170,7 +172,6 @@ function initializeDatabaseSchema($pdo) {
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `location_id` INT NOT NULL,
         `machine_id` INT NOT NULL,
-        `note` TEXT DEFAULT NULL,
         UNIQUE KEY `unique_location_machine` (`location_id`, `machine_id`),
         CONSTRAINT `fk_lm_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_lm_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
@@ -793,6 +794,57 @@ try {
         echo "✓ Baseball Season & Head-to-Head leagues migration applied successfully.\n";
     } else {
         echo "Baseball Season & Head-to-Head leagues migration already applied.\n";
+    }
+
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'clean_unused_tables_and_columns'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        // 1. Drop score_history table if exists
+        $pdo->exec("DROP TABLE IF EXISTS `score_history`");
+        
+        // 2. Drop note column from location_machines if exists
+        $hasNote = $pdo->query("SHOW COLUMNS FROM `location_machines` LIKE 'note'")->fetch();
+        if ($hasNote) {
+            $pdo->exec("ALTER TABLE `location_machines` DROP COLUMN `note`");
+        }
+        
+        // 3. Drop created_at column from users if exists
+        $hasCreatedAt = $pdo->query("SHOW COLUMNS FROM `users` LIKE 'created_at'")->fetch();
+        if ($hasCreatedAt) {
+            $pdo->exec("ALTER TABLE `users` DROP COLUMN `created_at`");
+        }
+        
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('clean_unused_tables_and_columns')")->execute();
+        echo "✓ Cleaned up unused tables/columns (score_history, location_machines.note, users.created_at) successfully.\n";
+    } else {
+        echo "Cleanup of unused tables/columns already applied.\n";
+    }
+
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'leagues_weekly_points_and_point_spread'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $hasWeeklyPoints = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'weekly_points'")->fetch();
+        if (!$hasWeeklyPoints) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `weekly_points` INT DEFAULT NULL AFTER `drop_lowest_weeks`");
+        }
+        $hasPointSpread = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'point_spread'")->fetch();
+        if (!$hasPointSpread) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `point_spread` INT DEFAULT NULL AFTER `weekly_points`");
+        }
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('leagues_weekly_points_and_point_spread')")->execute();
+        echo "✓ Added weekly_points and point_spread columns to leagues successfully.\n";
+    } else {
+        echo "Leagues weekly points and point spread migration already applied.\n";
+    }
+
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'leagues_make_innings_per_game_nullable'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("ALTER TABLE `leagues` MODIFY `innings_per_game` INT DEFAULT NULL");
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('leagues_make_innings_per_game_nullable')")->execute();
+        echo "✓ Made leagues.innings_per_game column nullable successfully.\n";
+    } else {
+        echo "Making leagues.innings_per_game nullable already applied.\n";
     }
 
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");

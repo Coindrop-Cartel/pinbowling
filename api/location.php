@@ -48,7 +48,7 @@ try {
                 $isPlayer = $user && in_array($user['role'], ['player', 'td', 'admin']);
                 if (!$isPlayer) validateTDAccess();
                 
-                $allowed = ['format', 'note', 'target_easy', 'target_med', 'target_hard'];
+                $allowed = ['format', 'target_easy', 'target_med', 'target_hard'];
                 $data = array_intersect_key($input, array_flip($allowed));
                 $locationService->addMachineToLocation(
                     (int)$input['locationId'],
@@ -86,7 +86,7 @@ try {
                 if (empty($input['locationId']) || empty($input['machineId'])) {
                     sendJson(['error' => 'locationId and machineId are required'], 400);
                 }
-                $allowed = ['format', 'note', 'target_easy', 'target_med', 'target_hard'];
+                $allowed = ['format', 'target_easy', 'target_med', 'target_hard'];
                 $data = array_intersect_key($input, array_flip($allowed));
                 $locationService->updateLocationMachine((int)$input['locationId'], (int)$input['machineId'], $data);
                 sendJson(['success' => true]);

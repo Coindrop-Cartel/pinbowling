@@ -333,12 +333,12 @@ describe('API Client (api.js)', () => {
     it('locations management methods should target the correct API and task', async () => {
       fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
 
-      await PB_API.locations.addMachine(1, 10, { note: 'Back room' });
+      await PB_API.locations.addMachine(1, 10, { format: 'bowling' });
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('api/location.php?task=units'),
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ locationId: 1, machineId: 10, note: 'Back room' })
+          body: JSON.stringify({ locationId: 1, machineId: 10, format: 'bowling' })
         })
       );
     });

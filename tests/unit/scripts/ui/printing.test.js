@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { printMachineScores, printBlankScoreSheet } from '@ui/printing.js'; // Import actual functions
+import { printMachineScores, printBlankScoreSheet, printScoreSheet, printSeasonResults } from '@ui/printing.js'; // Import actual functions
 
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
@@ -9,6 +9,9 @@ vi.mock('@core/engine.js', () => ({
     getLastFrameHint: () => '',
     getRoundLabel: () => 'Frame',
     getBonusTargets: () => ({ t1: 13000, t2: 16900 }),
+    calculateTurnResults: () => ({ total: 100, turnResults: [] }),
+    compareScores: (a, b) => b - a,
+    formatTotalScore: (score) => String(score)
   })),
 }));
 
@@ -114,6 +117,118 @@ describe('Printing Utilities (printing.js)', () => {
       window.open.mockReturnValue(null);
       printBlankScoreSheet([]);
       expect(window.alert).toHaveBeenCalledWith('Please allow popups to print.');
+    });
+  });
+
+  describe('printScoreSheet', () => {
+    it('should open a new window, write score sheet with filled scores, and include results', () => {
+      const machines = [
+        { id: 1, machineName: 'Machine A', orderNumber: 1, values: { 10: 10000 } },
+      ];
+      const player = { playerName: 'John Doe' };
+      const scoreMap = {
+        '1': { ball1: 5000, ball2: 7500, ball3: 10000 }
+      };
+      const resultsHtml = '<div class="test-results">Inning 1 Score: 10</div>';
+
+      printScoreSheet(machines, 'Test League', 'Test Event', 'bowling', player, scoreMap, resultsHtml);
+
+      expect(window.open).toHaveBeenCalledWith('', '_blank');
+      expect(mockPrintWindow.document.write).toHaveBeenCalled();
+      const html = mockPrintWindow.document.write.mock.calls[0][0];
+      expect(html).toContain('Test League');
+      expect(html).toContain('Test Event');
+      expect(html).toContain('John Doe');
+      expect(html).toContain('5,000');
+      expect(html).toContain('7,500');
+      expect(html).toContain('10,000');
+      expect(html).toContain('test-results');
+      expect(html).toContain('Inning 1 Score: 10');
+    });
+
+    it('should call print and close after a timeout', async () => {
+      printScoreSheet([], 'L', 'E', 'bowling', {}, {}, '');
+      vi.advanceTimersByTime(250);
+      expect(mockPrintWindow.print).toHaveBeenCalledTimes(1);
+      expect(mockPrintWindow.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('should alert if window.open fails', () => {
+      window.open.mockReturnValue(null);
+      printScoreSheet([]);
+      expect(window.alert).toHaveBeenCalledWith('Please allow popups to print.');
+    });
+  });
+
+  describe('printSeasonResults', () => {
+    it('should open a new window and write season results booklet HTML', () => {
+      const league = { id: 1, name: 'My League', startDate: '2026-01-01', participants: 'individual', scoringFormat: 'bowling', seasonScoring: 'weekly', dropLowestWeeks: 1 };
+      const players = [{ id: 1, playerName: 'John Doe', ifpaNumber: '12345' }];
+      const events = [{ id: 101, eventName: 'Week 1', eventDate: '2026-01-08', locationId: 201 }];
+      const locations = [{ id: 201, name: 'Test Pinball Hall' }];
+      const allLeagueTargets = [{ id: 50, eventId: 101, machineName: 'Addams Family', orderNumber: 1, values: { 10: 10000 } }];
+      const rawScores = [{ playerId: 1, eventId: 101, orderNumber: 1, ball1: 5000, ball2: 7500, ball3: 10000 }];
+      const engine = {
+        getPrintTargetSummaryHtml: () => '<div>Strike: 10,000</div>',
+        getRoundLabel: () => 'Frame',
+        calculateTurnResults: () => ({ total: 100, turnResults: [{ orderNumber: 1, machineName: 'Addams Family', displayMark: 'Strike', displayRunningTotal: '100' }] }),
+        compareScores: (a, b) => b - a,
+        formatTotalScore: (score) => String(score)
+      };
+
+      printSeasonResults(league, players, events, locations, allLeagueTargets, rawScores, engine);
+
+      expect(window.open).toHaveBeenCalledWith('', '_blank');
+      expect(mockPrintWindow.document.write).toHaveBeenCalled();
+      const html = mockPrintWindow.document.write.mock.calls[0][0];
+      expect(html).toContain('My League');
+      expect(html).toContain('John Doe');
+      expect(html).toContain('12345');
+      expect(html).toContain('Week 1');
+      expect(html).toContain('Test Pinball Hall');
+      expect(html).toContain('Addams Family');
+      expect(html).toContain('Season Scoreboard');
+    });
+
+    it('should call print and close after a timeout', async () => {
+      const league = { id: 1, name: 'L', participants: 'individual', scoringFormat: 'bowling' };
+      printSeasonResults(league, [], [], [], [], [], {
+        calculateTurnResults: () => ({ total: 0 }),
+        compareScores: () => 0,
+        formatTotalScore: () => ''
+      });
+      vi.advanceTimersByTime(250);
+      expect(mockPrintWindow.print).toHaveBeenCalledTimes(1);
+      expect(mockPrintWindow.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('should alert if window.open fails', () => {
+      window.open.mockReturnValue(null);
+      const league = { id: 1, name: 'L', participants: 'individual', scoringFormat: 'bowling' };
+      printSeasonResults(league, [], [], [], [], [], {});
+      expect(window.alert).toHaveBeenCalledWith('Please allow popups to print.');
+    });
+
+    it('should skip player scorecard if they have no scores for that week', () => {
+      const league = { id: 1, name: 'My League', startDate: '2026-01-01', participants: 'individual', scoringFormat: 'bowling', seasonScoring: 'weekly', dropLowestWeeks: 1 };
+      const players = [{ id: 1, playerName: 'John Doe', ifpaNumber: '12345' }, { id: 2, playerName: 'Jane Smith' }];
+      const events = [{ id: 101, eventName: 'Week 1', eventDate: '2026-01-08', locationId: 201 }];
+      const locations = [{ id: 201, name: 'Test Pinball Hall' }];
+      const allLeagueTargets = [{ id: 50, eventId: 101, machineName: 'Addams Family', orderNumber: 1, values: { 10: 10000 } }];
+      const rawScores = [{ playerId: 1, eventId: 101, orderNumber: 1, ball1: 5000, ball2: 7500, ball3: 10000 }];
+      const engine = {
+        getPrintTargetSummaryHtml: () => '<div>Strike: 10,000</div>',
+        getRoundLabel: () => 'Frame',
+        calculateTurnResults: () => ({ total: 100, turnResults: [{ orderNumber: 1, machineName: 'Addams Family', displayMark: 'Strike', displayRunningTotal: '100' }] }),
+        compareScores: (a, b) => b - a,
+        formatTotalScore: (score) => String(score)
+      };
+
+      printSeasonResults(league, players, events, locations, allLeagueTargets, rawScores, engine);
+
+      const html = mockPrintWindow.document.write.mock.calls[0][0];
+      expect(html).toContain('John Doe');
+      expect(html).not.toContain('<strong>Player:</strong> Jane Smith'); // Jane Smith has no scores, so should be skipped
     });
   });
 });

@@ -281,14 +281,16 @@ class LeagueService {
         string $seasonScoring = 'weekly',
         int $dropLowestWeeks = 0,
         ?int $weeksInSeason = null,
-        int $inningsPerGame = 2
+        ?int $inningsPerGame = 2,
+        ?int $weeklyPoints = null,
+        ?int $pointSpread = null
     ): array {
         $pdo = $this->db->getPdo();
         $stmt = $pdo->prepare(
-            'INSERT INTO leagues (name, start_date, type, participants, scoring_format, season_scoring, drop_lowest_weeks, weeks_in_season, innings_per_game)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO leagues (name, start_date, type, participants, scoring_format, season_scoring, drop_lowest_weeks, weeks_in_season, innings_per_game, weekly_points, point_spread)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$name, $startDate, $type, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $inningsPerGame]);
+        $stmt->execute([$name, $startDate, $type, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $inningsPerGame, $weeklyPoints, $pointSpread]);
         return $this->getLeague((int)$pdo->lastInsertId());
     }
 
@@ -315,13 +317,15 @@ class LeagueService {
         string $seasonScoring = 'weekly',
         int $dropLowestWeeks = 0,
         ?int $weeksInSeason = null,
-        int $inningsPerGame = 2
+        ?int $inningsPerGame = 2,
+        ?int $weeklyPoints = null,
+        ?int $pointSpread = null
     ): array {
         $pdo = $this->db->getPdo();
         $stmt = $pdo->prepare(
-            'UPDATE leagues SET name = ?, start_date = ?, participants = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ?, weeks_in_season = ?, innings_per_game = ? WHERE id = ?'
+            'UPDATE leagues SET name = ?, start_date = ?, participants = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ?, weeks_in_season = ?, innings_per_game = ?, weekly_points = ?, point_spread = ? WHERE id = ?'
         );
-        $stmt->execute([$name, $startDate, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $inningsPerGame, $leagueId]);
+        $stmt->execute([$name, $startDate, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $inningsPerGame, $weeklyPoints, $pointSpread, $leagueId]);
         return $this->getLeague($leagueId);
     }
 

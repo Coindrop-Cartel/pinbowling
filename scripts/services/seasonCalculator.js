@@ -171,8 +171,19 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
 
       scoreEntities.sort((a, b) => engine.compareScores(a.total, b.total));
       eventPointsMap[event.id] = {};
+      const weeklyPointsValue = league?.weeklyPoints ? Number(league.weeklyPoints) : scoreEntities.length;
+      const pointSpreadValue = league?.pointSpread ? Number(league.pointSpread) : 1;
+
+      let lastPoints = 0;
       scoreEntities.forEach((entity, idx) => {
-        eventPointsMap[event.id][entity.id] = scoreEntities.length - idx;
+        let pts;
+        if (idx > 0 && engine.compareScores(entity.total, scoreEntities[idx - 1].total) === 0) {
+          pts = lastPoints;
+        } else {
+          pts = Math.max(0, weeklyPointsValue - idx * pointSpreadValue);
+        }
+        eventPointsMap[event.id][entity.id] = pts;
+        lastPoints = pts;
       });
     });
   }
@@ -220,9 +231,10 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
       if (hasData) {
         const displayValue = league?.seasonScoring === 'weekly' ? `${scoreValue} pts` : engine.formatTotalScore(scoreValue);
         eventTotals[event.id] = { displayValue, isDropped: false };
-        individualScores.push({ eventId: event.id, value: scoreValue });
+        individualScores.push({ eventId: event.id, value: scoreValue, hasData: true });
       } else {
-        eventTotals[event.id] = null;
+        eventTotals[event.id] = { displayValue: '-', isDropped: false };
+        individualScores.push({ eventId: event.id, value: null, hasData: false });
       }
     });
 
@@ -231,6 +243,9 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
     let scoresToSum = [...individualScores];
     if (dropCount > 0 && individualScores.length > 0) {
       scoresToSum.sort((a, b) => {
+        if (a.hasData && !b.hasData) return -1;
+        if (!a.hasData && b.hasData) return 1;
+        if (!a.hasData && !b.hasData) return 0;
         if (league?.seasonScoring === 'weekly') return b.value - a.value;
         return engine.compareScores(a.value, b.value);
       });
@@ -243,7 +258,7 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
       });
     }
 
-    totalSeasonPoints = scoresToSum.reduce((sum, s) => sum + s.value, 0);
+    totalSeasonPoints = scoresToSum.reduce((sum, s) => sum + (s.value || 0), 0);
 
     return { entity, eventTotals, totalSeasonPoints, playedTargets: isTeamLeague ? [] : getPlayedTargets(entity.id, normalizedTargetsFlat) };
   });

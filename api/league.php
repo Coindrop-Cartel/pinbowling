@@ -126,7 +126,9 @@ try {
                     $input['seasonScoring'] ?? 'weekly',
                     (int)($input['dropLowestWeeks'] ?? 0),
                     isset($input['weeksInSeason']) ? (int)$input['weeksInSeason'] : null,
-                    (int)($input['inningsPerGame'] ?? 2)
+                    isset($input['inningsPerGame']) && $input['inningsPerGame'] !== '' ? (int)$input['inningsPerGame'] : null,
+                    isset($input['weeklyPoints']) && $input['weeklyPoints'] !== '' ? (int)$input['weeklyPoints'] : null,
+                    isset($input['pointSpread']) && $input['pointSpread'] !== '' ? (int)$input['pointSpread'] : null
                 );
                 if (!$league) sendJson(['error' => 'League created but could not be retrieved.'], 500);
                 sendJson(serializeLeague($league));
@@ -159,7 +161,9 @@ try {
                     $input['seasonScoring'] ?? 'weekly',
                     (int)($input['dropLowestWeeks'] ?? 0),
                     isset($input['weeksInSeason']) ? (int)$input['weeksInSeason'] : null,
-                    (int)($input['inningsPerGame'] ?? 2)
+                    isset($input['inningsPerGame']) && $input['inningsPerGame'] !== '' ? (int)$input['inningsPerGame'] : null,
+                    isset($input['weeklyPoints']) && $input['weeklyPoints'] !== '' ? (int)$input['weeklyPoints'] : null,
+                    isset($input['pointSpread']) && $input['pointSpread'] !== '' ? (int)$input['pointSpread'] : null
                 );
                 if (!$league) sendJson(['error' => 'Resource updated but could not be retrieved.'], 500);
                 sendJson(serializeLeague($league));
@@ -201,6 +205,6 @@ try {
             sendJson(['error' => 'Unsupported request method'], 405);
     }
 
-} catch (Exception $e) {
+} catch (\Throwable $e) {
     sendJson(['error' => $e->getMessage()], 500);
 }
