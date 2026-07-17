@@ -234,4 +234,139 @@ class PlayerService {
         $stmt = $pdo->prepare("UPDATE users SET email = ? WHERE id = ?");
         return $stmt->execute([$email, $userId]);
     }
+
+    /**
+     * Merge player B into player A, updating all references and deleting player B.
+     *
+     * @param int $playerAId The player to keep
+     * @param int $playerBId The player to merge and delete
+     * @throws \Exception
+     */
+    public function mergePlayers(int $playerAId, int $playerBId): void {
+        if ($playerAId === $playerBId) {
+            throw new \InvalidArgumentException("Cannot merge a player into themselves.");
+        }
+
+        $pdo = $this->db->getPdo();
+        try {
+            $pdo->beginTransaction();
+
+            // Update player A's IFPA and MatchPlay IDs if A doesn't have them but B does
+            $playerA = $this->getPlayer($playerAId);
+            $playerB = $this->getPlayer($playerBId);
+            if ($playerA && $playerB) {
+                $updateFields = [];
+                $updateParams = [];
+                if (empty($playerA['ifpa_id']) && !empty($playerB['ifpa_id'])) {
+                    $updateFields[] = "ifpa_id = ?";
+                    $updateParams[] = $playerB['ifpa_id'];
+                }
+                if (empty($playerA['matchplay_id']) && !empty($playerB['matchplay_id'])) {
+                    $updateFields[] = "matchplay_id = ?";
+                    $updateParams[] = $playerB['matchplay_id'];
+                }
+                if (!empty($updateFields)) {
+                    $updateParams[] = $playerAId;
+                    $stmt = $pdo->prepare("UPDATE players SET " . implode(", ", $updateFields) . " WHERE id = ?");
+                    $stmt->execute($updateParams);
+                }
+            }
+
+            // 1. Handle Users merge
+            $stmt = $pdo->prepare("SELECT id, role FROM users WHERE player_id = ?");
+            $stmt->execute([$playerBId]);
+            $userB = $stmt->fetch();
+
+            if ($userB) {
+                $stmt = $pdo->prepare("SELECT id, role FROM users WHERE player_id = ?");
+                $stmt->execute([$playerAId]);
+                $userA = $stmt->fetch();
+
+                if ($userA) {
+                    // Both have user accounts. Promote A's role if B's role is higher.
+                    $rolesOrder = ['player' => 1, 'td' => 2, 'admin' => 3];
+                    $roleA = $userA['role'] ?? 'player';
+                    $roleB = $userB['role'] ?? 'player';
+                    if (($rolesOrder[$roleB] ?? 0) > ($rolesOrder[$roleA] ?? 0)) {
+                        $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE id = ?");
+                        $stmt->execute([$roleB, $userA['id']]);
+                    }
+
+                    // Transfer league staff associations
+                    $stmt = $pdo->prepare("
+                        DELETE ls_b FROM league_staff ls_b
+                        INNER JOIN league_staff ls_a ON ls_b.league_id = ls_a.league_id
+                        WHERE ls_b.user_id = ? AND ls_a.user_id = ?
+                    ");
+                    $stmt->execute([$userB['id'], $userA['id']]);
+
+                    $stmt = $pdo->prepare("UPDATE league_staff SET user_id = ? WHERE user_id = ?");
+                    $stmt->execute([$userA['id'], $userB['id']]);
+
+                    // Delete player B's user row
+                    $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+                    $stmt->execute([$userB['id']]);
+                } else {
+                    // Player A does not have a user account. Transfer B's user account to A.
+                    $stmt = $pdo->prepare("UPDATE users SET player_id = ? WHERE id = ?");
+                    $stmt->execute([$playerAId, $userB['id']]);
+                }
+            }
+
+            // 2. Merge Scores
+            // Delete scores of player B that conflict with player A's existing scores
+            $stmt = $pdo->prepare("
+                DELETE s_b FROM scores s_b
+                INNER JOIN scores s_a ON s_b.event_id = s_a.event_id AND s_b.order_number = s_a.order_number
+                WHERE s_b.player_id = ? AND s_a.player_id = ?
+            ");
+            $stmt->execute([$playerBId, $playerAId]);
+
+            // Update remaining scores of player B to player A
+            $stmt = $pdo->prepare("UPDATE scores SET player_id = ? WHERE player_id = ?");
+            $stmt->execute([$playerAId, $playerBId]);
+
+            // 3. Merge League Players
+            // Delete duplicate league player rows for player B
+            $stmt = $pdo->prepare("
+                DELETE lp_b FROM league_players lp_b
+                INNER JOIN league_players lp_a ON lp_b.league_id = lp_a.league_id
+                WHERE lp_b.player_id = ? AND lp_a.player_id = ?
+            ");
+            $stmt->execute([$playerBId, $playerAId]);
+
+            // Update remaining league player rows to player A
+            $stmt = $pdo->prepare("UPDATE league_players SET player_id = ? WHERE player_id = ?");
+            $stmt->execute([$playerAId, $playerBId]);
+
+            // 4. Merge Team Members
+            // Delete duplicate team member rows for player B
+            $stmt = $pdo->prepare("
+                DELETE tm_b FROM team_members tm_b
+                INNER JOIN team_members tm_a ON tm_b.team_id = tm_a.team_id
+                WHERE tm_b.player_id = ? AND tm_a.player_id = ?
+            ");
+            $stmt->execute([$playerBId, $playerAId]);
+
+            // Update remaining team member rows to player A
+            $stmt = $pdo->prepare("UPDATE team_members SET player_id = ? WHERE player_id = ?");
+            $stmt->execute([$playerAId, $playerBId]);
+
+            // 5. Merge Matchups
+            // Update player B's matchups to player A
+            $stmt = $pdo->prepare("UPDATE matchups SET player_id = ? WHERE player_id = ?");
+            $stmt->execute([$playerAId, $playerBId]);
+
+            // 6. Delete player B's player record
+            $stmt = $pdo->prepare("DELETE FROM players WHERE id = ?");
+            $stmt->execute([$playerBId]);
+
+            $pdo->commit();
+        } catch (\Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
 }

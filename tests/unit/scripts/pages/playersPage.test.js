@@ -17,6 +17,7 @@ vi.mock('@services/api.js', () => ({
       delete: vi.fn(),
       updatePassword: vi.fn(),
       updateRole: vi.fn(),
+      merge: vi.fn(),
     },
   },
 }));
@@ -41,6 +42,7 @@ const uiMocks = vi.hoisted(() => ({
   showPrompt: vi.fn(),
   showChoiceDialog: vi.fn(),
   showAlert: vi.fn(),
+  showPlayerSelectionDialog: vi.fn(() => Promise.resolve('11')),
   createExpandableRow: vi.fn((container, options) => {
     const row = document.createElement(options.tag || 'div');
     row.innerHTML = options.headerHtml + (options.contentHtml || '');
@@ -871,6 +873,70 @@ describe('Player Management Page (playersPage.js)', () => {
       const roleBtn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Change Role'));
       expect(resetBtn.classList.contains('hidden')).toBe(false);
       expect(roleBtn.classList.contains('hidden')).toBe(false);
+    });
+  });
+
+  describe('Merge Players', () => {
+    it('should show merge button for admin users', async () => {
+      await initPlayersPage();
+      const mergeBtns = document.querySelectorAll('.merge-player-btn');
+      expect(mergeBtns.length).toBe(2); // One for Alice, one for Bob
+    });
+
+    it('should not show merge button for TD or Player users', async () => {
+      PB_API.auth.me.mockResolvedValue({ id: 2, role: 'td', player_id: 99 });
+      await initPlayersPage();
+      const mergeBtns = document.querySelectorAll('.merge-player-btn');
+      expect(mergeBtns.length).toBe(0);
+    });
+
+    it('should call PB_API.players.merge on confirmation', async () => {
+      PB_API.players.merge.mockResolvedValue({ success: true });
+      uiMocks.showPlayerSelectionDialog.mockResolvedValue('11'); // Select Bob to merge into Alice
+      uiMocks.showConfirm.mockResolvedValue(true);
+
+      await initPlayersPage();
+      const mergeBtns = document.querySelectorAll('.merge-player-btn');
+      // Click merge on Alice (id: 10)
+      mergeBtns[0].click();
+
+      await vi.waitFor(() => {
+        expect(uiMocks.showPlayerSelectionDialog).toHaveBeenCalledWith(
+          'Merge Player Accounts',
+          expect.stringContaining('Select the duplicate player account that should be merged INTO'),
+          expect.any(Array),
+          'Merge Accounts'
+        );
+        expect(uiMocks.showConfirm).toHaveBeenCalled();
+        expect(PB_API.players.merge).toHaveBeenCalledWith(10, 11);
+        expect(uiMocks.showAlert).toHaveBeenCalledWith(
+          expect.stringContaining('Successfully merged'),
+          'Merge Complete'
+        );
+      });
+    });
+
+    it('should handle cancel selection', async () => {
+      uiMocks.showPlayerSelectionDialog.mockResolvedValue(null);
+      await initPlayersPage();
+      const mergeBtns = document.querySelectorAll('.merge-player-btn');
+      mergeBtns[0].click();
+
+      await vi.waitFor(() => {
+        expect(PB_API.players.merge).not.toHaveBeenCalled();
+      });
+    });
+
+    it('should handle cancel confirmation', async () => {
+      uiMocks.showPlayerSelectionDialog.mockResolvedValue('11');
+      uiMocks.showConfirm.mockResolvedValue(false);
+      await initPlayersPage();
+      const mergeBtns = document.querySelectorAll('.merge-player-btn');
+      mergeBtns[0].click();
+
+      await vi.waitFor(() => {
+        expect(PB_API.players.merge).not.toHaveBeenCalled();
+      });
     });
   });
 });

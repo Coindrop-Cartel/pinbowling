@@ -107,6 +107,7 @@ export const PB_API = {
     delete: (id) => fetchJSON(`api/player.php?id=${id}`, { method: 'DELETE' }),
     updatePassword: (userId, password) => fetchJSON(`api/auth.php?task=reset&id=${userId}`, { method: 'POST', body: JSON.stringify({ password }) }),
     updateRole: (userId, role) => fetchJSON(`api/player.php?task=role&id=${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
+    merge: (playerAId, playerBId) => fetchJSON('api/player.php?task=merge', { method: 'POST', body: JSON.stringify({ playerAId, playerBId }) }),
   },
 
   machines: {

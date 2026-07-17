@@ -34,6 +34,21 @@ try {
 
         case 'POST':
             validateAdminAccess();
+
+            if ($task === 'merge') {
+                $playerAId = $input['playerAId'] ?? null;
+                $playerBId = $input['playerBId'] ?? null;
+                if (!$playerAId || !$playerBId) {
+                    sendJson(['error' => 'playerAId and playerBId are required'], 400);
+                }
+                try {
+                    $playerService->mergePlayers((int)$playerAId, (int)$playerBId);
+                    sendJson(['success' => true]);
+                } catch (\Exception $e) {
+                    sendJson(['error' => $e->getMessage()], 400);
+                }
+                break;
+            }
             
             if (empty($input['playerName'])) {
                 sendJson(['error' => 'playerName is required'], 400);

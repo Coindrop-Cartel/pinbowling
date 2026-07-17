@@ -1,6 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { requireAdmin, can, PERMISSIONS } from '@services/auth.js';
-import { showAlert, showPrompt, showChoiceDialog, showConfirm } from '@ui/dialogs.js';
+import { showAlert, showPrompt, showChoiceDialog, showConfirm, showPlayerSelectionDialog } from '@ui/dialogs.js';
 import { createExpandableRow, setupLiveFilter, createSkeletonLoader } from '@ui/selectors.js';
 import { escapeHTML } from '@scripts/utils.js';
 
@@ -147,6 +147,7 @@ export async function initPlayersPage() {
             ${!p.ifpaId && !p.matchplayId ? '<div class="muted-italic">No external IDs linked.</div>' : ''}
             <div class="small-action-buttons mt-10">
               ${canEdit ? `<button type="button" class="edit-player-btn secondary btn-row">Edit</button>` : ''}
+              ${isAdmin ? `<button type="button" class="merge-player-btn secondary btn-row">Merge</button>` : ''}
               ${isAdmin ? `<button type="button" class="delete-player-btn-inline btn-row">Delete</button>` : ''}
             </div>
           </div>
@@ -169,6 +170,9 @@ export async function initPlayersPage() {
 
         const editBtn = row.querySelector('.edit-player-btn');
         if (editBtn) editBtn.onclick = (e) => { e.stopPropagation(); editPlayer(Number(p.id)); };
+
+        const mergeBtn = row.querySelector('.merge-player-btn');
+        if (mergeBtn) mergeBtn.onclick = (e) => { e.stopPropagation(); mergePlayer(Number(p.id)); };
 
         const delBtn = row.querySelector('.delete-player-btn-inline');
         if (delBtn) delBtn.onclick = (e) => { e.stopPropagation(); deletePlayer(Number(p.id)); };
@@ -414,6 +418,44 @@ export async function initPlayersPage() {
       await refresh();
     } catch (error) {
       alert(`Error deleting player: ${error.message}`);
+    }
+  }
+
+  async function mergePlayer(keepPlayerId) {
+    const keepPlayer = allPlayers.find(p => p.id === keepPlayerId);
+    if (!keepPlayer) return;
+
+    const options = allPlayers
+      .filter(p => p.id !== keepPlayerId)
+      .map(p => ({ value: p.id, label: p.playerName }));
+
+    const mergePlayerId = await showPlayerSelectionDialog(
+      'Merge Player Accounts',
+      `Select the duplicate player account that should be merged INTO <strong>${escapeHTML(keepPlayer.playerName)}</strong>.`,
+      options,
+      'Merge Accounts'
+    );
+
+    if (!mergePlayerId) return;
+
+    const mergePlayerObj = allPlayers.find(p => p.id === Number(mergePlayerId));
+    if (!mergePlayerObj) return;
+
+    if (!await showConfirm(
+      `WARNING: You are about to merge player "${escapeHTML(mergePlayerObj.playerName)}" INTO "${escapeHTML(keepPlayer.playerName)}".<br><br>` +
+      `This will permanently delete the account for "${escapeHTML(mergePlayerObj.playerName)}" and transfer all of their scores, matchups, league memberships, and team memberships to "${escapeHTML(keepPlayer.playerName)}".<br><br>` +
+      `This action cannot be undone. Are you sure you want to proceed?`,
+      'Confirm Merge Accounts'
+    )) {
+      return;
+    }
+
+    try {
+      await PB_API.players.merge(keepPlayerId, Number(mergePlayerId));
+      await refresh();
+      showAlert(`Successfully merged "${escapeHTML(mergePlayerObj.playerName)}" into "${escapeHTML(keepPlayer.playerName)}".`, 'Merge Complete');
+    } catch (error) {
+      alert(`Error merging players: ${error.message}`);
     }
   }
 
