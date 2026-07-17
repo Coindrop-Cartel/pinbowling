@@ -180,6 +180,7 @@ export async function initLeaguesPage() {
     actionsRow.classList.add('hidden');
 
     if (leagueFormatInput) leagueFormatInput.disabled = false;
+    if (leagueParticipantsInput) leagueParticipantsInput.disabled = false;
 
     if (createToggle) {
       createToggle.textContent = 'Create League';
@@ -218,6 +219,14 @@ export async function initLeaguesPage() {
     
     window.scrollTo({ top: 0, behavior: 'smooth' });
     applyPreferredTheme(leagueFormatInput.value);
+
+    // Disable scoring format and league type if the league has events
+    const hasEvents = league.events && league.events.length > 0;
+    if (leagueFormatInput) leagueFormatInput.disabled = hasEvents;
+    if (leagueParticipantsInput) leagueParticipantsInput.disabled = hasEvents;
+
+    // Refresh the update button enabled/disabled state
+    if (filterInstance) filterInstance.performFilter();
   }
 
   /**
@@ -299,6 +308,13 @@ export async function initLeaguesPage() {
   });
 
   leagueDateInput.oninput = () => filterInstance.performFilter();
+
+  if (leagueFormatInput) leagueFormatInput.addEventListener('change', () => filterInstance.performFilter());
+  if (leagueSeasonScoringInput) leagueSeasonScoringInput.addEventListener('change', () => filterInstance.performFilter());
+  if (leagueParticipantsInput) leagueParticipantsInput.addEventListener('change', () => filterInstance.performFilter());
+  if (leagueDropLowestInput) leagueDropLowestInput.addEventListener('input', () => filterInstance.performFilter());
+  if (leagueWeeksInput) leagueWeeksInput.addEventListener('input', () => filterInstance.performFilter());
+  if (leagueInningsInput) leagueInningsInput.addEventListener('input', () => filterInstance.performFilter());
 
   const refresh = async (data = null) => {
     try {

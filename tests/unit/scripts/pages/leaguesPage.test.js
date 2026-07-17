@@ -717,4 +717,43 @@ describe('Leagues Page (leaguesPage.js)', () => {
       expect(PB_API.leagues.updateSeason).toHaveBeenCalledWith(1);
     });
   });
+
+  it('should lock scoring format and league type when editing a league with events', async () => {
+    isManagementAuthorized.mockResolvedValue(true);
+    const mockLeagueWithEvents = {
+      id: 1,
+      name: 'League With Events',
+      participants: 'individual',
+      scoringFormat: 'bowling',
+      players: [],
+      events: [{ id: 10, eventName: 'Week 1', matchups: [] }]
+    };
+    PB_API.leagues.getAll.mockResolvedValue([mockLeagueWithEvents]);
+    PB_API.players.getAll.mockResolvedValue([]);
+
+    await initLeaguesPage();
+
+    // Expand the league card
+    const header = document.querySelector('.league-header');
+    header.click();
+
+    // Click edit league button
+    const editBtn = document.querySelector('.edit-league-btn');
+    expect(editBtn).not.toBeNull();
+    editBtn.click();
+
+    // Verify format and participant inputs are disabled
+    const formatInput = document.getElementById('league-scoring-format');
+    const participantsInput = document.getElementById('league-participants');
+    expect(formatInput.disabled).toBe(true);
+    expect(participantsInput.disabled).toBe(true);
+
+    // Cancel / reset the form
+    const toggleBtn = document.getElementById('create-league-toggle');
+    toggleBtn.click(); // Cancels the edit and resets
+
+    // Verify they are re-enabled
+    expect(formatInput.disabled).toBe(false);
+    expect(participantsInput.disabled).toBe(false);
+  });
 });
