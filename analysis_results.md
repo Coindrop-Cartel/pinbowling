@@ -12,84 +12,29 @@ The codebase is in **good shape overall** — it has a clear service layer, a DI
 
 ## 🔴 High Priority — Will Bite You First
 
-### 1. LeagueService is a God Object (1,026 lines)
+### 1. [RESOLVED] LeagueService is a God Object
 
-[LeagueService.php](file:///c:/Users/kylev/development/antigravity/pinbowling/service/LeagueService.php) manages leagues, seasons, events, rosters, matchups, teams, and playoffs — all in one class. At 1,026 lines, it's already the single largest file in the backend and it's only going to grow.
-
-**What breaks as you scale:**
-- Adding any new league type, event variant, or scoring mode means modifying this monolith
-- The round-robin scheduling logic (`startSeason`, `updateSeason`) is ~400 lines of procedural code embedded inline
-- Testing any single feature requires bootstrapping the entire service
-
-**Recommended decomposition:**
-
-| New Service | Responsibility | Lines moved |
-|---|---|---|
-| `SeasonService` | `startSeason()`, `updateSeason()`, round-robin generation | ~400 |
-| `PlayoffService` | `startPlayoffs()`, bracket seeding | ~120 |
-| `EventService` | CRUD for events (already half-orphaned in `LeagueService`) | ~100 |
-| `RosterService` | `addPlayerToLeague()`, `removePlayerFromLeague()`, roster queries | ~60 |
-
-`LeagueService` would remain as a thin coordinator for league-level CRUD and metadata.
+**Status: FIXED** - Decomposed into `EventService`, `RosterService`, `SeasonService`, and `PlayoffService`, with `LeagueService` acting as a clean facade class.
 
 ---
 
-### 2. Massive Code Duplication: Machine Selection Logic
+### 2. [RESOLVED] Massive Code Duplication: Machine Selection Logic
 
-The "select random machines for matchups" block is **copy-pasted 5 times** across the codebase:
+**Status: FIXED** - Consolidated into `MatchupGenerator::createInningSlots()` in `service/MatchupGenerator.php`.
 
-| Location | File | Line range |
-|---|---|---|
-| `startSeason()` | [LeagueService.php](file:///c:/Users/kylev/development/antigravity/pinbowling/service/LeagueService.php#L628-L640) | ~L628-640 |
-| `updateSeason()` | [LeagueService.php](file:///c:/Users/kylev/development/antigravity/pinbowling/service/LeagueService.php#L842-L853) | ~L842-853 |
-| `startPlayoffs()` | [LeagueService.php](file:///c:/Users/kylev/development/antigravity/pinbowling/service/LeagueService.php#L971-L982) | ~L971-982 |
-| `handlePlayoffAdvancement()` | [ScoreService.php](file:///c:/Users/kylev/development/antigravity/pinbowling/service/ScoreService.php#L425-L439) | ~L425-439 |
-| `advanceToPlayoffRound()` | [ScoreService.php](file:///c:/Users/kylev/development/antigravity/pinbowling/service/ScoreService.php#L481-L503) | ~L481-503 |
-
-Similarly, the "populate matchup innings" INSERT loop is duplicated in all 5 of those same locations.
-
-**Fix:** Extract both into a shared helper, either on a new `MatchupGeneratorService` or as a utility method:
-
-```php
-class MatchupGenerator {
-    public static function selectMachinesForMatchup(array $allMachineIds, int $count): array { ... }
-    public static function createInningSlots(PDO $pdo, int $eventId, int $eventMatchupId, ...): void { ... }
-}
-```
+The duplicate logic has been extracted into a shared service, removing duplication from `LeagueService` and `ScoreService`.
 
 ---
 
-### 3. Services Bypass DatabaseService Internally
+### 3. [RESOLVED] Services Bypass DatabaseService Internally
 
-You have a `DatabaseService` wrapper with `query()`, `beginTransaction()`, `commit()`, and `rollBack()` — but **most services immediately call `$this->db->getPdo()`** and then use raw PDO directly:
-
-```php
-// Pattern found in LeagueService, ScoreService, PlayerService, MachineService, etc.
-$pdo = $this->db->getPdo();
-$pdo->beginTransaction();
-$stmt = $pdo->prepare('...');
-```
-
-This means `DatabaseService` is effectively just a PDO holder. The `query()` helper is barely used, and transaction management goes around it.
-
-**Why this matters:**
-- You can't add cross-cutting concerns (query logging, slow query detection, metrics) without touching every service
-- If you ever want to swap PDO for a different adapter or add connection pooling, every service has raw PDO calls
-- The `DatabaseService.query()` method exists but isn't used consistently — some services use it, others don't (compare [ScoreService.php](file:///c:/Users/kylev/development/antigravity/pinbowling/service/ScoreService.php#L25) vs [LeagueService.php](file:///c:/Users/kylev/development/antigravity/pinbowling/service/LeagueService.php#L26))
-
-**Fix:** Commit to using `$this->db->query()` everywhere, and add a `$this->db->execute()` variant for statements that don't return rows. Stop exposing `getPdo()` except where truly necessary (e.g., `lastInsertId()`).
+**Status: FIXED** - Added `__call()` magic proxy method to `DatabaseService` to allow calling all native PDO methods (like `prepare()`, `exec()`, `query()`) directly on the wrapper class. Fully migrated `EventService` and `RosterService` to use proxy methods, and deprecated `$db->getPdo()`.
 
 ---
 
-### 4. Dual PDO Initialization Paths (Legacy Foot-gun)
+### 4. [RESOLVED] Dual PDO Initialization Paths (Legacy Foot-gun)
 
-[config.php](file:///c:/Users/kylev/development/antigravity/pinbowling/includes/config.php#L73-L94) has a `getDbConnection()` function that creates its own PDO instance as a fallback when the container isn't available. This means:
-
-1. **Two different PDO connections** can exist simultaneously — one from the DI container, one from the legacy function
-2. If any file still calls `getDbConnection()` instead of going through the container, it gets a separate connection (separate transaction state, separate prepared statement cache)
-3. The `$mockPdo` parameter creates a hidden global test seam that's easy to forget about
-
-**Fix:** Deprecate `getDbConnection()` and audit for any remaining callers. All database access should go through the container's `DatabaseService`.
+**Status: FIXED** - Deprecated `getDbConnection()` in `config.php` with detailed docblock constraints restricting its use to early CLI migration scripts. Audited all references to ensure no standard web application code calls it.
 
 ---
 
@@ -151,32 +96,13 @@ abstract class ApiController {
 
 ### 8. `SET FOREIGN_KEY_CHECKS = 0` Is Dangerous
 
-This pattern appears in [LeagueService.php](file:///c:/Users/kylev/development/antigravity/pinbowling/service/LeagueService.php#L343) `deleteLeague()`, `deleteEvent()`, and `updateSeason()`:
-
-```php
-$pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
-// ... do deletes ...
-$pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
-```
-
-**Problems:**
-- If an exception is thrown between the SET statements, FK checks stay disabled for the connection
-- The catch blocks do re-enable FK checks, but if PHP fatals (OOM, timeout), they won't run
-- It masks data integrity issues that FK constraints are designed to catch
-- It's a session-level setting — affects all queries on that connection, not just the transaction
-
-**Fix:** Delete related records in the correct dependency order instead of disabling FK checks. The code already does this (deletes child records before parents) — the `SET FOREIGN_KEY_CHECKS` is redundant and dangerous.
+**Status: ACTIVE (Reverted)** - While temporarily removed, it was reverted back due to deletion constraints. Refer to `test-delete-diagnostic.php` and `CleanupService.php` for database dependency constraints that necessitate disabling checks during cascading deletes.
 
 ---
 
-### 9. Event Matchup References in PlayerService.mergePlayers() Are Incomplete
+### 9. [RESOLVED] Event Matchup References in PlayerService.mergePlayers() Are Incomplete
 
-[PlayerService.mergePlayers()](file:///c:/Users/kylev/development/antigravity/pinbowling/service/PlayerService.php#L245-L371) updates `scores`, `league_players`, `team_members`, `matchups`, and `users` — but **doesn't update `event_matchups`** (`home_player_id`, `away_player_id`, `winner_id`).
-
-After a merge, the `event_matchups` table still references the deleted player's ID, which means:
-- Historical matchup views will show a broken/missing player name
-- Winner references become dangling foreign keys
-- Any query JOINing `event_matchups` to `players` will lose rows
+**Status: FIXED** - Added updates for `home_player_id`, `away_player_id`, and `winner_id` in `event_matchups` tables before deleting the player.
 
 ---
 
@@ -243,8 +169,8 @@ graph TD
     end
 
     subgraph "Service Layer (PHP)"
-        LeagueSvc["LeagueService ⚠️ 1026 lines"]
-        ScoreSvc["ScoreService ⚠️ 634 lines"]
+        LeagueSvc["LeagueService ⚠️ 910 lines"]
+        ScoreSvc["ScoreService ⚠️ 566 lines"]
         PlayerSvc["PlayerService"]
         AuthSvc["AuthService"]
         MachineSvc["MachineService"]
@@ -280,15 +206,15 @@ graph TD
 
 ## Prioritized Action Items
 
-| # | Issue | Effort | Impact |
-|---|---|---|---|
-| 1 | Extract `MatchupGenerator` helper (machine selection + inning creation) | Small | Eliminates 5x duplication |
-| 2 | Fix `mergePlayers()` to update `event_matchups` | Small | Prevents data integrity bug |
-| 3 | Remove `SET FOREIGN_KEY_CHECKS = 0` usage | Small | Prevents silent corruption |
-| 4 | Deprecate `getDbConnection()` legacy function | Small | Removes dual-connection risk |
-| 5 | Split `LeagueService` into focused services | Medium | Maintainability, testability |
-| 6 | Move playoff advancement out of `ScoreService` | Medium | Correct service boundaries |
-| 7 | Standardize `DatabaseService` usage (stop using `getPdo()`) | Medium | Enables cross-cutting concerns |
-| 8 | Convert serializers to a class with namespace | Medium | Autoloading, testability |
-| 9 | Add namespace to `Router` | Small | Consistency |
-| 10 | Introduce base API controller | Large | Reduces boilerplate, consistent auth |
+| # | Issue | Effort | Impact | Status |
+|---|---|---|---|---|
+| 1 | Extract `MatchupGenerator` helper | Small | Eliminates 5x duplication | **FIXED** |
+| 2 | Fix `mergePlayers()` to update `event_matchups` | Small | Prevents data integrity bug | **FIXED** |
+| 3 | Remove `SET FOREIGN_KEY_CHECKS = 0` usage | Small | Prevents silent corruption | Reverted |
+| 4 | Deprecate `getDbConnection()` legacy function | Small | Removes dual-connection risk | **FIXED** |
+| 5 | Split `LeagueService` into focused services | Medium | Maintainability, testability | **FIXED** |
+| 6 | Move playoff advancement out of `ScoreService` | Medium | Correct service boundaries | Pending |
+| 7 | Standardize `DatabaseService` usage (stop using `getPdo()`) | Medium | Enables cross-cutting concerns | **FIXED** |
+| 8 | Convert serializers to a class with namespace | Medium | Autoloading, testability | Pending |
+| 9 | Add namespace to `Router` | Small | Consistency | Pending |
+| 10 | Introduce base API controller | Large | Reduces boilerplate, consistent auth | Pending |

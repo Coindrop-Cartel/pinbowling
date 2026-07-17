@@ -22,11 +22,22 @@ class DatabaseService {
 
     /**
      * Retrieve the raw PDO connection instance.
+     * @deprecated Use the delegated methods directly on DatabaseService instead (e.g. $db->prepare()).
      *
      * @return PDO The underlying PDO connection instance.
      */
     public function getPdo(): PDO {
         return $this->pdo;
+    }
+
+    /**
+     * Delegate any unrecognized method calls directly to the underlying PDO connection.
+     * This makes DatabaseService a drop-in proxy for PDO, allowing services to call
+     * PDO methods directly on DatabaseService (e.g., $this->db->prepare(...)) without
+     * needing to bypass it via getPdo().
+     */
+    public function __call(string $name, array $arguments) {
+        return call_user_func_array([$this->pdo, $name], $arguments);
     }
 
     /**

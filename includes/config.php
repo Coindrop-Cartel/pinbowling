@@ -68,6 +68,11 @@ $dbDsn = "mysql:host={$dbConfig['host']};port={$dbConfig['port']};dbname={$dbCon
 
 /**
  * Established a singleton PDO connection to the MySQL database.
+ * 
+ * @deprecated Web application code should NOT call this function. Instead, retrieve
+ * the DatabaseService instance from the DI Container: $container->get(DatabaseService::class).
+ * This function is retained strictly for early bootstrap CLI migration scripts.
+ * 
  * @return PDO
  */
 function getDbConnection($mockPdo = null) {

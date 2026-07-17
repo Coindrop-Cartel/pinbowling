@@ -45,6 +45,7 @@ class CleanupService {
         
         try {
             $pdo->beginTransaction();
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
 
             $idPlaceholders = implode(',', array_fill(0, count($leagueIds), '?'));
 
@@ -80,6 +81,7 @@ class CleanupService {
             $sql = "DELETE FROM leagues WHERE id IN ($idPlaceholders)";
             $pdo->prepare($sql)->execute($leagueIds);
 
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
             $pdo->commit();
 
             return [
@@ -88,6 +90,7 @@ class CleanupService {
                 'deletedCount' => count($leagueIds)
             ];
         } catch (\PDOException $e) {
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
@@ -105,6 +108,7 @@ class CleanupService {
         
         try {
             $pdo->beginTransaction();
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
 
             // Find players with no user account and no scores
             $stmt = $pdo->query(
@@ -139,6 +143,7 @@ class CleanupService {
             $sql = "DELETE FROM players WHERE id IN ($idPlaceholders)";
             $pdo->prepare($sql)->execute($playerIds);
 
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
             $pdo->commit();
 
             return [
@@ -147,6 +152,7 @@ class CleanupService {
                 'deletedCount' => count($playerIds)
             ];
         } catch (\PDOException $e) {
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
