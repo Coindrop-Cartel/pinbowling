@@ -1,14 +1,20 @@
 import { PB_API } from '@services/api.js';
-import { requireAdmin, can, PERMISSIONS } from '@services/auth.js';
+import { can, PERMISSIONS } from '@services/auth.js';
+import { showAlert, showAuthDialog, showConfirm, showPrompt } from '@ui/dialogs.js';
+import { ROUTE_PATHS } from '@scripts/routes.js';
+import { loadPage, escapeHTML } from '@scripts/utils.js';
+import { renderActionSummary } from '@ui/selectors.js';
 import { setDebugEnabled } from '@services/state.js';
-import { showPrompt, showConfirm, showAlert, showAuthDialog } from '@ui/dialogs.js';
-import { renderActionSummary, initTournamentSelector } from '@ui/selectors.js';
-import { navigateTo } from '@scripts/utils.js';
-import { ROUTES } from '@scripts/routes.js';
 
 /**
- * Logic for the System Management page.
- * Provides tools for password resets and database maintenance.
+ * Logic for the Management admin panel (password-protected tools and settings).
+ * @module pages/management
+ */
+
+/**
+ * Initializes the Management page: authenticates the admin user and reveals admin tools.
+ * @async
+ * @returns {Promise<void>}
  */
 export async function initManagementPage() {
   const authNotice = document.getElementById('management-auth-notice');
@@ -20,7 +26,7 @@ export async function initManagementPage() {
    */
   const initialize = async () => {
     const [user, isAuthorized] = await Promise.all([
-      PB_API.getCurrentUser(),
+      PB_API.auth.me(),
       can(PERMISSIONS.RUN_CLEANUP) // Maintenance check
     ]);
 
@@ -29,9 +35,7 @@ export async function initManagementPage() {
     } else if (user) {
       // Logged in but not an admin? Shoo!
       showAlert('Administrator access is required for system maintenance.', 'Access Denied');
-      // Casting ROUTES to any to allow property access on the array type
-      const routes = /** @type {any} */ (ROUTES);
-      navigateTo(routes.HOME());
+      loadPage(ROUTE_PATHS.HOME());
       return;
     }
     renderVersionInfo();
@@ -44,52 +48,151 @@ export async function initManagementPage() {
     authNotice?.classList.add('hidden');
     toolsSection?.classList.remove('hidden');
 
-    renderActionSummary(toolsSection, 'System Maintenance', [
-      { text: 'Run Database Cleanup', onclick: handleCleanup, hidden: user.role !== 'admin' }
-    ]);
+    const actionSummary = document.getElementById('mgmt-action-summary');
+    if (actionSummary) {
+      renderActionSummary(actionSummary, `System Maintenance for ${escapeHTML(user.username)}`, []);
+    }
+
+    const cleanupBtn = document.getElementById('mgmt-run-cleanup-btn');
+    if (cleanupBtn) {
+      if (user.role === 'admin') {
+        cleanupBtn.classList.remove('hidden');
+      } else {
+        cleanupBtn.classList.add('hidden');
+      }
+    }
+
+    const diagSection = document.getElementById('mgmt-diagnostics-section');
+    if (diagSection) {
+      if (user.role === 'admin') {
+        diagSection.classList.remove('hidden');
+        // Automatically fetch diagnostics when the admin tools are revealed
+        const loadDiagBtn = document.getElementById('mgmt-load-diag-btn');
+        if (loadDiagBtn) {
+          loadDiagBtn.click();
+        }
+      } else {
+        diagSection.classList.add('hidden');
+      }
+    }
   };
 
   /**
    * Adds a subtle version indicator to the bottom of the management tools.
    */
   const renderVersionInfo = () => {
-    if (document.getElementById('mgmt-ui-version') || !toolsSection) return;
-    if (window['PB_DEBUG_MODE']) console.log('[Management] Rendering version footer. current state:', window['PB_DEBUG_MODE']);
+    const versionInfo = document.getElementById('mgmt-ui-version');
+    if (!versionInfo || !toolsSection) return;
 
-    const versionInfo = document.createElement('div');
-    versionInfo.id = 'mgmt-ui-version';
-    versionInfo.style = "margin-top: 3rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; opacity: 0.5;";
+    versionInfo.classList.remove('hidden');
+    const versionText = document.getElementById('mgmt-ui-version-text');
+    if (versionText) versionText.textContent = `System UI Version: ${window['PB_UI_VERSION'] || '1.0.0'}`;
 
-    // Debug Mode Toggle
-    const debugLabel = document.createElement('label');
-    debugLabel.style = "display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;";
-    debugLabel.innerHTML = `
-      <input type="checkbox" id="mgmt-debug-toggle" style="margin:0;">
-      <span>Debug Logs</span>
-    `;
-    
-    const debugToggle = debugLabel.querySelector('input');
-    if (window['PB_DEBUG_MODE']) console.log('[Management] Syncing checkbox UI with window.PB_DEBUG_MODE:', window['PB_DEBUG_MODE']);
+    const debugToggle = document.getElementById('mgmt-debug-toggle');
     if (debugToggle) {
       debugToggle.checked = Boolean(window['PB_DEBUG_MODE']); // Explicitly sync state from global variable
-
       debugToggle.onchange = () => {
         const isEnabled = debugToggle.checked;
         window['PB_DEBUG_MODE'] = isEnabled;
         setDebugEnabled(isEnabled);
       };
     }
-
-    const versionText = document.createElement('span');
-    versionText.textContent = `System UI Version: ${window['PB_UI_VERSION'] || '1.0.0'}`;
-
-    versionInfo.appendChild(debugLabel);
-    versionInfo.appendChild(versionText);
-    if (toolsSection) (toolsSection.parentElement || document.body).appendChild(versionInfo);
   };
 
+  const loadDiagBtn = document.getElementById('mgmt-load-diag-btn');
+  const diagResults = document.getElementById('mgmt-diag-results');
+
+  if (loadDiagBtn) {
+    loadDiagBtn.addEventListener('click', async () => {
+      loadDiagBtn.disabled = true;
+      loadDiagBtn.textContent = 'Loading...';
+      try {
+        const diag = await PB_API.system.fetchDiagnostics();
+        
+        const statusEl = document.getElementById('diag-status');
+        const tsRow = document.getElementById('diag-troubleshooting-row');
+        const tsHints = document.getElementById('diag-troubleshooting-hints');
+
+        if (statusEl) {
+          if (diag.dbConnected) {
+            statusEl.textContent = 'Connected';
+            statusEl.style.color = 'green';
+            tsRow?.classList.add('hidden');
+          } else {
+            statusEl.textContent = 'Failed';
+            statusEl.style.color = 'red';
+            
+            // Build troubleshooting suggestions similar to db-test.php
+            if (tsRow && tsHints) {
+              const errStr = String(diag.dbError || '');
+              let hints = [];
+              if (errStr.includes('Access denied')) {
+                hints.push('Check DB_USER and DB_PASS in your .env file. If using root, you may need to configure a dedicated user for web access.');
+              }
+              if (errStr.includes('Connection refused') || errStr.includes('nosuchfile')) {
+                hints.push('If DB_HOST is localhost, try using 127.0.0.1. Also verify that the MySQL/MariaDB service is active and running.');
+              }
+              if (errStr.includes('Unknown database')) {
+                hints.push(`The database "${diag.configuredDatabase}" does not exist. Verify the name or create it via terminal.`);
+              }
+              hints.push(`Error Detail: ${errStr}`);
+              
+              tsHints.innerHTML = hints.map(h => `• ${escapeHTML(h)}`).join('<br>');
+              tsRow.classList.remove('hidden');
+            }
+          }
+        }
+        
+        const phpEl = document.getElementById('diag-php-version');
+        if (phpEl) phpEl.textContent = diag.phpVersion || 'unknown';
+        
+        const pdoEl = document.getElementById('diag-pdo-drivers');
+        if (pdoEl) pdoEl.textContent = (diag.pdoDrivers || []).join(', ') || 'none';
+        
+        const connEl = document.getElementById('diag-connected-db');
+        if (connEl) {
+          if (diag.dbConnected) {
+            connEl.textContent = `Host: ${diag.connectedHost} | Database: ${diag.connectedDatabase}`;
+          } else {
+            connEl.textContent = 'Disconnected';
+          }
+        }
+        
+        const configEl = document.getElementById('diag-configured-dsn');
+        if (configEl) configEl.textContent = `Host: ${diag.configuredHost}:${diag.configuredPort} | Database: ${diag.configuredDatabase}`;
+        
+        const userEl = document.getElementById('diag-configured-user');
+        if (userEl) userEl.textContent = diag.configuredUser || 'unknown';
+
+        const envEl = document.getElementById('diag-env-status');
+        if (envEl) envEl.textContent = diag.envFound ? 'Found' : 'Not Found';
+        
+        const tablesEl = document.getElementById('diag-tables-list');
+        if (tablesEl) {
+          if (diag.dbConnected) {
+            tablesEl.textContent = (diag.tables || []).join(', ') || 'No tables found';
+          } else {
+            tablesEl.textContent = 'N/A (database offline)';
+          }
+        }
+        
+        diagResults?.classList.remove('hidden');
+      } catch (err) {
+        const statusEl = document.getElementById('diag-status');
+        if (statusEl) {
+          statusEl.textContent = 'Failed';
+          statusEl.style.color = 'red';
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        showAlert('Failed to fetch system diagnostics: ' + message, 'Error');
+      } finally {
+        loadDiagBtn.disabled = false;
+        loadDiagBtn.textContent = 'Fetch Diagnostics';
+      }
+    });
+  }
+
   if (loginBtn) {
-    loginBtn.classList.add('btn-mgmt');
     // Use addEventListener for better reliability and wrap the call 
     // to ensure the MouseEvent isn't passed as the prompt message.
     loginBtn.addEventListener('click', async () => {
@@ -100,6 +203,11 @@ export async function initManagementPage() {
         document.dispatchEvent(new CustomEvent('pb:pageChanged'));
       }
     });
+  }
+
+  const cleanupBtn = document.getElementById('mgmt-run-cleanup-btn');
+  if (cleanupBtn) {
+    cleanupBtn.addEventListener('click', handleCleanup);
   }
 
   // Perform an initial check on load. If no password is set or the user is already
@@ -117,15 +225,16 @@ export async function initManagementPage() {
     
     if (!confirmed) return;
 
-    if (!await requireAdmin()) return;
-
     const daysInput = await showPrompt('Enter retention period in days (leagues older than this will be deleted):', 'Cleanup Configuration', false);
     if (daysInput === null) return; // User cancelled the prompt
     const days = parseInt(daysInput, 10) || 30;
 
     try {
-      // Using bracket notation to bypass linter warning on specific method signature
-      const result = await PB_API['runCleanup'](days);
+      if (!await can(PERMISSIONS.RUN_CLEANUP)) {
+        showAlert('Unauthorized: Administrator privileges are required for this action.', 'Access Denied');
+        return;
+      }
+      const result = await PB_API.system.runCleanup(days);
       showAlert(`Cleanup successful! Removed ${result.leagues_cleaned || 0} session leagues older than ${days} days.`, 'Success');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

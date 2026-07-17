@@ -1,0 +1,427 @@
+/** @vitest-environment jsdom */
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { initEventSetupPage } from '@pages/eventSetupPage.js';
+import { PB_API } from '@services/api.js';
+import * as Utils from '@scripts/utils.js';
+import * as Auth from '@services/auth.js';
+import { ROUTE_PATHS } from '@scripts/routes.js';
+import { printMachineScores } from '@ui/printing.js';
+
+vi.mock('@services/api.js', () => ({
+  PB_API: {
+    leagues: {
+      getAll: vi.fn(),
+    },
+    machines: {
+      getAll: vi.fn(),
+      getTargets: vi.fn(),
+      saveTarget: vi.fn(),
+      create: vi.fn(),
+    },
+    locations: {
+      getMachines: vi.fn(),
+    }
+  },
+}));
+
+vi.mock('@scripts/utils.js', () => ({
+  getActiveEventId: vi.fn(),
+  getActiveLeagueId: vi.fn(),
+  renderPreview: vi.fn(),
+  renderThresholdGrid: vi.fn(() => '<div>Grid</div>'),
+  escapeHTML: vi.fn(str => str),
+  applyScoreFormatting: vi.fn(),
+  parseFormattedNumber: vi.fn((value, allowDecimal = false) => {
+    const cleaned = String(value || '').replace(allowDecimal ? /[^\d.]/g : /\D/g, '');
+    return allowDecimal ? Number.parseFloat(cleaned) || 0 : Number(cleaned) || 0;
+  }),
+  formatNumber: (n) => String(n),
+  loadPage: vi.fn(), // Changed from navigateTo
+  getCookie: vi.fn(() => 'bowling'),
+  detectScalingFromValues: vi.fn(() => 'curved'),
+}));
+
+vi.mock('@scripts/routes.js', () => ({
+  ROUTE_PATHS: {
+    HOME: () => '/',
+    LEAGUES: (id) => `/leagues?id=${id}`,
+    LEAGUE_SETUP: (o) => `/setup?l=${o.leagueId}&e=${o.eventId}`
+  }
+}));
+
+const uiMocks = vi.hoisted(() => ({
+  createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() })),
+  showPrompt: vi.fn(),
+  showAlert: vi.fn(),
+  initReadOnlyTournamentDisplay: vi.fn((container, refresh) => Promise.resolve(refresh())),
+  initTournamentSelector: vi.fn(),
+  createExpandableRow: vi.fn((container, options) => {
+    const row = document.createElement(options.tag || 'div');
+    row.dataset.id = options.id;
+
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'row-header';
+    headerDiv.innerHTML = options.headerHtml || '';
+    row.appendChild(headerDiv);
+
+    if (options.contentHtml) {
+      const contentDiv = document.createElement('div');
+      contentDiv.className = `row-expansion ${options.isExpanded ? '' : 'hidden'}`;
+      contentDiv.innerHTML = options.contentHtml;
+      row.appendChild(contentDiv);
+    }
+    row.className = options.className || '';
+    container.appendChild(row);
+    if (options.onHeaderClick && headerDiv) {
+      headerDiv.addEventListener('click', options.onHeaderClick);
+    }
+    return row;
+  }),
+  setupSortableList: vi.fn(),
+}));
+
+vi.mock('@ui/selectors.js', () => uiMocks);
+vi.mock('@ui/dialogs.js', () => uiMocks);
+
+vi.mock('@ui/printing.js', () => ({
+  printMachineScores: vi.fn(),
+}));
+vi.mock('@services/normalizer.js', () => ({
+  normalizeTargets: vi.fn((t) => t),
+}));
+vi.mock('@ui/branding.js', () => ({
+  applyPreferredTheme: vi.fn(),
+}));
+
+vi.mock('@core/engine.js', () => ({
+  getScoringEngine: vi.fn(() => ({
+    getInitialValues: vi.fn(() => ({ value1: 5000000, value2: 500000 })),
+    getValue1Label: vi.fn(() => 'Target Score'),
+    getValue2Label: vi.fn(() => 'Base Score'),
+    getRowSummaryHtml: vi.fn(() => '<div>Summary</div>'),
+    getMarkFormatting: vi.fn(() => ''),
+    formatMark: vi.fn((turn) => turn.mark),
+    getRoundLabel: vi.fn(() => 'Frame'),
+    getBonusTargets: vi.fn(() => ({ t1: 15000, t2: 22500 })),
+    filterThresholds: vi.fn(v => v),
+    buildRoundValues: vi.fn(() => ({ 10: 1000000, 1: 100000 })),
+    getThresholdRowStyle: vi.fn(() => ''),
+  }))
+}));
+
+vi.mock('@services/auth.js', () => ({
+  requireAdmin: vi.fn(),
+  isManagementAuthorized: vi.fn(() => Promise.resolve(true)),
+}));
+
+describe('Event Setup Page (eventSetupPage.js)', () => {
+  beforeEach(() => {
+    // Mock layout methods not implemented in JSDOM
+    vi.stubGlobal('location', { origin: 'http://localhost' });
+    vi.stubGlobal('alert', vi.fn());
+    vi.stubGlobal('scrollTo', vi.fn());
+    Element.prototype.scrollIntoView = vi.fn();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    document.body.innerHTML = `
+      <div class="tournament-selector-container"></div>
+      <div id="tournament-selector-ui" class="hidden"></div>
+      <div id="config-card" class="hidden">
+        <div id="display-order"></div>
+        <input id="order-number" />
+        <input id="machine-name" />
+        <input id="value-10" />
+        <input id="value-1" />
+        <button id="fill-easy"></button>
+        <button id="fill-med"></button>
+        <button id="fill-hard"></button>
+        <div id="preview-values"></div>
+        <form id="round-form">
+          <button id="save-round-btn" disabled>Save</button>
+          <button id="cancel-config-btn" type="button">Cancel</button>
+        </form>
+      </div>
+      <div id="reorder-actions" class="hidden">
+        <button id="save-order-btn">Save Order</button>
+        <button id="cancel-order-btn">Cancel Order</button>
+      </div>
+      <table id="rounds-table" class="hidden"><tbody id="rounds-list"></tbody></table>
+      <div id="list-empty"></div>
+      <button id="add-target-btn">Add</button>
+      <button id="done-setup-btn">Done</button>
+      <button id="print-machines-btn">Print</button>
+    `;
+
+    vi.clearAllMocks();
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'League', events: [{ id: 101, locationId: 1 }] }]);
+    PB_API.machines.getAll.mockResolvedValue([{ id: 1, machineName: 'Iron Maiden' }]);
+    PB_API.machines.getTargets.mockResolvedValue([]);
+    PB_API.locations.getMachines.mockResolvedValue([]);
+    Utils.getActiveLeagueId.mockReturnValue('1');
+    Utils.getActiveEventId.mockReturnValue('101');
+
+    // Reset authorization state for every test to prevent state leakage
+    Auth.isManagementAuthorized.mockResolvedValue(true);
+    Auth.requireAdmin.mockResolvedValue(true);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('should redirect if not authorized', async () => {
+    Auth.isManagementAuthorized.mockResolvedValue(false);
+    await initEventSetupPage();
+    expect(uiMocks.showAlert).toHaveBeenCalledWith(expect.stringContaining('Unauthorized'), 'Access Denied');
+    expect(Utils.loadPage).toHaveBeenCalledWith(ROUTE_PATHS.HOME()); // Changed assertion
+  });
+
+  it('should load machine suggestions and targets on init', async () => {
+    await initEventSetupPage();
+    expect(PB_API.machines.getAll).toHaveBeenCalled();
+    expect(PB_API.machines.getTargets).toHaveBeenCalledWith('101');
+  });
+
+  it('should show the config form when "Add Target" is clicked', async () => {
+    await initEventSetupPage();
+    const btn = document.getElementById('add-target-btn');
+    const card = document.getElementById('config-card');
+    
+    btn.click();
+    expect(card.classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('display-order').textContent).toBe('1');
+  });
+
+  it('should toggle scaling modes', async () => {
+    document.body.innerHTML += `
+      <button id="scaling-flat"></button>
+      <button id="scaling-curved"></button>
+    `;
+    await initEventSetupPage();
+    
+    const btnFlat = document.getElementById('scaling-flat');
+    const btnCurved = document.getElementById('scaling-curved');
+    
+    btnFlat.click();
+    expect(btnFlat.classList.contains('btn-standard')).toBe(true);
+    
+    btnCurved.click();
+    expect(btnCurved.classList.contains('btn-standard')).toBe(true);
+    expect(btnFlat.classList.contains('secondary')).toBe(true);
+  });
+
+  it('should handle quick fill buttons', async () => {
+    const machine = { id: 1, machineName: 'Iron Maiden', format: 'bowling', targetEasy: 1000, targetMed: 2000, targetHard: 3000 };
+    // Ensure machines are returned before initialization
+    PB_API.machines.getAll.mockResolvedValue([machine]);
+    // Mock location machines as the active event has locationId: 1
+    PB_API.locations.getMachines.mockResolvedValue([machine]);
+    await initEventSetupPage();
+
+    // Manually trigger onSelect of the searchable select to set selectedMachineTargets
+    const onSelect = uiMocks.createSearchableSelect.mock.calls[0][3].onSelect;
+    onSelect('Iron Maiden');
+
+    const btnEasy = document.getElementById('fill-easy');
+    btnEasy.click();
+    expect(document.getElementById('value-10').value).toBe('1000');
+  });
+
+  it('should call printing when print button is clicked', async () => {
+    await initEventSetupPage();
+    
+    const printBtn = document.getElementById('print-machines-btn');
+    printBtn.click();
+    
+    await vi.waitFor(() => expect(PB_API.leagues.getAll).toHaveBeenCalled());
+    expect(printMachineScores).toHaveBeenCalled();
+  });
+
+  it('should handle reordering rounds and saving the batch', async () => {
+    PB_API.machines.getTargets.mockResolvedValue([
+      { id: 1, machineId: 10, orderNumber: 1, machineName: 'M1', values: {} },
+      { id: 2, machineId: 20, orderNumber: 2, machineName: 'M2', values: {} }
+    ]);
+    await initEventSetupPage();
+
+    const onReorder = uiMocks.setupSortableList.mock.calls[0][1].onReorder;
+    onReorder(['2', '1']); // Simulate swapping M2 and M1
+
+    expect(document.getElementById('reorder-actions').classList.contains('hidden')).toBe(false);
+    
+    PB_API.machines.saveTarget.mockResolvedValue({ success: true });
+    document.getElementById('save-order-btn').click();
+    
+    await vi.waitFor(() => expect(PB_API.machines.saveTarget).toHaveBeenCalled());
+  });
+
+  it('should call saveTargetScore on form submission', async () => {
+    Auth.requireAdmin.mockResolvedValue(true);
+    PB_API.machines.saveTarget.mockResolvedValue({ success: true });
+    
+    await initEventSetupPage();
+    
+    // Populate fields
+    document.getElementById('order-number').value = '1';
+    document.getElementById('machine-name').value = 'Iron Maiden';
+    document.getElementById('value-10').value = '1,000,000';
+    document.getElementById('value-1').value = '100,000';
+    
+    // Trigger events to ensure internal state is updated
+    document.getElementById('machine-name').dispatchEvent(new Event('change'));
+    document.getElementById('save-round-btn').disabled = false;
+
+    const form = document.getElementById('round-form');
+    form.dispatchEvent(new Event('submit'));
+
+    await vi.waitFor(() => expect(Auth.requireAdmin).toHaveBeenCalled());
+    expect(Auth.requireAdmin).toHaveBeenCalled();
+    expect(PB_API.machines.saveTarget).toHaveBeenCalledWith(expect.objectContaining({
+        orderNumber: 1,
+        machineId: 1
+    }));
+  });
+
+  it('should navigate back to leagues when "Done" is clicked', async () => {
+    await initEventSetupPage();
+    document.getElementById('done-setup-btn').click();
+    expect(Utils.loadPage).toHaveBeenCalledWith(ROUTE_PATHS.LEAGUES(Utils.getActiveLeagueId())); // Changed assertion
+  });
+
+  describe('Additional eventSetupPage Coverage', () => {
+    it('should reset list and hide actions when cancel-order-btn is clicked', async () => {
+      PB_API.machines.getTargets.mockResolvedValue([
+        { id: 1, machineId: 10, orderNumber: 1, machineName: 'M1', values: {} }
+      ]);
+      await initEventSetupPage();
+
+      // Trigger a reorder to make list dirty
+      const onReorder = uiMocks.setupSortableList.mock.calls[0][1].onReorder;
+      onReorder(['1']);
+
+      const cancelBtn = document.getElementById('cancel-order-btn');
+      expect(cancelBtn).not.toBeNull();
+      cancelBtn.click();
+
+      expect(document.getElementById('reorder-actions').classList.contains('hidden')).toBe(true);
+    });
+
+    it('should hide list and actions when eventId is empty during render', async () => {
+      Utils.getActiveEventId.mockReturnValue('');
+      await initEventSetupPage();
+      expect(document.getElementById('rounds-list').classList.contains('hidden')).toBe(true);
+      expect(document.getElementById('list-empty').classList.contains('hidden')).toBe(false);
+    });
+
+    it('should handle onMoveUp and onMoveDown click actions on target items', async () => {
+      PB_API.machines.getTargets.mockResolvedValue([
+        { id: 10, machineId: 10, orderNumber: 1, machineName: 'M1', value1: 100, value2: 10, values: {} },
+        { id: 20, machineId: 20, orderNumber: 2, machineName: 'M2', value1: 200, value2: 20, values: {} }
+      ]);
+      await initEventSetupPage();
+
+      const calls = uiMocks.createExpandableRow.mock.calls;
+      const m1RowOptions = calls.find(c => c[1].id === 10)[1];
+      const m2RowOptions = calls.find(c => c[1].id === 20)[1];
+
+      // Move M2 up (orderNumber 2 > 1)
+      expect(m2RowOptions.onMoveUp).not.toBeNull();
+      m2RowOptions.onMoveUp();
+
+      // Move M1 down (orderNumber 1 < 2)
+      expect(m1RowOptions.onMoveDown).not.toBeNull();
+      m1RowOptions.onMoveDown();
+    });
+
+    it('should update inline inputs and scaling toggles inside rounds', async () => {
+      PB_API.machines.getTargets.mockResolvedValue([
+        { id: 10, machineId: 10, orderNumber: 1, machineName: 'M1', value1: 100, value2: 10, values: { flat: [100], curved: [100] } }
+      ]);
+      await initEventSetupPage();
+
+      const row = document.querySelector('.round-item');
+      const s10 = row.querySelector('.score10-input');
+      const s1 = row.querySelector('.score1-input');
+
+      // Change input values and dispatch input event
+      s10.value = '500';
+      s10.dispatchEvent(new Event('input'));
+      s1.value = '50';
+      s1.dispatchEvent(new Event('input'));
+
+      // Test scaling toggle click inside the row
+      const curvedToggle = row.querySelector('.scaling-btn[data-scale="curved"]');
+      if (curvedToggle) {
+        curvedToggle.click();
+        expect(curvedToggle.classList.contains('btn-standard')).toBe(true);
+      }
+    });
+
+    it('should handle machine selection row-machine-select and difficulty fills qfill inside row content', async () => {
+      PB_API.machines.getTargets.mockResolvedValue([
+        { id: 10, machineId: 10, orderNumber: 1, machineName: 'M1', value1: 100, value2: 10, values: {} }
+      ]);
+      PB_API.machines.getAll.mockResolvedValue([
+        { id: 10, machineName: 'M1', targetEasy: 50, targetMed: 100, targetHard: 200 }
+      ]);
+      // Ensure dropdown suggestions return suggestions
+      PB_API.locations.getMachines.mockResolvedValue([
+        { id: 10, machineId: 10, machineName: 'M1', targetEasy: 50, targetMed: 100, targetHard: 200 }
+      ]);
+
+      await initEventSetupPage();
+
+      // Trigger expand
+      const onHeaderClick = uiMocks.createExpandableRow.mock.calls[0][1].onHeaderClick;
+      onHeaderClick();
+
+      // Simulate searchable select onSelect callback
+      const onSelect = uiMocks.createSearchableSelect.mock.calls[1][3].onSelect;
+      onSelect('10');
+
+      // Locate qfill button inside row
+      const medBtn = document.querySelector('.qfill[data-type="med"]');
+      if (medBtn) medBtn.click();
+    });
+
+    it('should call saveTarget with batch on save-order-btn click', async () => {
+      PB_API.machines.getTargets.mockResolvedValue([
+        { id: 10, machineId: 10, orderNumber: 1, machineName: 'M1', values: {} },
+        { id: 20, machineId: 20, orderNumber: 2, machineName: 'M2', values: {} }
+      ]);
+      await initEventSetupPage();
+
+      // Make dirty by reordering
+      const onReorder = uiMocks.setupSortableList.mock.calls[0][1].onReorder;
+      onReorder(['20', '10']);
+
+      const saveBtn = document.getElementById('save-order-btn');
+      await saveBtn.click();
+
+      expect(PB_API.machines.saveTarget).toHaveBeenCalled();
+    });
+
+    it('should create machine if it does not exist during target creation submit', async () => {
+      PB_API.machines.getAll.mockResolvedValue([]);
+      PB_API.machines.create.mockResolvedValue({ id: 999, machineName: 'New Unique Pinball' });
+      PB_API.machines.saveTarget.mockResolvedValue({ success: true });
+      Auth.requireAdmin.mockResolvedValue(true);
+
+      await initEventSetupPage();
+
+      document.getElementById('machine-name').value = 'New Unique Pinball';
+      document.getElementById('order-number').value = '1';
+      document.getElementById('value-10').value = '100';
+      document.getElementById('value-1').value = '10';
+
+      const form = document.getElementById('round-form');
+      await form.dispatchEvent(new Event('submit'));
+
+      await vi.waitFor(() => {
+        expect(PB_API.machines.create).toHaveBeenCalledWith(expect.objectContaining({ machineName: 'New Unique Pinball' }));
+      });
+      expect(PB_API.machines.saveTarget).toHaveBeenCalled();
+    });
+  });
+});

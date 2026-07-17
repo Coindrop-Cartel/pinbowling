@@ -1,0 +1,90 @@
+# Scoring Engine Contract
+
+This document defines the public API that every scoring engine must expose.  The
+contract is intentionally **data‑only** – engines should never touch the DOM,
+fetch data, or perform side‑effects.  The UI layer is responsible for rendering
+and for any interactions with the browser.
+
+## Core Methods
+
+| Method | Purpose | Input | Output | Notes |
+|--------|---------|------|-------|------|
+| `calculateTurnResults(machines, scoreMap)` | Compute the results for a single turn. | `machines: Machine[]`, `scoreMap: Record<string, number>` | `{ turnResults: TurnResult[], total: number, totalDisplay: string }` | `turnResults` contains per‑machine data used by the UI.  `total` is the numeric total for the turn.  `totalDisplay` is a formatted string for display.
+| `buildRoundValues(target, base, multiplier, scalingType)` | Build the per‑machine values for a round. | `target: number`, `base: number`, `multiplier: number`, `scalingType: 'linear' | 'exponential'` | `Record<string, number>` mapping machine IDs to the value for that round.
+| `getRunCount()` | Return the number of runs required to win a turn. | – | `number` |
+| `getPinCount()` | Return the number of pins required to win a turn. | – | `number` |
+| `getStrokes()` | Return the number of strokes required to win a turn. | – | `number` |
+| `getRowSummaryData(round)` | Return a plain object describing a round summary. | `round: Round` | `{ header: string, metadata: Record<string, any> }` |
+| `getPreviewRowData(frame)` | Return a preview of a frame for the UI. | `frame: Frame` | `{ header: string, metadata: Record<string, any> }` |
+| `formatMark(turnResult)` | Return a string or markup that represents a turn result for the UI. | `turnResult: TurnResult` | `string` |
+
+## Data Types
+
+```ts
+type Machine = {
+  id: string;
+  name: string;
+  format: string;
+  // …other properties used by the engine
+};
+
+type TurnResult = {
+  machineId: string;
+  score: number;
+  bonus?: number;
+  // …other fields that the UI may need
+};
+
+type Round = {
+  number: number;
+  target: number;
+  // …other round‑specific data
+};
+
+type Frame = {
+  number: number;
+  // …frame‑specific data
+};
+```
+
+## Rendering Responsibility
+
+The engine **must not** generate HTML or manipulate the DOM.  All rendering
+logic should live in the UI layer (e.g. `scripts/renderers/roundRowRenderer.js`).
+The engine simply returns the data structures defined above.
+
+## Extensibility
+
+If a new scoring format is added, it should implement the same methods.  The
+UI can then use the same renderer logic, passing in the appropriate engine.
+
+## Example Implementation (BowlingEngine)
+
+```js
+export class BowlingEngine {
+  calculateTurnResults(machines, scoreMap) {
+    // ...implementation
+    return { turnResults, total, totalDisplay };
+  }
+  // ...other methods as per the contract
+}
+```
+
+## Usage in the UI
+
+```js
+import { getScoringEngine } from '@core/engine.js';
+import { roundRowRenderer } from '@renderers/roundRowRenderer.js';
+
+const engine = getScoringEngine('bowling');
+const { turnResults } = engine.calculateTurnResults(machines, scoreMap);
+turnResults.forEach(tr => {
+  const row = roundRowRenderer.renderTurn(tr, engine);
+  container.appendChild(row);
+});
+```
+
+---
+
+This contract will be referenced throughout the refactor to ensure consistency
+and to provide a clear target for the subsequent phases.

@@ -1,68 +1,148 @@
 <?php
+
+namespace App\Service;
+
 /**
- * Cleanup Service for PinBowling.
- * Automates the removal of one-off session leagues and their associated data 
- * after a retention period (default 30 days) to prevent database bloat.
+ * Service managing database maintenance, pruning old session-based leagues and abandoned guest players.
  */
-require_once __DIR__ . '/../includes/config.php';
+class CleanupService {
+    private DatabaseService $db;
 
-try {
-    $pdo = getDbConnection();
-    
-    // This operation is restricted to global admins only.
-    // Trigger via CRON or CLI: curl -H "X-PB-SECRET: <SECRET>" https://yoursite.com/service/cleanupService.php
-    validateAdminAccess();
-
-    // Check for optional retention period override via query string or JSON body
-    $input = getJsonInput();
-    $retentionDays = (int)($_GET['days'] ?? $input['days'] ?? 30);
-    if ($retentionDays <= 0) $retentionDays = 30;
-
-    $cutoffDate = date('Y-m-d', strtotime("-$retentionDays days"));
-
-    // Identify session leagues that have passed the retention threshold.
-    $stmt = $pdo->prepare("SELECT id FROM leagues WHERE type = 'session' AND start_date < ?");
-    $stmt->execute([$cutoffDate]);
-    $leagueIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (empty($leagueIds)) {
-        sendJson(['message' => 'No session leagues older than ' . $retentionDays . ' days were found.'], 200);
+    public function __construct(DatabaseService $db) {
+        $this->db = $db;
     }
 
-    $pdo->beginTransaction();
+    /**
+     * Clean up session leagues older than retention period.
+     *
+     * @param int $retentionDays Number of days to retain session leagues (default 30)
+     * @return array Result with count of deleted leagues
+     */
+    public function cleanupOldSessionLeagues(int $retentionDays = 30): array {
+        if ($retentionDays <= 0) {
+            $retentionDays = 30;
+        }
 
-    // Prepare placeholders for bulk deletion
-    $idPlaceholders = implode(',', array_fill(0, count($leagueIds), '?'));
+        $cutoffDate = date('Y-m-d', strtotime("-$retentionDays days"));
 
-    // 1. Remove player scores for events within these leagues
-    $sqlScores = "DELETE FROM scores WHERE event_id IN (SELECT id FROM events WHERE league_id IN ($idPlaceholders))";
-    $pdo->prepare($sqlScores)->execute($leagueIds);
+        // Identify session leagues that have passed the retention threshold
+        $stmt = $this->db->query(
+            "SELECT id FROM leagues WHERE type = 'session' AND start_date < ?",
+            [$cutoffDate]
+        );
+        $results = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        $leagueIds = array_map('intval', $results);
 
-    // 2. Remove target score templates for events within these leagues
-    $sqlTargets = "DELETE FROM target_scores WHERE event_id IN (SELECT id FROM events WHERE league_id IN ($idPlaceholders))";
-    $pdo->prepare($sqlTargets)->execute($leagueIds);
+        if (empty($leagueIds)) {
+            return [
+                'success' => true,
+                'message' => "No session leagues older than $retentionDays days were found.",
+                'deletedCount' => 0
+            ];
+        }
 
-    // 3. Remove the events themselves
-    $sqlEvents = "DELETE FROM events WHERE league_id IN ($idPlaceholders)";
-    $pdo->prepare($sqlEvents)->execute($leagueIds);
+        $pdo = $this->db->getPdo();
+        
+        try {
+            $pdo->beginTransaction();
 
-    // 4. Remove player-to-league roster mappings
-    $sqlRoster = "DELETE FROM league_players WHERE league_id IN ($idPlaceholders)";
-    $pdo->prepare($sqlRoster)->execute($leagueIds);
+            $idPlaceholders = implode(',', array_fill(0, count($leagueIds), '?'));
 
-    // 5. Finally, delete the leagues
-    $sqlLeagues = "DELETE FROM leagues WHERE id IN ($idPlaceholders)";
-    $pdo->prepare($sqlLeagues)->execute($leagueIds);
+            // 1. Remove player scores for events within these leagues
+            $sql = "DELETE FROM scores WHERE event_id IN (SELECT id FROM events WHERE league_id IN ($idPlaceholders))";
+            $pdo->prepare($sql)->execute($leagueIds);
 
-    $pdo->commit();
+            // 2. Remove target score templates
+            $sql = "DELETE FROM target_scores WHERE event_id IN (SELECT id FROM events WHERE league_id IN ($idPlaceholders))";
+            $pdo->prepare($sql)->execute($leagueIds);
 
-    sendJson([
-        'success' => true,
-        'leagues_cleaned' => count($leagueIds),
-        'cleaned_ids' => $leagueIds
-    ]);
+            // 3. Remove the events themselves
+            $sql = "DELETE FROM events WHERE league_id IN ($idPlaceholders)";
+            $pdo->prepare($sql)->execute($leagueIds);
 
-} catch (Exception $e) {
-    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
-    sendJson(['error' => $e->getMessage()], 500);
+            // 4. Remove player-to-league roster mappings
+            $sql = "DELETE FROM league_players WHERE league_id IN ($idPlaceholders)";
+            $pdo->prepare($sql)->execute($leagueIds);
+
+            // 5. Remove league team associations
+            $sql = "DELETE FROM league_teams WHERE league_id IN ($idPlaceholders)";
+            $pdo->prepare($sql)->execute($leagueIds);
+
+            // 6. Finally, delete the leagues
+            $sql = "DELETE FROM leagues WHERE id IN ($idPlaceholders)";
+            $pdo->prepare($sql)->execute($leagueIds);
+
+            $pdo->commit();
+
+            return [
+                'success' => true,
+                'message' => count($leagueIds) . " session league(s) older than $retentionDays days have been deleted.",
+                'deletedCount' => count($leagueIds)
+            ];
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Clean up abandoned session player records (no associated user or events).
+     *
+     * @return array Result with count of deleted players
+     */
+    public function cleanupAbandonedPlayers(): array {
+        $pdo = $this->db->getPdo();
+        
+        try {
+            $pdo->beginTransaction();
+
+            // Find players with no user account and no scores
+            $stmt = $pdo->query(
+                "SELECT p.id FROM players p 
+                 LEFT JOIN users u ON p.id = u.player_id 
+                 LEFT JOIN scores s ON p.id = s.player_id
+                 WHERE u.id IS NULL AND s.id IS NULL
+                 GROUP BY p.id"
+            );
+            $playerIds = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+
+            if (empty($playerIds)) {
+                $pdo->commit();
+                return [
+                    'success' => true,
+                    'message' => 'No abandoned players found.',
+                    'deletedCount' => 0
+                ];
+            }
+
+            $idPlaceholders = implode(',', array_fill(0, count($playerIds), '?'));
+
+            // Delete player league memberships
+            $sql = "DELETE FROM league_players WHERE player_id IN ($idPlaceholders)";
+            $pdo->prepare($sql)->execute($playerIds);
+
+            // Delete player team memberships
+            $sql = "DELETE FROM team_members WHERE player_id IN ($idPlaceholders)";
+            $pdo->prepare($sql)->execute($playerIds);
+
+            // Delete abandoned players
+            $sql = "DELETE FROM players WHERE id IN ($idPlaceholders)";
+            $pdo->prepare($sql)->execute($playerIds);
+
+            $pdo->commit();
+
+            return [
+                'success' => true,
+                'message' => count($playerIds) . ' abandoned player(s) have been deleted.',
+                'deletedCount' => count($playerIds)
+            ];
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
 }

@@ -1,0 +1,447 @@
+import { describe, it, expect } from 'vitest';
+import { ScoringEngine } from '@core/ScoringEngine.js';
+import { renderStandardScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
+import { FormatBranding } from '@services/scoringFormatBranding.js';
+
+/**
+ * Unit tests for the base ScoringEngine class.
+ * Verifies interface enforcement, interpolation logic, and default metadata.
+ */
+describe('ScoringEngine (Base Class)', () => {
+  const engine = new ScoringEngine();
+
+  // ── Constructor ──────────────────────────────────────────────────────
+  describe('constructor', () => {
+    it('should default config to empty object', () => {
+      const e = new ScoringEngine();
+      expect(e.config).toEqual({});
+    });
+
+    it('should accept and store config', () => {
+      const cfg = { brand: 'Test', roundLabel: 'Hole' };
+      const e = new ScoringEngine(cfg);
+      expect(e.config).toBe(cfg);
+    });
+  });
+
+  // ── Abstract method enforcement ──────────────────────────────────────
+  describe('abstract methods', () => {
+    it('calculateTurnResults should throw', () => {
+      expect(() => engine.calculateTurnResults([], {})).toThrow(
+        'calculateTurnResults must be implemented by subclass'
+      );
+    });
+
+    it('formatMark should throw', () => {
+      expect(() => engine.formatMark({})).toThrow(
+        'formatMark must be implemented by subclass'
+      );
+    });
+  });
+
+  // ── calculateInterpolatedValues ──────────────────────────────────────
+  describe('calculateInterpolatedValues', () => {
+    it('flat desc: anchor at rank 10 (bowling default)', () => {
+      // topScore=10000 at position=10, bottomScore=1000, flat, desc
+      const values = engine.calculateInterpolatedValues(10000, 1000, 10, 'flat', 'desc');
+      expect(values).not.toBeNull();
+      expect(values[10]).toBe(10000); // anchor
+      expect(values[1]).toBe(1000);   // floor
+      // Rank 5: fraction = (5-1)/9 = 4/9, value = 1000 + 9000*(4/9) = 5000
+      expect(values[5]).toBe(5000);
+    });
+
+    it('flat asc: anchor at rank 3 (golf par)', () => {
+      // topScore=1000 at position=3, bottomScore=100, flat, asc
+      const values = engine.calculateInterpolatedValues(1000, 100, 3, 'flat', 'asc');
+      expect(values).not.toBeNull();
+      expect(values[3]).toBe(1000); // anchor
+      expect(values[10]).toBe(100); // floor (rank 10 is lowest in asc)
+      // Rank 1: fraction = (10-1)/9 = 1, value = 100 + range*1
+      // fractionAtAnchor = (10-3)/9 = 7/9, multiplier = 7/9
+      // range = (1000-100)/(7/9) = 900*9/7 ≈ 1157.14
+      // rank 1: 100 + 1157.14*1 = 1257.14 → 1257
+      expect(values[1]).toBe(1257);
+    });
+
+    it('curved desc: anchor at rank 10', () => {
+      const values = engine.calculateInterpolatedValues(10000, 1000, 10, 'curved', 'desc');
+      expect(values).not.toBeNull();
+      expect(values[10]).toBe(10000);
+      expect(values[1]).toBe(1000);
+      // Curved: fraction = (r-1)/9, multiplier = fraction^2
+      // Rank 5: fraction = 4/9, multiplier = 16/81 ≈ 0.1975
+      // range = (10000-1000)/1 = 9000 (fractionAtAnchor=1, multiplier=1)
+      // value = 1000 + 9000 * 16/81 ≈ 1000 + 1777.78 = 2778
+      expect(values[5]).toBe(2778);
+    });
+
+    it('curved asc: anchor at rank 3', () => {
+      const values = engine.calculateInterpolatedValues(1000, 100, 3, 'curved', 'asc');
+      expect(values).not.toBeNull();
+      expect(values[3]).toBe(1000);
+      expect(values[10]).toBe(100);
+      // Curved asc: fraction = (10-r)/9, multiplier = fraction^2
+      // fractionAtAnchor = (10-3)/9 = 7/9, multiplierAtAnchor = 49/81
+      // range = (1000-100)/(49/81) = 900*81/49 ≈ 1487.76
+      // rank 1: fraction = 9/9 = 1, multiplier = 1, value = 100 + 1487.76 = 1588
+      expect(values[1]).toBe(1588);
+    });
+
+    it('should return null when topScore <= 0', () => {
+      expect(engine.calculateInterpolatedValues(0, 100, 10, 'flat', 'desc')).toBeNull();
+      expect(engine.calculateInterpolatedValues(-1, 100, 10, 'flat', 'desc')).toBeNull();
+    });
+
+    it('should return null when bottomScore < 0', () => {
+      expect(engine.calculateInterpolatedValues(10000, -1, 10, 'flat', 'desc')).toBeNull();
+    });
+
+    it('should return null when position <= 0', () => {
+      expect(engine.calculateInterpolatedValues(10000, 1000, 0, 'flat', 'desc')).toBeNull();
+      expect(engine.calculateInterpolatedValues(10000, 1000, -1, 'flat', 'desc')).toBeNull();
+    });
+
+    it('should allow bottomScore = 0 (valid floor)', () => {
+      const values = engine.calculateInterpolatedValues(10000, 0, 10, 'flat', 'desc');
+      expect(values).not.toBeNull();
+      expect(values[10]).toBe(10000);
+      expect(values[1]).toBe(0);
+    });
+
+    it('should produce all 10 ranks', () => {
+      const values = engine.calculateInterpolatedValues(10000, 1000, 10, 'flat', 'desc');
+      for (let r = 1; r <= 10; r++) {
+        expect(values[r]).toBeDefined();
+        expect(typeof values[r]).toBe('number');
+      }
+    });
+
+    it('desc: values should decrease from rank 10 to rank 1', () => {
+      const values = engine.calculateInterpolatedValues(10000, 1000, 10, 'flat', 'desc');
+      for (let r = 2; r <= 10; r++) {
+        expect(values[r]).toBeGreaterThan(values[r - 1]);
+      }
+    });
+
+    it('asc: values should decrease from rank 1 to rank 10', () => {
+      const values = engine.calculateInterpolatedValues(1000, 100, 3, 'flat', 'asc');
+      for (let r = 2; r <= 10; r++) {
+        expect(values[r]).toBeLessThan(values[r - 1]);
+      }
+    });
+
+    it('anchor position should match topScore exactly', () => {
+      const pos = 7;
+      const values = engine.calculateInterpolatedValues(5000, 500, pos, 'flat', 'desc');
+      expect(values[pos]).toBe(5000);
+    });
+  });
+
+  // ── buildRoundValues ─────────────────────────────────────────────────
+  describe('buildRoundValues', () => {
+    it('should delegate to calculateInterpolatedValues with position=10, order=desc', () => {
+      const values = engine.buildRoundValues(10000, 1000, 'flat');
+      const direct = engine.calculateInterpolatedValues(10000, 1000, 10, 'flat', 'desc');
+      expect(values).toEqual(direct);
+    });
+
+    it('should return null for invalid inputs', () => {
+      expect(engine.buildRoundValues(0, 1000, 'flat')).toBeNull();
+    });
+  });
+
+  // ── compareScores ────────────────────────────────────────────────────
+  describe('compareScores', () => {
+    it('should sort descending (high score wins) by default', () => {
+      expect(engine.compareScores(100, 200)).toBeGreaterThan(0); // b-a = 200-100 = 100 > 0
+      expect(engine.compareScores(200, 100)).toBeLessThan(0);   // b-a = 100-200 = -100 < 0
+      expect(engine.compareScores(100, 100)).toBe(0);
+    });
+  });
+
+  // ── formatTotalScore ─────────────────────────────────────────────────
+  describe('formatTotalScore', () => {
+    it('should return String(total) by default', () => {
+      expect(engine.formatTotalScore(42)).toBe('42');
+      expect(engine.formatTotalScore(0)).toBe('0');
+      expect(engine.formatTotalScore(-5)).toBe('-5');
+    });
+  });
+
+  // ── getRoundCountOptions ─────────────────────────────────────────────
+  describe('getRoundCountOptions', () => {
+    it('should return [10] by default', () => {
+      expect(engine.getRoundCountOptions()).toEqual([10]);
+    });
+  });
+
+  // ── getThresholdRange ────────────────────────────────────────────────
+  describe('getThresholdRange', () => {
+    it('should return descending range when start > end (bowling default)', () => {
+      const e = new ScoringEngine({ thresholdStart: 10, thresholdEnd: 1 });
+      expect(e.getThresholdRange()).toEqual([10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+    });
+
+    it('should return ascending range when start <= end (golf)', () => {
+      const e = new ScoringEngine({ thresholdStart: 1, thresholdEnd: 10 });
+      expect(e.getThresholdRange()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    });
+
+    it('should return single element when start === end', () => {
+      const e = new ScoringEngine({ thresholdStart: 5, thresholdEnd: 5 });
+      expect(e.getThresholdRange()).toEqual([5]);
+    });
+  });
+
+  // ── filterThresholds ─────────────────────────────────────────────────
+  describe('filterThresholds', () => {
+    it('should pass through values unchanged', () => {
+      const vals = { 1: 100, 2: 200 };
+      expect(engine.filterThresholds(vals)).toBe(vals);
+    });
+  });
+
+  // ── getInitialValues ─────────────────────────────────────────────────
+  describe('getInitialValues', () => {
+    it('should return defaults with suggestedTarget', () => {
+      expect(engine.getInitialValues(5000)).toEqual({ value1: 5000, value2: 0 });
+    });
+
+    it('should return defaults without suggestedTarget', () => {
+      expect(engine.getInitialValues()).toEqual({ value1: 0, value2: 0 });
+    });
+  });
+
+  // ── getMarkFormatting ────────────────────────────────────────────────
+  describe('getMarkFormatting', () => {
+    it('should return empty string by default', () => {
+      expect(engine.getMarkFormatting(5, 3)).toBe('');
+      expect(engine.getMarkFormatting(0, 0)).toBe('');
+    });
+  });
+
+  // ── Config-based getters with defaults ───────────────────────────────
+  describe('config-based getters and branding', () => {
+    it('should provide default implementations for optional utility methods', () => {
+      expect(engine.getBonusTargets()).toEqual({ t1: 0, t2: 0 });
+    });
+
+    it('should provide standard default terminology on engine', () => {
+      expect(engine.getRoundLabel()).toBe('Round');
+      expect(engine.getTurnHeaderPrefix()).toBe('Round');
+      expect(engine.getPrimaryTargetLabel()).toBe('Target');
+    });
+
+    it('should use config values for engine rules when provided', () => {
+      const e = new ScoringEngine({
+        roundLabel: 'Frame',
+        turnHeaderPrefix: 'Frame',
+        primaryTargetLabel: 'Strike',
+        thresholdStart: 10,
+        thresholdEnd: 1
+      });
+      expect(e.getRoundLabel()).toBe('Frame');
+      expect(e.getTurnHeaderPrefix()).toBe('Frame');
+      expect(e.getPrimaryTargetLabel()).toBe('Strike');
+      expect(e.getThresholdStart()).toBe(10);
+      expect(e.getThresholdEnd()).toBe(1);
+    });
+
+    it('should fall back to defaults when config is empty on engine', () => {
+      const e = new ScoringEngine();
+      expect(e.getThresholdStart()).toBe(10);
+      expect(e.getThresholdEnd()).toBe(1);
+    });
+
+    it('should retrieve correct presentational config from FormatBranding', () => {
+      const bowlingBranding = FormatBranding.get('bowling');
+      expect(bowlingBranding.brandName).toBe('PinBowling');
+      expect(bowlingBranding.logoImage).toBe('pinbowling.png');
+      expect(bowlingBranding.playActionLabel).toBe("Let's Bowl!");
+      expect(bowlingBranding.themeClass).toBe('theme-bowling');
+    });
+  });
+
+  // ── getThresholdSort ─────────────────────────────────────────────────
+  describe('getThresholdSort', () => {
+    it('should sort by rank descending by default', () => {
+      const sort = engine.getThresholdSort();
+      expect(sort(['10', 10000], ['1', 1000])).toBeLessThan(0);
+      expect(sort(['1', 1000], ['10', 10000])).toBeGreaterThan(0);
+      expect(sort(['5', 5000], ['5', 5000])).toBe(0);
+    });
+  });
+
+  // ── getThresholdLabel ────────────────────────────────────────────────
+  describe('getThresholdLabel', () => {
+    it('should return the rank as-is by default', () => {
+      expect(engine.getThresholdLabel(5, 1000, 3)).toBe(5);
+      expect(engine.getThresholdLabel('10', 10000, 1)).toBe('10');
+    });
+  });
+
+  // ── getThresholdRowClass ─────────────────────────────────────────────
+  describe('getThresholdRowClass', () => {
+    it('should highlight start and end ranks', () => {
+      const e = new ScoringEngine({ thresholdStart: 10, thresholdEnd: 1 });
+      const className = e.getThresholdRowClass(10, 10000, 1000);
+      expect(className).toBe('threshold-major');
+    });
+
+    it('should dim non-major ranks', () => {
+      const e = new ScoringEngine({ thresholdStart: 10, thresholdEnd: 1 });
+      const className = e.getThresholdRowClass(5, 5000, 1000);
+      expect(className).toBe('threshold-minor');
+    });
+  });
+
+  // ── getRowSummaryData ────────────────────────────────────────────────
+  describe('getRowSummaryData', () => {
+    it('should return primary target label and value', () => {
+      const e = new ScoringEngine({ primaryTargetLabel: 'Strike' });
+      const data = e.getRowSummaryData({ value1: 10000 });
+      expect(data.label).toBe('Strike');
+      expect(data.value).toBe(10000);
+    });
+
+    it('should use default "Target" label when not configured', () => {
+      const data = engine.getRowSummaryData({ value1: 5000 });
+      expect(data.label).toBe('Target');
+      expect(data.value).toBe(5000);
+    });
+  });
+
+  // ── Missing Coverage Helpers and Hooks ───────────────────────────────
+  describe('default hooks and getters', () => {
+    it('getMachinesPerRound should return 1 by default', () => {
+      expect(engine.getMachinesPerRound()).toBe(1);
+    });
+
+    it('getMaxRosterSize should return Infinity by default', () => {
+      expect(engine.getMaxRosterSize()).toBe(Infinity);
+    });
+
+    it('getRoundDisplayLabel should label using round label and 1-based index', () => {
+      const e = new ScoringEngine({ roundLabel: 'Hole' });
+      expect(e.getRoundDisplayLabel(0)).toBe('Hole 1');
+      expect(e.getRoundDisplayLabel(8)).toBe('Hole 9');
+    });
+
+    it('generateValue2Defaults should return empty array by default', () => {
+      expect(engine.generateValue2Defaults(5)).toEqual([]);
+    });
+
+    it('getMatchupDescription should return null by default', () => {
+      expect(engine.getMatchupDescription(5)).toBeNull();
+    });
+
+    it('getRequiredEventData should return empty object by default', () => {
+      expect(engine.getRequiredEventData(123, {})).toEqual({});
+    });
+
+    it('enrichScoreMap should pass through score map unchanged by default', () => {
+      const scoreMap = { 1: { ball1: 10 } };
+      expect(engine.enrichScoreMap(scoreMap, {})).toBe(scoreMap);
+    });
+
+    it('getRoundRowContext should return empty object by default', () => {
+      expect(engine.getRoundRowContext({}, {})).toEqual({});
+    });
+
+    it('buildPlayerScoreMap should map player scores by orderNumber', () => {
+      const playerScores = [
+        { orderNumber: 1, ball1: 10, ball2: 20, ball3: 30 },
+        { orderNumber: 2, ball1: 5, ball2: 15, ball3: 25 }
+      ];
+      const result = engine.buildPlayerScoreMap('p1', playerScores);
+      expect(result).toEqual({
+        '1': { ball1: 10, ball2: 20, ball3: 30 },
+        '2': { ball1: 5, ball2: 15, ball3: 25 }
+      });
+    });
+
+    it('buildPlayerScoreMap should handle null/empty playerScores gracefully', () => {
+      expect(engine.buildPlayerScoreMap('p1', null)).toEqual({});
+    });
+
+    it('isLastRound and getMaxOrder should behave correctly', () => {
+      const e1 = new ScoringEngine();
+      expect(e1.getMaxOrder()).toBe(0);
+      expect(e1.isLastRound(0)).toBe(true);
+
+      const e2 = new ScoringEngine({ maxOrder: 10 });
+      expect(e2.getMaxOrder()).toBe(10);
+      expect(e2.isLastRound(10)).toBe(true);
+      expect(e2.isLastRound(9)).toBe(false);
+    });
+
+    it('renderRoundRow should return a div element', async () => {
+      const row = await engine.renderRoundRow({}, null, false, null, {});
+      expect(row).toBeInstanceOf(HTMLElement);
+      expect(row.tagName).toBe('DIV');
+    });
+
+    it('renderResults should construct standard HTML table rows', () => {
+      const mockTable = { classList: { remove: vi.fn() } };
+      const mockExistingGrid = { remove: vi.fn() };
+
+      const querySelectorMock = vi.fn((selector) => {
+        if (selector === 'table.data-table') return mockTable;
+        if (selector === '.scoreboard-grid') return mockExistingGrid;
+        return null;
+      });
+
+      const domRefs = {
+        resultsPanel: {
+          querySelector: querySelectorMock,
+          classList: { remove: vi.fn() }
+        },
+        resultsBody: { innerHTML: '' },
+        totalScore: { textContent: '' },
+        resultsEmpty: { classList: { add: vi.fn() } },
+        escapeHTML: (s) => s
+      };
+
+      const calcResult = {
+        turnResults: [
+          { orderNumber: 1, machineName: 'M1', displayMark: '5', displayRunningTotal: '5' }
+        ],
+        totalDisplay: '10'
+      };
+
+      renderStandardScoreboard(calcResult, domRefs);
+
+      expect(mockTable.classList.remove).toHaveBeenCalledWith('hidden');
+      expect(mockExistingGrid.remove).toHaveBeenCalled();
+      expect(domRefs.resultsBody.innerHTML).toContain('M1');
+      expect(domRefs.resultsBody.innerHTML).toContain('5');
+      expect(domRefs.totalScore.textContent).toBe('10');
+      expect(domRefs.resultsEmpty.classList.add).toHaveBeenCalledWith('hidden');
+      expect(domRefs.resultsPanel.classList.remove).toHaveBeenCalledWith('hidden');
+    });
+
+    it('getPreviewRowData should return structured preview data', () => {
+      const frame = { machineName: 'M1', value1: 100, value2: 10, scaling: 'flat', values: {} };
+      const result = engine.getPreviewRowData(frame);
+      expect(result.value1).toBe(100);
+      expect(result.value2).toBe(10);
+    });
+
+
+
+    it('getQuickFillValues should return correct parsed values', () => {
+      const machineData = { targetEasy: 100, targetMed: 200, targetHard: 300 };
+
+      expect(engine.getQuickFillValues(machineData, 'easy')).toEqual({ value1: 100, value2: 0 });
+      expect(engine.getQuickFillValues(machineData, 'med')).toEqual({ value1: 200, value2: 0 });
+      expect(engine.getQuickFillValues(machineData, 'hard')).toEqual({ value1: 300, value2: 0 });
+      expect(engine.getQuickFillValues(null, 'easy')).toBeNull();
+      expect(engine.getQuickFillValues({}, 'easy')).toBeNull();
+    });
+
+    it('getPrintTargetSummaryHtml should return empty string by default', () => {
+      expect(engine.getPrintTargetSummaryHtml({}, false, (v) => v)).toBe('');
+    });
+  });
+});

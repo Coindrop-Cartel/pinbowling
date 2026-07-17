@@ -1,326 +1,326 @@
 <?php
-/**
- * Data service for configuring PinBowling machines and their scoring thresholds.
- * 
- * Supported Methods:
- * - GET: Fetch master machine registry or event-specific target scores.
- * - POST: Add master machines, create target scores, or bulk-reorder rounds.
- * - PUT: Update master machine names or specific target score thresholds.
- * - DELETE: Remove machines from global registry or targets from specific events.
- * 
- * Query Parameters:
- * - task: 'machine' (default), 'threshold', or 'sort'
- * - eventId: Filter targets by event
- * - leagueId: Filter targets by league
- */
-require_once __DIR__ . '/../includes/config.php';
+
+namespace App\Service;
 
 /**
- * Helper to transform flat database rows into a structured JSON format 
- * where thresholds are grouped in a 'values' object.
- * This specific serializer is for Target_Scores or Location_Machines, which contain score values.
- * @param array $row
- * @return array
+ * Service managing the master registry of pinball machines and target score thresholds.
  */
-function serializeTargetScore($row) {
-    return [
-        'id' => (int)$row['id'], // This is the ID of the Target_Scores or Location_Machines entry
-        'eventId' => isset($row['event_id']) ? (int)$row['event_id'] : null,
-        'machineId' => (int)$row['machine_id'], // This is the ID of the master machine
-        'machineName' => $row['machine_name'], // Joined from Machines table
-        'orderNumber' => (int)$row['order_number'],
-        'value1' => (int)($row['value1'] ?? 0),
-        'value2' => (int)($row['value2'] ?? 0),
-        'values' => [
-            1 => (int)$row['score1'], 2 => (int)$row['score2'], 3 => (int)$row['score3'], 4 => (int)$row['score4'], 5 => (int)$row['score5'],
-            6 => (int)$row['score6'], 7 => (int)$row['score7'], 8 => (int)$row['score8'], 9 => (int)$row['score9'], 10 => (int)$row['score10'],
-        ],
-    ];
-}
+class MachineService {
+    private DatabaseService $db;
 
-/**
- * Helper to transform flat database rows from the master Machines table into a structured JSON format.
- * @param array $row
- * @return array
- */
-function serializeMasterMachine($row) {
-    return [
-        'id' => (int)$row['id'],
-        'machineId' => (int)$row['id'],
-        'machineName' => $row['machine_name'],
-        'year' => $row['year'] ? (int)$row['year'] : null,
-        'manufacturer' => $row['manufacturer'] ?? null,
-    ];
-}
-
-try {
-    $pdo = getDbConnection();
-    $method = $_SERVER['REQUEST_METHOD'];
-    $task = $_GET['task'] ?? 'machine';
-    $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
-    $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
-
-    // GET: Retrieve the configuration for all rounds
-    if ($method === 'GET') {
-        if ($leagueId) { // Fetch all target scores for all events in a league
-            $stmt = $pdo->prepare('
-                SELECT ts.*, m.machine_name 
-                FROM target_scores ts 
-                JOIN machines m ON ts.machine_id = m.id 
-                JOIN events e ON ts.event_id = e.id
-                WHERE e.league_id = ? 
-                ORDER BY ts.event_id ASC, ts.order_number ASC
-            ');
-            $stmt->execute([$leagueId]);
-            $machines = array_map('serializeTargetScore', $stmt->fetchAll());
-        } else if ($eventId) { // Fetch event-specific target scores
-            $stmt = $pdo->prepare('
-                SELECT ts.*, m.machine_name 
-                FROM target_scores ts 
-                JOIN machines m ON ts.machine_id = m.id 
-                WHERE ts.event_id = ? 
-                ORDER BY ts.order_number ASC
-            ');
-            $stmt->execute([$eventId]);
-            $machines = array_map('serializeTargetScore', $stmt->fetchAll());
-        } else { // Fetch master list of machines (titles only)
-            $stmt = $pdo->query('SELECT id, machine_name, year, manufacturer FROM machines ORDER BY machine_name ASC');
-            $machines = array_map('serializeMasterMachine', $stmt->fetchAll());
-        }
-        sendJson($machines);
+    public function __construct(DatabaseService $db) {
+        $this->db = $db;
     }
 
-    $input = getJsonInput();
+    /**
+     * Get all master machines.
+     *
+     * @return array
+     */
+    public function getAllMachines(): array {
+        $stmt = $this->db->getPdo()->query(
+            'SELECT m.id, m.machine_name, m.year, m.manufacturer, ms.format, ms.target_easy, ms.target_med, ms.target_hard
+             FROM machines m
+             LEFT JOIN machine_scores ms ON ms.machine_id = m.id
+             ORDER BY m.machine_name ASC'
+        );
+        return $stmt->fetchAll();
+    }
 
-    // POST: Add a new round/machine configuration (Protected by API Secret)
-    if ($method === 'POST') {
-        if ($task === 'sort') {
-            if (!is_array($input)) sendJson(['error' => 'Input must be an array of updates'], 400);
+    /**
+     * Get a specific machine.
+     *
+     * @param int $machineId
+     * @return array
+     */
+    public function getMachine(int $machineId): array {
+        $stmt = $this->db->query(
+            'SELECT m.id, m.machine_name, m.year, m.manufacturer, ms.format, ms.target_easy, ms.target_med, ms.target_hard
+             FROM machines m
+             LEFT JOIN machine_scores ms ON ms.machine_id = m.id
+             WHERE m.id = ?',
+            [$machineId]
+        );
+        return $stmt->fetchAll();
+    }
 
-            // Fetch the event_id for the targets we are reordering.
-            $stmtAuth = $pdo->prepare('
-                SELECT e.league_id, ts.event_id 
-                FROM target_scores ts 
-                JOIN events e ON ts.event_id = e.id 
-                WHERE ts.id = ?
-            ');
-            $stmtAuth->execute([(int)$input[0]['id']]);
-            $auth = $stmtAuth->fetch();
-
-            if (!$auth) sendJson(['error' => 'Invalid target ID'], 400);
+    /**
+     * Save machine scores helper.
+     *
+     * @param int $machineId
+     * @param array $scores
+     */
+    public function saveMachineScores(int $machineId, array $scores): void {
+        $pdo = $this->db->getPdo();
+        foreach ($scores as $format => $targets) {
+            $easy = (int)($targets['targetEasy'] ?? $targets['target_easy'] ?? 0);
+            $med = (int)($targets['targetMed'] ?? $targets['target_med'] ?? 0);
+            $hard = (int)($targets['targetHard'] ?? $targets['target_hard'] ?? 0);
             
-            validateLeagueAccess($pdo, $auth['league_id']);
-            $eventId = $auth['event_id'];
+            $stmt = $pdo->prepare(
+                'INSERT INTO machine_scores (machine_id, format, target_easy, target_med, target_hard)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE target_easy = VALUES(target_easy), target_med = VALUES(target_med), target_hard = VALUES(target_hard)'
+            );
+            $stmt->execute([$machineId, $format, $easy, $med, $hard]);
+        }
+    }
 
+    /**
+     * Create a new machine.
+     *
+     * @param string $machineName
+     * @param int|null $year
+     * @param string|null $manufacturer
+     * @param array|null $scores Optional baseline target scores
+     * @return array Created machine
+     */
+    public function createMachine(string $machineName, ?int $year = null, ?string $manufacturer = null, ?array $scores = null): array {
+        $pdo = $this->db->getPdo();
+        
+        $stmt = $pdo->prepare(
+            'INSERT INTO machines (machine_name, year, manufacturer) VALUES (?, ?, ?)'
+        );
+        $stmt->execute([$machineName, $year, $manufacturer]);
+        $machineId = (int)$pdo->lastInsertId();
+        
+        if ($scores) {
+            $this->saveMachineScores($machineId, $scores);
+        }
+        
+        return $this->getMachine($machineId);
+    }
+
+    /**
+     * Update a machine.
+     *
+     * @param int $machineId
+     * @param string|null $machineName
+     * @param int|null $year
+     * @param string|null $manufacturer
+     * @param array|null $scores Optional baseline target scores
+     * @return array Updated machine
+     */
+    public function updateMachine(int $machineId, ?string $machineName = null, ?int $year = null, ?string $manufacturer = null, ?array $scores = null): array {
+        $pdo = $this->db->getPdo();
+        
+        $fields = [];
+        $params = [];
+        
+        if ($machineName !== null) {
+            $fields[] = 'machine_name = ?';
+            $params[] = $machineName;
+        }
+        if ($year !== null) {
+            $fields[] = 'year = ?';
+            $params[] = $year;
+        }
+        if ($manufacturer !== null) {
+            $fields[] = 'manufacturer = ?';
+            $params[] = $manufacturer;
+        }
+        
+        if (!empty($fields)) {
+            $params[] = $machineId;
+            $sql = "UPDATE machines SET " . implode(", ", $fields) . " WHERE id = ?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+        }
+        
+        if ($scores !== null) {
+            $this->saveMachineScores($machineId, $scores);
+        }
+        
+        return $this->getMachine($machineId);
+    }
+
+    /**
+     * Delete a machine.
+     *
+     * @param int $machineId
+     * @return bool
+     */
+    public function deleteMachine(int $machineId): bool {
+        $pdo = $this->db->getPdo();
+        
+        try {
             $pdo->beginTransaction();
-            try {
-                // To safely reorder across both target_scores and scores tables without unique key
-                // violations, we use a two-step "high-number shift" approach.
-                
-                // Step 1: Shift existing order_numbers to a high range (current + 1000)
-                // We fetch current numbers first to ensure we can map the Scores table correctly.
-                $stmtMap = $pdo->prepare('SELECT id, order_number FROM target_scores WHERE event_id = ?');
-                $stmtMap->execute([$eventId]);
-                $currentMapping = $stmtMap->fetchAll(PDO::FETCH_KEY_PAIR); // [id => old_order]
-
-                $stmtShiftTarget = $pdo->prepare('UPDATE target_scores SET order_number = order_number + 1000 WHERE event_id = ?');
-                $stmtShiftTarget->execute([$eventId]);
-                
-                $stmtShiftScores = $pdo->prepare('UPDATE scores SET order_number = order_number + 1000 WHERE event_id = ?');
-                $stmtShiftScores->execute([$eventId]);
-
-                // Step 2: Apply the new normalized incremental order numbers
-                $stmtUpdateTarget = $pdo->prepare('UPDATE target_scores SET order_number = ? WHERE id = ?');
-                $stmtUpdateScores = $pdo->prepare('UPDATE scores SET order_number = ? WHERE event_id = ? AND order_number = ?');
-
-                foreach ($input as $item) {
-                    $id = (int)$item['id'];
-                    $newOrder = (int)$item['orderNumber'];
-                    $oldOrderShifted = (int)($currentMapping[$id] ?? 0) + 1000;
-
-                    $stmtUpdateTarget->execute([$newOrder, $id]);
-                    if ($oldOrderShifted > 1000) {
-                        $stmtUpdateScores->execute([$newOrder, $eventId, $oldOrderShifted]);
-                    }
-                }
-
-                $pdo->commit();
-                sendJson(['success' => true]);
-            } catch (Exception $e) {
+            
+            // Delete target scores for this machine
+            $stmt = $pdo->prepare('DELETE FROM target_scores WHERE machine_id = ?');
+            $stmt->execute([$machineId]);
+            
+            // Delete location machines
+            $stmt = $pdo->prepare('DELETE FROM location_machines WHERE machine_id = ?');
+            $stmt->execute([$machineId]);
+            
+            // Delete scores for this machine
+            $stmt = $pdo->prepare('DELETE FROM scores WHERE machine_id = ?');
+            $stmt->execute([$machineId]);
+            
+            // Finally delete the machine
+            $stmt = $pdo->prepare('DELETE FROM machines WHERE id = ?');
+            $result = $stmt->execute([$machineId]);
+            
+            $pdo->commit();
+            return $result;
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
                 $pdo->rollBack();
-                sendJson(['error' => $e->getMessage()], 500);
             }
+            throw $e;
         }
+    }
 
-        // Task 'threshold' handles event-specific target scores (target_scores table)
-        if ($task === 'threshold') {
-            $batch = isset($input[0]) ? $input : [$input];
-            $pdo->beginTransaction();
-            try {
-                // Validate access for the target league (Setup change)
-                $firstEventId = $batch[0]['eventId'] ?? 0;
-                $stmtL = $pdo->prepare('SELECT league_id FROM events WHERE id = ?');
-                $stmtL->execute([(int)$firstEventId]);
-                validateLeagueAccess($pdo, $stmtL->fetchColumn());
+    /**
+     * Get target scores for an event.
+     *
+     * @param int $eventId
+     * @return array
+     */
+    public function getEventTargetScores(int $eventId): array {
+        $stmt = $this->db->query(
+            'SELECT ts.*, m.machine_name 
+             FROM target_scores ts 
+             JOIN machines m ON ts.machine_id = m.id 
+             WHERE ts.event_id = ? 
+             ORDER BY ts.order_number ASC',
+            [$eventId]
+        );
+        return $stmt->fetchAll();
+    }
 
-                // If batch updating, shift all current records to high range to avoid unique key collisions during reorder
-                if (count($batch) > 1) {
-                    $eventIds = array_unique(array_column($batch, 'eventId'));
-                    foreach ($eventIds as $eid) {
-                        $pdo->prepare('UPDATE target_scores SET order_number = order_number + 1000 WHERE event_id = ?')->execute([(int)$eid]);
-                        $pdo->prepare('UPDATE scores SET order_number = order_number + 1000 WHERE event_id = ?')->execute([(int)$eid]);
-                    }
-                }
+    /**
+     * Get target scores for a league.
+     *
+     * @param int $leagueId
+     * @return array
+     */
+    public function getLeagueTargetScores(int $leagueId): array {
+        $stmt = $this->db->query(
+            'SELECT ts.*, m.machine_name 
+             FROM target_scores ts 
+             JOIN machines m ON ts.machine_id = m.id 
+             JOIN events e ON ts.event_id = e.id
+             WHERE e.league_id = ? 
+             ORDER BY ts.event_id ASC, ts.order_number ASC',
+            [$leagueId]
+        );
+        return $stmt->fetchAll();
+    }
 
-                foreach ($batch as $item) {
-                    if (empty($item['eventId']) || empty($item['machineId'])) throw new Exception('eventId and machineId are required');
-                    $id = (int)($item['id'] ?? 0);
-                    if ($id) {
-                        // Find the "shifted" original order number to correctly update the scores table
-                        $stmtOrig = $pdo->prepare('SELECT order_number FROM target_scores WHERE id = ?');
-                        $stmtOrig->execute([$id]);
-                        $shiftedOldOrder = (int)$stmtOrig->fetchColumn();
+    /**
+     * Create or update target scores for an event.
+     *
+     * @param int $eventId
+     * @param array $targets Array of target score data
+     * @return bool
+     */
+    public function saveTargetScores(int $eventId, array $targets): bool {
+        $pdo = $this->db->getPdo();
 
-                        $sql = 'UPDATE target_scores SET machine_id = ?, order_number = ?, value1 = ?, value2 = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
-                        $params = [(int)$item['machineId'], (int)$item['orderNumber'], (int)($item['value1'] ?? 0), (int)($item['value2'] ?? 0)];
-                        for ($i = 1; $i <= 10; $i++) $params[] = (int)($item['values'][$i] ?? 0);
-                        $params[] = $id;
-
-                        // Update Scores table to match the new order number
-                        $stmtScores = $pdo->prepare('UPDATE scores SET order_number = ? WHERE event_id = ? AND order_number = ?');
-                        $stmtScores->execute([(int)$item['orderNumber'], (int)$item['eventId'], $shiftedOldOrder]);
-                    } else {
-                        $sql = 'INSERT INTO target_scores (event_id, machine_id, order_number, value1, value2, score1, score2, score3, score4, score5, score6, score7, score8, score9, score10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), value1=VALUES(value1), value2=VALUES(value2), score1=VALUES(score1), score2=VALUES(score2), score3=VALUES(score3), score4=VALUES(score4), score5=VALUES(score5), score6=VALUES(score6), score7=VALUES(score7), score8=VALUES(score8), score9=VALUES(score9), score10=VALUES(score10)';
-                        $params = [(int)$item['eventId'], (int)$item['machineId'], (int)$item['orderNumber'], (int)($item['value1'] ?? 0), (int)($item['value2'] ?? 0)];
-                        for ($i = 1; $i <= 10; $i++) $params[] = (int)($item['values'][$i] ?? 0);
-                    }
-                    $pdo->prepare($sql)->execute($params);
-                }
-                $pdo->commit();
-                sendJson(['success' => true]); // Logic exits here for 'threshold'
-            } catch (Exception $e) {
-                if ($pdo->inTransaction()) $pdo->rollBack();
-                sendJson(['error' => $e->getMessage()], 400);
-            }
+        // Support a single target object or a batch array
+        if (isset($targets['machineId'])) {
+            $targets = [$targets];
         }
-
-        // Default behavior: Create a new master machine (Machines table)
-        // Standard: 'machineName'. Fallback: 'name' (to be deprecated).
-        $name = $input['machineName'] ?? $input['name'] ?? null; 
-        if (!$name) {
-            sendJson(['error' => 'machineName is required'], 400);
-        }
-        $year = isset($input['year']) ? (int)$input['year'] : null;
-        $mfg = $input['manufacturer'] ?? null;
 
         try {
-            $stmt = $pdo->prepare('INSERT INTO machines (machine_name, year, manufacturer) VALUES (?, ?, ?)');
-            $stmt->execute([$name, $year, $mfg]);
-        } catch (PDOException $error) {
-            if ($error->errorInfo[1] === 1062) {
-                $stmt = $pdo->prepare('SELECT id, machine_name, year, manufacturer FROM machines WHERE machine_name = ?');
-                $stmt->execute([$name]);
-                sendJson(serializeMasterMachine($stmt->fetch()), 409);
-            }
-            throw $error;
-        }
-        $id = (int)$pdo->lastInsertId();
+            $pdo->beginTransaction();
 
-        $stmt = $pdo->prepare('SELECT id, machine_name, year, manufacturer FROM machines WHERE id = ?');
-        $stmt->execute([$id]);
-        $row = $stmt->fetch();
-        if (!$row) {
-            sendJson(['error' => 'Machine created but could not be retrieved.'], 500);
+            $stmt = $pdo->prepare(
+                'INSERT INTO target_scores
+                    (event_id, machine_id, order_number, value1, value2,
+                     score1, score2, score3, score4, score5,
+                     score6, score7, score8, score9, score10)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                    machine_id   = VALUES(machine_id),
+                    value1       = VALUES(value1),
+                    value2       = VALUES(value2),
+                    score1       = VALUES(score1),  score2  = VALUES(score2),
+                    score3       = VALUES(score3),  score4  = VALUES(score4),
+                    score5       = VALUES(score5),  score6  = VALUES(score6),
+                    score7       = VALUES(score7),  score8  = VALUES(score8),
+                    score9       = VALUES(score9),  score10 = VALUES(score10)'
+            );
+
+            foreach ($targets as $target) {
+                $values = $target['values'] ?? [];
+                $stmt->execute([
+                    $target['eventId']     ?? $eventId,
+                    $target['machineId'],
+                    $target['orderNumber'],
+                    $target['value1']      ?? 0,
+                    $target['value2']      ?? 0,
+                    $values[1]  ?? $values['1']  ?? 0,
+                    $values[2]  ?? $values['2']  ?? 0,
+                    $values[3]  ?? $values['3']  ?? 0,
+                    $values[4]  ?? $values['4']  ?? 0,
+                    $values[5]  ?? $values['5']  ?? 0,
+                    $values[6]  ?? $values['6']  ?? 0,
+                    $values[7]  ?? $values['7']  ?? 0,
+                    $values[8]  ?? $values['8']  ?? 0,
+                    $values[9]  ?? $values['9']  ?? 0,
+                    $values[10] ?? $values['10'] ?? 0,
+                ]);
+            }
+
+            $pdo->commit();
+            return true;
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
-        sendJson(serializeMasterMachine($row));
     }
 
-    // PUT: Update an existing round configuration (Protected by API Secret)
-    if ($method === 'PUT') {
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
+    /**
+     * Reorder target scores for an event.
+     *
+     * @param array $updates Array of [id => order_number] updates
+     * @return bool
+     */
+    public function reorderTargetScores(array $updates): bool {
+        $pdo = $this->db->getPdo();
         
-        // Task 'threshold' handles target_scores, default handles master machines
-        if ($task === 'threshold') {
-            if (empty($input['machineId']) || empty($input['orderNumber']) || empty($input['values'])) {
-                sendJson(['error' => 'machineId, orderNumber, and values are required for target scores'], 400);
+        try {
+            $pdo->beginTransaction();
+            
+            // Shift all to temporary high numbers to avoid unique constraint violations
+            $stmt = $pdo->prepare('SELECT event_id FROM target_scores WHERE id = ? LIMIT 1');
+            $stmt->execute([(int)$updates[0]['id']]);
+            $eventId = $stmt->fetchColumn();
+            
+            $highNum = 10000;
+            $stmt = $pdo->prepare('UPDATE target_scores SET order_number = ? WHERE event_id = ?');
+            $stmt->execute([$highNum, $eventId]);
+            
+            // Now set to correct numbers
+            $updateStmt = $pdo->prepare('UPDATE target_scores SET order_number = ? WHERE id = ?');
+            foreach ($updates as $update) {
+                $updateStmt->execute([$update['orderNumber'], $update['id']]);
             }
-
-            // Setup change: Admin or League access required
-            $stmtL = $pdo->prepare('SELECT e.league_id FROM target_scores ts JOIN events e ON ts.event_id = e.id WHERE ts.id = ?');
-            $stmtL->execute([$id]);
-            $lId = $stmtL->fetchColumn();
-            validateLeagueAccess($pdo, $lId);
-
-            $sql = 'UPDATE target_scores SET machine_id = ?, order_number = ?, value1 = ?, value2 = ?, score1 = ?, score2 = ?, score3 = ?, score4 = ?, score5 = ?, score6 = ?, score7 = ?, score8 = ?, score9 = ?, score10 = ? WHERE id = ?';
-            $params = [(int)$input['machineId'], (int)$input['orderNumber'], (int)($input['value1'] ?? 0), (int)($input['value2'] ?? 0)];
-            for ($i = 1; $i <= 10; $i++) $params[] = (int)($input['values'][$i] ?? 0);
-            $params[] = $id;
-            $pdo->prepare($sql)->execute($params);
-            $stmt = $pdo->prepare('SELECT ts.*, m.machine_name FROM target_scores ts JOIN machines m ON ts.machine_id = m.id WHERE ts.id = ?');
-            $stmt->execute([$id]);
-            $row = $stmt->fetch();
-            if (!$row) {
-                sendJson(['error' => 'Target score updated but could not be retrieved.'], 500);
+            
+            $pdo->commit();
+            return true;
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
             }
-            sendJson(serializeTargetScore($row));
-        } else { // Update a master machine (title only)
-            // Master DB modification: TD or Admin access required
-            validateTDAccess();
-
-            $name = $input['machineName'] ?? $input['name'] ?? null;
-            if (!$name) sendJson(['error' => 'machineName is required'], 400);
-            $year = isset($input['year']) ? (int)$input['year'] : null;
-            $mfg = $input['manufacturer'] ?? null;
-
-            try {
-                $sql = 'UPDATE machines SET machine_name = ?, year = ?, manufacturer = ? WHERE id = ?';
-                $pdo->prepare($sql)->execute([$name, $year, $mfg, $id]);
-            } catch (PDOException $error) {
-                if ($error->errorInfo[1] === 1062) {
-                    sendJson(['error' => 'Machine name already exists'], 409);
-                }
-                throw $error;
-            }
-
-            // Fetch the updated master machine
-            $stmt = $pdo->prepare('SELECT id, machine_name, year, manufacturer FROM machines WHERE id = ?');
-            $stmt->execute([$id]);
-            $row = $stmt->fetch();
-            if (!$row) {
-                sendJson(['error' => 'Machine updated but could not be retrieved.'], 500);
-            }
-            sendJson(serializeMasterMachine($row));
+            throw $e;
         }
     }
 
-    // DELETE: Remove a round configuration (Protected by API Secret)
-    if ($method === 'DELETE') {
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if (!$id) { // ID of the entity to delete
-            sendJson(['error' => 'id query parameter is required'], 400);
-        }
-        
-        if ($task === 'threshold') {
-            // Setup change: Admin or League access required
-            $stmtL = $pdo->prepare('SELECT e.league_id FROM target_scores ts JOIN events e ON ts.event_id = e.id WHERE ts.id = ?');
-            $stmtL->execute([$id]);
-            $lId = $stmtL->fetchColumn();
-            validateLeagueAccess($pdo, $lId);
-            $table = 'target_scores';
-        } else {
-            // Master DB modification: Admin access required
-            validateAdminAccess();
-            $table = 'machines';
-        }
-
-        $stmt = $pdo->prepare("DELETE FROM $table WHERE id = ?");
-        $stmt->execute([$id]);
-        sendJson(['success' => true]);
+    /**
+     * Delete target scores for an event.
+     *
+     * @param int $eventId
+     * @return bool
+     */
+    public function deleteEventTargetScores(int $eventId): bool {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare('DELETE FROM target_scores WHERE event_id = ?');
+        return $stmt->execute([$eventId]);
     }
-
-    sendJson(['error' => 'Unsupported request method'], 405);
-
-} catch (Exception $e) {
-    sendJson(['error' => $e->getMessage()], 500);
 }

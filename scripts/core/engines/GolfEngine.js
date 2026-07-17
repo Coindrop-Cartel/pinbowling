@@ -39,30 +39,46 @@ export class GolfEngine extends ScoringEngine {
    * This helps players understand the primary goal of the hole.
    * 
    * @param {Object} round 
-   * @param {Function} formatFn 
-   * @returns {string}
+   * @returns {Object}
    */
-  getRowSummaryHtml(round, formatFn) {
+  getRowSummaryData(round) {
     const goal = round.values?.[3] || round.values?.['3'] || round.value1 || 0;
     const par = round.value2 || 3;
-    return `<div class="strike-target" style="font-size: 0.8rem; color: var(--pb-primary); margin-top: 4px;"><b>Target Score:</b> ${formatFn(goal)} &nbsp;&nbsp; <b>Par:</b> ${par}</div>`;
+    return {
+      label: 'Target Score',
+      value: goal,
+      label2: 'Par',
+      value2: par
+    };
   }
 
   /**
-   * Highlighting for Golf thresholds (Target Stroke and Par Stroke).
+   * Golf-specific target summary for the printable blank score sheet.
+   * Shows the Target Score and Par for the hole.
    */
-  getThresholdRowStyle(rank, value1, value2) {
-    const r = Number(rank);
-    // Highlighting for the key thresholds: Start (3), End (10), and Par.
-    const isMajor = 
-      r === this.getThresholdStart() || 
-      r === this.getThresholdEnd() || 
-      r === Number(value2);
+  getPrintTargetSummaryHtml(machine, _isLastRound, formatNumberFn) {
+    const goal = machine.values?.[3] || machine.values?.['3'] || machine.value1 || 0;
+    return `
+        <span>Target Score: <strong>${formatNumberFn(goal)}</strong></span>
+        <span class="ml-15">Par: <strong>${machine.value2}</strong></span>
+      `;
+  }
 
-    if (isMajor) {
-      return 'margin: 2px 0; font-weight: bold; color: var(--pb-primary);';
+  /**
+   * Returns CSS class names for threshold row styling.
+   * Golf-specific: highlights Target Score, End (10), and Par stroke.
+   */
+  getThresholdRowClass(rank, value1, value2) {
+    const r = Number(rank);
+    const isTarget = r === this.getThresholdStart();
+    const isEnd = r === this.getThresholdEnd();
+    const isPar = r === Number(value2);
+
+    // Return class name if major threshold, empty string otherwise
+    if (isTarget || isEnd || isPar) {
+      return 'threshold-highlight';
     }
-    return 'margin: 2px 0; opacity: 0.8;';
+    return '';
   }
 
   /**
@@ -227,5 +243,27 @@ export class GolfEngine extends ScoringEngine {
   
   getInitialValues(suggestedTarget = 5000000) {
     return { value1: suggestedTarget, value2: 3 };
+  }
+
+  /**
+   * Generates randomized par values for the given hole count.
+   * Guarantees at least one of each common par (3, 4, 5) for variety.
+   * Remaining holes are filled with random 3/4/5 values.
+   * @param {number} count Number of holes.
+   * @returns {number[]}
+   */
+  generateValue2Defaults(count) {
+    const pars = [];
+    // Guarantee at least one of each common par values for variety
+    pars.push(3, 4, 5);
+    while (pars.length < count) {
+      pars.push(Math.floor(Math.random() * 3) + 3); // 3,4,5
+    }
+    // Shuffle
+    for (let i = pars.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pars[i], pars[j]] = [pars[j], pars[i]];
+    }
+    return pars.slice(0, count);
   }
 }

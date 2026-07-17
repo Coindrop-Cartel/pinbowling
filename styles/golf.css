@@ -10,3 +10,60 @@
   --pb-shadow: 6px 6px 0px var(--pb-primary);
   --pb-background: #ffffff;
 }
+
+/* Golf-specific standings markings styling */
+.theme-golf .standings-mark span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 1.1rem;
+  line-height: 1;
+  position: relative;
+}
+
+/* Birdie (Circle) */
+.theme-golf .standings-mark span.golf-birdie {
+  border: 2px solid var(--pb-primary);
+  color: var(--pb-primary);
+  background-color: transparent;
+}
+
+/* Eagle (Solid Circle) */
+.theme-golf .standings-mark span.golf-eagle {
+  background-color: var(--pb-primary);
+  color: var(--pb-white);
+}
+
+/* Albatross or better (Solid Circle with Frame) */
+.theme-golf .standings-mark span.golf-albatross {
+  background-color: var(--pb-primary);
+  color: var(--pb-white);
+  border: 2px solid var(--pb-black);
+}
+
+/* Bogey (Square) */
+.theme-golf .standings-mark span.golf-bogey {
+  border-radius: 0;
+  border: 2px solid var(--pb-primary);
+  color: var(--pb-primary);
+  background-color: transparent;
+}
+
+/* Double Bogey (Solid Square) */
+.theme-golf .standings-mark span.golf-double-bogey {
+  border-radius: 0;
+  background-color: var(--pb-primary);
+  color: var(--pb-white);
+}
+
+/* Triple Bogey or worse (Solid Square with Frame) */
+.theme-golf .standings-mark span.golf-triple-bogey {
+  border-radius: 0;
+  background-color: var(--pb-primary);
+  color: var(--pb-white);
+  border: 2px solid var(--pb-black);
+}

@@ -11,8 +11,10 @@ class LeagueServiceTest extends TestCase {
         // Satisfy the API Secret check for includes/config.php
         $_SERVER['HTTP_X_PB_SECRET'] = 'bowl-2024-secret';
         
-        // Include the service to access its functions
-        require_once __DIR__ . '/../../service/leagueService.php';
+        // Note: the leagueService.php controller returns early when PHPUNIT_RUNNING is true.
+        // Serializer functions (serializeEvent, serializeLeague) are loaded transitively
+        // via tests/bootstrap.php -> includes/bootstrap.php -> includes/serializers.php.
+        require_once __DIR__ . '/../../api/league.php';
     }
 
     public function testSerializeEventMapsSnakeCaseToCamelCase() {

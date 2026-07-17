@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title><?php echo isset($pageTitle) ? "PinBowling - $pageTitle" : 'PinBowling'; ?></title>
-  <link rel="stylesheet" id="theme-stylesheet" href="<?php echo versionedAsset($baseUrl . '/' . ($stylesDir ? $stylesDir . '/' : '') . 'styles.css'); ?>" />
-  <link rel="icon" type="image/png" href="<?php echo versionedAsset($baseUrl . '/images/logo.png'); ?>" />
+  <title><?php echo isset($pageTitle) ? "Pinball And Stuff - Don't say \"and stuff\"" : "Pinball And Stuff"; ?></title>
+  <link rel="stylesheet" id="theme-stylesheet" href="<?php echo versionedAsset($baseUrl . '/styles/styles.css'); ?>" />
+  <link rel="icon" type="image/png" href="<?php echo versionedAsset($baseUrl . '/images/' . $active['logo']); ?>" />
   <script>
     // Bridge PHP calculated base path to JavaScript
     window.APP_BASE = "<?php echo $baseUrl; ?>";
@@ -19,8 +19,7 @@
       "@services/": "<?php echo versionedAsset($baseUrl . '/scripts/services/'); ?>",
       "@ui/": "<?php echo versionedAsset($baseUrl . '/scripts/ui/'); ?>",
       "@core/": "<?php echo versionedAsset($baseUrl . '/scripts/core/'); ?>",
-      "@pages/": "<?php echo versionedAsset($baseUrl . '/scripts/pages/'); ?>",
-      "@constants/": "<?php echo $baseUrl; ?>/constants/"
+      "@pages/": "<?php echo versionedAsset($baseUrl . '/scripts/pages/'); ?>"
     }
   }
   </script>
@@ -29,6 +28,10 @@
   <?php include __DIR__ . '/header.php'; ?>
 
   <?php echo $pageContent; ?>
+
+  <footer class="site-footer">
+    <p>@2026 PinballAndStuff.com</p>
+  </footer>
 
   <script src="<?php echo versionedAsset($baseUrl . '/js-config.php'); ?>"></script>
   <script type="module" src="<?php echo versionedAsset($baseUrl . '/scripts/main.js'); ?>"></script>

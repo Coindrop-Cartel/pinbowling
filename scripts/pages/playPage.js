@@ -1,11 +1,25 @@
 import { PB_API } from '@services/api.js';
+import { can, PERMISSIONS, filterPlayersForUser } from '@services/auth.js';
 import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
-import { formatNumber, applyScoreFormatting, renderThresholdGrid, getCookie, loadPage } from '@scripts/utils.js';
-import { can, PERMISSIONS } from '@services/auth.js';
-import { createSearchableSelect, createExpandableRow, setupSortableList } from '@ui/selectors.js';
-import { showPlayerSelectionDialog } from '@ui/dialogs.js';
-import { getFormatBadgeHtml, applyPreferredTheme } from '@ui/branding.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
+import { getCookie, formatNumber, applyScoreFormatting, parseFormattedNumber, loadPage, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
+import { applyPreferredTheme } from '@ui/branding.js';
+import { createExpandableRow, setupSortableList, createSearchableSelect } from '@ui/selectors.js';
+import { showDialog, showPlayerSelectionDialog } from '@ui/dialogs.js';
+import { ROUTE_PATHS } from '@scripts/routes.js';
+import { renderPreviewRow } from '@scripts/renderers/roundRowRenderer.js';
+import { generateSessionName, selectRandomMachines, getTargetScoreForDifficulty } from '@services/sessionGenerator.js';
 
+/**
+ * Logic for the Play page where players enter their scores for the current session.
+ * @module pages/play
+ */
+
+/**
+ * Initializes the Play page: loads session data, renders machine/score entry UI, and binds submission controls.
+ * @async
+ * @returns {Promise<void>}
+ */
 export async function initPlayPage() {
   const form = document.getElementById('quick-play-form');
   const locSelect = document.getElementById('qp-location');
@@ -28,16 +42,16 @@ export async function initPlayPage() {
   const sessionsCard = document.getElementById('qp-sessions-card');
   let allPlayersCache = [];
   let todayEvents = [];
-  let currentSessionFormat = getCookie('pb_preferred_format') || 'bowling';
+  let currentSessionFormat = ScoringFormats.resolve(getCookie('pb_preferred_format'));
 
   // Populate session format dropdown from central list
   if (formatSelect) {
     formatSelect.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
-    formatSelect.value = getCookie('pb_preferred_format') || 'bowling';
+    formatSelect.value = ScoringFormats.resolve(getCookie('pb_preferred_format'));
   }
 
   const updateRoundOptions = () => {
-    currentSessionFormat = formatSelect?.value || 'bowling';
+    currentSessionFormat = ScoringFormats.resolve(formatSelect?.value);
     const engine = getScoringEngine(currentSessionFormat);
     const roundLabel = engine.getRoundLabel();
     applyPreferredTheme(currentSessionFormat);
@@ -59,19 +73,19 @@ export async function initPlayPage() {
 
   async function refreshSessionsData() {
     // Fetch only session-type leagues directly from the server
-    const sessionLeagues = await PB_API.getLeagues({ type: 'session' });
+    const sessionLeagues = await PB_API.leagues.getAll({ type: 'session' });
     const today = new Date().toISOString().split('T')[0];
     
     todayEvents = [];
     sessionLeagues.forEach(league => {
       const matches = (league.events || []).filter(e => e.eventDate === today);
       matches.forEach(event => {
-        const format = event.scoringFormat || league.scoringFormat || 'bowling';
+        const format = ScoringFormats.resolve(event.scoringFormat || league.scoringFormat);
         todayEvents.push({ ...event, leagueId: league.id, roster: league.players || [], scoringFormat: format });
       });
     });
 
-    allPlayersCache = await PB_API.getPlayers();
+    allPlayersCache = await PB_API.players.getAll();
   }
 
   function renderExistingSessions() {
@@ -98,80 +112,75 @@ export async function initPlayPage() {
         className: 'session-item',
         format: event.scoringFormat,
         headerHtml: `
-          <div style="flex: 1; display: flex; flex-direction: column;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <strong>${event.eventName}</strong>
+          <div class="session-item-header">
+            <div class="flex-center gap-8">
+              <strong>${escapeHTML(event.eventName)}</strong>
             </div>
-            <div class="session-stats" style="font-size: 0.75rem; opacity: 0.7; margin-top: 2px;">
-              ${event.locationName || 'No Location'} | ${event.eventDate} | Players: ${event.roster?.length || 0}
+            <div class="session-stats">
+              ${escapeHTML(event.locationName) || 'No Location'} | ${escapeHTML(event.eventDate)} | Players: ${event.roster?.length || 0}
             </div>
-            <div style="display: flex; gap: 6px; margin-top: 8px;">
-              <button class="join-btn secondary btn-row">Join</button>
+            <div class="play-action-buttons">
               <button class="play-btn secondary btn-row">Play</button>
               <button class="scoreboard-btn secondary btn-row">Scoreboard</button>
             </div>
           </div>
         `,
         contentHtml: '',
-        onHeaderClick: () => loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}`)
+        onHeaderClick: () => loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, leagueId: event.leagueId }))
       });
 
       row.querySelector('.scoreboard-btn').onclick = (e) => {
         e.stopPropagation();
-        loadPage(`standings?eventId=${event.id}&leagueId=${event.leagueId}`);
-      };
-
-      row.querySelector('.join-btn').onclick = async (e) => {
-        e.stopPropagation();
-        
-        const currentUser = await PB_API.getCurrentUser();
-        let selectedId = null;
-
-        const joinedIds = new Set(event.roster.map(p => p.id));
-        
-        // Auto-join logic for logged-in users
-        if (currentUser?.player_id) {
-            if (joinedIds.has(currentUser.player_id)) {
-                loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${currentUser.player_id}`);
-                return;
-            }
-            selectedId = currentUser.player_id;
-        } else {
-            const available = allPlayersCache.filter(p => !joinedIds.has(p.id));
-            if (available.length === 0) {
-              alert('All registered players have already joined this session.');
-              return;
-            }
-            const options = available.map(p => ({ value: p.id, label: p.playerName }));
-            selectedId = await showPlayerSelectionDialog('Play Session', 'Select your name to start playing:', options, 'Play');
-        }
-
-        if (selectedId) {
-          await PB_API.addLeaguePlayer(event.leagueId, Number(selectedId));
-          loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`);
-        }
+        loadPage(ROUTE_PATHS.STANDINGS({ eventId: event.id, leagueId: event.leagueId }));
       };
 
       row.querySelector('.play-btn').onclick = async (e) => {
         e.stopPropagation();
         
-        const currentUser = await PB_API.getCurrentUser();
+        const currentUser = await PB_API.auth.me().catch(err => {
+          console.warn("Failed to fetch current user, likely not logged in:", err);
+          return null;
+        });
+        const joinedIds = new Set(event.roster.map(p => p.id));
         let selectedId = null;
 
         if (currentUser?.player_id) {
             selectedId = currentUser.player_id;
         } else {
-            const roster = event.roster || [];
-            if (roster.length === 0) {
-              alert('No players are assigned to this session yet. Use "Join" to add yourself.');
-              return;
-            }
-            const options = roster.map(p => ({ value: p.id, label: p.playerName }));
+            // For guests, show players from the cache. We filter to non-users to prevent 
+            // guest sessions from hijacking registered accounts.
+            const available = filterPlayersForUser(allPlayersCache, currentUser);
+            const options = available.map(p => ({ 
+              value: p.id, 
+              label: joinedIds.has(p.id) ? p.playerName : `${p.playerName} (Join)` 
+            }));
             selectedId = await showPlayerSelectionDialog('Play Session', 'Who is playing?', options, 'Play');
         }
 
         if (selectedId) {
-          loadPage(`scores?eventId=${event.id}&leagueId=${event.leagueId}&playerId=${selectedId}`);
+          try {
+            // If the selected player isn't in the league yet, join them automatically
+            if (!joinedIds.has(Number(selectedId))) {
+              const engine = getScoringEngine(event.scoringFormat);
+              const maxRoster = engine.getMaxRosterSize();
+              // Enforce roster limit for formats with player constraints (e.g., baseball)
+              if (joinedIds.size >= maxRoster) {
+                showDialog({title: 'Session Full', message: `This session has reached its maximum roster size of ${maxRoster} and cannot accept more players.`, confirmText: 'OK' , hideCancel: true });
+                return;
+              }
+              const result = await PB_API.leagues.addPlayer(event.leagueId, Number(selectedId));
+              if (result.error) throw new Error(result.error);
+            }
+            loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, leagueId: event.leagueId, playerId: selectedId }));
+          } catch (err) {
+            console.error('[Play] Failed to join session:', err);
+            const message = err?.message || String(err);
+            if (message.includes('Unauthorized') || message.includes('401')) {
+              showPlayerSelectionDialog('Access Denied', 'Guests can only join as unregistered players. Please select a guest profile or log in.', [], 'Close');
+            } else {
+              alert('Failed to join session: ' + message);
+            }
+          }
         }
       };
     });
@@ -184,9 +193,12 @@ export async function initPlayPage() {
 
   // Batch initial data fetches for smoother loading
   const [locations] = await Promise.all([
-    PB_API.getLocations(),
+    PB_API.locations.getAll(),
     refreshSessionsData()
   ]);
+
+  // Guard: If we are no longer on the Play page, abort initialization
+  if (!document.getElementById('quick-play-form')) return;
 
   locationsCache = locations;
   locationsCache.forEach(loc => {
@@ -255,12 +267,12 @@ export async function initPlayPage() {
 
   form.onsubmit = (e) => {
     e.preventDefault();
-    generatePreview();
+    generatePreview().catch(err => { console.error('[generatePreview]', err); alert(err.message); });
   };
 
   renderExistingSessions();
 
-  function generatePreview() {
+  async function generatePreview() {
     const locId = Number(locSelect.value);
     const location = locationsCache.find(l => l.id === locId);
     const now = new Date();
@@ -269,9 +281,7 @@ export async function initPlayPage() {
     const locName = location ? location.name : 'No Location';
 
     const rawName = nameInput.value.trim();
-    const finalNamePreview = rawName 
-      ? `${rawName} - ${locName} - ${date} - ${time}`
-      : `${locName} - ${date} - ${time}`;
+    const finalNamePreview = generateSessionName(rawName, locName, date, time);
 
     // Show minimized header
     if (summaryText) {
@@ -284,10 +294,10 @@ export async function initPlayPage() {
     const frameCount = Number(document.getElementById('qp-frames').value);
     const difficulty = document.getElementById('qp-difficulty').value;
     const globalScaling = document.getElementById('qp-scaling').value;
-    currentSessionFormat = formatSelect?.value || 'bowling';
+    currentSessionFormat = ScoringFormats.resolve(formatSelect?.value);
     const engine = getScoringEngine(currentSessionFormat);
 
-    const locMachines = location?.machines || [];
+    const locMachines = await PB_API.locations.getMachines(locId);
     currentLocMachines = locMachines;
     
     if (locMachines.length === 0) {
@@ -295,30 +305,26 @@ export async function initPlayPage() {
       return;
     }
 
+    const machinesPerRound = engine.getMachinesPerRound();
+    const totalMachinesNeeded = frameCount * machinesPerRound;
+    
     // Pick random machines
-    const shuffled = [...locMachines].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, frameCount);
-    while (selected.length < frameCount) {
+    const selected = selectRandomMachines(locMachines, totalMachinesNeeded);
+    while (selected.length < totalMachinesNeeded) {
       selected.push(locMachines[Math.floor(Math.random() * locMachines.length)]);
     }
 
-    // Generate randomized pars for Golf (ensure at least one 3, 4, and 5)
-    const pars = [];
-    if (currentSessionFormat === 'golf') {
-      pars.push(3, 4, 5);
-      while (pars.length < frameCount) {
-        pars.push(Math.floor(Math.random() * 3) + 3); // Random 3, 4, or 5
-      }
-      // Shuffle the pars so the 3, 4, 5 aren't always the first three holes
-      pars.sort(() => Math.random() - 0.5);
-    }
+    // Generate default value2 settings for the format (e.g., par values for golf)
+    const value2Defaults = engine.generateValue2Defaults(frameCount);
 
       generatedFrames = selected.map((m, index) => {
-        const difficultyKey = 'target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-        const baseScore = m[difficultyKey] || 1000000;
+        const baseScore = getTargetScoreForDifficulty(m, difficulty);
         let { value1, value2 } = engine.getInitialValues(baseScore);
 
-        if (currentSessionFormat === 'golf') value2 = pars[index];
+        // Apply default value2 for formats that support it (e.g., golf pars)
+        if (value2Defaults.length > 0 && value2Defaults[index] !== undefined) {
+          value2 = value2Defaults[index];
+        }
 
         return {
             machineId: Number(m.machineId),
@@ -333,14 +339,49 @@ export async function initPlayPage() {
             scaling: globalScaling,
             values: engine.buildRoundValues(value1, value2, globalScaling),
             orderNumber: index + 1,
+            scores: {},
             tempId: Math.random().toString(36).substr(2, 9)
         };
     });
 
     renderPreview();
+    renderMatchupPreview();
     previewSection.classList.remove('hidden');
     
     previewSection.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function renderMatchupPreview() {
+    const matchupContainer = document.getElementById('qp-matchups-preview');
+    if (!matchupContainer) return;
+
+    const engine = getScoringEngine(currentSessionFormat);
+    const matchupInfo = engine.getMatchupDescription(generatedFrames.length);
+
+    if (!matchupInfo) {
+      matchupContainer.classList.add('hidden');
+      return;
+    }
+
+    matchupContainer.classList.remove('hidden');
+    matchupContainer.innerHTML = `
+      <div class="card matchup-preview-card">
+        <h3>Head-to-Head Matchups</h3>
+        <p class="text-muted">${escapeHTML(matchupInfo.description)}</p>
+        <div class="matchup-preview-grid">
+          ${matchupInfo.details.map(d => `
+            <div class="matchup-info">
+              <span class="matchup-label">${escapeHTML(d.label)}:</span>
+              <span>${escapeHTML(d.value)}</span>
+            </div>
+          `).join('')}
+          <div class="matchup-info">
+            <span class="matchup-label">Machines:</span>
+            <span>${generatedFrames.filter(f => f.machineId).length} selected</span>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function renderPreview() {
@@ -349,45 +390,10 @@ export async function initPlayPage() {
       const isExpanded = expandedTempId === frame.tempId;
       const engine = getScoringEngine(currentSessionFormat);
 
-      const headerHtml = `
-        <div style="display: flex; align-items: center; gap: 12px; width: 100%; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">
-            <div class="drag-handle" style="cursor: grab; color: var(--pb-primary); opacity: 0.5; padding: 0 4px; font-size: 1.2rem;">☰</div>
-            <span style="font-weight: bold; min-width: 30px; text-align: center;">${frame.orderNumber}</span>
-            <span style="flex: 1; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" class="machine-name-display">${frame.machineName}</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto;" onclick="event.stopPropagation()">
-            <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${engine.getValue1Label()}:</label>
-              <input type="text" class="score10-input" value="${formatNumber(frame.value1)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
-            </div>
-            <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${engine.getValue2Label()}:</label>
-              <input type="text" class="score1-input" value="${formatNumber(frame.value2)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
-            </div>
-          </div>
-        </div>
-      `;
-
-      const contentHtml = `
-          <div class="form-row">
-            <label style="font-size: 0.85rem;">Change Machine</label>
-            <input type="text" class="row-machine-search" placeholder="Filter machines..." style="width: 100%; box-sizing: border-box; margin-bottom: 5px;">
-            <select class="row-machine-select" style="width: 100%; box-sizing: border-box;"></select>
-          </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <div style="display: flex; gap: 6px;">
-               <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
-               <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
-               <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
-            </div>
-            <div style="display: flex; gap: 4px;">
-               <button type="button" class="scaling-btn ${frame.scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
-               <button type="button" class="scaling-btn ${frame.scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
-            </div>
-          </div>
-          <div class="preview-values-container">${renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2)}</div>
-      `;
+      const { headerHtml, contentHtml } = renderPreviewRow(
+        engine, frame, index, isExpanded,
+        formatNumber, escapeHTML, renderThresholdGrid
+      );
 
       const row = createExpandableRow(framesList, {
         id: frame.tempId,
@@ -419,13 +425,14 @@ export async function initPlayPage() {
       });
       const s10 = row.querySelector('.score10-input');
       const s1 = row.querySelector('.score1-input');
-      applyScoreFormatting(s10);
-      applyScoreFormatting(s1);
+      if (s1) s1.dataset.allowDecimal = engine.getValue2AllowsDecimal?.() === true ? 'true' : 'false';
+      if (s10) applyScoreFormatting(s10);
+      if (s1) applyScoreFormatting(s1);
 
       // Immediate data updates as user types
       const updateValues = () => {
-        frame.value1 = Number(s10.value.replace(/\D/g, '')) || 0;
-        frame.value2 = Number(s1.value.replace(/\D/g, '')) || 0;
+        if (s10) frame.value1 = parseFormattedNumber(s10.value);
+        if (s1) frame.value2 = parseFormattedNumber(s1.value, engine.getValue2AllowsDecimal?.() === true);
         frame.values = engine.buildRoundValues(frame.value1, frame.value2, frame.scaling);
 
         // Update the visual grid without re-rendering the whole row to maintain input focus
@@ -435,8 +442,8 @@ export async function initPlayPage() {
         }
       };
 
-      s10.oninput = updateValues;
-      s1.oninput = updateValues;
+      if (s10) s10.oninput = updateValues;
+      if (s1) s1.oninput = updateValues;
 
       // Searchable Select initialization (only if expanded)
       if (isExpanded) {
@@ -459,10 +466,12 @@ export async function initPlayPage() {
           }
         });
 
-        // To prevent the blank dropdown, clear the search and force an update
-        // so the full list of machines at this location is visible immediately.
-        mSearch.value = ''; 
+        // Show all options unfiltered, then pre-select the assigned machine
         mSearchInstance.updateOptions('');
+        if (frame.machineId) {
+          mSelect.value = String(frame.machineId);
+          mSearch.value = frame.machineName || '';
+        }
         mSearch.addEventListener('focus', (e) => e.target.select());
         setTimeout(() => mSearch.focus(), 50);
 
@@ -475,8 +484,8 @@ export async function initPlayPage() {
               const { value1, value2 } = engine.getInitialValues(val);
               frame.value1 = value1;
               frame.value2 = value2;
-              s10.value = formatNumber(frame.value1);
-              s1.value = formatNumber(frame.value2);
+              if (s10) s10.value = formatNumber(frame.value1);
+              if (s1) s1.value = formatNumber(frame.value2);
               updateValues();
               renderPreview();
             }
@@ -508,15 +517,13 @@ export async function initPlayPage() {
     const date = now.toLocaleDateString();
     const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    const eventName = rawName 
-      ? `${rawName} - ${locName} - ${date} - ${time}`
-      : `${locName} - ${date} - ${time}`;
+    const eventName = generateSessionName(rawName, locName, date, time);
 
     finalizeBtn.disabled = true;
     finalizeBtn.textContent = 'Starting Session...';
 
     try {
-      const newLeague = await PB_API.createLeague({ 
+      const newLeague = await PB_API.leagues.create({ 
         name: eventName, 
         startDate: now.toISOString().split('T')[0],
         type: 'session',
@@ -529,7 +536,7 @@ export async function initPlayPage() {
 
       const qpLeague = newLeague;
 
-      const newEvent = await PB_API.createEvent({
+      const newEvent = await PB_API.events.create({
         leagueId: qpLeague.id,
         eventName: eventName,
         eventDate: now.toISOString().split('T')[0],
@@ -559,11 +566,60 @@ export async function initPlayPage() {
       if (targetPayloads.length > 0) {
         // Sending all targets in a single request prevents 403 Forbidden 
         // errors caused by server-side rate-limiting or flood protection.
-        await PB_API.saveTargetScore(targetPayloads);
+        await PB_API.machines.saveTarget(targetPayloads);
       }
 
-      // Direct redirect to the scoreboard for the new session
-      loadPage(`standings?eventId=${event.id}&leagueId=${qpLeague.id}`);
+      // Redirect to the scoring page for the new session.
+      // If the user has a player profile, auto-join them and pre-select them.
+      const currentUser = await PB_API.auth.me();
+      if (currentUser?.player_id) {
+        await PB_API.leagues.addPlayer(qpLeague.id, currentUser.player_id);
+      }
+
+      // Generate matchups for formats that use them (e.g., baseball head-to-head)
+      const engine = getScoringEngine(currentSessionFormat);
+      const matchupInfo = engine.getMatchupDescription(generatedFrames.length);
+      if (matchupInfo) {
+        const leagueData = await PB_API.leagues.get(qpLeague.id);
+        const roster = leagueData?.players || [];
+
+        if (roster.length < 2 && allPlayersCache.length > 0) {
+          const opponentOptions = allPlayersCache
+            .filter(p => !roster.some(r => r.id === p.id))
+            .map(p => ({ value: p.id, label: p.playerName }));
+
+          if (opponentOptions.length > 0) {
+            const opponentId = await showPlayerSelectionDialog(
+              'Select Opponent',
+              'This format requires at least 2 players. Choose an opponent:',
+              opponentOptions,
+              'Add & Continue'
+            );
+            if (opponentId) {
+              await PB_API.leagues.addPlayer(qpLeague.id, Number(opponentId));
+              roster.push({ id: Number(opponentId) });
+            }
+          }
+        }
+
+        const updatedLeague = roster.length >= 2 ? { players: roster } : await PB_API.leagues.get(qpLeague.id);
+        const finalRoster = updatedLeague?.players || [];
+
+        if (finalRoster.length >= 2) {
+          const inningCount = generatedFrames.length / engine.getMachinesPerRound();
+          const machines = generatedFrames.map(f => ({ machineId: f.machineId }));
+          const matchups = engine.generateMatchupPayload(finalRoster, inningCount, machines);
+
+          if (matchups.length > 0) {
+            await PB_API.matchups.save(matchups.map(m => ({
+              ...m,
+              eventId: Number(event.id)
+            })));
+          }
+        }
+      }
+
+      loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, leagueId: qpLeague.id, playerId: currentUser?.player_id }));
 
     } catch (err) {
       console.error(err);

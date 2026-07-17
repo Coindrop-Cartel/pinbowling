@@ -8,15 +8,15 @@
 require_once __DIR__ . '/includes/config.php';
 
 try {
-    $pdo = getDbConnection();
+    $pdo = $GLOBALS['container']->get(\App\Service\DatabaseService::class)->getPdo();
 
     $stmt = $pdo->query('SELECT DATABASE() AS dbname, @@hostname AS hostname');
     $info = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    global $DB_HOST, $DB_PORT, $DB_NAME;
-    $configuredHost = $DB_HOST;
-    $configuredPort = $DB_PORT;
-    $configuredDb = $DB_NAME;
+    $dbConfig = Configuration::getInstance()->getDbConfig();
+    $configuredHost = $dbConfig['host'];
+    $configuredPort = $dbConfig['port'];
+    $configuredDb = $dbConfig['name'];
 
     $phpVersion = PHP_VERSION;
     $pdoDrivers = PDO::getAvailableDrivers();
@@ -83,7 +83,7 @@ try {
         echo '<li>Verify the MariaDB service is running: <code>systemctl status mariadb</code>.</li>';
     }
     if (strpos($e->getMessage(), 'Unknown database') !== false) {
-        echo '<li>The database <code>' . htmlspecialchars($DB_NAME) . '</code> does not exist. Create it via terminal: <code>CREATE DATABASE ' . $DB_NAME . ';</code></li>';
+        echo '<li>The database <code>' . htmlspecialchars($configuredDb) . '</code> does not exist. Create it via terminal: <code>CREATE DATABASE ' . $configuredDb . ';</code></li>';
     }
     echo '</ul>';
 

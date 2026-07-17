@@ -1,19 +1,6 @@
 /**
  * Centralized route configuration for the PinBowling application.
  */
-export const ROUTES = [
-  { path: 'index.php', label: 'Home' },
-  { path: 'leagues.php', label: 'Leagues' },
-  { path: 'players.php', label: 'Players' },
-  { path: 'machines.php', label: 'Machines' },
-  { path: 'locations.php', label: 'Locations' },
-  { path: 'standings.php', label: 'Standings' },
-  { path: 'scores.php', label: 'Scores' },
-  { path: 'eventSetup.php', label: 'Setup' },
-  { path: 'play.php', label: 'Play' },
-  { path: 'management.php', label: 'Maintenance' }
-];
-
 /**
  * @param {string} path 
  * @param {Object} [params] 
@@ -35,13 +22,30 @@ const buildUrl = (path, params = {}) => {
   return `${base}${p}${queryString ? '?' + queryString : ''}`;
 };
 
-ROUTES['HOME'] = (params = {}) => buildUrl('/', params);
-ROUTES['SCORES'] = (params = {}) => buildUrl('/scores', params);
-ROUTES['LEAGUES'] = (params = {}) => buildUrl('/leagues', params);
-ROUTES['LEAGUE_SETUP'] = (params = {}) => buildUrl('/eventSetup', params);
-ROUTES['STANDINGS'] = (params = {}) => buildUrl('/standings', params);
-ROUTES['PLAYERS'] = (params = {}) => buildUrl('/players', params);
-ROUTES['LOCATIONS'] = (params = {}) => buildUrl('/locations', params);
-ROUTES['MACHINES'] = (params = {}) => buildUrl('/machines', params);
-ROUTES['PLAY'] = (params = {}) => buildUrl('/play', params);
-ROUTES['MAINTENANCE'] = (params = {}) => buildUrl('/management', params);
+export const ROUTE_PATHS = {
+  HOME: (params = {}) => buildUrl('/', params),
+  SCORES: (params = {}) => buildUrl('/scores', params),
+  LEAGUES: (params = {}) => buildUrl('/leagues', params),
+  TEAMS: (params = {}) => buildUrl('/teams', params),
+  LEAGUE_SETUP: (params = {}) => buildUrl('/eventSetup', params),
+  STANDINGS: (params = {}) => buildUrl('/standings', params),
+  PLAYERS: (params = {}) => buildUrl('/players', params),
+  LOCATIONS: (params = {}) => buildUrl('/locations', params),
+  MACHINES: (params = {}) => buildUrl('/machines', params),
+  PLAY: (params = {}) => buildUrl('/play', params),
+  MAINTENANCE: (params = {}) => buildUrl('/management', params),
+};
+
+export const ROUTES = [
+  { path: ROUTE_PATHS.HOME(), label: 'Home' },
+  { path: ROUTE_PATHS.LEAGUES(), label: 'Leagues' },
+  { path: ROUTE_PATHS.PLAYERS(), label: 'Players' },
+  { path: ROUTE_PATHS.TEAMS(), label: 'Teams' },
+  { path: ROUTE_PATHS.MACHINES(), label: 'Machines' },
+  { path: ROUTE_PATHS.LOCATIONS(), label: 'Locations' },
+  { path: ROUTE_PATHS.STANDINGS(), label: 'Standings' },
+  { path: ROUTE_PATHS.SCORES(), label: 'Scores' },
+  { path: ROUTE_PATHS.LEAGUE_SETUP(), label: 'Setup' },
+  { path: ROUTE_PATHS.PLAY(), label: 'Play' },
+  { path: ROUTE_PATHS.MAINTENANCE(), label: 'Maintenance' }
+];

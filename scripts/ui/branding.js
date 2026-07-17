@@ -1,4 +1,5 @@
-import { getScoringEngine } from '@core/engine.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
+import { FormatBranding } from '@services/scoringFormatBranding.js';
 import { getCookie } from '@scripts/utils.js';
 
 /**
@@ -8,36 +9,44 @@ import { getCookie } from '@scripts/utils.js';
  * @param {string} [overrideFormat] - Force a specific format, ignoring cookies.
  */
 export function applyPreferredTheme(overrideFormat) {
-  const preferred = overrideFormat || getCookie('pb_preferred_format') || 'bowling';
-  const engine = getScoringEngine(preferred);
+  const preferred = ScoringFormats.resolve(overrideFormat || getCookie('pb_preferred_format'));
+  const branding = FormatBranding.get(preferred);
 
   // Clear any previous theme classes and apply the current engine's theme
-  document.body.classList.remove('theme-golf', 'theme-bowling');
-  const themeClass = engine.getThemeClass();
+  document.body.classList.remove('theme-golf', 'theme-bowling', 'theme-baseball');
+  const themeClass = branding.themeClass;
   if (themeClass) document.body.classList.add(themeClass);
-  
-  // Update dynamic logos (header/nav)
-  const logoImgs = document.querySelectorAll('.nav-logo img, .header-logo img, .site-logo img, #site-logo');
+
+  // Update main site logo (if present on home page)
+  const mainLogo = document.querySelector('.main-site-logo');
+  if (mainLogo) {
+    const lastSlash = mainLogo.src.lastIndexOf('/');
+    const basePath = lastSlash !== -1 ? mainLogo.src.substring(0, lastSlash + 1) : '';
+    mainLogo.src = `${basePath}main-site-logo-${branding.brandName.toLowerCase()}.png`;
+  }
+
+  // Update dynamic logos (general page logos)
+  const logoImgs = document.querySelectorAll('.header-logo img, .site-logo img, #site-logo');
   logoImgs.forEach(img => {
     const lastSlash = img.src.lastIndexOf('/');
     const basePath = lastSlash !== -1 ? img.src.substring(0, lastSlash + 1) : '';
-    img.src = basePath + engine.getLogoImage();
-    img.alt = engine.getBrandName() + ' Logo';
+    img.src = basePath + branding.logoImage;
+    img.alt = branding.brandName + ' Logo';
   });
 
-  // Update the navigation brand name label
-  document.querySelectorAll('.nav-logo span').forEach(el => {
-    el.textContent = engine.getBrandName();
+  // Update nav brand name spans (if present)
+  document.querySelectorAll('.nav-logo span').forEach(span => {
+    span.textContent = branding.brandName;
   });
 
   // Update all play CTA links (nav and home button)
   document.querySelectorAll('[data-route="PLAY"]').forEach(link => {
-    link.textContent = engine.getPlayActionLabel();
+    link.textContent = branding.playActionLabel;
   });
 
   // Update homepage descriptive text
   const logicText = document.getElementById('scoring-logic-text');
-  if (logicText) logicText.textContent = engine.getScoringDescription();
+  if (logicText) logicText.textContent = branding.scoringDescription;
 }
 
 /**
@@ -48,10 +57,10 @@ export function applyPreferredTheme(overrideFormat) {
  */
 export function getFormatBadgeHtml(format) {
   if (!format) return '';
-  const engine = getScoringEngine(format);
-  const label = engine.getBrandName();
-  const themeClass = engine.getThemeClass();
-  return `<span class="badge ${themeClass}" style="background: var(--pb-primary); color: var(--pb-white); font-size:0.65rem; padding:2px 6px; border-radius:10px; margin-left:8px; vertical-align:middle; font-weight: bold; text-transform: uppercase; border: none;">${label}</span>`;
+  const branding = FormatBranding.get(format);
+  const label = branding.brandName;
+  const themeClass = branding.themeClass;
+  return `<span class="badge ${themeClass}">${label}</span>`;
 }
 
 /**

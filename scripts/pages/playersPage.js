@@ -1,17 +1,38 @@
 import { PB_API } from '@services/api.js';
-import { setupLiveFilter, createExpandableRow } from '@ui/selectors.js';
-import { showConfirm, showPrompt, showChoiceDialog, showAlert } from '@ui/dialogs.js';
-import { requireAdmin } from '@services/auth.js';
+import { requireAdmin, can, PERMISSIONS } from '@services/auth.js';
+import { showAlert, showPrompt, showChoiceDialog, showConfirm, showPlayerSelectionDialog } from '@ui/dialogs.js';
+import { createExpandableRow, setupLiveFilter, createSkeletonLoader } from '@ui/selectors.js';
+import { escapeHTML } from '@scripts/utils.js';
 
 /**
  * Initializes the Player Management page.
+ * @module pages/players
+ */
+
+/**
+ * Initializes the Players page: loads players, binds CRUD controls, and renders the player list.
+ * @async
+ * @returns {Promise<void>}
  */
 export async function initPlayersPage() {
-  // Batch initial user check and data fetch
-  const [currentUser, playersData] = await Promise.all([
-    PB_API.getCurrentUser(),
-    PB_API.getPlayers()
-  ]);
+  let currentUser;
+  let playersData;
+  const loader = createSkeletonLoader(document.getElementById('player-list'), { count: 5 });
+  try {
+    // Batch initial user check and data fetch
+    [currentUser, playersData] = await Promise.all([
+      PB_API.auth.me(),
+      PB_API.players.getAll()
+    ]);
+  } catch (error) {
+    console.error('Error initializing Players page:', error);
+    return; // Stop initialization if initial data fetch fails
+  } finally {
+    loader.remove();
+  }
+
+  // Guard: If we are no longer on the Players page, abort initialization
+  if (!document.getElementById('player-list')) return;
 
   const isAdmin = currentUser && currentUser.role === 'admin';
   const isTD = currentUser && currentUser.role === 'td';
@@ -19,17 +40,22 @@ export async function initPlayersPage() {
 
   const playerFormTitle = document.getElementById('player-form-title');
   const playerForm = document.getElementById('player-form');
+  const playerFormCard = document.getElementById('player-form-card');
   const editingPlayerIdInput = document.getElementById('editing-player-id');
   const playerNameInput = document.getElementById('player-name');
   const ifpaIdInput = document.getElementById('ifpa-id');
   const matchplayIdInput = document.getElementById('matchplay-id');
+  const usernameRow = document.getElementById('player-username-row');
+  const usernameInput = document.getElementById('player-username');
+  const emailRow = document.getElementById('player-email-row');
+  const emailInput = document.getElementById('player-email');
   const savePlayerButton = document.getElementById('save-player-button');
-  const cancelEditButton = document.getElementById('cancel-edit-button');
 
   const playerList = document.getElementById('player-list');
 
   let allPlayers = []; // Cache players for editing
   let filterInstance = null;
+  let expandedPlayerId = null;
 
   // Setup "Create Player" toggle
   const ifpaRow = document.getElementById('player-ifpa-row');
@@ -54,16 +80,24 @@ export async function initPlayersPage() {
 
   const createToggle = document.createElement('button');
   createToggle.type = 'button';
-  createToggle.className = 'secondary btn-mgmt';
+  createToggle.className = 'secondary btn-mgmt mt-10 hidden';
   createToggle.textContent = 'Create New Player';
-  createToggle.style.marginTop = '10px';
   playerNameInput.after(createToggle);
 
-  if (savePlayerButton) savePlayerButton.classList.add('btn-mgmt');
+  if (!currentUser) {
+    if (createToggle) createToggle.classList.add('hidden');
+    if (playerFormCard) playerFormCard.classList.add('hidden');
+  }
 
-  if (!hasElevatedPrivileges) {
-    createToggle.classList.add('hidden');
-    playerForm.closest('.card').classList.add('hidden');
+  // Standardize the primary form action button
+  if (savePlayerButton) {
+    savePlayerButton.classList.add('secondary', 'btn-mgmt');
+  }
+
+  // REVEAL-ONLY: Management tools should be hidden in PHP/CSS by default.
+  if (hasElevatedPrivileges) {
+    createToggle.classList.remove('hidden');
+    playerFormCard?.classList.remove('hidden');
   }
 
   createToggle.onclick = () => {
@@ -74,11 +108,11 @@ export async function initPlayersPage() {
     actionsRow.classList.toggle('hidden', !isHidden);
     if (isHidden) {
       createToggle.textContent = 'Cancel';
-      createToggle.style.marginTop = '0';
+      createToggle.classList.replace('mt-10', 'mt-0');
       actionsRow.appendChild(createToggle);
     } else {
       createToggle.textContent = 'Create New Player';
-      createToggle.style.marginTop = '10px';
+      createToggle.classList.replace('mt-0', 'mt-10');
       playerNameInput.after(createToggle);
     }
   };
@@ -92,27 +126,34 @@ export async function initPlayersPage() {
       filtered.forEach(p => {
         const isSelf = currentUser && String(p.id) === String(currentUser.player_id);
         const canEdit = hasElevatedPrivileges || isSelf;
+        // Robust role detection: check userRole (standardized), role (fallback), or infer from userId presence
+        const displayRole = p.userRole || p.role || (p.userId ? 'player' : '');
 
         const headerHtml = `
-          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-              <strong>${p.playerName}</strong> 
-              ${p.userRole ? `<span class="badge" style="background:var(--pb-primary); color:var(--pb-white); font-size:0.7rem; padding:2px 6px; border-radius:10px; font-weight: bold; text-transform: uppercase;">${p.userRole}</span>` : ''}
-            </div>
-            <div style="display: flex; gap: 8px;">
-              ${canEdit ? `<button type="button" class="edit-player-btn secondary btn-row">Edit</button>` : ''}
-              ${isAdmin ? `<button type="button" class="delete-player-btn-inline btn-row">Delete</button>` : ''}
+          <div class="header-bar">
+            <div class="name-with-badge">
+              <strong>${escapeHTML(p.playerName)}</strong>
+              ${displayRole ? `<span class="badge">${escapeHTML(displayRole)}</span>` : ''}
             </div>
           </div>
         `;
 
         const contentHtml = `
-          <div style="font-size: 0.85rem; color: #666; display: flex; flex-direction: column; gap: 4px;">
-            ${p.ifpaId ? `<div><strong>IFPA ID:</strong> ${p.ifpaId}</div>` : ''}
-            ${p.matchplayId ? `<div><strong>MatchPlay ID:</strong> ${p.matchplayId}</div>` : ''}
-            ${!p.ifpaId && !p.matchplayId ? '<div style="opacity: 0.6; font-style: italic;">No external IDs linked.</div>' : ''}
+          <div class="content-muted-col">
+            ${p.username ? `<div><strong>Username:</strong> ${escapeHTML(p.username)}</div>` : ''}
+            ${p.email ? `<div><strong>Email:</strong> ${escapeHTML(p.email)}</div>` : ''}
+            ${p.ifpaId ? `<div><strong>IFPA ID:</strong> ${escapeHTML(p.ifpaId)}</div>` : ''}
+            ${p.matchplayId ? `<div><strong>MatchPlay ID:</strong> ${escapeHTML(p.matchplayId)}</div>` : ''}
+            ${!p.ifpaId && !p.matchplayId ? '<div class="muted-italic">No external IDs linked.</div>' : ''}
+            <div class="small-action-buttons mt-10">
+              ${canEdit ? `<button type="button" class="edit-player-btn secondary btn-row">Edit</button>` : ''}
+              ${isAdmin ? `<button type="button" class="merge-player-btn secondary btn-row">Merge</button>` : ''}
+              ${isAdmin ? `<button type="button" class="delete-player-btn-inline btn-row">Delete</button>` : ''}
+            </div>
           </div>
         `;
+
+        const isExpanded = String(p.id) === String(expandedPlayerId);
 
         const row = createExpandableRow(playerList, {
           id: p.id,
@@ -120,11 +161,18 @@ export async function initPlayersPage() {
           className: 'player-item-row',
           headerHtml,
           contentHtml,
-          isExpanded: false
+          isExpanded,
+          onHeaderClick: () => {
+            expandedPlayerId = (expandedPlayerId === p.id) ? null : p.id;
+            filterInstance.performFilter();
+          }
         });
 
         const editBtn = row.querySelector('.edit-player-btn');
         if (editBtn) editBtn.onclick = (e) => { e.stopPropagation(); editPlayer(Number(p.id)); };
+
+        const mergeBtn = row.querySelector('.merge-player-btn');
+        if (mergeBtn) mergeBtn.onclick = (e) => { e.stopPropagation(); mergePlayer(Number(p.id)); };
 
         const delBtn = row.querySelector('.delete-player-btn-inline');
         if (delBtn) delBtn.onclick = (e) => { e.stopPropagation(); deletePlayer(Number(p.id)); };
@@ -137,9 +185,10 @@ export async function initPlayersPage() {
     
     // Hide the "Create" toggle if an exact match exists, unless the creation 
     // form is already open (in which case the button serves as "Cancel").
-    const isFormOpen = ifpaRow && !ifpaRow.classList.contains('hidden');
-    createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
-
+    if (hasElevatedPrivileges) { // Only apply this logic if the user can actually create/edit
+      const isFormOpen = ifpaRow && !ifpaRow.classList.contains('hidden');
+      createToggle.classList.toggle('hidden', !!exactMatch && !isFormOpen);
+    }
     savePlayerButton.disabled = !query || (!!exactMatch && !isEditingThisPlayer);
     savePlayerButton.title = (exactMatch && !isEditingThisPlayer) ? "This player name already exists." : "";
   };
@@ -154,11 +203,17 @@ export async function initPlayersPage() {
   matchplayIdInput.addEventListener('input', () => filterInstance.performFilter());
 
   async function refresh(data = null) {
-    const players = data || await PB_API.getPlayers();
+    const players = Array.isArray(data) ? data : await PB_API.players.getAll();
+    const safePlayers = Array.isArray(players) ? players : [];
+
     // Update array in-place to keep the filter reference valid
     allPlayers.length = 0;
-    allPlayers.push(...players);
-    filterInstance.performFilter();
+    allPlayers.push(...safePlayers);
+    
+    if (filterInstance) {
+      filterInstance.setData(allPlayers);
+      filterInstance.performFilter();
+    }
     resetForm();
   }
 
@@ -171,25 +226,33 @@ export async function initPlayersPage() {
     playerNameInput.value = '';
     ifpaIdInput.value = '';
     matchplayIdInput.value = '';
+    if (usernameRow) usernameRow.classList.add('hidden');
+    if (usernameInput) {
+      usernameInput.value = '';
+      usernameInput.disabled = false;
+    }
+    if (emailRow) emailRow.classList.add('hidden');
+    if (emailInput) {
+      emailInput.value = '';
+      emailInput.disabled = false;
+    }
     if (playerFormTitle) playerFormTitle.textContent = 'Add New Player';
     savePlayerButton.textContent = 'Save Player';
     
     resetPassBtn.classList.add('hidden');
     changeRoleBtn.classList.add('hidden');
-    if (cancelEditButton) cancelEditButton.classList.add('hidden');
 
     // Collapse creation fields
     if (ifpaRow) ifpaRow.classList.add('hidden');
     if (matchplayRow) matchplayRow.classList.add('hidden');
     if (actionsRow) actionsRow.classList.add('hidden');
     createToggle.textContent = 'Create New Player';
-    createToggle.style.marginTop = '10px';
+    createToggle.classList.replace('mt-0', 'mt-10');
     playerNameInput.after(createToggle);
     
     playerNameInput.disabled = false;
-    if (!hasElevatedPrivileges) {
-      playerForm.closest('.card').classList.add('hidden');
-    }
+    // Ensure card is hidden for non-privileged users if we aren't editing self
+    playerFormCard?.classList.toggle('hidden', !hasElevatedPrivileges);
 
     if (filterInstance) filterInstance.performFilter();
   }
@@ -205,29 +268,45 @@ export async function initPlayersPage() {
     const isSelf = currentUser && String(player.id) === String(currentUser.player_id);
     if (!hasElevatedPrivileges && !isSelf) return;
 
-    playerForm.closest('.card').classList.remove('hidden');
+    playerFormCard?.classList.remove('hidden');
 
     editingPlayerIdInput.value = player.id;
     playerNameInput.value = player.playerName;
     
-    // Lock name for non-privileged users UNLESS it is their own profile
-    playerNameInput.disabled = !hasElevatedPrivileges && !isSelf;
+    // If not elevated, name is always disabled. Admins/TDs can edit names.
+    playerNameInput.disabled = !hasElevatedPrivileges;
     
     ifpaIdInput.value = player.ifpaId || '';
     matchplayIdInput.value = player.matchplayId || '';
+    
+    const hasAccount = !!player.userId;
+    if (hasAccount) {
+      if (usernameRow) usernameRow.classList.remove('hidden');
+      if (usernameInput) {
+        usernameInput.value = player.username || '';
+        usernameInput.disabled = !hasElevatedPrivileges && !isSelf;
+      }
+      if (emailRow) emailRow.classList.remove('hidden');
+      if (emailInput) {
+        emailInput.value = player.email || '';
+        emailInput.disabled = !hasElevatedPrivileges && !isSelf;
+      }
+    } else {
+      if (usernameRow) usernameRow.classList.add('hidden');
+      if (usernameInput) usernameInput.value = '';
+      if (emailRow) emailRow.classList.add('hidden');
+      if (emailInput) emailInput.value = '';
+    }
+
     if (playerFormTitle) playerFormTitle.textContent = `Edit Player: ${player.playerName}`;
     savePlayerButton.textContent = 'Update Player';
-
-    // Expand fields for editing
     if (ifpaRow) ifpaRow.classList.remove('hidden');
     if (matchplayRow) matchplayRow.classList.remove('hidden');
     if (actionsRow) actionsRow.classList.remove('hidden');
     createToggle.textContent = 'Cancel';
-    createToggle.style.marginTop = '0';
+    createToggle.classList.replace('mt-10', 'mt-0');
     actionsRow.appendChild(createToggle);
 
-    // Show management tools if the player has an account
-    const hasAccount = !!player.userId;
     resetPassBtn.classList.toggle('hidden', !hasAccount || !hasElevatedPrivileges);
     changeRoleBtn.classList.toggle('hidden', !hasAccount || !hasElevatedPrivileges);
 
@@ -236,7 +315,7 @@ export async function initPlayersPage() {
         const newPass = await showPrompt(`Enter a new temporary password for ${player.playerName}:`, 'Reset User Password', false);
         if (newPass) {
            try {
-             await PB_API.updateUserPassword(player.userId, newPass);
+             await PB_API.players.updatePassword(player.userId, newPass);
              showAlert(`Password updated successfully for ${player.playerName}.`, 'Success');
            } catch (err) {
              showAlert(err.message, 'Update Failed');
@@ -251,10 +330,12 @@ export async function initPlayersPage() {
         ];
         if (isAdmin) choices.push({ value: 'admin', label: 'Admin' });
 
-        const newRole = await showChoiceDialog('Change User Role', `Assign a new role for ${player.playerName}:`, choices, player.userRole);
-        if (newRole && newRole !== player.userRole) {
+        const currentRole = player.userRole || player.role;
+        // Ensure the current role is passed to highlight the correct button in the dialog
+        const newRole = await showChoiceDialog('Change User Role', `Assign a new role for ${player.playerName}:`, choices, currentRole);
+        if (newRole && newRole !== currentRole) {
           try {
-            await PB_API.updateUserRole(player.userId, newRole);
+            await PB_API.players.updateRole(player.userId, newRole);
             await refresh();
             // Refresh the current player object from the cache to sync the edit form state
             const updated = allPlayers.find(p => p.id === playerId);
@@ -267,10 +348,11 @@ export async function initPlayersPage() {
     }
 
     window.scrollTo(0, 0); // Scroll to the form
+    // Ensure validation runs with the updated form state, deferring slightly
+    // to allow DOM updates to fully propagate in some environments (e.g., JSDOM).
+    // This is a common workaround for synchronous DOM reads in test environments.
+    setTimeout(() => filterInstance.performFilter(), 0);
   }
-
-  // Centralize cancel logic to the resetForm helper
-  if (cancelEditButton) cancelEditButton.addEventListener('click', resetForm);
 
   playerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -278,6 +360,8 @@ export async function initPlayersPage() {
     const name = playerNameInput.value.trim();
     const ifpaId = ifpaIdInput.value.trim() || null;
     const matchplayId = matchplayIdInput.value.trim() || null;
+    const username = usernameInput ? usernameInput.value.trim() : '';
+    const email = emailInput ? emailInput.value.trim() : '';
 
     if (!name) return;
 
@@ -293,19 +377,27 @@ export async function initPlayersPage() {
     const payload = { 
       playerName: name, 
       ifpaId: ifpaId, 
-      matchplayId: matchplayId
+      matchplayId: matchplayId,
+      username: username || null,
+      email: email || null
     };
+
+    savePlayerButton.disabled = true;
+    savePlayerButton.textContent = 'Saving...';
 
     try {
       if (id) {
-        await PB_API.updatePlayer(id, payload);
+        await PB_API.players.update(id, payload);
       } else {
-        await PB_API.createPlayer(payload);
+        await PB_API.players.create(payload);
       }
       await refresh();
       resetForm();
     } catch (error) {
       alert(`Error saving player: ${error.message}`);
+    } finally {
+      savePlayerButton.disabled = false;
+      savePlayerButton.textContent = id ? 'Update Player' : 'Save Player';
     }
   });
 
@@ -313,7 +405,7 @@ export async function initPlayersPage() {
     const player = allPlayers.find(p => p.id === playerId);
     if (!player) return;
     
-    if (!await showConfirm(`Are you sure you want to delete player "${player.playerName}"? This action cannot be undone and will remove all their associated scores.`, 'Delete Player')) {
+    if (!await showConfirm(`Are you sure you want to delete player "${escapeHTML(player.playerName)}"? This action cannot be undone and will remove all their associated scores.`, 'Delete Player')) {
       return;
     }
 
@@ -322,13 +414,51 @@ export async function initPlayersPage() {
     }
 
     try {
-      await PB_API.deletePlayer(playerId);
+      await PB_API.players.delete(playerId);
       await refresh();
     } catch (error) {
       alert(`Error deleting player: ${error.message}`);
     }
   }
 
+  async function mergePlayer(keepPlayerId) {
+    const keepPlayer = allPlayers.find(p => p.id === keepPlayerId);
+    if (!keepPlayer) return;
+
+    const options = allPlayers
+      .filter(p => p.id !== keepPlayerId)
+      .map(p => ({ value: p.id, label: p.playerName }));
+
+    const mergePlayerId = await showPlayerSelectionDialog(
+      'Merge Player Accounts',
+      `Select the duplicate player account that should be merged INTO <strong>${escapeHTML(keepPlayer.playerName)}</strong>.`,
+      options,
+      'Merge Accounts'
+    );
+
+    if (!mergePlayerId) return;
+
+    const mergePlayerObj = allPlayers.find(p => p.id === Number(mergePlayerId));
+    if (!mergePlayerObj) return;
+
+    if (!await showConfirm(
+      `WARNING: You are about to merge player "${escapeHTML(mergePlayerObj.playerName)}" INTO "${escapeHTML(keepPlayer.playerName)}".<br><br>` +
+      `This will permanently delete the account for "${escapeHTML(mergePlayerObj.playerName)}" and transfer all of their scores, matchups, league memberships, and team memberships to "${escapeHTML(keepPlayer.playerName)}".<br><br>` +
+      `This action cannot be undone. Are you sure you want to proceed?`,
+      'Confirm Merge Accounts'
+    )) {
+      return;
+    }
+
+    try {
+      await PB_API.players.merge(keepPlayerId, Number(mergePlayerId));
+      await refresh();
+      showAlert(`Successfully merged "${escapeHTML(mergePlayerObj.playerName)}" into "${escapeHTML(keepPlayer.playerName)}".`, 'Merge Complete');
+    } catch (error) {
+      alert(`Error merging players: ${error.message}`);
+    }
+  }
+
   // Initial render with batched data
-  refresh(playersData);
+  await refresh(playersData);
 }

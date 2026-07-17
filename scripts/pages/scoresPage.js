@@ -1,20 +1,26 @@
 import { PB_API } from '@services/api.js';
+import { filterPlayersForUser, can, PERMISSIONS } from '@services/auth.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActiveEventIdSilent, formatNumber, setCurrentPlayerIdSilent, getCurrentPlayerId, escapeHTML, getActiveMatchupId, setActiveMatchupIdSilent, loadPage } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
-import { formatNumber, applyScoreFormatting, getActiveEventId, getActiveLeagueId, setActiveEventId, setActiveLeagueId, setCurrentPlayerId, getCurrentPlayerId, renderThresholdGrid } from '@scripts/utils.js';
-import { initTournamentSelector, createSearchableSelect, renderActionSummary } from '@ui/selectors.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
+import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
+import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildBaseballScoreMapForPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
 import { applyPreferredTheme } from '@ui/branding.js';
-import { printBlankScoreSheet } from '@ui/printing.js';
-import { can, PERMISSIONS } from '@services/auth.js';
+import { printBlankScoreSheet, printScoreSheet } from '@ui/printing.js';
+import { buildRoundRow } from '../renderers/roundRowRenderer.js';
+import { FormatBranding } from '@services/scoringFormatBranding.js';
+import { renderStandardScoreboard, renderBaseballScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
+import { ROUTE_PATHS } from '@scripts/routes.js';
 
 /**
- * Initializes the Player Scoring page.
- * 
- * This module handles:
- * 1. Rendering the round-by-round input form based on event target scores.
- * 2. Real-time calculation of bowling results (Marks, Running Total).
- * 3. Player selection and roster filtering.
- * 4. Saving cumulative ball data to the backend.
+ * Logic for the Scores page: viewing and editing player scores across events.
+ * @module pages/scores
+ */
+
+/**
+ * Initializes the Scores page: loads score data, renders the score table, and binds editing controls.
  * @async
+ * @returns {Promise<void>}
  */
 export async function initScoresPage() {
   const roundsInput = document.getElementById('rounds-input');
@@ -27,57 +33,112 @@ export async function initScoresPage() {
   const playerSelectionCard = document.getElementById('player-selection-card');
   const scoringCard = document.getElementById('scoring-card');
   const resultsCard = document.getElementById('results-card');
-
+  const tournamentSelectorUI = document.getElementById('tournament-selector-ui');
+  const tournamentSummary = document.getElementById('tournament-summary');
+  const playerSelectorUI = document.getElementById('player-selector-ui');
+  const playerSummary = document.getElementById('player-summary');
+  
+  let allLeaguesCache = []; // Module-level cache for leagues
+  let tournamentSelector = null;
   // Fetch leagues and current user once at the start. 
-  const [rawLeagues, user] = await Promise.all([
-    PB_API.getLeagues(),
-    PB_API.getCurrentUser()
+  const [leaguesFromApi, userResult] = await Promise.all([
+    PB_API.leagues.getAll().catch(err => {
+      console.error("Failed to fetch leagues:", err);
+      return [];
+    }),
+    // Allow getCurrentUser to fail gracefully if the user is not logged in.
+    // The rest of the page logic can then handle the null user.
+    PB_API.auth.me().catch(err => {
+      return null;
+    })
   ]);
+  const user = userResult;
 
+  // Guard: If we are no longer on the Scores page, abort initialization
+  if (!document.getElementById('rounds-input')) return;
+
+  allLeaguesCache = leaguesFromApi; // Update the module-level cache
   // Requirement: Unregistered users only see leagues that have at least one guest player.
-  const initialLeagues = !user 
-    ? rawLeagues.filter(l => (l.players || []).some(p => !p.userId))
-    : rawLeagues;
+  // The initialLeagues filtering logic here is now handled by initTournamentSelector.
 
   // If we land on the scores page with a session/non-standard league active, 
   // we clear it so the selector resets and refreshes to show standard leagues.
   // EXCEPTION: If we have both leagueId and eventId, we are deep-linking from "Let's Bowl".
-  const initialLeagueId = getActiveLeagueId();
-  const initialEventId = getActiveEventId();
+  let initialLeagueId = getActiveLeagueId();
+  let initialEventId = getActiveEventId();
+
+  // The "summary" eventId is a virtual ID used for the Season Summary scoreboard.
+  // Scores must be entered for specific events, so we clear it if it persists from navigation.
+  // Silent: we are mid-initialization; dispatching pb:pageChanged would re-trigger initApp().
+  if (initialEventId === 'summary') {
+    setActiveEventIdSilent('');
+    initialEventId = '';
+  }
+
   if (initialLeagueId && !initialEventId) {
-    const active = initialLeagues.find(l => String(l.id) === String(initialLeagueId));
+    const active = allLeaguesCache.find(l => String(l.id) === String(initialLeagueId)); // Use the full cache
     if (active && active.type !== 'standard') {
-      setActiveLeagueId('');
-      setActiveEventId('');
+      setActiveLeagueIdSilent('');
+      initialLeagueId = '';
+      setActiveEventIdSilent('');
+      initialEventId = '';
     }
   }
+  let lastEventId = initialEventId;
+  let lastLeagueId = initialLeagueId;
 
   let playerSearchInstance = null;
   let currentUser = user;
   let activeLeague = null;
   let allPlayersCache = [];
+  let selectablePlayers = [];
   let machines = [];
+  let activeFormat = ScoringFormats.DEFAULT;
+  let eventMatchups = [];
+  let allEventScores = [];
+  let activeEvent = null;
+  let summaryTitle = '';
 
-  // Selection UI Toggles
-  const tournamentSelectorUI = document.getElementById('tournament-selector-ui');
-  const tournamentSummary = document.getElementById('tournament-summary');
-
-  const playerSelectorUI = document.getElementById('player-selector-ui');
-  const playerSummary = document.getElementById('player-summary');
+  function updateTournamentSummary() {
+    const activePlayerId = getCurrentPlayerId();
+    const player = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
+    
+    renderActionSummary(tournamentSummary, summaryTitle, [
+      { text: 'Change', onclick: handleTournamentChange },
+      {
+        text: 'Print Score Sheet',
+        onclick: () => {
+          const scoreMap = getScoreMapFromInputs();
+          printScoreSheet(machines, activeLeague?.name, activeEvent?.eventName, activeFormat, player, scoreMap, resultsPanel ? resultsPanel.innerHTML : '');
+        },
+        hidden: !player || machines.length === 0 || !!getActiveMatchupId()
+      },
+      { text: 'Print Blank Score Sheet', onclick: () => printBlankScoreSheet(machines, activeLeague?.name, activeEvent?.eventName, activeFormat), hidden: machines.length === 0 || !!getActiveMatchupId() }
+    ]);
+  }
 
   const handleTournamentChange = () => {
+    setActiveMatchupIdSilent('');
     tournamentSelectorUI.classList.remove('hidden');
     tournamentSummary.classList.add('hidden');
     playerSelectionCard.classList.add('hidden');
     playerSummary.classList.add('hidden');
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
-    setCurrentPlayerId('');
+    setCurrentPlayerIdSilent('');
+    
+    const playerSearch = document.getElementById('player-search');
+    if (playerSearch) playerSearch.value = '';
+    if (playerSelect) playerSelect.value = '';
 
     const search = document.getElementById('league-search-global');
     if (search) {
       search.value = '';
       search.dispatchEvent(new Event('input'));
+    }
+
+    if (playerSearchInstance) {
+      playerSearchInstance.updateOptions('');
     }
   };
 
@@ -86,150 +147,24 @@ export async function initScoresPage() {
     playerSummary.classList.add('hidden');
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
+
+    // Clear selection context when manually changing players.
+    // Use the silent variant to avoid triggering pb:pageChanged, which would
+    // cause main.js to re-run initApp() and re-initialize this page.
+    setCurrentPlayerIdSilent('');
+    const playerSearch = document.getElementById('player-search');
+    if (playerSearch) playerSearch.value = '';
+    if (playerSelect) playerSelect.value = '';
+
+    if (playerSearchInstance) {
+      playerSearchInstance.updateOptions('');
+    }
   };
 
   // Default engine
-  let Engine = getScoringEngine('bowling');
+  let Engine = getScoringEngine(ScoringFormats.DEFAULT);
 
-  warning.classList.add('hidden');
-  playerSelect.disabled = false;
 
-  /**
-   * Helper to create a formatted numeric input for pinball scores.
-   * @param {number} roundNumber 
-   * @param {number} ball 
-   * @param {number} machineId 
-   * @param {string|number} value 
-   * @param {string} placeholder 
-   * @returns {HTMLInputElement}
-   */
-  function createRollInput(roundNumber, ball, machineId, value = '', placeholder = '') {
-    const input = document.createElement('input');
-    input.placeholder = placeholder || `Ball ${ball} cumulative`;
-    input.className = 'roll-input';
-    input.value = (value !== '' && value !== undefined) ? formatNumber(value) : '';
-    input.dataset.order = roundNumber;
-    input.dataset.ball = ball;
-    input.dataset.machineId = machineId;
-    applyScoreFormatting(input);
-
-    return input;
-  }
-
-  /**
-   * Constructs the HTML structure for a single round's input row.
-   * 
-   * @param {Object} round The machine configuration for this round.
-   * @param {Object} turnValues Existing scores from the database (if any).
-   * @param {boolean} [isLastRound=false] Whether to apply 10th-frame logic.
-   * @param {Object} targetPlayer The player being scored.
-   * @returns {HTMLElement} The row element.
-   */
-  async function buildRoundRow(round, turnValues, isLastRound = false, targetPlayer = null) {
-    const row = document.createElement('div');
-    
-    // Centralized Security Logic
-    const canUpdateAny = await can(PERMISSIONS.UPDATE_ANY_SCORE);
-    
-    const isUpdate = !!(turnValues?.ball1 || turnValues?.ball2 || turnValues?.ball3);
-    const isStandardLeague = activeLeague?.type === 'standard';
-    
-    const isSelf = currentUser && String(targetPlayer?.id) === String(currentUser.player_id);
-    const isTargetUnregistered = !targetPlayer?.userId;
-    
-    // Rule: Non-TDs/Admins can only ADD scores, never UPDATE (especially in standard leagues).
-    let accessDenied = false;
-    let msg = '';
-
-    if (isUpdate && !canUpdateAny) {
-        accessDenied = true;
-        msg = 'Updates locked';
-    } else if (!canUpdateAny) {
-        // If they can't manage all, they can only score self or unregistered guests.
-        const isAuthorizedToScore = isSelf || isTargetUnregistered;
-        if (!isAuthorizedToScore) {
-            accessDenied = true;
-            msg = 'Guest Only';
-        }
-    }
-
-    row.className = 'round-row';
-    row.style = "display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 8px 12px; margin-bottom: 5px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;";
-    row.dataset.orderNumber = round.orderNumber;
-
-    const bonusHtml = Engine.getBonusTargetHtml(round, isLastRound, formatNumber);
-
-    row.innerHTML = `
-      <div class="round-info" style="cursor: pointer; flex: 1; min-width: 200px;">
-        <div class="round-label"><b>${Engine.getRoundLabel()} ${round.orderNumber}:</b> ${round.machineName}</div>
-        ${Engine.getRowSummaryHtml(round, formatNumber)}
-        ${bonusHtml}
-        <div class="target-details hidden" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--pb-primary); opacity: 0.8;">
-          <div style="font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; text-transform: uppercase; color: var(--pb-primary);">Scoring Thresholds</div>
-          ${renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2)}
-        </div>
-      </div>
-      <div class="round-inputs-container" style="display: flex; gap: 0.5rem; align-items: center; ${accessDenied ? 'opacity: 0.5; pointer-events: none;' : ''}"></div>
-      <button class="save-round-button" ${accessDenied ? 'style="display:none;"' : 'disabled'}>Save</button>
-    `;
-
-    if (accessDenied) {
-        row.querySelector('.round-inputs-container').insertAdjacentHTML('afterend', `<span style="font-size: 0.7rem; color: #888; text-transform: uppercase;">${msg}</span>`);
-    }
-
-    const inputsContainer = row.querySelector('.round-inputs-container');
-    const saveBtn = row.querySelector('.save-round-button');
-    saveBtn.classList.add('btn-mgmt'); // Apply standardized button style
-
-    row.querySelector('.round-info').addEventListener('click', () => {
-      row.querySelector('.target-details').classList.toggle('hidden');
-    });
-
-    for (let ball = 1; ball <= 3; ball += 1) {
-      const value = turnValues?.[`ball${ball}`] ?? '';
-      const placeholder = `Ball ${ball} cumulative`;
-      
-      // Use round.machineId (master list ID) instead of round.id (Target_Scores row ID)
-      // to ensure database foreign key constraints pass.
-      const input = createRollInput(round.orderNumber, ball, round.machineId, value, placeholder);
-      
-      input.addEventListener('input', () => {
-        saveBtn.disabled = false;
-        saveBtn.classList.add('is-dirty');
-      });
-
-      inputsContainer.appendChild(input);
-    }
-
-    saveBtn.addEventListener('click', async () => {
-      const currentPlayerId = getCurrentPlayerId();
-      if (!currentPlayerId) return;
-
-      const ball1 = Number(row.querySelector('[data-ball="1"]').value.replace(/\D/g, '')) || 0;
-      const ball2 = Number(row.querySelector('[data-ball="2"]').value.replace(/\D/g, '')) || 0;
-      const ball3 = Number(row.querySelector('[data-ball="3"]').value.replace(/\D/g, '')) || 0;
-
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving...';
-
-      await PB_API.saveScore({
-        playerId: Number(currentPlayerId),
-        orderNumber: Number(round.orderNumber),
-        eventId: Number(getActiveEventId()),
-        leagueId: Number(getActiveLeagueId()),
-        machineId: Number(round.machineId),
-        ball1,
-        ball2,
-        ball3,
-      });
-
-      saveBtn.textContent = 'Save';
-      saveBtn.classList.remove('is-dirty');
-      renderCurrentResults();
-    });
-
-    return row;
-  }
 
   /**
    * Populates the player dropdown.
@@ -240,50 +175,81 @@ export async function initScoresPage() {
   async function renderPlayerSelect() {
     try {
       const leagueId = getActiveLeagueId();
-      let players = [];
-
-      if (leagueId) {
-        // Fetch the specific league to get the assigned roster
-        const league = await PB_API.getLeague(leagueId);
-        players = league?.players || [];
-      } else {
-        // Fallback to the global player registry if no league is active
-        players = (await PB_API.getPlayers()) || [];
-      }
-
-      // Requirement: Unregistered users can only select players that are unregistered guests
-      if (!currentUser) {
-        players = players.filter(p => !p.userId);
-      }
-
+      // Fetch all players to ensure we can resolve IDs from URLs even if the 
+      // league-specific roster fetch doesn't include a newly added player yet.
+      const allPlayers = await PB_API.players.getAll();
       allPlayersCache.length = 0;
-      allPlayersCache.push(...players);
+      allPlayersCache.push(...allPlayers);
 
+      selectablePlayers = [];
+
+      const activeMatchupId = getActiveMatchupId();
+      const isMatchupContext = !!activeMatchupId;
+      if (isMatchupContext) {
+        const matchup = eventMatchups[0];
+        selectablePlayers = [];
+        if (matchup) {
+          // Matchup players are always selectable — they're the ones being scored.
+          // Do NOT filter them by registration status; unregistered users need to
+          // be able to select unregistered players to enter scores, and spectators
+          // need to be able to select either player to view their scores.
+          if (matchup.awayPlayerId) {
+            const awayPlayer = allPlayers.find(p => String(p.id) === String(matchup.awayPlayerId));
+            selectablePlayers.push(awayPlayer || { id: matchup.awayPlayerId, playerName: matchup.awayPlayerName });
+          }
+          if (matchup.homePlayerId) {
+            const homePlayer = allPlayers.find(p => String(p.id) === String(matchup.homePlayerId));
+            selectablePlayers.push(homePlayer || { id: matchup.homePlayerId, playerName: matchup.homePlayerName });
+          }
+        }
+      } else if (leagueId) {
+        // Use the cached leagues to find the specific league and its roster
+        const league = allLeaguesCache.find(l => String(l.id) === String(leagueId));
+        
+        if (league?.participants === 'team') {
+          // In a team league, the selectable players are the members of the assigned teams
+          const memberMap = new Map();
+          (league.teams || []).forEach(team => {
+            (team.members || []).forEach(m => memberMap.set(String(m.id), m));
+          });
+          selectablePlayers = Array.from(memberMap.values());
+        } else {
+          selectablePlayers = league?.players || [];
+        }
+      } else {
+        selectablePlayers = allPlayers;
+      }
+
+      // Requirement: Unregistered users can only select players that are unregistered guests.
+      // EXCEPTION: In a matchup context, both players are always selectable so that
+      // unregistered players can be selected for score entry and spectators can view scores.
+      if (!isMatchupContext) {
+        selectablePlayers = filterPlayersForUser(selectablePlayers, currentUser);
+      }
+
+      // If a playerId is in the URL, ensure they are at least in the selectable list 
+      // for the current session, even if the roster fetch hasn't updated yet.
       const currentPlayerId = getCurrentPlayerId();
+      if (currentPlayerId && !selectablePlayers.some(p => String(p.id) === String(currentPlayerId))) {
+          const p = allPlayers.find(p => String(p.id) === String(currentPlayerId));
+          if (p) selectablePlayers.unshift(p);
+      }
 
       if (!playerSearchInstance) {
         let searchInput = document.getElementById('player-search');
-        if (!searchInput) {
-          searchInput = document.createElement('input');
-          searchInput.id = 'player-search';
-          searchInput.type = 'text';
-          searchInput.placeholder = 'Type to search player...';
-          searchInput.style.width = '100%';
-          searchInput.style.marginBottom = '10px';
-          searchInput.style.boxSizing = 'border-box';
-          if (playerSelect) playerSelect.before(searchInput);
-        }
 
         if (searchInput && playerSelect) {
-          playerSearchInstance = createSearchableSelect(searchInput, playerSelect, allPlayersCache, {
+          playerSearchInstance = createSearchableSelect(searchInput, playerSelect, selectablePlayers, {
             valueKey: 'id',
             labelKey: 'playerName',
-            placeholder: allPlayersCache.length === 0 ? 'No players configured' : 'Select a player',
+            placeholder: selectablePlayers.length === 0 ? 'No players configured' : 'Select a player',
             onSelect: async (val) => {
               if (!val) {
-                setCurrentPlayerId('');
+                setCurrentPlayerIdSilent('');
               } else {
-                setCurrentPlayerId(val);
+                // Silent: we explicitly call refreshPlayerSelection() below,
+                // so avoid the full initApp() re-init from pb:pageChanged.
+                setCurrentPlayerIdSilent(val);
               }
               await refreshPlayerSelection();
             }
@@ -292,12 +258,24 @@ export async function initScoresPage() {
       }
 
       if (playerSearchInstance) {
-        playerSearchInstance.updateOptions('');
+        playerSearchInstance.setData(selectablePlayers);
       }
+      // Only enable selection once data is actually filtered and bound
+      if (playerSelect) playerSelect.disabled = false;
 
-      if (currentPlayerId && allPlayersCache.some((player) => String(player.id) === String(currentPlayerId))) {
-        if (playerSelect) playerSelect.value = currentPlayerId;
-        return currentPlayerId;
+      if (currentPlayerId) {
+        const player = allPlayersCache.find(p => String(p.id) === String(currentPlayerId));
+        if (player && playerSelect) {
+          playerSelect.value = currentPlayerId;
+          const searchInput = document.getElementById('player-search');
+          if (searchInput) searchInput.value = player.playerName;
+          return currentPlayerId;
+        }
+      } else {
+        // If no player is active, ensure the UI is physically cleared
+        const searchInput = document.getElementById('player-search');
+        if (searchInput) searchInput.value = '';
+        if (playerSelect) playerSelect.value = '';
       }
     } catch (err) {
       console.error('Failed to render player selection:', err);
@@ -311,33 +289,82 @@ export async function initScoresPage() {
    * @param {Object} player The player being scored.
    */
   async function loadScoresIntoForm(scoreRows, player) {
-    const scoreMap = scoreRows.reduce((map, row) => {
+    const normalized = normalizeScores(scoreRows || []);
+    const scoreMap = normalized.reduce((map, row) => {
       map[String(row.orderNumber)] = row;
       return map;
     }, {});
+
+    // Enrich with opponent data for baseball head-to-head matchups
+    const enriched = Engine.enrichScoreMap(scoreMap, getEngineContext());
     
     const maxOrder = machines.length > 0 ? Math.max(...machines.map(m => m.orderNumber)) : 0;
 
-    roundsInput.innerHTML = '';
-    for (const round of machines) {
-      const isLastRound = round.orderNumber === maxOrder;
-      const turnValues = scoreMap[String(round.orderNumber)];
+    const fragment = document.createDocumentFragment();
+    const pendingRows = [];
 
-      // Inject last-frame specific hint if defined for this format
+    machines.forEach((round, index) => {
+      const isLastRound = round.orderNumber === maxOrder;
+
+
+
+      pendingRows.push(buildRoundRow(round, enriched, isLastRound, player, index, {
+        currentUser,
+        activeLeague,
+        machines,
+        engine: Engine,
+        engineContext: getEngineContext(),
+        getCurrentPlayerId,
+        saveScoreCallback: async (scoreData) => {
+          const activeMatchupId = getActiveMatchupId();
+          await PB_API.scores.save({
+            playerId: scoreData.playerId,
+            orderNumber: scoreData.orderNumber,
+            eventId: Number(getActiveEventId()),
+            leagueId: Number(getActiveLeagueId()),
+            machineId: scoreData.machineId,
+            ball1: scoreData.ball1,
+            ball2: scoreData.ball2,
+            ball3: scoreData.ball3,
+            eventMatchupId: activeMatchupId ? Number(activeMatchupId) : null
+          });
+        },
+        refreshCallback: async () => {
+          if (Engine.getMatchupDescription?.(1)) {
+            try {
+              const activeMatchupId = getActiveMatchupId();
+              if (activeMatchupId) {
+                allEventScores = await PB_API.scores.get(null, null, null, Number(activeMatchupId));
+              } else {
+                allEventScores = await PB_API.scores.get(null, Number(getActiveEventId()));
+              }
+            } catch (e) {
+              console.warn('[ScoresPage] Failed to refresh allEventScores after save:', e);
+            }
+          }
+          renderCurrentResults();
+        }
+      }));
+    });
+
+    const rows = await Promise.all(pendingRows);
+    rows.forEach((row, index) => {
+      const isLastRound = (index === rows.length - 1);
       if (isLastRound) {
-        const lfHint = Engine.getLastFrameHint?.();
+        const branding = FormatBranding.get(activeFormat);
+        const lfHint = branding.lastFrameHint;
         if (lfHint) {
           const hintDiv = document.createElement('div');
-          hintDiv.className = 'hint';
-          hintDiv.style = "font-size: 0.75rem; padding: 8px 12px; margin-bottom: 5px; border-left-width: 4px;";
+          hintDiv.className = 'hint small';
           hintDiv.innerHTML = lfHint;
-          roundsInput.appendChild(hintDiv);
+          fragment.appendChild(hintDiv);
         }
       }
+      fragment.appendChild(row);
+    });
 
-      const row = await buildRoundRow(round, turnValues, isLastRound, player);
-      roundsInput.appendChild(row);
-    }
+    roundsInput.innerHTML = '';
+    roundsInput.appendChild(fragment);
   }
 
   /**
@@ -346,19 +373,37 @@ export async function initScoresPage() {
    */
   async function refreshPlayerSelection() {
     let activePlayerId = await renderPlayerSelect();
+    const activeMatchupId = getActiveMatchupId();
     
-    // Auto-select logged in user if they are in the roster and no one is selected yet
+    // Auto-select logged in user if they are in the roster and no one is selected yet.
+    // In a matchup context, only auto-select if the user is one of the two participants.
     if (!activePlayerId && currentUser?.player_id) {
         const isInRoster = allPlayersCache.some(p => String(p.id) === String(currentUser.player_id));
-        if (isInRoster) {
+        const isMatchupParticipant = activeMatchupId && eventMatchups[0] && (
+            String(eventMatchups[0].homePlayerId) === String(currentUser.player_id) ||
+            String(eventMatchups[0].awayPlayerId) === String(currentUser.player_id)
+        );
+        // Skip auto-selection in matchup context if user is not a participant
+        if (isInRoster && (!activeMatchupId || isMatchupParticipant)) {
             activePlayerId = String(currentUser.player_id);
-            setCurrentPlayerId(activePlayerId);
+            // Silent: avoid pb:pageChanged loop during auto-selection within refresh()
+            setCurrentPlayerIdSilent(activePlayerId);
             if (playerSelect) playerSelect.value = activePlayerId;
             // Update search input text if exists
             const search = document.getElementById('player-search');
             const pObj = allPlayersCache.find(p => String(p.id) === activePlayerId);
             if (search && pObj) search.value = pObj.playerName;
         }
+    }
+
+    // Default to first matchup player if none selected
+    if (!activePlayerId && activeMatchupId && selectablePlayers && selectablePlayers.length > 0) {
+      activePlayerId = String(selectablePlayers[0].id);
+      // Silent: avoid pb:pageChanged loop during auto-selection within refresh()
+      setCurrentPlayerIdSilent(activePlayerId);
+      if (playerSelect) playerSelect.value = activePlayerId;
+      const search = document.getElementById('player-search');
+      if (search) search.value = selectablePlayers[0].playerName;
     }
 
     if (!activePlayerId) {
@@ -370,24 +415,102 @@ export async function initScoresPage() {
         playerSelectorUI.classList.remove('hidden');
         playerSummary.classList.add('hidden');
       }
+      updateTournamentSummary();
       return;
     }
 
     const player = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
-    playerSelectorUI.classList.add('hidden');
 
-    renderActionSummary(playerSummary, `Player: ${player?.playerName || 'Selected'}`, [
-      { text: 'Change', onclick: handlePlayerChange }
-    ]);
+    const loader = createSkeletonLoader(roundsInput, { count: 5 });
+    try {
+      const scores = activeMatchupId 
+        ? await PB_API.scores.get(Number(activePlayerId), null, null, Number(activeMatchupId))
+        : await PB_API.scores.get(Number(activePlayerId), Number(getActiveEventId()));
+      await loadScoresIntoForm(scores, player);
 
-    warning.classList.add('hidden');
-    scoringCard.classList.remove('hidden');
-    resultsCard.classList.remove('hidden');
-    roundsInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
-    
-    const scores = await PB_API.getScores(Number(activePlayerId), Number(getActiveEventId()));
-    await loadScoresIntoForm(scores, player);
-    renderCurrentResults();
+      const matchup = eventMatchups[0];
+      const isParticipant = matchup && currentUser && (
+        String(matchup.homePlayerId) === String(currentUser.player_id) ||
+        String(matchup.awayPlayerId) === String(currentUser.player_id)
+      );
+      const isTD = await can(PERMISSIONS.UPDATE_ANY_SCORE);
+      const isSpectator = activeMatchupId && !isParticipant;
+
+      scoringCard.classList.remove('hidden');
+      resultsCard.classList.remove('hidden');
+
+      if (isSpectator) {
+        // Show the compact player summary with a "Change" button, just like
+        // non-spectator mode. The selector dropdown stays hidden until "Change"
+        // is clicked, which reveals it so the spectator can switch players.
+        playerSelectorUI?.classList.add('hidden');
+        playerSummary?.classList.remove('hidden');
+        renderActionSummary(playerSummary, `Player: ${player?.playerName || 'Selected'}`, [
+          { text: 'Change', onclick: handlePlayerChange }
+        ]);
+        
+        const awayName = matchup?.awayPlayerName || 'BYE';
+        const homeName = matchup?.homePlayerName || 'Unknown';
+        warning.innerHTML = `<strong>Spectator Mode:</strong> Viewing matchup in progress between ${escapeHTML(awayName)} and ${escapeHTML(homeName)}.`;
+        warning.classList.remove('hidden');
+        
+        // Determine if the currently selected player is editable by this spectator.
+        // Unregistered (guest) players can be edited by anyone.
+        // Registered players can be edited by TDs/admins, but are view-only for others.
+        const selectedPlayerObj = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
+        const isSelectedPlayerUnregistered = !selectedPlayerObj?.userId;
+        const canEditSelected = isSelectedPlayerUnregistered || isTD;
+
+        if (canEditSelected) {
+          // Unregistered guest player — allow score entry
+          warning.innerHTML += ' <span class="meta-muted">(You may enter scores for this unregistered player.)</span>';
+          roundsInput.querySelectorAll('input').forEach((input) => {
+            input.disabled = false;
+            input.readOnly = false;
+          });
+          const saveBtns = roundsInput.querySelectorAll('.save-round-button');
+          saveBtns.forEach(btn => btn.style.display = '');
+        } else {
+          // Registered player — view only
+          roundsInput.querySelectorAll('input').forEach((input) => {
+            input.disabled = true;
+            input.readOnly = true;
+          });
+          const saveBtns = roundsInput.querySelectorAll('.save-round-button');
+          saveBtns.forEach(btn => btn.style.display = 'none');
+        }
+      } else {
+        warning.classList.add('hidden');
+        playerSummary?.classList.remove('hidden');
+        renderActionSummary(playerSummary, `Player: ${player?.playerName || 'Selected'}`, [
+          { text: 'Change', onclick: handlePlayerChange }
+        ]);
+        roundsInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
+      }
+
+      renderCurrentResults();
+      updateTournamentSummary();
+    } finally {
+      loader.remove();
+    }
+  }
+
+  /**
+   * Builds the context object passed to engine methods (enrichScoreMap, renderResults, getRoundRowContext).
+   * This allows format-specific engines to access the data they need without the UI
+   * branching on activeFormat.
+   */
+  function getEngineContext() {
+    return {
+      allEventScores,
+      eventMatchups,
+      allPlayersCache,
+      getCurrentPlayerId,
+      normalizeScores,
+      groupScoresByPlayer,
+      buildBaseballScoreMapForPlayer,
+      escapeHTML
+    };
   }
 
   /**
@@ -395,16 +518,8 @@ export async function initScoresPage() {
    * @returns {Object} Map of order_number to ball scores.
    */
   function getScoreMapFromInputs() {
-    const scoreMap = {};
-    roundsInput.querySelectorAll('.round-row').forEach((row) => {
-      const orderNum = Number(row.dataset.orderNumber);
-      scoreMap[orderNum] = {
-        ball1: Number(row.querySelector('[data-ball="1"]').value.replace(/\D/g, '')) || 0,
-        ball2: Number(row.querySelector('[data-ball="2"]').value.replace(/\D/g, '')) || 0,
-        ball3: Number(row.querySelector('[data-ball="3"]').value.replace(/\D/g, '')) || 0,
-      };
-    });
-    return scoreMap;
+    const scoreMap = buildScoreMapFromDOM(roundsInput);
+    return Engine.enrichScoreMap(scoreMap, getEngineContext());
   }
 
   /**
@@ -413,22 +528,23 @@ export async function initScoresPage() {
    */
   function renderCurrentResults() {
     const scoreMap = getScoreMapFromInputs();
-    const { turnResults, totalDisplay } = Engine.calculateTurnResults(machines, scoreMap);
+    const calcResult = Engine.calculateTurnResults(machines, scoreMap);
 
-    resultsBody.innerHTML = turnResults
-      .map(result => `
-          <tr>
-            <td>${result.orderNumber}</td>
-            <td>${result.machineName}</td>
-            <td>${result.displayMark}</td>
-            <td>${result.displayRunningTotal}</td>
-          </tr>
-      `)
-      .join('');
-
-    totalScore.textContent = totalDisplay;
-    resultsEmpty.classList.add('hidden');
-    resultsPanel.classList.remove('hidden');
+    if (activeFormat === ScoringFormats.BASEBALL) {
+      renderBaseballScoreboard(calcResult, machines, scoreMap, getEngineContext(), {
+        resultsPanel,
+        resultsBody,
+        totalScore,
+        resultsEmpty
+      }, Engine);
+    } else {
+      renderStandardScoreboard(calcResult, {
+        resultsPanel,
+        resultsBody,
+        totalScore,
+        resultsEmpty
+      });
+    }
   }
 
   /**
@@ -437,8 +553,30 @@ export async function initScoresPage() {
    * @async
    */
   const refresh = async () => {
-    const eventId = getActiveEventId();
+    let eventId = getActiveEventId();
+    let leagueId = getActiveLeagueId();
+    const activeMatchupId = getActiveMatchupId();
+
+    if (activeMatchupId) {
+      const matchup = await PB_API.matchups.get(null, Number(activeMatchupId));
+      if (matchup) {
+        eventId = String(matchup.eventId ?? matchup.event_id);
+        leagueId = String(matchup.leagueId ?? matchup.league_id);
+        // Use silent variants to avoid dispatching pb:pageChanged, which would
+        // re-trigger initApp() -> initScoresPage() -> refresh() in an infinite loop.
+        setActiveEventIdSilent(eventId);
+        setActiveLeagueIdSilent(leagueId);
+      }
+    }
+
     if (!eventId) {
+      if (getCurrentPlayerId()) {
+        setCurrentPlayerIdSilent('');
+      }
+      const playerSearch = document.getElementById('player-search');
+      if (playerSearch) playerSearch.value = '';
+      if (playerSelect) playerSelect.value = '';
+
       roundsInput.innerHTML = '';
       tournamentSelectorUI.classList.remove('hidden');
       tournamentSummary.classList.add('hidden');
@@ -448,49 +586,251 @@ export async function initScoresPage() {
       return;
     }
     
+    // If the tournament context (league or event) has changed, reset the player 
+    // selection to ensure the search box is cleared and we don't carry over 
+    // a player context that may not exist in the new roster.
+    if (eventId !== lastEventId || leagueId !== lastLeagueId) {
+      if (getCurrentPlayerId()) {
+        const playerSearch = document.getElementById('player-search');
+        if (playerSearch) playerSearch.value = '';
+        if (playerSelect) playerSelect.value = '';
+        setCurrentPlayerIdSilent('');
+      }
+      lastEventId = eventId;
+      lastLeagueId = leagueId;
+    }
+
     // Fetch leagues and machine targets in parallel. User is already fetched at init.
     const [leagues, eventTargets] = await Promise.all([
-      PB_API.getLeagues(),
-      PB_API.getTargetScores(eventId)
+      PB_API.leagues.getAll(),
+      PB_API.machines.getTargets(eventId)
     ]);
+    allLeaguesCache = leagues; // Update the cache with fresh data
+
+    // Refresh the league list in the selector to catch any mid-session roster changes
+    if (tournamentSelector) {
+      tournamentSelector.setData(allLeaguesCache);
+    }
 
     const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
     const event = league?.events?.find(e => String(e.id) === String(eventId));
 
-    const isSession = league?.type === 'session';
-    const leagueTitle = isSession ? '' : `<div style="font-weight: bold;">League: ${league?.name || 'Unknown'}</div>`;
-    const eventTitle = `<div style="font-size: 0.9rem; opacity: 0.8;">Event: ${event?.eventName || 'Event'}</div>`;
-    const summaryTitle = `${leagueTitle}${eventTitle}`;
+    const format = ScoringFormats.resolve(event?.scoringFormat || league?.scoringFormat);
+    activeFormat = format;
+    Engine = getScoringEngine(format);
 
-    tournamentSelectorUI.classList.add('hidden');
-    renderActionSummary(tournamentSummary, summaryTitle, [
-      { text: 'Change', onclick: handleTournamentChange },
-      { text: 'Print Blank Score Sheet', onclick: () => printBlankScoreSheet(machines, league?.name, event?.eventName, format), hidden: eventTargets.length === 0 }
-    ]);
+    // Ask the engine what additional data it needs for this event,
+    // then fetch it generically — no format-specific branching required.
+    const requiredData = Engine.getRequiredEventData(eventId, PB_API);
+    if (activeMatchupId) {
+      requiredData.eventMatchups = PB_API.matchups.get(null, Number(activeMatchupId)).then(m => [m]);
+      requiredData.allEventScores = PB_API.scores.get(null, null, null, Number(activeMatchupId));
+    }
+    const requiredKeys = Object.keys(requiredData);
+    const requiredValues = await Promise.all(Object.values(requiredData));
+    requiredKeys.forEach((key, i) => {
+      if (key === 'eventMatchups') eventMatchups = requiredValues[i] || [];
+      else if (key === 'allEventScores') allEventScores = requiredValues[i] || [];
+    });
+    // Clear any keys not declared by this engine
+    if (!requiredKeys.includes('eventMatchups')) eventMatchups = [];
+    if (!requiredKeys.includes('allEventScores')) allEventScores = [];
+
+    // Customize the target machines list to be matchup-specific if deep-linked
+    let machinesNormalized = normalizeTargets(eventTargets);
+    if (activeMatchupId && eventMatchups.length > 0) {
+      const matchupDetails = eventMatchups[0];
+      machinesNormalized = (matchupDetails.innings || []).map(inningSlot => {
+        const tgt = eventTargets.find(t => t.orderNumber === inningSlot.orderNumber);
+        return {
+          id: inningSlot.id,
+          eventId: inningSlot.eventId,
+          orderNumber: inningSlot.orderNumber,
+          machineId: inningSlot.machineId,
+          machineName: inningSlot.machineName,
+          value1: tgt ? tgt.value1 : 5000000,
+          value2: tgt ? tgt.value2 : 1.5
+        };
+      });
+    }
 
     activeLeague = league;
-    const format = event?.scoringFormat || league?.scoringFormat || 'bowling';
-    Engine = getScoringEngine(format);
+    activeEvent = event;
+
+    const isSession = league?.type === 'session';
+    if (activeMatchupId && eventMatchups.length > 0) {
+      const matchup = eventMatchups[0];
+      summaryTitle = `
+        <div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>
+        <div class="meta-muted">Week: ${escapeHTML(event?.eventName || 'Week')}</div>
+        <div class="meta-muted">Matchup: ${escapeHTML(matchup?.awayPlayerName || 'BYE')} vs ${escapeHTML(matchup?.homePlayerName)}</div>
+      `;
+    } else {
+      const leagueTitle = isSession ? '' : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;
+      const eventTitle = `<div class="meta-muted">Event: ${escapeHTML(event?.eventName || 'Event')}</div>`;
+      summaryTitle = `${leagueTitle}${eventTitle}`;
+    }
+
+    tournamentSelectorUI.classList.add('hidden');
+    updateTournamentSummary();
+
     applyPreferredTheme(format);
+    const branding = FormatBranding.get(format);
 
     // Update the scoring section title using the Engine's specific terminology (Frame vs Hole)
     const scoringHeader = scoringCard.querySelector('h2');
     if (scoringHeader) {
-      scoringHeader.textContent = `Enter ${Engine.getRoundLabel()} Scores`;
+      scoringHeader.textContent = `Enter ${branding.roundLabel} Scores`;
     }
 
     // Update the general hint text based on the active engine
     const scoringHint = document.getElementById('scoring-hint');
     if (scoringHint) {
-      scoringHint.textContent = Engine.getScoringHint();
+      scoringHint.textContent = branding.scoringHint;
     }
 
-    machines = eventTargets;
+    machines = machinesNormalized;
+
+    const isH2H = league?.participants === 'head2head';
+    const scheduleContainer = document.getElementById('matchups-schedule-container');
+    
+    if (isH2H && !activeMatchupId) {
+      playerSelectionCard.classList.add('hidden');
+      scoringCard.classList.add('hidden');
+      resultsCard.classList.add('hidden');
+      warning.classList.add('hidden');
+      
+      if (scheduleContainer) {
+        scheduleContainer.classList.remove('hidden');
+        const matchupsList = scheduleContainer.querySelector('.week-matchups-list');
+        const matchups = event?.matchups || [];
+        if (matchups.length === 0) {
+          matchupsList.innerHTML = '<li class="list-item-row" style="padding: 10px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">No matchups scheduled for this week.</li>';
+        } else {
+          const isPlayoffs = event?.eventName && event.eventName.startsWith('Playoffs:');
+          if (isPlayoffs) {
+            const seriesMap = {};
+            matchups.forEach(m => {
+              const sId = m.seriesId || 1;
+              seriesMap[sId] = seriesMap[sId] || [];
+              seriesMap[sId].push(m);
+            });
+            
+            matchupsList.innerHTML = Object.entries(seriesMap).map(([sId, games]) => {
+              games.sort((a, b) => a.gameNumber - b.gameNumber);
+              const firstGame = games[0];
+              const homeName = escapeHTML(firstGame.homePlayerName);
+              const awayName = escapeHTML(firstGame.awayPlayerName);
+              
+              let homeWins = 0;
+              let awayWins = 0;
+              games.forEach(g => {
+                if (g.status === 'completed') {
+                  if (g.winnerId === g.homePlayerId) homeWins++;
+                  else if (g.winnerId === g.awayPlayerId) awayWins++;
+                }
+              });
+              
+              const gamesHtml = games.map(g => {
+                const winnerHome = g.status === 'completed' && g.winnerId === g.homePlayerId;
+                const winnerAway = g.status === 'completed' && g.winnerId === g.awayPlayerId;
+                
+                return `
+                  <div class="playoff-game-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-top: 6px; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #2196f3;">
+                    <span class="meta-strong" style="font-size: 0.9em;">Game ${g.gameNumber}</span>
+                    <div class="game-score" style="font-size: 0.9em;">
+                      ${g.status === 'completed' ? `
+                        <span class="${winnerAway ? 'font-bold' : ''}">${g.awayRuns}</span> - <span class="${winnerHome ? 'font-bold' : ''}">${g.homeRuns}</span>
+                      ` : `
+                        <span class="badge pending" style="background: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">Pending</span>
+                      `}
+                    </div>
+                    <div class="game-actions" style="display: flex; gap: 6px;">
+                      <button class="play-matchup-btn primary btn-row btn-small" data-matchup-id="${g.id}" data-event-id="${g.eventId}" style="padding: 2px 8px; font-size: 0.85em;">
+                        ${g.status === 'completed' ? 'View/Edit' : 'Play'}
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('');
+              
+              return `
+                <li class="list-item-row playoff-series-card" style="display: block; padding: 15px; margin-bottom: 12px; border: 1px solid #2196f3; border-radius: 6px; background: #fff;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #ddd; padding-bottom: 8px; margin-bottom: 8px;">
+                    <span class="meta-strong" style="color: #1976d2; font-size: 1.05em;">Series ${sId} - ${escapeHTML(event.eventName.replace('Playoffs: ', ''))}</span>
+                    <span class="badge completed font-bold" style="background: #e3f2fd; color: #0d47a1; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">
+                      ${awayName} (${awayWins}) vs ${homeName} (${homeWins})
+                    </span>
+                  </div>
+                  <div class="series-games-list">
+                    ${gamesHtml}
+                  </div>
+                </li>
+              `;
+            }).join('');
+          } else {
+            matchupsList.innerHTML = matchups.map(m => {
+              const isBye = m.awayPlayerId === null;
+              const winnerHome = m.status === 'completed' && m.winnerId === m.homePlayerId;
+              const winnerAway = m.status === 'completed' && m.winnerId === m.awayPlayerId;
+              
+              return `
+                <li class="list-item-row" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
+                  <div class="matchup-players" style="font-weight: 500;">
+                    <span class="${winnerAway ? 'font-bold' : ''}" style="${winnerAway ? 'color: #2e7d32;' : ''}">${escapeHTML(m.awayPlayerName || 'BYE')}</span> 
+                    <span class="meta-muted" style="margin: 0 8px;">(Away) vs</span> 
+                    <span class="${winnerHome ? 'font-bold' : ''}" style="${winnerHome ? 'color: #2e7d32;' : ''}">${escapeHTML(m.homePlayerName)}</span>
+                    <span class="meta-muted" style="margin-left: 8px;">(Home)</span>
+                  </div>
+                  <div class="matchup-score-badge" style="display: flex; align-items: center; gap: 12px;">
+                    ${m.status === 'completed' ? `
+                      <span class="badge completed font-bold" style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px;">
+                        ${m.awayRuns} - ${m.homeRuns}
+                      </span>
+                    ` : `
+                      <span class="badge pending" style="background: #fff3e0; color: #e65100; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;">
+                        Pending
+                      </span>
+                    `}
+                    
+                    <div class="matchup-actions" style="display: flex; gap: 8px;">
+                      ${!isBye ? `
+                        <button class="play-matchup-btn primary btn-row btn-small" data-matchup-id="${m.id}" data-event-id="${m.eventId}">
+                          ${m.status === 'completed' ? 'View/Edit' : 'Play'}
+                        </button>
+                      ` : ''}
+                    </div>
+                  </div>
+                </li>
+              `;
+            }).join('');
+          }
+          
+          matchupsList.querySelectorAll('.play-matchup-btn').forEach(btn => {
+            btn.onclick = () => {
+              const matchupId = Number(btn.dataset.matchupId);
+              const evId = Number(btn.dataset.eventId);
+              // loadPage() updates the URL and dispatches pb:pageChanged, so use
+              // silent variants here to avoid a redundant mid-navigation re-init.
+              setActiveLeagueIdSilent(league.id);
+              setActiveEventIdSilent(evId);
+              loadPage(ROUTE_PATHS.SCORES({ eventId: evId, leagueId: league.id, matchupId }));
+            };
+          });
+        }
+      }
+      return;
+    }
+    
+    if (scheduleContainer) {
+      scheduleContainer.classList.add('hidden');
+    }
 
     if (machines.length === 0) {
-      warning.textContent = 'No target scores have been configured for the selected event.';
+      warning.innerHTML = 'This event has not been setup.';
       warning.classList.remove('hidden');
       roundsInput.innerHTML = '';
+
       return;
     }
 
@@ -498,15 +838,19 @@ export async function initScoresPage() {
     playerSelectionCard.classList.remove('hidden');
     await refreshPlayerSelection();
 
-    // Update the results table header to use "Frame" (mapping data from order_number)
-    const resultsTableHeader = resultsPanel.querySelector('thead tr');
+    // Update the results table header to use the engine's round label
+    const resultsTableHeader = resultsPanel.querySelector('table.data-table thead tr');
     if (resultsTableHeader) {
       const roundHeader = resultsTableHeader.querySelector('th:first-child');
       if (roundHeader) {
-        roundHeader.textContent = Engine.getRoundLabel();
+        roundHeader.textContent = branding.roundLabel;
       }
     }
   };
 
-  await initTournamentSelector('.tournament-selector-container', { onRefresh: refresh, existingLeagues: initialLeagues });
+  tournamentSelector = await initTournamentSelector('.tournament-selector-container', { 
+    onRefresh: refresh, 
+    existingLeagues: allLeaguesCache, // Pass the full list of leagues
+    currentUser: currentUser // Pass the current user for filtering
+  });
 }

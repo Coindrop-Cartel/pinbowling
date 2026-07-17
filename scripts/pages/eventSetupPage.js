@@ -1,25 +1,42 @@
 import { PB_API } from '@services/api.js';
+import { isManagementAuthorized, requireAdmin } from '@services/auth.js';
+import { showAlert } from '@ui/dialogs.js';
+import { loadPage, getActiveEventId, getActiveLeagueId, renderPreview, formatNumber, applyScoreFormatting, parseFormattedNumber, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
+import { applyPreferredTheme } from '@ui/branding.js';
+import { ROUTE_PATHS } from '@scripts/routes.js';
 import { getScoringEngine } from '@core/engine.js';
-import { getActiveEventId, getActiveLeagueId, renderPreview, applyScoreFormatting, formatNumber, renderThresholdGrid } from '@scripts/utils.js';
-import { createSearchableSelect, initReadOnlyTournamentDisplay, createExpandableRow, setupSortableList } from '@ui/selectors.js';
-import { showPrompt, showAlert } from '@ui/dialogs.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
+import { FormatBranding } from '@services/scoringFormatBranding.js';
 import { printMachineScores } from '@ui/printing.js';
-import { requireAdmin, isManagementAuthorized } from '@services/auth.js';
-import {navigateTo} from '@scripts/utils.js';
-import { ROUTES } from '@scripts/routes.js';
+import { createSearchableSelect, setupSortableList, createExpandableRow, initReadOnlyTournamentDisplay } from '@ui/selectors.js';
+import { normalizeTargets } from '@services/normalizer.js';
+import { detectScalingFromValues } from '@scripts/utils.js';
 
+/**
+ * Logic for configuring events within a league (dates, machines, target scores).
+ * @module pages/eventSetup
+ */
+
+/**
+ * Initializes the Event Setup page: loads league/event data and binds UI controls.
+ * @async
+ * @returns {Promise<void>}
+ */
 export async function initEventSetupPage() {
   // Verify authorization before initializing the page logic
   const [authorized, initialLeagues] = await Promise.all([
     isManagementAuthorized(),
-    PB_API.getLeagues()
+    PB_API.leagues.getAll()
   ]);
 
   if (!authorized) {
     showAlert('Unauthorized: Management access is required to view the setup page.', 'Access Denied');
-    navigateTo(ROUTES.HOME);
+    loadPage(ROUTE_PATHS.HOME());
     return;
   }
+
+  // Guard: If we are no longer on the Event Setup page, abort initialization
+  if (!document.getElementById('round-form')) return;
 
   const configCard = document.getElementById('config-card');
   const orderInput = document.getElementById('order-number');
@@ -41,6 +58,7 @@ export async function initEventSetupPage() {
   let expandedTargetId = null;
   let isListDirty = false;
   let originalEventTargets = [];
+  let activeFormat = ScoringFormats.DEFAULT;
   const printMachinesBtn = document.getElementById('print-machines-btn');
   let machineSearch;
 
@@ -62,6 +80,8 @@ export async function initEventSetupPage() {
   let masterMachines = [];
   let eventTargets = [];
   let currentSuggestedMachines = [];
+  let eventMatch = null;
+  let league = null;
 
   let Engine = getScoringEngine();
 
@@ -69,16 +89,16 @@ export async function initEventSetupPage() {
     printMachinesBtn.addEventListener('click', async () => {
       const eventId = getActiveEventId();
       if (!eventId) return alert('Select an event first.');
-      const leagues = await PB_API.getLeagues();
+      const leagues = await PB_API.leagues.getAll();
       const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
-      printMachineScores(eventTargets, league?.scoringFormat || 'bowling');
+      printMachineScores(eventTargets, ScoringFormats.resolve(league?.scoringFormat));
     });
   }
 
   const doneBtn = document.getElementById('done-setup-btn');
   if (doneBtn) {
     doneBtn.addEventListener('click', () => {
-      navigateTo(ROUTES.LEAGUES(getActiveLeagueId()));
+      loadPage(ROUTE_PATHS.LEAGUES(getActiveLeagueId()));
     });
   }
 
@@ -130,7 +150,8 @@ export async function initEventSetupPage() {
   }
 
   const updateQuickFillState = (machineName) => {
-    const match = currentSuggestedMachines.find(m => m.machineName === machineName);
+    const format = ScoringFormats.resolve(eventMatch?.scoringFormat || league?.scoringFormat);
+    const match = currentSuggestedMachines.find(m => m.machineName === machineName && m.format === format);
     selectedMachineTargets = match ? { easy: match.targetEasy, med: match.targetMed, hard: match.targetHard } : null;
     
     btnEasy.disabled = !selectedMachineTargets?.easy;
@@ -160,7 +181,7 @@ export async function initEventSetupPage() {
   });
 
   if (btnFlat && btnCurved) {
-    window.updateScalingUI = () => {
+    const updateScalingUI = () => {
       btnFlat.classList.toggle('btn-standard', currentScaling === 'flat');
       btnFlat.classList.toggle('secondary', currentScaling !== 'flat');
       btnCurved.classList.toggle('btn-standard', currentScaling === 'curved');
@@ -169,17 +190,17 @@ export async function initEventSetupPage() {
 
     btnFlat.addEventListener('click', () => {
       currentScaling = 'flat';
-      window.updateScalingUI();
+      updateScalingUI();
       updatePreviewAndDirty();
     });
 
     btnCurved.addEventListener('click', () => {
       currentScaling = 'curved';
-      window.updateScalingUI();
+      updateScalingUI();
       updatePreviewAndDirty();
     });
 
-    window.updateScalingUI();
+    updateScalingUI();
   }
 
   score10Input.addEventListener('input', updatePreviewAndDirty);
@@ -239,13 +260,22 @@ export async function initEventSetupPage() {
     const maxOrder = eventTargets.length > 0 ? Math.max(...eventTargets.map(t => t.orderNumber)) : 0;
 
     eventTargets.forEach((round) => {
-      const bonusHtml = Engine.getBonusTargetHtml(round, round.orderNumber === maxOrder, formatNumber);
+      let bonusHtml = '';
+      if (round.orderNumber === maxOrder) {
+        const bonusTargets = Engine.getBonusTargets?.(round);
+        if (bonusTargets && (bonusTargets.t1 || bonusTargets.t2)) {
+          bonusHtml = `
+            <span>Target 1: ${formatNumber(bonusTargets.t1)}</span>
+            <span>Target 2: ${formatNumber(bonusTargets.t2)}</span>
+          `;
+        }
+      }
       const isExpanded = expandedTargetId === round.id;
+      const branding = FormatBranding.get(activeFormat);
+
 
       // Detect scaling from data to sync inline toggles
-      const gapStart = (round.values[2] || 0) - (round.values[1] || 0);
-      const gapEnd = (round.values[10] || 0) - (round.values[9] || 0);
-      const scaling = (gapEnd > gapStart * 1.5) ? 'curved' : 'flat';
+      const scaling = detectScalingFromValues(round.values);
 
       const row = createExpandableRow(roundsList, {
         id: round.id,
@@ -271,43 +301,43 @@ export async function initEventSetupPage() {
           }
         } : null,
         headerHtml: `
-        <div style="display: flex; align-items: center; gap: 12px; width: 100%; flex-wrap: wrap;">
-          <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">
-            <div class="drag-handle" style="cursor: grab; color: var(--pb-primary); opacity: 0.5; padding: 0 4px; font-size: 1.2rem;">☰</div>
-            <span style="font-weight: bold; min-width: 30px; text-align: center;">${round.orderNumber}</span>
-            <span style="flex: 1; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" class="machine-name-display">${round.machineName}</span>
+        <div class="flex gap-12 w-100 wrap">
+          <div class="flex gap-12 flex-1 min-250 align-center">
+            <div class="drag-handle">☰</div>
+            <span class="round-number">${round.orderNumber}</span>
+            <span class="machine-name-display">${escapeHTML(round.machineName)}</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto;" onclick="event.stopPropagation()">
-            <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${Engine.getValue1Label()}:</label>
-              <input type="text" class="score10-input" value="${formatNumber(round.value1)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
+          <div class="flex gap-12 wrap justify-end" onclick="event.stopPropagation()">
+            <div class="flex gap-6 min-140 flex-1 align-center">
+              <label class="small value-label">${branding.value1Label}:</label>
+              <input type="text" class="score10-input score-input" value="${formatNumber(round.value1)}">
             </div>
-            <div style="display: flex; align-items: center; gap: 6px; min-width: 140px; flex: 1;">
-              <label style="font-size: 0.7rem; color: var(--pb-primary); opacity: 0.8; font-weight: bold; white-space: nowrap;">${Engine.getValue2Label()}:</label>
-              <input type="text" class="score1-input" value="${formatNumber(round.value2)}" style="flex: 1; width: 100%; padding: 3px; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 3px;">
+            <div class="flex gap-6 min-140 flex-1 align-center">
+              <label class="small value-label">${branding.value2Label}:</label>
+              <input type="text" class="score1-input score-input" value="${formatNumber(round.value2)}">
             </div>
           </div>
         </div>
         `,
         contentHtml: `
           <div class="form-row">
-            <label style="font-size: 0.85rem;">Change Machine</label>
-            <input type="text" class="row-machine-search" placeholder="Filter machines..." style="width: 100%; box-sizing: border-box; margin-bottom: 5px;">
-            <select class="row-machine-select" style="width: 100%; box-sizing: border-box;"></select>
+            <label class="small">Change Machine</label>
+            <input type="text" class="row-machine-search" placeholder="Filter machines...">
+            <select class="row-machine-select"></select>
           </div>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <div style="display: flex; gap: 6px;">
+          <div class="flex-between mb-10">
+            <div class="flex gap-6">
                <button type="button" class="qfill secondary btn-row" data-type="easy">Easy</button>
                <button type="button" class="qfill secondary btn-row" data-type="med">Med</button>
                <button type="button" class="qfill secondary btn-row" data-type="hard">Hard</button>
             </div>
-            <div style="display: flex; gap: 4px;">
+            <div class="flex gap-4">
                <button type="button" class="scaling-btn ${scaling === 'flat' ? 'btn-standard' : 'secondary'} btn-row" data-scale="flat">Flat</button>
                <button type="button" class="scaling-btn ${scaling === 'curved' ? 'btn-standard' : 'secondary'} btn-row" data-scale="curved">Curved</button>
             </div>
           </div>
           <div class="preview-values-container">${renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2)}</div>
-          ${bonusHtml ? `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd;">${bonusHtml}</div>` : ''}
+          ${bonusHtml ? `<div class="target-details">${bonusHtml}</div>` : ''}
         `,
         onHeaderClick: (e) => {
           expandedTargetId = (expandedTargetId === round.id) ? null : round.id;
@@ -317,12 +347,13 @@ export async function initEventSetupPage() {
 
       const s10 = row.querySelector('.score10-input');
       const s1 = row.querySelector('.score1-input');
+      if (s1) s1.dataset.allowDecimal = Engine.getValue2AllowsDecimal?.() === true ? 'true' : 'false';
       applyScoreFormatting(s10);
       applyScoreFormatting(s1);
 
       const updateValues = () => {
-        round.value1 = Number(s10.value.replace(/\D/g, '')) || 0;
-        round.value2 = Number(s1.value.replace(/\D/g, '')) || 0;
+        round.value1 = parseFormattedNumber(s10.value);
+        round.value2 = parseFormattedNumber(s1.value, Engine.getValue2AllowsDecimal?.() === true);
 
         const currentScaling = row.querySelector('.scaling-btn.btn-standard').dataset.scale;
         round.values = Engine.buildRoundValues(round.value1, round.value2, currentScaling);
@@ -364,7 +395,8 @@ export async function initEventSetupPage() {
         row.querySelectorAll('.qfill').forEach(btn => {
           btn.onclick = () => {
             const type = btn.dataset.type;
-            const match = currentSuggestedMachines.find(m => String(m.id) === String(round.machineId));
+            const format = ScoringFormats.resolve(eventMatch?.scoringFormat || league?.scoringFormat);
+            const match = currentSuggestedMachines.find(m => String(m.machineId || m.id) === String(round.machineId) && m.format === format);
             const val = match ? match['target' + type.charAt(0).toUpperCase() + type.slice(1)] : null;
             if (val) {
               s10.value = formatNumber(val);
@@ -405,7 +437,7 @@ export async function initEventSetupPage() {
     });
 
     try {
-      await PB_API.saveTargetScore(payload);
+      await PB_API.machines.saveTarget(payload);
       isListDirty = false;
       originalEventTargets = JSON.parse(JSON.stringify(eventTargets));
       expandedTargetId = null;
@@ -420,21 +452,25 @@ export async function initEventSetupPage() {
     
     // Batch the initial global data fetches
     const [machines, leaguesData] = await Promise.all([
-      PB_API.getMachines(),
-      PB_API.getLeagues()
+      PB_API.machines.getAll(),
+      PB_API.leagues.getAll()
     ]);
 
     masterMachines = machines;
     const leagueId = getActiveLeagueId();
-    const league = leaguesData.find(l => String(l.id) === String(leagueId));
-    const eventMatch = league?.events?.find(e => String(e.id) === String(eventId));
+    league = leaguesData.find(l => String(l.id) === String(leagueId));
+    eventMatch = league?.events?.find(e => String(e.id) === String(eventId));
 
     const format = eventMatch?.scoringFormat || league?.scoringFormat;
+    activeFormat = ScoringFormats.resolve(format);
     Engine = getScoringEngine(format);
+    applyPreferredTheme(format);
+    score1Input.dataset.allowDecimal = Engine.getValue2AllowsDecimal?.() === true ? 'true' : 'false';
 
-    // Update UI labels based on the scoring engine
-    if (labelHigh) labelHigh.textContent = Engine.getValue1Label();
-    if (labelLow) labelLow.textContent = Engine.getValue2Label();
+    // Update UI labels based on the scoring format branding
+    const branding = FormatBranding.get(activeFormat);
+    if (labelHigh) labelHigh.textContent = branding.value1Label;
+    if (labelLow) labelLow.textContent = branding.value2Label;
 
     const defaults = Engine.getInitialValues();
     score10Input.placeholder = `e.g. ${formatNumber(defaults.value1)}`;
@@ -443,14 +479,14 @@ export async function initEventSetupPage() {
     const locationId = eventMatch?.locationId;
 
     const [suggestedData, targets] = await Promise.all([
-      locationId ? PB_API.getLocationMachines(locationId) : Promise.resolve(masterMachines),
-      eventId ? PB_API.getTargetScores(eventId) : Promise.resolve([])
+      locationId ? PB_API.locations.getMachines(locationId) : Promise.resolve(masterMachines),
+      eventId ? PB_API.machines.getTargets(eventId) : Promise.resolve([])
     ]);
 
-    // Update the array in-place so the searchable select component sees the new data
+    // Normalize targets and suggested machines into a consistent shape
     currentSuggestedMachines.length = 0;
-    currentSuggestedMachines.push(...suggestedData);
-    currentSuggestedMachines.sort((a, b) => a.machineName.localeCompare(b.machineName));
+    currentSuggestedMachines.push(...(suggestedData || []));
+    currentSuggestedMachines.sort((a, b) => (a.machineName || '').localeCompare(b.machineName || ''));
     
     // Clear search text on fresh load/navigation
     document.getElementById('machine-name').value = '';
@@ -458,7 +494,7 @@ export async function initEventSetupPage() {
     updateQuickFillState('');
 
     isListDirty = false;
-    eventTargets = targets;
+    eventTargets = normalizeTargets(targets || []);
     originalEventTargets = JSON.parse(JSON.stringify(eventTargets));
     await render();
   };
@@ -491,8 +527,8 @@ export async function initEventSetupPage() {
     e.preventDefault();
     const orderNumber = Number(orderInput.value);
     const machineName = document.getElementById('machine-name').value.trim();
-    const score10 = Number(score10Input.value.replace(/\D/g, ''));
-    const score1 = Number(score1Input.value.replace(/\D/g, ''));
+    const score10 = parseFormattedNumber(score10Input.value);
+    const score1 = parseFormattedNumber(score1Input.value, Engine.getValue2AllowsDecimal?.() === true);
     const eventId = getActiveEventId();
 
     if (!orderNumber || !machineName || (!score10 && !score1) || !eventId) return;
@@ -508,7 +544,7 @@ export async function initEventSetupPage() {
     // we create it first to obtain a global 'machine_id'.
     let masterMachine = masterMachines.find(m => m.machineName.toLowerCase() === machineName.toLowerCase());
     if (!masterMachine) {
-        masterMachine = await PB_API.createMachine(machineName);
+        masterMachine = await PB_API.machines.create({ machineName });
         masterMachines.push(masterMachine);
     }
 
@@ -522,13 +558,18 @@ export async function initEventSetupPage() {
       values 
     };
 
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+
     try {
-      await PB_API.saveTargetScore(payload);
+      await PB_API.machines.saveTarget(payload);
       await refresh();
       resetForm();
     } catch (err) {
       console.error('Save failed:', err);
       alert(`Failed to save: ${err.message}`);
+    } finally {
+      submitBtn.textContent = 'Save';
     }
   });
 

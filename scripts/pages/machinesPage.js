@@ -1,23 +1,30 @@
 import { PB_API } from '@services/api.js';
-import { setupLiveFilter, createExpandableRow } from '@ui/selectors.js';
+import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
 import { showConfirm, showAlert } from '@ui/dialogs.js';
 import { requireAdmin } from '@services/auth.js';
-import { navigateTo } from '@scripts/utils.js';
-import { ROUTES } from '@scripts/routes.js';
+import { escapeHTML, formatNumber, applyScoreFormatting } from '@scripts/utils.js';
+import { getScoringEngine } from '@core/engine.js';
+import { ScoringFormats } from '@services/scoringFormat.js';
 
 /**
- * Logic for the Global Machine Registry page.
- * 
- * Provides an interface to manage the master list of pinball machines.
- * Includes live filtering, deduplication checks during entry, and 
- * administrative protection for deletions.
+ * Logic for managing pinball machines and their target score values.
+ * @module pages/machines
+ */
+
+/**
+ * Initializes the Machines page: loads machines, binds CRUD controls, and renders the machine list.
+ * @async
+ * @returns {Promise<void>}
  */
 export async function initMachinesPage() {
   // Batch initial user check and data fetch
   const [currentUser, machinesData] = await Promise.all([
-    PB_API.getCurrentUser(),
-    PB_API.getMachines()
+    PB_API.auth.me(),
+    PB_API.machines.getAll()
   ]);
+
+  // Guard: If we are no longer on the Machines page, abort initialization
+  if (!document.getElementById('machine-form')) return;
 
   const isAdmin = currentUser && currentUser.role === 'admin';
   const isTD = currentUser && currentUser.role === 'td';
@@ -33,6 +40,64 @@ export async function initMachinesPage() {
   const machineList = document.getElementById('machines-list');
   const emptyNotice = document.getElementById('machines-list-empty');
 
+  const baselineScoresRow = document.getElementById('machine-baseline-scores-row');
+  const baselineFormatSelect = document.getElementById('baseline-format');
+  const baselineEasyInput = document.getElementById('baseline-easy');
+  const baselineMedInput = document.getElementById('baseline-med');
+  const baselineHardInput = document.getElementById('baseline-hard');
+
+  let editingScores = {}; // Keyed by format: { targetEasy, targetMed, targetHard }
+
+  // Apply real-time formatting to baseline score inputs
+  if (baselineEasyInput) applyScoreFormatting(baselineEasyInput);
+  if (baselineMedInput) applyScoreFormatting(baselineMedInput);
+  if (baselineHardInput) applyScoreFormatting(baselineHardInput);
+
+  /**
+   * Updates the labels, placeholders, and values for the baseline scores based on the selected format.
+   * @param {string} fmt 
+   */
+  const updateBaselineFieldsForFormat = (fmt) => {
+    const eng = getScoringEngine(fmt);
+    const defs = eng.getInitialValues();
+    const v1Label = eng.getValue1Label();
+    const fmtScores = editingScores[fmt] || {};
+
+    if (baselineEasyInput) {
+      baselineEasyInput.closest('.form-row').querySelector('label').textContent = `${v1Label}: Easy`;
+      baselineEasyInput.placeholder = `e.g. ${formatNumber(defs.value1)}`;
+      baselineEasyInput.value = fmtScores.targetEasy != null && fmtScores.targetEasy !== 0 ? formatNumber(fmtScores.targetEasy) : '';
+      applyScoreFormatting(baselineEasyInput);
+    }
+    if (baselineMedInput) {
+      baselineMedInput.closest('.form-row').querySelector('label').textContent = `${v1Label}: Medium`;
+      baselineMedInput.placeholder = `e.g. ${formatNumber(defs.value1 * 2)}`;
+      baselineMedInput.value = fmtScores.targetMed != null && fmtScores.targetMed !== 0 ? formatNumber(fmtScores.targetMed) : '';
+      applyScoreFormatting(baselineMedInput);
+    }
+    if (baselineHardInput) {
+      baselineHardInput.closest('.form-row').querySelector('label').textContent = `${v1Label}: Hard`;
+      baselineHardInput.placeholder = `e.g. ${formatNumber(defs.value1 * 3)}`;
+      baselineHardInput.value = fmtScores.targetHard != null && fmtScores.targetHard !== 0 ? formatNumber(fmtScores.targetHard) : '';
+      applyScoreFormatting(baselineHardInput);
+    }
+  };
+
+  if (baselineFormatSelect) {
+    baselineFormatSelect.addEventListener('change', (e) => {
+      const oldFmt = ScoringFormats.resolve(baselineFormatSelect.dataset.prevFormat);
+      editingScores[oldFmt] = {
+        targetEasy: Number(baselineEasyInput.value.replace(/\D/g, '')) || 0,
+        targetMed: Number(baselineMedInput.value.replace(/\D/g, '')) || 0,
+        targetHard: Number(baselineHardInput.value.replace(/\D/g, '')) || 0,
+      };
+
+      const newFmt = e.target.value;
+      baselineFormatSelect.dataset.prevFormat = newFmt;
+      updateBaselineFieldsForFormat(newFmt);
+    });
+  }
+
   // Populate Year dropdown from 1947 (Humpty Dumpty / Flipper Era) to current year
   if (yearInput) {
     const currentYear = new Date().getFullYear();
@@ -45,23 +110,23 @@ export async function initMachinesPage() {
 
   let allMachines = [];
   let filterInstance = null;
+  let expandedMachineId = null;
 
-  // Setup "Create Machine" toggle
   const metadataRow = document.getElementById('machine-metadata-row');
-  const actionsRow = saveMachineButton.closest('.form-actions');
+  const actionsRow = saveMachineButton?.closest('.form-actions');
 
   if (saveMachineButton) saveMachineButton.classList.add('btn-mgmt');
 
   const createToggle = document.createElement('button');
   createToggle.type = 'button';
-  createToggle.className = 'secondary btn-mgmt';
+  createToggle.className = 'secondary btn-mgmt mt-10';
   createToggle.textContent = 'Create New Machine';
-  createToggle.style.marginTop = '10px';
   machineNameInput.after(createToggle);
 
   if (!hasElevatedPrivileges) {
-    createToggle.classList.add('hidden');
-    machineForm.closest('.card').classList.add('hidden');
+    if (createToggle) createToggle.classList.add('hidden');
+    const formCard = machineForm?.closest('.card');
+    if (formCard) formCard.classList.add('hidden');
   }
 
   createToggle.onclick = () => {
@@ -69,8 +134,16 @@ export async function initMachinesPage() {
     if (isHidden) {
       toggleFormVisibility(false);
       createToggle.textContent = 'Cancel';
-      createToggle.style.marginTop = '0';
+      createToggle.classList.replace('mt-10', 'mt-0');
       actionsRow.appendChild(createToggle);
+      
+      // Initialize format details
+      editingScores = {};
+      if (baselineFormatSelect) {
+        baselineFormatSelect.value = ScoringFormats.DEFAULT;
+        baselineFormatSelect.dataset.prevFormat = ScoringFormats.DEFAULT;
+        updateBaselineFieldsForFormat(ScoringFormats.DEFAULT);
+      }
     } else {
       resetForm();
     }
@@ -78,6 +151,7 @@ export async function initMachinesPage() {
 
   function toggleFormVisibility(hide) {
     metadataRow.classList.toggle('hidden', hide);
+    if (baselineScoresRow) baselineScoresRow.classList.toggle('hidden', hide);
     actionsRow.classList.toggle('hidden', hide);
   }
 
@@ -98,29 +172,51 @@ export async function initMachinesPage() {
       filtered.forEach(m => {
         const info = [m.manufacturer, m.year].filter(Boolean).join(', ');
         const headerHtml = `
-          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            <div style="flex: 1;">
-              <span style="font-weight: bold;">${m.machineName}</span>
-              ${info ? `<br><small style="opacity: 0.7; font-size: 0.8rem;">${info}</small>` : ''}
+          <div class="header-bar">
+            <div class="flex-1">
+              <span class="font-bold">${escapeHTML(m.machineName)}</span>
+              ${info ? `<br><small class="machine-info">${escapeHTML(info)}</small>` : ''}
             </div>
-            <div style="display: flex; gap: 8px;">
-              <button type="button" class="edit-mach-btn secondary btn-row">Edit</button>
+          </div>
+        `;
+
+        const scoreFormats = Object.keys(m.scores || {});
+        const scoreLines = scoreFormats.length > 0
+          ? scoreFormats.map(f => {
+              const s = m.scores[f];
+              return `<small>${f.charAt(0).toUpperCase() + f.slice(1)}: E: ${formatNumber(s.targetEasy)} | M: ${formatNumber(s.targetMed)} | H: ${formatNumber(s.targetHard)}</small>`;
+            }).join('<br>')
+          : `<small class="text-muted">No baseline target scores set.</small>`;
+
+        const contentHtml = `
+          <div class="content-muted-col">
+            <div class="mb-10">
+              <strong>Baseline Target Scores:</strong><br>
+              ${scoreLines}
+            </div>
+            <div class="small-action-buttons">
+              ${hasElevatedPrivileges ? `<button type="button" class="edit-mach-btn secondary btn-row">Edit</button>` : ''}
               ${isAdmin ? `<button type="button" class="delete-mach-btn btn-row">Delete</button>` : ''}
             </div>
           </div>
         `;
 
-        const contentHtml = '<div style="font-size: 0.85rem; color: #666; font-style: italic;">Select Edit to update machine metadata.</div>';
+        const isExpanded = String(m.id) === String(expandedMachineId);
 
         const row = createExpandableRow(machineList, {
           id: m.id,
           className: 'machine-registry-item',
           headerHtml,
           contentHtml,
-          isExpanded: false
+          isExpanded,
+          onHeaderClick: () => {
+            expandedMachineId = (expandedMachineId === m.id) ? null : m.id;
+            filterInstance.performFilter();
+          }
         });
 
-        row.querySelector('.edit-mach-btn').onclick = (e) => { e.stopPropagation(); editMachine(m); };
+        const editBtn = row.querySelector('.edit-mach-btn');
+        if (editBtn) editBtn.onclick = (e) => { e.stopPropagation(); editMachine(m); };
         const deleteBtn = row.querySelector('.delete-mach-btn');
         if (deleteBtn) deleteBtn.onclick = async (e) => {
           e.stopPropagation();
@@ -157,10 +253,18 @@ export async function initMachinesPage() {
     if (machineFormTitle) machineFormTitle.textContent = `Edit Machine: ${m.machineName}`;
     saveMachineButton.textContent = 'Update Machine';
 
+    // Load existing scores and initialize the baseline fields
+    editingScores = m.scores && !Array.isArray(m.scores) ? JSON.parse(JSON.stringify(m.scores)) : {};
+    if (baselineFormatSelect) {
+      baselineFormatSelect.value = ScoringFormats.DEFAULT;
+      baselineFormatSelect.dataset.prevFormat = ScoringFormats.DEFAULT;
+      updateBaselineFieldsForFormat(ScoringFormats.DEFAULT);
+    }
+
     // Expand fields for editing
     toggleFormVisibility(false);
     createToggle.textContent = 'Cancel';
-    createToggle.style.marginTop = '0';
+    createToggle.classList.replace('mt-10', 'mt-0');
     actionsRow.appendChild(createToggle);
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -173,6 +277,11 @@ export async function initMachinesPage() {
     yearInput.value = '';
     mfgInput.value = '';
 
+    editingScores = {};
+    if (baselineEasyInput) baselineEasyInput.value = '';
+    if (baselineMedInput) baselineMedInput.value = '';
+    if (baselineHardInput) baselineHardInput.value = '';
+
     machineNameInput.disabled = false;
     if (!hasElevatedPrivileges) {
       machineForm.closest('.card').classList.add('hidden');
@@ -184,7 +293,7 @@ export async function initMachinesPage() {
     // Collapse creation fields
     toggleFormVisibility(true);
     createToggle.textContent = 'Create New Machine';
-    createToggle.style.marginTop = '10px';
+    createToggle.classList.replace('mt-0', 'mt-10');
     machineNameInput.after(createToggle);
 
     saveMachineButton.textContent = 'Save Machine';
@@ -202,7 +311,7 @@ export async function initMachinesPage() {
 
   async function refresh(data = null) {
     try {
-      const machines = data || await PB_API.getMachines();
+      const machines = data || await PB_API.machines.getAll();
       allMachines.length = 0;
       allMachines.push(...machines);
       filterInstance.performFilter();
@@ -223,28 +332,45 @@ export async function initMachinesPage() {
       return;
     }
 
+    // Save current baseline inputs to local cache first
+    if (baselineFormatSelect) {
+      const currentFmt = baselineFormatSelect.value;
+      editingScores[currentFmt] = {
+        targetEasy: Number(baselineEasyInput.value.replace(/\D/g, '')) || 0,
+        targetMed: Number(baselineMedInput.value.replace(/\D/g, '')) || 0,
+        targetHard: Number(baselineHardInput.value.replace(/\D/g, '')) || 0,
+      };
+    }
+
     const payload = { 
       machineName: name,
       year: yearInput.value ? parseInt(yearInput.value, 10) : null,
-      manufacturer: mfgInput.value.trim() || null
+      manufacturer: mfgInput.value.trim() || null,
+      scores: editingScores
     };
+
+    saveMachineButton.disabled = true;
+    saveMachineButton.textContent = 'Saving...';
 
     try {
       if (id) {
-        await PB_API.updateMachine(id, payload); 
+        await PB_API.machines.update(id, payload); 
       } else {
-        await PB_API.createMachine(payload);
+        await PB_API.machines.create(payload);
       }
       await refresh();
     } catch (err) {
       showAlert('Failed to save machine: ' + err.message);
+    } finally {
+      saveMachineButton.disabled = false;
+      saveMachineButton.textContent = id ? 'Update Machine' : 'Save Machine';
     }
   });
 
   async function deleteMachine(id) {
     if (!await requireAdmin(`Enter Admin Password to confirm deletion of the machine:`)) return;
     try {
-      await PB_API.deleteMachine(id);
+      await PB_API.machines.delete(id);
       await refresh();
     } catch (error) {
       showAlert(`Error deleting machine: ${error.message}`);

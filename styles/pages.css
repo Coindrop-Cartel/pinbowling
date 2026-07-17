@@ -1,0 +1,568 @@
+/* pages.css - Game scoring interfaces, rosters, standings markup, tournament selector, and page-specific view configurations */
+
+/* Round & Scoring Rows */
+.round-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 8px 12px;
+  margin-bottom: 5px;
+  background: #f9f9f9;
+  border-radius: 4px;
+  border: 1px solid #eee;
+}
+
+.round-info {
+  cursor: pointer;
+  flex: 1;
+  min-width: 200px;
+}
+
+.round-label {
+  font-weight: 700;
+}
+
+.machine-name-display {
+  flex: 1;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.round-number {
+  font-weight: 700;
+  min-width: 30px;
+  text-align: center;
+  display: inline-block;
+}
+
+.score-input {
+  flex: 1;
+  width: 100%;
+  padding: 3px;
+  font-size: 0.85rem;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+}
+
+.round-inputs-container {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-basis: 100%;
+}
+
+.round-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  flex-basis: 100%;
+}
+
+.round-inputs-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.opponent-inputs-container {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-basis: 100%;
+}
+
+.save-round-button {
+  flex-basis: 100%;
+}
+
+.input-role-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: 0.25rem;
+  white-space: nowrap;
+  min-width: 5.5em;
+  display: inline-block;
+}
+
+.pitcher-label {
+  color: var(--pb-primary, #0a2d48);
+}
+
+.batter-label {
+  color: var(--pb-accent, #e64a19);
+}
+
+.roll-input-readonly {
+  opacity: 0.6;
+  background-color: #f0f0f0;
+  border-color: #ccc;
+  cursor: not-allowed;
+}
+
+.roll-input-readonly:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.ball-locked {
+  opacity: 0.6;
+  background-color: #f0f0f0;
+  border-color: #ccc;
+  cursor: not-allowed;
+}
+
+.ball-locked:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.round-status-bar {
+  flex-basis: 100%;
+  border-top: 1px dashed rgba(0,0,0,0.05);
+  padding-top: 8px;
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.round-msg {
+  font-size: 0.75rem;
+  color: #d9534f;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.target-details {
+  flex-basis: 100%;
+  width: 100%;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--pb-primary);
+  opacity: 0.8;
+}
+
+/* Event Setup Thresholds & Setup elements */
+.threshold-grid-container {
+  background: var(--pb-gray);
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.threshold-prefix {
+  font-weight: bold;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  padding-bottom: 2px;
+  opacity: 0.6;
+}
+
+.threshold-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+}
+
+.threshold-row {
+  margin: 2px 0;
+}
+
+.threshold-heading {
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  color: var(--pb-primary);
+}
+
+.meta-strong {
+  font-weight: bold;
+}
+
+.meta-muted {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.strike-target {
+  font-size: 0.8rem;
+  color: var(--pb-primary);
+  margin-top: 4px;
+}
+
+.bonus-targets {
+  margin-top: 8px;
+  border-top: 1px dashed #bbb;
+  padding-top: 4px;
+  font-size: 0.8rem;
+  color: var(--pb-primary);
+}
+
+.hero-subtitle {
+  opacity: 0.8;
+}
+
+.display-order {
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+/* Standings */
+.standings-round {
+  text-align: center;
+}
+
+.standings-mark {
+  font-size: 0.95rem;
+}
+
+.standings-round-score {
+  font-weight: 700;
+}
+
+.standings-total {
+  font-weight: 900;
+}
+
+.team-header {
+  background-color: var(--pb-gray);
+  font-weight: bold;
+}
+
+.dropped-score {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.score-just-updated {
+  animation: pulse 1s ease-in-out 0s 2;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(0,0,0,0.12); }
+  50% { box-shadow: 0 0 8px 4px rgba(0,0,0,0.08); }
+  100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+}
+
+@keyframes score-pulse {
+  0% { box-shadow: inset 0 0 0 4px var(--pb-primary); font-weight: 900; z-index: 10; }
+  80% { box-shadow: inset 0 0 0 4px var(--pb-primary); font-weight: 900; }
+  100% { box-shadow: inset 0 0 0 0px var(--pb-primary); font-weight: inherit; }
+}
+
+.score-just-updated {
+  animation: score-pulse 10s ease-out;
+  position: relative;
+}
+
+/* Tournament Selector */
+.tournament-selector {
+  margin-bottom: 5px;
+}
+
+/* Rosters & Players Lists */
+.player-list {
+  list-style: none;
+  padding: 14px 16px;
+  margin: 0;
+}
+
+.summary-box {
+  background: #f9f9f9;
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  border: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.generator-options {
+  display: flex;
+  gap: 15px;
+  border-top: 1px solid #eee;
+  padding-top: 20px;
+  margin-top: 20px;
+}
+
+.list-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+  background: #f9f9f9;
+  padding: 5px 10px;
+  border-radius: 4px;
+}
+
+.roster-section {
+  margin-top: 20px;
+  border-top: 1px solid #ccc;
+  padding-top: 15px;
+}
+
+.roster-section-bar {
+  margin-bottom: 15px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 15px;
+}
+
+.player-name-indent {
+  padding-left: 20px;
+}
+
+.player-filter-grid {
+  max-height: 400px;
+  overflow-y: auto;
+  margin: 15px 0;
+  border: 1px solid #eee;
+  padding: 15px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: 20px;
+  row-gap: 5px;
+}
+
+.player-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  cursor: pointer;
+  border-bottom: 1px solid #f5f5f5;
+  min-width: 0;
+}
+
+.checkbox-lg {
+  width: 18px !important;
+  height: 18px !important;
+  margin: 0 !important;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+/* Dynamic Scoring Frame components */
+.frame-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  padding: 25px;
+  border: 3px solid var(--pb-primary) !important;
+  margin-bottom: 20px;
+  background-color: white;
+}
+
+.event-item, .player-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--pb-gray);
+}
+
+.league-header,
+.location-header {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.event-item:last-child, .player-item:last-child {
+  border-bottom: none;
+}
+
+.frame-info {
+  flex: 1;
+  min-width: 180px;
+}
+
+.frame-label {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--pb-black) !important;
+  line-height: 1;
+}
+
+.frame-machine {
+  font-weight: bold;
+  font-size: 1.2rem;
+  margin-bottom: 5px;
+}
+
+.frame-inputs-container {
+  display: flex;
+  gap: 15px;
+  flex: 2;
+  min-width: 300px;
+}
+
+.roll-input {
+  text-align: right;
+  margin-bottom: 0;
+  font-weight: 800;
+  font-size: 1.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.roll-input::placeholder {
+  font-size: 0.75rem;
+  font-weight: normal;
+  text-align: center;
+}
+
+.save-frame-button.is-dirty {
+  background-color: var(--pb-primary) !important;
+  color: var(--pb-white) !important;
+  box-shadow: 4px 4px 0px var(--pb-gray);
+}
+
+.session-item-header {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.session-stats {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.play-action-buttons {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.name-with-badge {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.machine-info {
+  opacity: 0.7;
+  font-size: 0.8rem;
+}
+
+.muted-italic {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* Mobile Responsiveness for Pages and scoring */
+@media (max-width: 768px) {
+  .summary-box {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .summary-box button {
+    align-self: flex-end;
+  }
+
+  .generator-options {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .play-action-buttons {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .list-item-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .list-item-row .small-action-buttons {
+    align-self: flex-end;
+  }
+
+  .header-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .header-bar .action-buttons {
+    align-self: flex-end;
+  }
+
+  .row-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .round-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 15px;
+  }
+
+  .round-info {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+
+  .round-inputs-container {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .opponent-inputs-container {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .ball-input-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .ball-input-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: bold;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    color: var(--pb-black);
+  }
+
+  .roll-input {
+    width: 100%;
+    text-align: left;
+  }
+
+  .btn-link-auth {
+    background: none !important;
+    border: none !important;
+    color: var(--pb-black) !important;
+    text-decoration: underline !important;
+    text-transform: none !important;
+    font-weight: normal !important;
+    font-size: 0.9rem;
+    align-self: center;
+    cursor: pointer;
+    padding: 10px;
+  }
+}

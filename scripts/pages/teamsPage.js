@@ -1,0 +1,250 @@
+import { PB_API } from '@services/api.js';
+import { isManagementAuthorized } from '@services/auth.js';
+import { createExpandableRow, setupLiveFilter } from '@ui/selectors.js';
+import { showConfirm, showPlayerSelectionDialog, showAlert } from '@ui/dialogs.js';
+import { escapeHTML } from '@scripts/utils.js';
+
+/**
+ * Logic for managing Teams and their Roster.
+ * @module pages/teams
+ */
+
+/**
+ * Initializes the Teams page: loads teams, binds CRUD controls, and renders the team list.
+ * @async
+ * @returns {Promise<void>}
+ */
+export async function initTeamsPage() {
+  const isAuthorized = await isManagementAuthorized();
+
+  // Guard: If we are no longer on the Teams page, abort initialization
+  if (!document.getElementById('team-form')) return;
+
+  const teamForm = document.getElementById('team-form');
+  const teamFormTitle = document.getElementById('team-form-title');
+  const teamIdInput = document.getElementById('team-id');
+  const teamNameInput = document.getElementById('team-name');
+  const teamCityInput = document.getElementById('team-city');
+  const teamStateInput = document.getElementById('team-state');
+  const saveBtn = document.getElementById('save-team-btn');
+  const cancelBtn = document.getElementById('cancel-team-btn');
+  const teamsList = document.getElementById('teams-list');
+  const emptyNotice = document.getElementById('teams-list-empty');
+
+  let allTeams = [];
+  let allPlayersCache = [];
+  let filterInstance = null;
+  let editingTeamId = null;
+  let expandedTeamId = null;
+
+  if (!isAuthorized) {
+    const formCard = document.getElementById('team-form-card');
+    if (formCard) formCard.classList.add('hidden');
+  }
+
+  const refresh = async () => {
+    try {
+      const [teams, players] = await Promise.all([
+        PB_API.teams.getAll(),
+        PB_API.players.getAll()
+      ]);
+
+      // Guard: If we are no longer on the Teams page, abort re-render
+      if (!document.getElementById('team-form')) return;
+
+      allTeams.length = 0;
+      allTeams.push(...teams);
+      allPlayersCache = players;
+      if (filterInstance) {
+        filterInstance.setData(allTeams);
+        filterInstance.performFilter();
+      }
+    } catch (err) {
+      console.error('Failed to refresh teams:', err);
+    }
+  };
+
+  const onFilterUpdate = (filtered, query) => {
+    teamsList.innerHTML = '';
+    const hasTeams = filtered.length > 0;
+    emptyNotice.classList.toggle('hidden', hasTeams);
+
+    if (!hasTeams) {
+      emptyNotice.textContent = allTeams.length === 0 ? 'No teams created yet.' : 'No matching teams found.';
+    }
+
+    filtered.forEach(team => {
+      const isExpanded = String(team.id) === String(expandedTeamId);
+
+      const headerHtml = `
+        <div class="flex-1">
+          <h3 class="section-heading">${escapeHTML(team.name)}</h3>
+          <small>${escapeHTML(team.city) || 'No City'}, ${escapeHTML(team.state) || 'No State'} | Members: ${team.members?.length || 0}</small>
+        </div>
+      `;
+
+      const contentHtml = `
+        <div class="team-roster-section roster-section-bar">
+          <div class="section-bar">
+            <h4 class="section-subheading">Roster</h4>
+            ${isAuthorized ? `<button class="add-member-btn secondary btn-row" data-team-id="${team.id}">Add Player</button>` : ''}
+          </div>
+          <ul class="team-members-list list-unstyled"></ul>
+          <div class="notice team-members-empty hidden">No players assigned to this team.</div>
+        </div>
+        <div class="action-buttons">
+          ${isAuthorized ? '<button class="edit-team-btn secondary btn-row">Edit Team</button>' : ''}
+          ${isAuthorized ? '<button class="delete-team-btn btn-row">Delete Team</button>' : ''}
+        </div>
+      `;
+
+      const row = createExpandableRow(teamsList, {
+        id: team.id,
+        className: 'team-registry-item',
+        headerHtml,
+        contentHtml,
+        isExpanded,
+        onHeaderClick: () => {
+          expandedTeamId = (expandedTeamId === team.id) ? null : team.id;
+          onFilterUpdate(filtered, query);
+        }
+      });
+
+      // Render members
+      const membersListEl = row.querySelector('.team-members-list');
+      const membersEmptyEl = row.querySelector('.team-members-empty');
+      
+      if (team.members && team.members.length > 0) {
+        membersEmptyEl.classList.add('hidden');
+        team.members.forEach(member => {
+          const li = document.createElement('li');
+          li.className = 'list-item-row';
+          li.innerHTML = `
+            <span>${escapeHTML(member.playerName)}</span>
+            ${isAuthorized ? `<button class="remove-member-btn btn-row" data-team-id="${team.id}" data-player-id="${member.id}" data-player-name="${member.playerName}">Remove</button>` : ''}
+          `;
+          membersListEl.appendChild(li);
+        });
+      } else {
+        membersEmptyEl.classList.remove('hidden');
+      }
+
+      // Button listeners
+      if (isAuthorized) {
+        row.querySelector('.edit-team-btn').onclick = () => editTeam(team);
+        row.querySelector('.delete-team-btn').onclick = () => deleteTeam(team);
+        row.querySelector('.add-member-btn').onclick = () => addMemberToTeam(team);
+        row.querySelectorAll('.remove-member-btn').forEach(btn => {
+          btn.onclick = () => removeMemberFromTeam(btn.dataset.teamId, btn.dataset.playerId, btn.dataset.playerName);
+        });
+      }
+    });
+
+    // Duplicate check and button state
+    const exactMatch = allTeams.find(t => 
+      t.name.trim().toLowerCase() === query && 
+      (!editingTeamId || String(t.id) !== String(editingTeamId))
+    );
+    saveBtn.disabled = !query || !!exactMatch;
+    if (exactMatch) saveBtn.title = "A team with this name already exists.";
+    else saveBtn.title = "";
+  };
+
+  filterInstance = setupLiveFilter(teamNameInput, allTeams, {
+    labelKey: 'name',
+    onFilter: onFilterUpdate
+  });
+
+  const resetForm = () => {
+    editingTeamId = null;
+    teamForm.reset();
+    teamIdInput.value = '';
+    teamFormTitle.textContent = 'Add New Team';
+    saveBtn.textContent = 'Save Team';
+    cancelBtn.classList.add('hidden');
+    filterInstance.performFilter();
+  };
+
+  const editTeam = (team) => {
+    editingTeamId = team.id;
+    expandedTeamId = team.id; // Auto-expand roster when editing
+    teamIdInput.value = team.id;
+    teamNameInput.value = team.name;
+    teamCityInput.value = team.city || '';
+    teamStateInput.value = team.state || '';
+    teamFormTitle.textContent = `Edit Team: ${team.name}`;
+    saveBtn.textContent = 'Update Team';
+    cancelBtn.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    filterInstance.performFilter();
+  };
+
+  if (cancelBtn) cancelBtn.onclick = resetForm;
+
+  teamForm.onsubmit = async (e) => {
+    e.preventDefault();
+    if (!teamNameInput.value.trim()) return;
+
+    const payload = {
+      name: teamNameInput.value.trim(),
+      city: teamCityInput.value.trim(),
+      state: teamStateInput.value.trim()
+    };
+
+    try {
+      if (editingTeamId) {
+        await PB_API.teams.update(editingTeamId, payload);
+      } else {
+        await PB_API.teams.create(payload);
+      }
+      resetForm();
+      await refresh();
+    } catch (err) {
+      showAlert(`Failed to save team: ${err.message}`);
+    }
+  };
+
+  const deleteTeam = async (team) => {
+    if (!await showConfirm(`Delete team "${team.name}"? This will remove all roster associations.`, 'Delete Team')) return;
+    try {
+      await PB_API.teams.delete(team.id);
+      await refresh();
+    } catch (err) {
+      showAlert(`Failed to delete team: ${err.message}`);
+    }
+  };
+
+  const addMemberToTeam = async (team) => {
+    const memberIds = new Set(team.members.map(m => m.id));
+    const available = allPlayersCache.filter(p => !memberIds.has(p.id));
+
+    if (available.length === 0) {
+      showAlert('All players are already assigned to this team.');
+      return;
+    }
+
+    const options = available.map(p => ({ value: p.id, label: p.playerName }));
+    const selectedId = await showPlayerSelectionDialog(`Add to ${team.name}`, 'Select a player:', options);
+
+    if (selectedId) {
+      try {
+        await PB_API.teams.addMember(team.id, selectedId);
+        await refresh();
+      } catch (err) {
+        showAlert(`Failed to add member: ${err.message}`);
+      }
+    }
+  };
+
+  const removeMemberFromTeam = async (teamId, playerId, playerName) => {
+    if (!await showConfirm(`Remove ${playerName} from this team?`, 'Remove Member')) return;
+    try {
+      await PB_API.teams.removeMember(teamId, playerId);
+      await refresh();
+    } catch (err) {
+      showAlert(`Failed to remove member: ${err.message}`);
+    }
+  };
+
+  await refresh();
+}
