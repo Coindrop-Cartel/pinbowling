@@ -52,11 +52,19 @@ class CleanupService {
             $sql = "DELETE FROM scores WHERE event_id IN (SELECT id FROM events WHERE league_id IN ($idPlaceholders))";
             $pdo->prepare($sql)->execute($leagueIds);
 
-            // 2. Remove target score templates
+            // 2. Remove matchups for events within these leagues
+            $sql = "DELETE FROM matchups WHERE event_id IN (SELECT id FROM events WHERE league_id IN ($idPlaceholders))";
+            $pdo->prepare($sql)->execute($leagueIds);
+
+            // 3. Remove event matchups
+            $sql = "DELETE FROM event_matchups WHERE event_id IN (SELECT id FROM events WHERE league_id IN ($idPlaceholders))";
+            $pdo->prepare($sql)->execute($leagueIds);
+
+            // 4. Remove target score templates
             $sql = "DELETE FROM target_scores WHERE event_id IN (SELECT id FROM events WHERE league_id IN ($idPlaceholders))";
             $pdo->prepare($sql)->execute($leagueIds);
 
-            // 3. Remove the events themselves
+            // 5. Remove the events themselves
             $sql = "DELETE FROM events WHERE league_id IN ($idPlaceholders)";
             $pdo->prepare($sql)->execute($leagueIds);
 

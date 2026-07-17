@@ -425,45 +425,11 @@ class ScoreService
             $machinesStmt = $pdo->query('SELECT id FROM machines');
             $allMachineIds = $machinesStmt->fetchAll(\PDO::FETCH_COLUMN);
 
-            $neededMachines = $inningsPerGame * 2;
-            $matchupMachines = [];
-            $shuffledMachines = $allMachineIds;
-            shuffle($shuffledMachines);
-            while (count($matchupMachines) < $neededMachines) {
-                foreach ($shuffledMachines as $mId) {
-                    $matchupMachines[] = $mId;
-                    if (count($matchupMachines) >= $neededMachines) {
-                        break;
-                    }
-                }
-            }
-
-            $matchupStmt = $pdo->prepare(
-                'INSERT INTO matchups (event_id, event_matchup_id, order_number, player_id, machine_id, player_order)
-                 VALUES (?, ?, ?, ?, ?, ?)'
+            MatchupGenerator::createInningSlots(
+                $pdo, $eventId, $nextEventMatchupId,
+                $homePlayerId, $awayPlayerId,
+                $inningsPerGame, $allMachineIds
             );
-
-            for ($inning = 1; $inning <= $inningsPerGame; $inning++) {
-                $topMachineId = $matchupMachines[($inning - 1) * 2];
-                $matchupStmt->execute([
-                    $eventId,
-                    $nextEventMatchupId,
-                    $inning,
-                    $homePlayerId,
-                    $topMachineId,
-                    1
-                ]);
-
-                $bottomMachineId = $matchupMachines[($inning - 1) * 2 + 1];
-                $matchupStmt->execute([
-                    $eventId,
-                    $nextEventMatchupId,
-                    $inning,
-                    $awayPlayerId,
-                    $bottomMachineId,
-                    2
-                ]);
-            }
         }
     }
 
@@ -489,45 +455,11 @@ class ScoreService
             $stmt->execute([$nextEventId, $pair['home'], $pair['away'], $nextRoundName, $pair['series_id']]);
             $eventMatchupId = (int) $pdo->lastInsertId();
 
-            $neededMachines = $inningsPerGame * 2;
-            $matchupMachines = [];
-            $shuffledMachines = $allMachineIds;
-            shuffle($shuffledMachines);
-            while (count($matchupMachines) < $neededMachines) {
-                foreach ($shuffledMachines as $mId) {
-                    $matchupMachines[] = $mId;
-                    if (count($matchupMachines) >= $neededMachines) {
-                        break;
-                    }
-                }
-            }
-
-            $matchupStmt = $pdo->prepare(
-                'INSERT INTO matchups (event_id, event_matchup_id, order_number, player_id, machine_id, player_order)
-                 VALUES (?, ?, ?, ?, ?, ?)'
+            MatchupGenerator::createInningSlots(
+                $pdo, $nextEventId, $eventMatchupId,
+                $pair['home'], $pair['away'],
+                $inningsPerGame, $allMachineIds
             );
-
-            for ($inning = 1; $inning <= $inningsPerGame; $inning++) {
-                $topMachineId = $matchupMachines[($inning - 1) * 2];
-                $matchupStmt->execute([
-                    $nextEventId,
-                    $eventMatchupId,
-                    $inning,
-                    $pair['home'],
-                    $topMachineId,
-                    1
-                ]);
-
-                $bottomMachineId = $matchupMachines[($inning - 1) * 2 + 1];
-                $matchupStmt->execute([
-                    $nextEventId,
-                    $eventMatchupId,
-                    $inning,
-                    $pair['away'],
-                    $bottomMachineId,
-                    2
-                ]);
-            }
         }
     }
 

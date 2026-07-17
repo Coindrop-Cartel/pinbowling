@@ -13,6 +13,10 @@ use App\Service\SettingsService;
 use App\Service\AuthService;
 use App\Service\PlayerService;
 use App\Service\LeagueService;
+use App\Service\EventService;
+use App\Service\RosterService;
+use App\Service\SeasonService;
+use App\Service\PlayoffService;
 use App\Service\LocationService;
 use App\Service\MachineService;
 use App\Service\ScoreService;
@@ -63,9 +67,27 @@ $container->set(PlayerService::class, function (Container $c) {
     return new PlayerService($c->get(DatabaseService::class));
 });
 
-// 7. Register LeagueService
+// 7. Register LeagueService and its sub-services
+$container->set(EventService::class, function (Container $c) {
+    return new EventService($c->get(DatabaseService::class));
+});
+$container->set(RosterService::class, function (Container $c) {
+    return new RosterService($c->get(DatabaseService::class));
+});
+$container->set(SeasonService::class, function (Container $c) {
+    return new SeasonService($c->get(DatabaseService::class), $c->get(EventService::class));
+});
+$container->set(PlayoffService::class, function (Container $c) {
+    return new PlayoffService($c->get(DatabaseService::class), $c->get(EventService::class));
+});
 $container->set(LeagueService::class, function (Container $c) {
-    return new LeagueService($c->get(DatabaseService::class));
+    return new LeagueService(
+        $c->get(DatabaseService::class),
+        $c->get(EventService::class),
+        $c->get(RosterService::class),
+        $c->get(SeasonService::class),
+        $c->get(PlayoffService::class)
+    );
 });
 
 // 8. Register LocationService

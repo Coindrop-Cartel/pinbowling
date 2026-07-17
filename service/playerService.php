@@ -352,12 +352,43 @@ class PlayerService {
             $stmt = $pdo->prepare("UPDATE team_members SET player_id = ? WHERE player_id = ?");
             $stmt->execute([$playerAId, $playerBId]);
 
-            // 5. Merge Matchups
+            // 5. Merge Matchups (detailed inning slots)
             // Update player B's matchups to player A
             $stmt = $pdo->prepare("UPDATE matchups SET player_id = ? WHERE player_id = ?");
             $stmt->execute([$playerAId, $playerBId]);
 
-            // 6. Delete player B's player record
+            // 6. Merge Event Matchups
+            // event_matchups has three player-referencing columns. All must be
+            // reassigned before player B is deleted, because home_player_id is
+            // NOT NULL with ON DELETE CASCADE — cascade would silently wipe rows.
+            //
+            // Edge case: if A and B appeared against each other in the same matchup
+            // (possible with duplicate accounts), we skip the home/away swap to avoid
+            // creating a self-referential row, but we still promote winner_id to A.
+
+            // 6a. Rows where B is the home player and A is NOT already the away player
+            $stmt = $pdo->prepare("
+                UPDATE event_matchups
+                SET home_player_id = ?
+                WHERE home_player_id = ?
+                  AND (away_player_id IS NULL OR away_player_id != ?)
+            ");
+            $stmt->execute([$playerAId, $playerBId, $playerAId]);
+
+            // 6b. Rows where B is the away player and A is NOT already the home player
+            $stmt = $pdo->prepare("
+                UPDATE event_matchups
+                SET away_player_id = ?
+                WHERE away_player_id = ?
+                  AND home_player_id != ?
+            ");
+            $stmt->execute([$playerAId, $playerBId, $playerAId]);
+
+            // 6c. Promote winner references unconditionally (safe regardless of the above)
+            $stmt = $pdo->prepare("UPDATE event_matchups SET winner_id = ? WHERE winner_id = ?");
+            $stmt->execute([$playerAId, $playerBId]);
+
+            // 7. Delete player B's player record
             $stmt = $pdo->prepare("DELETE FROM players WHERE id = ?");
             $stmt->execute([$playerBId]);
 
