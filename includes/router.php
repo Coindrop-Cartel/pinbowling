@@ -84,7 +84,11 @@ class Router {
         }
 
         if ($route === 'index' || $route === 'index.php') {
-            return ['type' => 'redirect', 'location' => $this->baseUrl . '/', 'status' => 301];
+            $location = $this->baseUrl . '/';
+            if (!empty($query)) {
+                $location .= '?' . $query;
+            }
+            return ['type' => 'redirect', 'location' => $location, 'status' => 301];
         }
 
         $pageName = (strpos($route, '.php') === false) ? $route . '.php' : $route;
