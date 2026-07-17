@@ -265,6 +265,7 @@ export async function initLeaguesPage() {
         },
         onStartPlayoffs: startPlayoffsFlow,
         onUpdateSeason: updateSeasonFlow,
+        onPrintSeasonResults: printSeasonResultsFlow,
         getParticipantMeta
       });
     }
@@ -668,6 +669,35 @@ export async function initLeaguesPage() {
     }
   }
 
+  async function printSeasonResultsFlow(leagueId) {
+    const league = allLeagues.find(l => l.id === leagueId);
+    if (!league) return;
+
+    const loader = createSkeletonLoader(leaguesList, { count: 3 });
+    try {
+      const [rawScores, allLeagueTargets, locations] = await Promise.all([
+        PB_API.scores.get(null, null, leagueId),
+        PB_API.machines.getTargets(null, leagueId),
+        PB_API.locations.getAll()
+      ]);
+
+      const { getScoringEngine } = await import('@core/engine.js');
+      const { printSeasonResults } = await import('@ui/printing.js');
+      const format = ScoringFormats.resolve(league.scoringFormat);
+      const engine = getScoringEngine(format);
+
+      printSeasonResults(league, league.players || [], league.events || [], locations, allLeagueTargets, rawScores, engine);
+    } catch (err) {
+      console.error(err);
+      await showDialog({
+        title: 'Error generating season printout',
+        message: err.message || 'An error occurred.'
+      });
+    } finally {
+      loader.remove();
+    }
+  }
+
   async function removePlayerFromLeague(leagueId, playerId, playerName) {
     if (!await showConfirm(`Remove ${playerName} from this league? Their scores will remain, but they will no longer be associated with this league's roster.`, 'Remove Player')) return;
 
@@ -735,6 +765,7 @@ export async function initLeaguesPage() {
                 onRemovePlayer: (lgId, playerId, playerName) => removePlayerFromLeague(lgId, playerId, playerName),
                 onStartPlayoffs: startPlayoffsFlow,
                 onUpdateSeason: updateSeasonFlow,
+                onPrintSeasonResults: printSeasonResultsFlow,
                 getParticipantMeta
               });
           }
