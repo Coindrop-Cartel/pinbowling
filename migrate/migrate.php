@@ -70,7 +70,9 @@ function initializeDatabaseSchema($pdo) {
         `start_date` DATE DEFAULT NULL,
         `scoring_format` VARCHAR(50) DEFAULT 'bowling',
         `season_scoring` ENUM('cumulative', 'weekly') DEFAULT 'weekly',
-        `drop_lowest_weeks` INT DEFAULT 0
+        `drop_lowest_weeks` INT DEFAULT 0,
+        `weekly_points` INT DEFAULT NULL,
+        `point_spread` INT DEFAULT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `teams` (
@@ -816,6 +818,33 @@ try {
         echo "✓ Cleaned up unused tables/columns (score_history, location_machines.note, users.created_at) successfully.\n";
     } else {
         echo "Cleanup of unused tables/columns already applied.\n";
+    }
+
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'leagues_weekly_points_and_point_spread'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $hasWeeklyPoints = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'weekly_points'")->fetch();
+        if (!$hasWeeklyPoints) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `weekly_points` INT DEFAULT NULL AFTER `drop_lowest_weeks`");
+        }
+        $hasPointSpread = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'point_spread'")->fetch();
+        if (!$hasPointSpread) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `point_spread` INT DEFAULT NULL AFTER `weekly_points`");
+        }
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('leagues_weekly_points_and_point_spread')")->execute();
+        echo "✓ Added weekly_points and point_spread columns to leagues successfully.\n";
+    } else {
+        echo "Leagues weekly points and point spread migration already applied.\n";
+    }
+
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'leagues_make_innings_per_game_nullable'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("ALTER TABLE `leagues` MODIFY `innings_per_game` INT DEFAULT NULL");
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('leagues_make_innings_per_game_nullable')")->execute();
+        echo "✓ Made leagues.innings_per_game column nullable successfully.\n";
+    } else {
+        echo "Making leagues.innings_per_game nullable already applied.\n";
     }
 
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");

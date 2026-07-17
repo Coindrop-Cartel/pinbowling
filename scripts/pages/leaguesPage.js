@@ -47,6 +47,7 @@ export async function initLeaguesPage() {
   let allLeagues = [];
   let filterInstance = null;
   let editingLeagueId = null;
+  let skipScrollOnNextRender = false;
 
   // Setup "Create League" toggle behavior
   const dateRow = leagueDateInput ? leagueDateInput.closest('.form-row') : null;
@@ -54,6 +55,10 @@ export async function initLeaguesPage() {
   const leagueFormatInput = document.getElementById('league-scoring-format');
   const leagueSeasonScoringInput = document.getElementById('league-season-scoring');
   const seasonScoringRow = document.getElementById('league-season-scoring-row');
+  const leagueWeeklyPointsInput = document.getElementById('league-weekly-points');
+  const weeklyPointsRow = document.getElementById('league-weekly-points-row');
+  const leaguePointSpreadInput = document.getElementById('league-point-spread');
+  const pointSpreadRow = document.getElementById('league-point-spread-row');
   const leagueParticipantsInput = document.getElementById('league-participants');
   const participantsRow = document.getElementById('league-participants-row');
   const leagueDropLowestInput = document.getElementById('league-drop-weeks');
@@ -69,6 +74,19 @@ export async function initLeaguesPage() {
     return { mode: 'Individual', countLabel: 'Players', count: league?.players?.length || 0, listLabel: 'Roster', emptyLabel: 'players' };
   };
 
+  const handleSeasonScoringChange = () => {
+    if (!leagueSeasonScoringInput) return;
+    const isWeekly = leagueSeasonScoringInput.value === 'weekly';
+    const isH2H = leagueParticipantsInput?.value === 'head2head';
+    if (isWeekly && !isH2H && dateRow && !dateRow.classList.contains('hidden')) {
+      weeklyPointsRow?.classList.remove('hidden');
+      pointSpreadRow?.classList.remove('hidden');
+    } else {
+      weeklyPointsRow?.classList.add('hidden');
+      pointSpreadRow?.classList.add('hidden');
+    }
+  };
+
   const handleParticipantsChange = () => {
     if (!leagueParticipantsInput) return;
     const isH2H = leagueParticipantsInput.value === 'head2head';
@@ -79,6 +97,8 @@ export async function initLeaguesPage() {
       }
       seasonScoringRow?.classList.add('hidden');
       dropLowestRow?.classList.add('hidden');
+      weeklyPointsRow?.classList.add('hidden');
+      pointSpreadRow?.classList.add('hidden');
       weeksRow?.classList.remove('hidden');
       inningsRow?.classList.remove('hidden');
     } else {
@@ -91,6 +111,7 @@ export async function initLeaguesPage() {
       if (dateRow && !dateRow.classList.contains('hidden')) {
         seasonScoringRow?.classList.remove('hidden');
         dropLowestRow?.classList.remove('hidden');
+        handleSeasonScoringChange();
       }
       weeksRow?.classList.add('hidden');
       inningsRow?.classList.add('hidden');
@@ -117,6 +138,7 @@ export async function initLeaguesPage() {
       <option value="weekly" selected>Weekly Points</option>
       <option value="cumulative">Cumulative Total</option>
     `;
+    leagueSeasonScoringInput.onchange = handleSeasonScoringChange;
   }
 
   const eventFormatInput = document.getElementById('event-scoring-format');
@@ -131,6 +153,8 @@ export async function initLeaguesPage() {
   if (formatRow) formatRow.classList.add('hidden');
   if (participantsRow) participantsRow.classList.add('hidden');
   if (seasonScoringRow) seasonScoringRow.classList.add('hidden');
+  if (weeklyPointsRow) weeklyPointsRow.classList.add('hidden');
+  if (pointSpreadRow) pointSpreadRow.classList.add('hidden');
   if (dropLowestRow) dropLowestRow.classList.add('hidden');
   if (weeksRow) weeksRow.classList.add('hidden');
   if (inningsRow) inningsRow.classList.add('hidden');
@@ -152,6 +176,7 @@ export async function initLeaguesPage() {
         formatRow.classList.remove('hidden');
         if (participantsRow) participantsRow.classList.remove('hidden');
         handleParticipantsChange();
+        handleSeasonScoringChange();
         actionsRow.classList.remove('hidden');
         createToggle.classList.replace('mt-10', 'mt-0');
         actionsRow.appendChild(createToggle);
@@ -174,6 +199,8 @@ export async function initLeaguesPage() {
     formatRow.classList.add('hidden');
     if (participantsRow) participantsRow.classList.add('hidden');
     if (seasonScoringRow) seasonScoringRow.classList.add('hidden');
+    if (weeklyPointsRow) weeklyPointsRow.classList.add('hidden');
+    if (pointSpreadRow) pointSpreadRow.classList.add('hidden');
     if (dropLowestRow) dropLowestRow.classList.add('hidden');
     if (weeksRow) weeksRow.classList.add('hidden');
     if (inningsRow) inningsRow.classList.add('hidden');
@@ -198,6 +225,8 @@ export async function initLeaguesPage() {
     if (leagueParticipantsInput) leagueParticipantsInput.value = league.participants || 'individual';
     if (leagueSeasonScoringInput) leagueSeasonScoringInput.value = league.seasonScoring || 'weekly';
     if (leagueDropLowestInput) leagueDropLowestInput.value = league.dropLowestWeeks || 0;
+    if (leagueWeeklyPointsInput) leagueWeeklyPointsInput.value = league.weeklyPoints !== null && league.weeklyPoints !== undefined ? league.weeklyPoints : '';
+    if (leaguePointSpreadInput) leaguePointSpreadInput.value = league.pointSpread !== null && league.pointSpread !== undefined ? league.pointSpread : '';
     if (leagueWeeksInput) leagueWeeksInput.value = league.weeksInSeason || 8;
     if (leagueInningsInput) leagueInningsInput.value = league.inningsPerGame || 2;
 
@@ -217,7 +246,9 @@ export async function initLeaguesPage() {
       actionsRow.appendChild(createToggle);
     }
     
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (leagueForm) {
+      leagueForm.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     applyPreferredTheme(leagueFormatInput.value);
 
     // Disable scoring format and league type if the league has events
@@ -275,8 +306,10 @@ export async function initLeaguesPage() {
         onStartPlayoffs: startPlayoffsFlow,
         onUpdateSeason: updateSeasonFlow,
         onPrintSeasonResults: printSeasonResultsFlow,
-        getParticipantMeta
+        getParticipantMeta,
+        skipScroll: skipScrollOnNextRender
       });
+      skipScrollOnNextRender = false;
     }
 
     // Duplicate Name Prevention
@@ -343,8 +376,12 @@ export async function initLeaguesPage() {
     const participants = leagueParticipantsInput?.value || 'individual';
     const seasonScoring = leagueSeasonScoringInput?.value || 'weekly';
     const dropLowestWeeks = parseInt(leagueDropLowestInput?.value || '0', 10);
-    const weeksInSeason = leagueWeeksInput ? parseInt(leagueWeeksInput.value, 10) : null;
-    const inningsPerGame = leagueInningsInput ? parseInt(leagueInningsInput.value, 10) : 2;
+    const isH2H = participants === 'head2head';
+    const isWeekly = seasonScoring === 'weekly';
+    const weeksInSeason = (isH2H && leagueWeeksInput) ? parseInt(leagueWeeksInput.value, 10) : null;
+    const inningsPerGame = (isH2H && leagueInningsInput) ? parseInt(leagueInningsInput.value, 10) : null;
+    const weeklyPoints = (!isH2H && isWeekly && leagueWeeklyPointsInput?.value) ? parseInt(leagueWeeklyPointsInput.value, 10) : null;
+    const pointSpread = (!isH2H && isWeekly && leaguePointSpreadInput?.value) ? parseInt(leaguePointSpreadInput.value, 10) : null;
 
     if (!isAuthorized) return;
 
@@ -360,13 +397,16 @@ export async function initLeaguesPage() {
         seasonScoring, 
         dropLowestWeeks,
         weeksInSeason,
-        inningsPerGame
+        inningsPerGame,
+        weeklyPoints,
+        pointSpread
       };
       if (editingLeagueId) {
         await PB_API.leagues.update(editingLeagueId, payload);
       } else {
         await PB_API.leagues.create(payload);
       }
+      skipScrollOnNextRender = true;
       resetForm();
       await refresh();
     } catch (err) {
@@ -782,8 +822,10 @@ export async function initLeaguesPage() {
                 onStartPlayoffs: startPlayoffsFlow,
                 onUpdateSeason: updateSeasonFlow,
                 onPrintSeasonResults: printSeasonResultsFlow,
-                getParticipantMeta
+                getParticipantMeta,
+                skipScroll: skipScrollOnNextRender
               });
+              skipScrollOnNextRender = false;
           }
           updateLeagueHeaderStats(leagueId, league);
       }

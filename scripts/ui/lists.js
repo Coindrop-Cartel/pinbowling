@@ -158,7 +158,8 @@ export function renderLeagueList(container, filteredLeagues, {
   onStartPlayoffs,
   onUpdateSeason,
   onPrintSeasonResults,
-  getParticipantMeta
+  getParticipantMeta,
+  skipScroll
 }) {
   container.innerHTML = '';
   
@@ -414,7 +415,9 @@ export function renderLeagueList(container, filteredLeagues, {
 
     if (shouldExpand && !row.dataset.scrolled) {
       row.dataset.scrolled = "true";
-      setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      if (!skipScroll) {
+        setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      }
     }
   });
 }

@@ -148,6 +148,12 @@ describe('Leagues Page (leaguesPage.js)', () => {
           <div id="league-season-scoring-row" class="form-row hidden">
             <select id="league-season-scoring"></select>
           </div>
+          <div id="league-weekly-points-row" class="form-row hidden">
+            <input id="league-weekly-points" type="number" />
+          </div>
+          <div id="league-point-spread-row" class="form-row hidden">
+            <input id="league-point-spread" type="number" />
+          </div>
           <div id="league-participants-row" class="form-row hidden">
             <input id="league-participants" type="number" />
           </div>

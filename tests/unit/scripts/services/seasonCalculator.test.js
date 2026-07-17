@@ -151,7 +151,7 @@ describe('calculateSeasonSummary', () => {
     expect(engine.calculateTurnResults).toHaveBeenCalledTimes(1);
   });
 
-  it('should set eventTotals to null for events with no scores', () => {
+  it('should set eventTotals to display "-" for events with no scores', () => {
     const league = makeLeague();
     const players = makePlayers(1);
     const events = makeEvents(2);
@@ -165,7 +165,7 @@ describe('calculateSeasonSummary', () => {
     });
 
     expect(result.rows[0].eventTotals[100]).not.toBeNull();
-    expect(result.rows[0].eventTotals[101]).toBeNull();
+    expect(result.rows[0].eventTotals[101]).toEqual({ displayValue: '-', isDropped: false });
   });
 
   // ── Weekly scoring ───────────────────────────────────────────────
@@ -196,6 +196,68 @@ describe('calculateSeasonSummary', () => {
       expect(rowByPlayerId[1].totalSeasonPoints).toBe(3);
       expect(rowByPlayerId[2].totalSeasonPoints).toBe(2);
       expect(rowByPlayerId[3].totalSeasonPoints).toBe(1);
+    });
+
+    it('should assign custom weekly points and support custom point spread', () => {
+      const league = makeLeague({ seasonScoring: 'weekly', weeklyPoints: 100, pointSpread: 2 });
+      const players = makePlayers(3);
+      const events = makeEvents(1);
+
+      engine.calculateTurnResults
+        .mockImplementationOnce(() => ({ turnResults: [], total: 300 })) // Player 1
+        .mockImplementationOnce(() => ({ turnResults: [], total: 200 })) // Player 2
+        .mockImplementationOnce(() => ({ turnResults: [], total: 100 })); // Player 3
+
+      const targetsByEvent = { 100: makeTargets(100) };
+      const scoresByEventAndPlayer = {
+        100: { 1: makeScores(100, 1), 2: makeScores(100, 2), 3: makeScores(100, 3) }
+      };
+
+      const result = calculateSeasonSummary({
+        league, players, events, targetsByEvent, scoresByEventAndPlayer, engine
+      });
+
+      const rowByPlayerId = {};
+      result.rows.forEach(r => { rowByPlayerId[r.entity.id] = r; });
+      expect(rowByPlayerId[1].totalSeasonPoints).toBe(100);
+      expect(rowByPlayerId[2].totalSeasonPoints).toBe(98);
+      expect(rowByPlayerId[3].totalSeasonPoints).toBe(96);
+    });
+
+    it('should handle ties in weekly points ranking with competition rank gaps', () => {
+      const league = makeLeague({ seasonScoring: 'weekly', weeklyPoints: 100, pointSpread: 1 });
+      const players = makePlayers(5);
+      const events = makeEvents(1);
+
+      engine.calculateTurnResults
+        .mockImplementationOnce(() => ({ turnResults: [], total: 400 })) // Player 1 (400) -> 1st
+        .mockImplementationOnce(() => ({ turnResults: [], total: 300 })) // Player 2 (300) -> ties for 2nd
+        .mockImplementationOnce(() => ({ turnResults: [], total: 300 })) // Player 3 (300) -> ties for 2nd
+        .mockImplementationOnce(() => ({ turnResults: [], total: 300 })) // Player 4 (300) -> ties for 2nd
+        .mockImplementationOnce(() => ({ turnResults: [], total: 200 })); // Player 5 (200) -> 5th
+
+      const targetsByEvent = { 100: makeTargets(100) };
+      const scoresByEventAndPlayer = {
+        100: { 
+          1: makeScores(100, 1), 
+          2: makeScores(100, 2), 
+          3: makeScores(100, 3),
+          4: makeScores(100, 4),
+          5: makeScores(100, 5)
+        }
+      };
+
+      const result = calculateSeasonSummary({
+        league, players, events, targetsByEvent, scoresByEventAndPlayer, engine
+      });
+
+      const rowByPlayerId = {};
+      result.rows.forEach(r => { rowByPlayerId[r.entity.id] = r; });
+      expect(rowByPlayerId[1].totalSeasonPoints).toBe(100);
+      expect(rowByPlayerId[2].totalSeasonPoints).toBe(99);
+      expect(rowByPlayerId[3].totalSeasonPoints).toBe(99);
+      expect(rowByPlayerId[4].totalSeasonPoints).toBe(99);
+      expect(rowByPlayerId[5].totalSeasonPoints).toBe(96);
     });
 
     it('should display "pts" suffix for weekly event totals', () => {
@@ -558,7 +620,7 @@ describe('calculateSeasonSummary', () => {
 
       // Player has scores but no targets → calculateTurnResults not called (eventTargets.length > 0 guard)
       expect(engine.calculateTurnResults).not.toHaveBeenCalled();
-      expect(result.rows[0].eventTotals[100]).toBeNull();
+      expect(result.rows[0].eventTotals[100]).toEqual({ displayValue: '-', isDropped: false });
     });
 
     it('should use engine.formatTotalScore for cumulative event totals', () => {
@@ -801,7 +863,7 @@ describe('calculateSeasonSummary', () => {
       result.rows.forEach(r => { rowByTeamId[r.entity.id] = r; });
       // t1 has data (member 1 scored), t2 has no data
       expect(rowByTeamId['t1'].eventTotals[100]).not.toBeNull();
-      expect(rowByTeamId['t2'].eventTotals[100]).toBeNull();
+      expect(rowByTeamId['t2'].eventTotals[100]).toEqual({ displayValue: '-', isDropped: false });
     });
   });
 
@@ -848,6 +910,33 @@ describe('calculateSeasonSummary', () => {
       expect(result.rows[0].record.losses).toBe(1);
       expect(result.rows[0].record.runDiff).toBe(1);
       expect(result.rows[0].record.totalRuns).toBe(9);
+    });
+  });
+
+  describe('drop lowest weeks including unplayed weeks', () => {
+    it('should drop unplayed weeks before playing weeks', () => {
+      const league = makeLeague({ dropLowestWeeks: 2 });
+      const players = [{ id: 1, name: 'Player 1' }];
+      const events = [{ id: 100 }, { id: 101 }, { id: 102 }];
+      const targetsByEvent = { 100: makeTargets(100), 101: makeTargets(101), 102: makeTargets(102) };
+      
+      // Player only has scores for event 100 (value 150). Event 101 and 102 are unplayed.
+      const scoresByEventAndPlayer = {
+        100: { 1: makeScores(100, 1) }
+      };
+
+      engine.calculateTurnResults.mockImplementation(() => ({ turnResults: [], total: 150 }));
+
+      const result = calculateSeasonSummary({
+        league, players, events, targetsByEvent, scoresByEventAndPlayer, engine
+      });
+
+      const row = result.rows[0];
+      // Unplayed weeks 101 and 102 should be dropped
+      expect(row.eventTotals[100].isDropped).toBe(false);
+      expect(row.eventTotals[101].isDropped).toBe(true);
+      expect(row.eventTotals[102].isDropped).toBe(true);
+      expect(row.totalSeasonPoints).toBe(150);
     });
   });
 });
