@@ -102,7 +102,7 @@ $container->set(MachineService::class, function (Container $c) {
 
 // 10. Register ScoreService
 $container->set(ScoreService::class, function (Container $c) {
-    return new ScoreService($c->get(DatabaseService::class));
+    return new ScoreService($c->get(DatabaseService::class), $c->get(PlayoffService::class));
 });
 
 // 11. Register TeamService

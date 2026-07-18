@@ -106,8 +106,6 @@ require_once PB_INC_DIR . '/http.php';
 
 // Include modularized auth helpers
 require_once PB_INC_DIR . '/auth.php';
-// Include data serializers
-require_once PB_INC_DIR . '/serializers.php';
 
 // Add the includes directory to the PHP include_path to allow cleaner require statements
 set_include_path(get_include_path() . PATH_SEPARATOR . PB_INC_DIR);

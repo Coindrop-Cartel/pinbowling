@@ -8,10 +8,12 @@ namespace App\Service;
 class ScoreService
 {
     private DatabaseService $db;
+    private PlayoffService $playoffService;
 
-    public function __construct(DatabaseService $db)
+    public function __construct(DatabaseService $db, PlayoffService $playoffService)
     {
         $this->db = $db;
+        $this->playoffService = $playoffService;
     }
 
     /**
@@ -291,177 +293,11 @@ class ScoreService
         $stmt->execute([$homeRuns, $awayRuns, $winnerId, $status, $eventMatchupId]);
 
         if ($status === 'completed') {
-            $this->handlePlayoffAdvancement($eventMatchupId);
+            $this->playoffService->handlePlayoffAdvancement($eventMatchupId);
         }
     }
 
-    /**
-     * Handles playoff bracket progression and next round advancement when a playoff matchup finishes.
-     */
-    private function handlePlayoffAdvancement(int $eventMatchupId): void
-    {
-        $pdo = $this->db->getPdo();
 
-        $stmt = $pdo->prepare('SELECT em.*, e.league_id FROM event_matchups em JOIN events e ON em.event_id = e.id WHERE em.id = ?');
-        $stmt->execute([$eventMatchupId]);
-        $matchup = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if (!$matchup || !$matchup['round_name']) {
-            return;
-        }
-
-        $eventId = (int) $matchup['event_id'];
-        $leagueId = (int) $matchup['league_id'];
-        $roundName = $matchup['round_name'];
-        $seriesId = (int) $matchup['series_id'];
-        $gameNumber = (int) $matchup['game_number'];
-        $homePlayerId = (int) $matchup['home_player_id'];
-        $awayPlayerId = (int) $matchup['away_player_id'];
-
-        $leagueStmt = $pdo->prepare('SELECT playoff_series_length, innings_per_game FROM leagues WHERE id = ?');
-        $leagueStmt->execute([$leagueId]);
-        $league = $leagueStmt->fetch(\PDO::FETCH_ASSOC);
-        $seriesLength = (int) ($league['playoff_series_length'] ?? 1);
-        $inningsPerGame = (int) ($league['innings_per_game'] ?? 2);
-
-        $seriesStmt = $pdo->prepare(
-            'SELECT winner_id FROM event_matchups 
-             WHERE event_id = ? AND round_name = ? AND series_id = ? AND status = \'completed\''
-        );
-        $seriesStmt->execute([$eventId, $roundName, $seriesId]);
-        $games = $seriesStmt->fetchAll(\PDO::FETCH_ASSOC);
-
-        $homeWins = 0;
-        $awayWins = 0;
-        foreach ($games as $g) {
-            $winId = isset($g['winner_id']) ? (int) $g['winner_id'] : null;
-            if ($winId === $homePlayerId) {
-                $homeWins++;
-            } elseif ($winId === $awayPlayerId) {
-                $awayWins++;
-            }
-        }
-
-        $clinchCount = (int) ceil($seriesLength / 2);
-        $seriesWinnerId = null;
-        if ($homeWins >= $clinchCount) {
-            $seriesWinnerId = $homePlayerId;
-        } elseif ($awayWins >= $clinchCount) {
-            $seriesWinnerId = $awayPlayerId;
-        }
-
-        if ($seriesWinnerId !== null) {
-            $expectedSeriesCount = 1;
-            if ($roundName === 'Quarterfinals') {
-                $expectedSeriesCount = 4;
-            } elseif ($roundName === 'Semifinals') {
-                $expectedSeriesCount = 2;
-            }
-
-            $allRoundStmt = $pdo->prepare(
-                'SELECT series_id, winner_id, home_player_id, away_player_id FROM event_matchups 
-                 WHERE event_id = ? AND round_name = ? AND status = \'completed\''
-            );
-            $allRoundStmt->execute([$eventId, $roundName]);
-            $allRoundGames = $allRoundStmt->fetchAll(\PDO::FETCH_ASSOC);
-
-            $seriesWinners = [];
-            foreach ($allRoundGames as $g) {
-                $sId = (int) $g['series_id'];
-                $hId = (int) $g['home_player_id'];
-                $aId = (int) $g['away_player_id'];
-
-                if (!isset($seriesWinners[$sId])) {
-                    $specStmt = $pdo->prepare(
-                        'SELECT winner_id FROM event_matchups 
-                         WHERE event_id = ? AND round_name = ? AND series_id = ? AND status = \'completed\''
-                    );
-                    $specStmt->execute([$eventId, $roundName, $sId]);
-                    $specGames = $specStmt->fetchAll(\PDO::FETCH_ASSOC);
-
-                    $sHomeWins = 0;
-                    $sAwayWins = 0;
-                    foreach ($specGames as $sg) {
-                        $sgWinId = isset($sg['winner_id']) ? (int) $sg['winner_id'] : null;
-                        if ($sgWinId === $hId) {
-                            $sHomeWins++;
-                        } elseif ($sgWinId === $aId) {
-                            $sAwayWins++;
-                        }
-                    }
-
-                    if ($sHomeWins >= $clinchCount) {
-                        $seriesWinners[$sId] = $hId;
-                    } elseif ($sAwayWins >= $clinchCount) {
-                        $seriesWinners[$sId] = $aId;
-                    }
-                }
-            }
-
-            if (count($seriesWinners) === $expectedSeriesCount) {
-                if ($roundName === 'Quarterfinals') {
-                    $this->advanceToPlayoffRound($leagueId, 'Semifinals', [
-                        ['home' => $seriesWinners[1], 'away' => $seriesWinners[2], 'series_id' => 1],
-                        ['home' => $seriesWinners[3], 'away' => $seriesWinners[4], 'series_id' => 2]
-                    ], $inningsPerGame, $seriesLength);
-                } elseif ($roundName === 'Semifinals') {
-                    $this->advanceToPlayoffRound($leagueId, 'Finals', [
-                        ['home' => $seriesWinners[1], 'away' => $seriesWinners[2], 'series_id' => 1]
-                    ], $inningsPerGame, $seriesLength);
-                } else {
-                    $stmt = $pdo->prepare('UPDATE leagues SET status = \'completed\' WHERE id = ?');
-                    $stmt->execute([$leagueId]);
-                }
-            }
-        } else {
-            $nextGameNumber = $gameNumber + 1;
-
-            $insertStmt = $pdo->prepare(
-                'INSERT INTO event_matchups (event_id, home_player_id, away_player_id, status, game_number, round_name, series_id)
-                 VALUES (?, ?, ?, \'pending\', ?, ?, ?)'
-            );
-            $insertStmt->execute([$eventId, $homePlayerId, $awayPlayerId, $nextGameNumber, $roundName, $seriesId]);
-            $nextEventMatchupId = (int) $pdo->lastInsertId();
-
-            $machinesStmt = $pdo->query('SELECT id FROM machines');
-            $allMachineIds = $machinesStmt->fetchAll(\PDO::FETCH_COLUMN);
-
-            MatchupGenerator::createInningSlots(
-                $pdo, $eventId, $nextEventMatchupId,
-                $homePlayerId, $awayPlayerId,
-                $inningsPerGame, $allMachineIds
-            );
-        }
-    }
-
-    /**
-     * Helper to create next round events and matches.
-     */
-    private function advanceToPlayoffRound(int $leagueId, string $nextRoundName, array $pairings, int $inningsPerGame, int $seriesLength): void
-    {
-        $pdo = $this->db->getPdo();
-
-        $eventStmt = $pdo->prepare('INSERT INTO events (league_id, event_name, status, scoring_format) VALUES (?, ?, \'pending\', \'baseball\')');
-        $eventStmt->execute([$leagueId, "Playoffs: " . $nextRoundName]);
-        $nextEventId = (int) $pdo->lastInsertId();
-
-        $machinesStmt = $pdo->query('SELECT id FROM machines');
-        $allMachineIds = $machinesStmt->fetchAll(\PDO::FETCH_COLUMN);
-
-        foreach ($pairings as $pair) {
-            $stmt = $pdo->prepare(
-                'INSERT INTO event_matchups (event_id, home_player_id, away_player_id, status, game_number, round_name, series_id)
-                 VALUES (?, ?, ?, \'pending\', 1, ?, ?)'
-            );
-            $stmt->execute([$nextEventId, $pair['home'], $pair['away'], $nextRoundName, $pair['series_id']]);
-            $eventMatchupId = (int) $pdo->lastInsertId();
-
-            MatchupGenerator::createInningSlots(
-                $pdo, $nextEventId, $eventMatchupId,
-                $pair['home'], $pair['away'],
-                $inningsPerGame, $allMachineIds
-            );
-        }
-    }
 
     /**
      * Inning half run calculator helper.

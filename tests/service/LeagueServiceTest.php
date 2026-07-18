@@ -1,5 +1,6 @@
 <?php
 use PHPUnit\Framework\TestCase;
+use App\Includes\Serializer;
 
 /**
  * Unit tests for League Service logic.
@@ -12,8 +13,6 @@ class LeagueServiceTest extends TestCase {
         $_SERVER['HTTP_X_PB_SECRET'] = 'bowl-2024-secret';
         
         // Note: the leagueService.php controller returns early when PHPUNIT_RUNNING is true.
-        // Serializer functions (serializeEvent, serializeLeague) are loaded transitively
-        // via tests/bootstrap.php -> includes/bootstrap.php -> includes/serializers.php.
         require_once __DIR__ . '/../../api/league.php';
     }
 
@@ -28,7 +27,7 @@ class LeagueServiceTest extends TestCase {
             'scoring_format' => 'classic'
         ];
 
-        $result = serializeEvent($dbRow);
+        $result = Serializer::event($dbRow);
 
         $this->assertEquals(10, $result['id']);
         $this->assertEquals(5, $result['leagueId']);
@@ -46,7 +45,7 @@ class LeagueServiceTest extends TestCase {
             'scoring_format' => 'bowling'
         ];
 
-        $result = serializeLeague($dbRow);
+        $result = Serializer::league($dbRow);
 
         $this->assertEquals('Empty League', $result['name']);
         $this->assertIsArray($result['events']);

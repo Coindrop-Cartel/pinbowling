@@ -5,7 +5,8 @@
  * This file handles routing for the application by delegating to the Router class.
  */
 require_once __DIR__ . '/includes/bootstrap.php';
-require_once __DIR__ . '/includes/router.php';
+
+use App\Includes\Router;
 
 // Make $uiVersion available from the container for legacy code
 $container = $GLOBALS['container'];

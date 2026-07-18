@@ -1,9 +1,11 @@
 <?php
+
+namespace App\Includes;
+
 /**
  * Router class for PinBowling.
  * Handles request parsing, versioned assets, auth guards, and file mapping.
  */
-
 class Router {
     private $baseUrl;
     private $uiVersion;

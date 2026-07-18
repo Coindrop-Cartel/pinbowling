@@ -1,14 +1,11 @@
 <?php
 use PHPUnit\Framework\TestCase;
+use App\Includes\Serializer;
 
 /**
- * Unit tests for the serializer helper functions in includes/serializers.php.
+ * Unit tests for the Serializer class.
  */
 class SerializersTest extends TestCase {
-
-    protected function setUp(): void {
-        require_once __DIR__ . '/../../includes/serializers.php';
-    }
 
     /**
      * serializePlayer should handle the standard `user_id` column key
@@ -26,7 +23,7 @@ class SerializersTest extends TestCase {
             'user_id'      => '7',
         ];
 
-        $result = serializePlayer($row);
+        $result = Serializer::player($row);
 
         $this->assertSame(42, $result['id']);
         $this->assertSame('Ada Lovelace', $result['playerName']);
@@ -50,7 +47,7 @@ class SerializersTest extends TestCase {
             'userId'      => '3',
         ];
 
-        $result = serializePlayer($row);
+        $result = Serializer::player($row);
 
         $this->assertSame(10, $result['id']);
         $this->assertSame('Alan Turing', $result['playerName']);
@@ -68,7 +65,7 @@ class SerializersTest extends TestCase {
             'player_name' => 'Grace Hopper',
         ];
 
-        $result = serializePlayer($row);
+        $result = Serializer::player($row);
 
         $this->assertSame(5, $result['id']);
         $this->assertNull($result['userId']);

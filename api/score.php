@@ -6,84 +6,94 @@
 
 require_once __DIR__ . '/../includes/bootstrap.php';
 
-try {
-    $container = $GLOBALS['container'];
-    $scoreService = $container->get(\App\Service\ScoreService::class);
+use App\Http\ApiController;
+use App\Includes\Serializer;
+use App\Service\ScoreService;
 
-    $method = $_SERVER['REQUEST_METHOD'];
-    $input = getJsonInput();
+class ScoreController extends ApiController {
+    private ScoreService $scoreService;
 
-    switch ($method) {
-        case 'GET':
-            $eventMatchupId = isset($_GET['eventMatchupId']) ? (int) $_GET['eventMatchupId'] : 0;
-            if ($eventMatchupId) {
-                $scores = $scoreService->getMatchupScores($eventMatchupId);
-            } else {
-                $eventId = isset($_GET['eventId']) ? (int) $_GET['eventId'] : 0;
-                $playerId = isset($_GET['playerId']) ? (int) $_GET['playerId'] : 0;
-                $leagueId = isset($_GET['leagueId']) ? (int) $_GET['leagueId'] : 0;
-
-                if (!$eventId && !$leagueId) {
-                    sendJson(['error' => 'eventId, leagueId, or eventMatchupId query parameter is required'], 400);
-                }
-
-                if ($leagueId) {
-                    $scores = $scoreService->getLeagueScores($leagueId);
-                } else {
-                    $scores = $scoreService->getEventScores($eventId, $playerId ? $playerId : null);
-                }
-            }
-
-            sendJson(array_map('serializeScore', $scores));
-            break;
-
-        case 'POST':
-            if (empty($input['eventId']) || empty($input['playerId']) || empty($input['machineId']) || !isset($input['orderNumber'])) {
-                sendJson(['error' => 'eventId, playerId, machineId, and orderNumber are required'], 400);
-            }
-
-            validateSessionOrSecret();
-
-            $scoreService->saveScore(
-                (int) $input['eventId'],
-                (int) $input['playerId'],
-                (int) $input['machineId'],
-                (int) $input['orderNumber'],
-                $input['ball1'] ?? null,
-                $input['ball2'] ?? null,
-                $input['ball3'] ?? null,
-                isset($input['eventMatchupId']) ? (int) $input['eventMatchupId'] : null
-            );
-
-            sendJson(['success' => true]);
-            break;
-
-        case 'DELETE':
-            $eventId = isset($_GET['eventId']) ? (int) $_GET['eventId'] : 0;
-            $playerId = isset($_GET['playerId']) ? (int) $_GET['playerId'] : 0;
-
-            validateAdminAccess();
-
-            if ($playerId && $eventId) {
-                // Delete scores for player in event
-                $scoreService->deletePlayerEventScores($eventId, $playerId);
-            } else if ($playerId) {
-                // Delete all scores for player
-                $scoreService->deletePlayerScores($playerId);
-            } else if ($eventId) {
-                // Delete all scores for event
-                $scoreService->deleteEventScores($eventId);
-            } else {
-                sendJson(['error' => 'eventId or playerId query parameter is required'], 400);
-            }
-
-            sendJson(['success' => true]);
-            break;
-
-        default:
-            sendJson(['error' => 'Unsupported request method'], 405);
+    public function __construct($container) {
+        parent::__construct($container);
+        $this->scoreService = $container->get(ScoreService::class);
     }
 
-} catch (Exception $e) {
-    sendJson(['error' => $e->getMessage()], 500);
+    protected function handle(): void {
+        switch ($this->method) {
+            case 'GET':
+                $eventMatchupId = isset($_GET['eventMatchupId']) ? (int) $_GET['eventMatchupId'] : 0;
+                if ($eventMatchupId) {
+                    $scores = $this->scoreService->getMatchupScores($eventMatchupId);
+                } else {
+                    $eventId = isset($_GET['eventId']) ? (int) $_GET['eventId'] : 0;
+                    $playerId = isset($_GET['playerId']) ? (int) $_GET['playerId'] : 0;
+                    $leagueId = isset($_GET['leagueId']) ? (int) $_GET['leagueId'] : 0;
+
+                    if (!$eventId && !$leagueId) {
+                        $this->sendError('eventId, leagueId, or eventMatchupId query parameter is required', 400);
+                    }
+
+                    if ($leagueId) {
+                        $scores = $this->scoreService->getLeagueScores($leagueId);
+                    } else {
+                        $scores = $this->scoreService->getEventScores($eventId, $playerId ? $playerId : null);
+                    }
+                }
+
+                $this->sendJson(array_map([Serializer::class, 'score'], $scores));
+                break;
+
+            case 'POST':
+                if (empty($this->input['eventId']) || empty($this->input['playerId']) || empty($this->input['machineId']) || !isset($this->input['orderNumber'])) {
+                    $this->sendError('eventId, playerId, machineId, and orderNumber are required', 400);
+                }
+
+                $this->validateSessionOrSecret();
+
+                $this->scoreService->saveScore(
+                    (int) $this->input['eventId'],
+                    (int) $this->input['playerId'],
+                    (int) $this->input['machineId'],
+                    (int) $this->input['orderNumber'],
+                    $this->input['ball1'] ?? null,
+                    $this->input['ball2'] ?? null,
+                    $this->input['ball3'] ?? null,
+                    isset($this->input['eventMatchupId']) ? (int) $this->input['eventMatchupId'] : null
+                );
+
+                $this->sendJson(['success' => true]);
+                break;
+
+            case 'DELETE':
+                $eventId = isset($_GET['eventId']) ? (int) $_GET['eventId'] : 0;
+                $playerId = isset($_GET['playerId']) ? (int) $_GET['playerId'] : 0;
+
+                $this->validateAdminAccess();
+
+                if ($playerId && $eventId) {
+                    // Delete scores for player in event
+                    $this->scoreService->deletePlayerEventScores($eventId, $playerId);
+                } else if ($playerId) {
+                    // Delete all scores for player
+                    $this->scoreService->deletePlayerScores($playerId);
+                } else if ($eventId) {
+                    // Delete all scores for event
+                    $this->scoreService->deleteEventScores($eventId);
+                } else {
+                    $this->sendError('eventId or playerId query parameter is required', 400);
+                }
+
+                $this->sendJson(['success' => true]);
+                break;
+
+            default:
+                $this->sendError('Unsupported request method', 405);
+        }
+    }
+}
+
+// Prevent immediate execution during unit testing
+$container = $GLOBALS['container'];
+if (!defined('PHPUNIT_RUNNING') || PHPUNIT_RUNNING !== true) {
+    (new ScoreController($container))->dispatch();
 }

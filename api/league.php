@@ -2,209 +2,214 @@
 /**
  * League Management REST API Endpoint.
  * HTTP controller that delegates to the LeagueService class.
- *
- * Supported Methods:
- * - GET: Retrieve leagues, events (fixtures), or full league details
- * - POST: Create leagues, events, or add players to leagues
- * - PUT: Update leagues or events
- * - DELETE: Remove leagues, events, or players from leagues
  */
 
 require_once __DIR__ . '/../includes/bootstrap.php';
 
-// Prevent immediate execution during unit testing
-if (defined('PHPUNIT_RUNNING') && PHPUNIT_RUNNING === true) {
-    return;
-}
+use App\Http\ApiController;
+use App\Includes\Serializer;
+use App\Service\LeagueService;
 
-try {
-    $container = $GLOBALS['container'];
-    $leagueService = $container->get(\App\Service\LeagueService::class);
-    $method = $_SERVER['REQUEST_METHOD'];
-    $input = getJsonInput();
-    // Use 'task' parameter (formerly 'action') to avoid ad-blocker filters
-    $task = $_GET['task'] ?? 'league';
+class LeagueController extends ApiController {
+    private LeagueService $leagueService;
 
-    switch ($method) {
-        case 'GET':
-            if ($task === 'fixture') {
-                $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : null;
-                $events = $leagueService->getAllEvents($leagueId);
-                sendJson(array_map('serializeEvent', $events));
-            } else {
-                $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-                if ($id) {
-                    $league = $leagueService->getLeague($id);
-                    if (!$league) sendJson(['error' => 'League not found'], 404);
-                    sendJson(serializeLeague($league));
-                } else {
-                    $leagues = $leagueService->getAllLeaguesWithDetails($_GET['type'] ?? null);
-                    sendJson(array_map('serializeLeague', $leagues));
-                }
-            }
-            break;
-
-        case 'POST':
-            if ($task === 'member') {
-                if (empty($input['leagueId']) || empty($input['playerId'])) {
-                    sendJson(['error' => 'leagueId and playerId are required'], 400);
-                }
-
-                $leagueId = (int)$input['leagueId'];
-                $playerId = (int)$input['playerId'];
-                $meta = $leagueService->getLeagueMeta($leagueId);
-                $playerUserId = $leagueService->getPlayerUserId($playerId);
-
-                if ($meta['type'] === 'session') {
-                    if ($playerUserId !== null) validateSessionOrSecret();
-                } else {
-                    if ($playerUserId !== null) validateTDAccess();
-                }
-
-                if ($meta['scoring_format'] === 'baseball' && $meta['type'] === 'session') {
-                    if ($leagueService->getLeaguePlayerCount($leagueId) >= 2) {
-                        sendJson(['error' => 'Baseball sessions are limited to 2 players'], 400);
-                    }
-                }
-
-                $leagueService->addPlayerToLeague($leagueId, $playerId);
-                sendJson(['success' => true]);
-
-            } elseif ($task === 'start_season') {
-                validateTDAccess();
-                if (empty($input['leagueId'])) {
-                    sendJson(['error' => 'leagueId is required'], 400);
-                }
-                $leagueService->startSeason((int)$input['leagueId']);
-                sendJson(['success' => true]);
-
-            } elseif ($task === 'update_season') {
-                validateTDAccess();
-                if (empty($input['leagueId'])) {
-                    sendJson(['error' => 'leagueId is required'], 400);
-                }
-                $leagueService->updateSeason((int)$input['leagueId']);
-                sendJson(['success' => true]);
-
-            } elseif ($task === 'start_playoffs') {
-                validateTDAccess();
-                if (empty($input['leagueId']) || empty($input['seeds']) || empty($input['seriesLength'])) {
-                    sendJson(['error' => 'leagueId, seeds, and seriesLength are required'], 400);
-                }
-                $leagueService->startPlayoffs(
-                    (int)$input['leagueId'],
-                    $input['seeds'],
-                    (int)$input['seriesLength']
-                );
-                sendJson(['success' => true]);
-
-            } elseif ($task === 'fixture') {
-                validateTDAccess();
-                if (empty($input['leagueId']) || empty($input['eventName'])) {
-                    sendJson(['error' => 'leagueId and eventName are required'], 400);
-                }
-
-                $event = $leagueService->createEvent(
-                    (int)$input['leagueId'],
-                    $input['eventName'],
-                    $input['eventDate'] ?? null,
-                    !empty($input['locationId']) ? (int)$input['locationId'] : null,
-                    $input['scoringFormat'] ?? null
-                );
-                if (!$event) sendJson(['error' => 'Event created but could not be retrieved.'], 500);
-                sendJson(serializeEvent($event));
-
-            } else {
-                if (empty($input['name'])) sendJson(['error' => 'name is required'], 400);
-
-                $league = $leagueService->createLeague(
-                    $input['name'],
-                    $input['startDate'] ?? null,
-                    $input['type'] ?? 'standard',
-                    $input['participants'] ?? 'individual',
-                    $input['scoringFormat'] ?? 'bowling',
-                    $input['seasonScoring'] ?? 'weekly',
-                    (int)($input['dropLowestWeeks'] ?? 0),
-                    isset($input['weeksInSeason']) ? (int)$input['weeksInSeason'] : null,
-                    isset($input['inningsPerGame']) && $input['inningsPerGame'] !== '' ? (int)$input['inningsPerGame'] : null,
-                    isset($input['weeklyPoints']) && $input['weeklyPoints'] !== '' ? (int)$input['weeklyPoints'] : null,
-                    isset($input['pointSpread']) && $input['pointSpread'] !== '' ? (int)$input['pointSpread'] : null
-                );
-                if (!$league) sendJson(['error' => 'League created but could not be retrieved.'], 500);
-                sendJson(serializeLeague($league));
-            }
-            break;
-
-        case 'PUT':
-            validateTDAccess();
-
-            $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-            if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
-
-            if ($task === 'fixture') {
-                $event = $leagueService->updateEvent(
-                    $id,
-                    $input['eventName'] ?? null,
-                    $input['eventDate'] ?? null,
-                    !empty($input['locationId']) ? (int)$input['locationId'] : null,
-                    $input['scoringFormat'] ?? 'bowling'
-                );
-                if (!$event) sendJson(['error' => 'Resource updated but could not be retrieved.'], 500);
-                sendJson(serializeEvent($event));
-            } else {
-                $league = $leagueService->updateLeague(
-                    $id,
-                    $input['name'],
-                    $input['startDate'] ?? null,
-                    $input['participants'] ?? 'individual',
-                    $input['scoringFormat'] ?? 'bowling',
-                    $input['seasonScoring'] ?? 'weekly',
-                    (int)($input['dropLowestWeeks'] ?? 0),
-                    isset($input['weeksInSeason']) ? (int)$input['weeksInSeason'] : null,
-                    isset($input['inningsPerGame']) && $input['inningsPerGame'] !== '' ? (int)$input['inningsPerGame'] : null,
-                    isset($input['weeklyPoints']) && $input['weeklyPoints'] !== '' ? (int)$input['weeklyPoints'] : null,
-                    isset($input['pointSpread']) && $input['pointSpread'] !== '' ? (int)$input['pointSpread'] : null
-                );
-                if (!$league) sendJson(['error' => 'Resource updated but could not be retrieved.'], 500);
-                sendJson(serializeLeague($league));
-            }
-            break;
-
-        case 'DELETE':
-            if ($task === 'member') {
-                $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
-                $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
-
-                $meta = $leagueService->getLeagueMeta($leagueId);
-                if ($meta['type'] === 'session') {
-                    validateSessionOrSecret();
-                } else {
-                    validateTDAccess();
-                }
-
-                $leagueService->removePlayerFromLeague($leagueId, $playerId);
-            } else {
-                $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-                if (!$id) sendJson(['error' => 'id query parameter is required'], 400);
-
-                if ($task === 'fixture') {
-                    if ($leagueService->getEventLeagueId($id) === false) {
-                        sendJson(['error' => 'Event not found'], 404);
-                    }
-                    validateTDAccess();
-                    $leagueService->deleteEvent($id);
-                } else {
-                    validateAdminAccess();
-                    $leagueService->deleteLeague($id);
-                }
-            }
-            sendJson(['success' => true]);
-            break;
-
-        default:
-            sendJson(['error' => 'Unsupported request method'], 405);
+    public function __construct($container) {
+        parent::__construct($container);
+        $this->leagueService = $container->get(LeagueService::class);
     }
 
-} catch (\Throwable $e) {
-    sendJson(['error' => $e->getMessage()], 500);
+    protected function handle(): void {
+        switch ($this->method) {
+            case 'GET':
+                if ($this->task === 'fixture') {
+                    $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : null;
+                    $events = $this->leagueService->getAllEvents($leagueId);
+                    $this->sendJson(array_map([Serializer::class, 'event'], $events));
+                } else {
+                    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+                    if ($id) {
+                        $league = $this->leagueService->getLeague($id);
+                        if (!$league) $this->sendError('League not found', 404);
+                        $this->sendJson(Serializer::league($league));
+                    } else {
+                        $leagues = $this->leagueService->getAllLeaguesWithDetails($_GET['type'] ?? null);
+                        $this->sendJson(array_map([Serializer::class, 'league'], $leagues));
+                    }
+                }
+                break;
+
+            case 'POST':
+                if ($this->task === 'member') {
+                    if (empty($this->input['leagueId']) || empty($this->input['playerId'])) {
+                        $this->sendError('leagueId and playerId are required', 400);
+                    }
+
+                    $meta = $this->leagueService->getLeagueMeta((int)$this->input['leagueId']);
+                    if ($meta['type'] === 'session') {
+                        $this->validateSessionOrSecret();
+                    } else {
+                        $this->validateTDAccess();
+                    }
+
+                    $this->leagueService->addPlayerToLeague((int)$this->input['leagueId'], (int)$this->input['playerId']);
+
+                } else if ($this->task === 'team') {
+                    if (empty($this->input['leagueId']) || empty($this->input['teamId'])) {
+                        $this->sendError('leagueId and teamId are required', 400);
+                    }
+
+                    $meta = $this->leagueService->getLeagueMeta((int)$this->input['leagueId']);
+                    if ($meta['type'] === 'session') {
+                        $this->validateSessionOrSecret();
+                    } else {
+                        $this->validateTDAccess();
+                    }
+
+                    $this->leagueService->addTeamToLeague((int)$this->input['leagueId'], (int)$this->input['teamId']);
+
+                } else if ($this->task === 'startSeason') {
+                    if (empty($this->input['leagueId'])) {
+                        $this->sendError('leagueId is required', 400);
+                    }
+
+                    $meta = $this->leagueService->getLeagueMeta((int)$this->input['leagueId']);
+                    if ($meta['type'] === 'session') {
+                        $this->validateSessionOrSecret();
+                    } else {
+                        $this->validateTDAccess();
+                    }
+
+                    $this->leagueService->startSeason((int)$this->input['leagueId']);
+
+                } else if ($this->task === 'startPlayoffs') {
+                    if (empty($this->input['leagueId']) || empty($this->input['seeds']) || !isset($this->input['seriesLength'])) {
+                        $this->sendError('leagueId, seeds, and seriesLength are required', 400);
+                    }
+
+                    $this->validateTDAccess();
+                    $this->leagueService->startPlayoffs(
+                        (int)$this->input['leagueId'],
+                        $this->input['seeds'],
+                        (int)$this->input['seriesLength']
+                    );
+
+                } else if ($this->task === 'fixture') {
+                    if (empty($this->input['leagueId']) || empty($this->input['eventName'])) {
+                        $this->sendError('leagueId and eventName are required', 400);
+                    }
+
+                    $meta = $this->leagueService->getLeagueMeta((int)$this->input['leagueId']);
+                    if ($meta['type'] === 'session') {
+                        $this->validateSessionOrSecret();
+                    } else {
+                        $this->validateTDAccess();
+                    }
+
+                    $event = $this->leagueService->createEvent(
+                        (int)$this->input['leagueId'],
+                        $this->input['eventName'],
+                        $this->input['eventDate'] ?? null,
+                        !empty($this->input['locationId']) ? (int)$this->input['locationId'] : null,
+                        $this->input['scoringFormat'] ?? null
+                    );
+                    if (!$event) $this->sendError('Event created but could not be retrieved.', 500);
+                    $this->sendJson(Serializer::event($event));
+
+                } else {
+                    if (empty($this->input['name'])) $this->sendError('name is required', 400);
+
+                    $league = $this->leagueService->createLeague(
+                        $this->input['name'],
+                        $this->input['startDate'] ?? null,
+                        $this->input['type'] ?? 'standard',
+                        $this->input['participants'] ?? 'individual',
+                        $this->input['scoringFormat'] ?? 'bowling',
+                        $this->input['seasonScoring'] ?? 'weekly',
+                        (int)($this->input['dropLowestWeeks'] ?? 0),
+                        isset($this->input['weeksInSeason']) ? (int)$this->input['weeksInSeason'] : null,
+                        isset($this->input['inningsPerGame']) && $this->input['inningsPerGame'] !== '' ? (int)$this->input['inningsPerGame'] : null,
+                        isset($this->input['weeklyPoints']) && $this->input['weeklyPoints'] !== '' ? (int)$this->input['weeklyPoints'] : null,
+                        isset($this->input['pointSpread']) && $this->input['pointSpread'] !== '' ? (int)$this->input['pointSpread'] : null
+                    );
+                    if (!$league) $this->sendError('League created but could not be retrieved.', 500);
+                    $this->sendJson(Serializer::league($league));
+                }
+                break;
+
+            case 'PUT':
+                $this->validateTDAccess();
+
+                $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+                if (!$id) $this->sendError('id query parameter is required', 400);
+
+                if ($this->task === 'fixture') {
+                    $event = $this->leagueService->updateEvent(
+                        $id,
+                        $this->input['eventName'] ?? null,
+                        $this->input['eventDate'] ?? null,
+                        !empty($this->input['locationId']) ? (int)$this->input['locationId'] : null,
+                        $this->input['scoringFormat'] ?? 'bowling'
+                    );
+                    if (!$event) $this->sendError('Resource updated but could not be retrieved.', 500);
+                    $this->sendJson(Serializer::event($event));
+                } else {
+                    $league = $this->leagueService->updateLeague(
+                        $id,
+                        $this->input['name'],
+                        $this->input['startDate'] ?? null,
+                        $this->input['participants'] ?? 'individual',
+                        $this->input['scoringFormat'] ?? 'bowling',
+                        $this->input['seasonScoring'] ?? 'weekly',
+                        (int)($this->input['dropLowestWeeks'] ?? 0),
+                        isset($this->input['weeksInSeason']) ? (int)$this->input['weeksInSeason'] : null,
+                        isset($this->input['inningsPerGame']) && $this->input['inningsPerGame'] !== '' ? (int)$this->input['inningsPerGame'] : null,
+                        isset($this->input['weeklyPoints']) && $this->input['weeklyPoints'] !== '' ? (int)$this->input['weeklyPoints'] : null,
+                        isset($this->input['pointSpread']) && $this->input['pointSpread'] !== '' ? (int)$this->input['pointSpread'] : null
+                    );
+                    if (!$league) $this->sendError('Resource updated but could not be retrieved.', 500);
+                    $this->sendJson(Serializer::league($league));
+                }
+                break;
+
+            case 'DELETE':
+                if ($this->task === 'member') {
+                    $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
+                    $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
+
+                    $meta = $this->leagueService->getLeagueMeta($leagueId);
+                    if ($meta['type'] === 'session') {
+                        $this->validateSessionOrSecret();
+                    } else {
+                        $this->validateTDAccess();
+                    }
+
+                    $this->leagueService->removePlayerFromLeague($leagueId, $playerId);
+                } else {
+                    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+                    if (!$id) $this->sendError('id query parameter is required', 400);
+
+                    if ($this->task === 'fixture') {
+                        if ($this->leagueService->getEventLeagueId($id) === false) {
+                            $this->sendError('Event not found', 404);
+                        }
+                        $this->validateTDAccess();
+                        $this->leagueService->deleteEvent($id);
+                    } else {
+                        $this->validateAdminAccess();
+                        $this->leagueService->deleteLeague($id);
+                    }
+                }
+                $this->sendJson(['success' => true]);
+                break;
+
+            default:
+                $this->sendError('Unsupported request method', 405);
+        }
+    }
+}
+
+// Prevent immediate execution during unit testing
+$container = $GLOBALS['container'];
+if (!defined('PHPUNIT_RUNNING') || PHPUNIT_RUNNING !== true) {
+    (new LeagueController($container))->dispatch();
 }
