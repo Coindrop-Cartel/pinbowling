@@ -106,7 +106,7 @@ class LeagueService {
 
         // Fetch players
         $stmt = $pdo->prepare(
-            'SELECT p.id, p.player_name as playerName, p.ifpa_id as ifpaId, u.id as user_id 
+            'SELECT p.id, p.player_name, p.ifpa_id, u.id as user_id 
              FROM players p 
              JOIN league_players lp ON p.id = lp.player_id 
              LEFT JOIN users u ON p.id = u.player_id 
@@ -178,7 +178,7 @@ class LeagueService {
         }
 
         $lpStmt = $pdo->query(
-            'SELECT lp.league_id, p.id, p.player_name as playerName, p.ifpa_id as ifpaId, u.id as user_id
+            'SELECT lp.league_id, p.id, p.player_name, p.ifpa_id, u.id as user_id
              FROM players p
              JOIN league_players lp ON p.id = lp.player_id
              LEFT JOIN users u ON p.id = u.player_id

@@ -228,6 +228,51 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
     expect(document.getElementById('value-10').value).toBe('1000');
   });
 
+  it('should fallback to general machine targets for a non-bowling format if not defined at location', async () => {
+    PB_API.leagues.getAll.mockResolvedValue([
+      { 
+        id: 1, 
+        name: 'League', 
+        scoringFormat: 'golf', 
+        events: [{ id: 101, locationId: 1, scoringFormat: 'golf' }] 
+      }
+    ]);
+    
+    const masterMachine = {
+      id: 10,
+      machineName: 'Addams Family',
+      scores: {
+        golf: { targetEasy: 3, targetMed: 4, targetHard: 5 }
+      }
+    };
+    PB_API.machines.getAll.mockResolvedValue([masterMachine]);
+
+    const locMachine = {
+      id: 100,
+      locationId: 1,
+      machineId: 10,
+      machineName: 'Addams Family',
+      format: 'bowling',
+      targetEasy: 1000,
+      targetMed: 2000,
+      targetHard: 3000,
+      scores: {
+        bowling: { targetEasy: 1000, targetMed: 2000, targetHard: 3000 }
+      }
+    };
+    PB_API.locations.getMachines.mockResolvedValue([locMachine]);
+
+    await initEventSetupPage();
+
+    const onSelect = uiMocks.createSearchableSelect.mock.calls[0][3].onSelect;
+    onSelect('Addams Family');
+
+    const btnEasy = document.getElementById('fill-easy');
+    btnEasy.click();
+    
+    expect(document.getElementById('value-10').value).toBe('3');
+  });
+
   it('should call printing when print button is clicked', async () => {
     await initEventSetupPage();
     

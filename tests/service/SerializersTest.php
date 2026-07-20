@@ -35,25 +35,6 @@ class SerializersTest extends TestCase {
         $this->assertSame(7, $result['userId']);
     }
 
-    /**
-     * serializePlayer should fall back to the camelCase `userId` key
-     * returned by LeagueService's player queries (which alias the column).
-     */
-    public function testSerializePlayerWithCamelCaseUserId() {
-        $row = [
-            'id'          => '10',
-            'player_name' => 'Alan Turing',
-            'ifpa_id'     => null,
-            'userId'      => '3',
-        ];
-
-        $result = Serializer::player($row);
-
-        $this->assertSame(10, $result['id']);
-        $this->assertSame('Alan Turing', $result['playerName']);
-        $this->assertNull($result['ifpaId']);
-        $this->assertSame(3, $result['userId']);
-    }
 
     /**
      * serializePlayer should produce null for userId when neither key is present

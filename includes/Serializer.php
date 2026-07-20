@@ -16,14 +16,13 @@ class Serializer {
     public static function player($row) {
         return [
             'id' => isset($row['id']) ? (int)$row['id'] : null,
-            'playerName' => $row['player_name'] ?? $row['playerName'] ?? null,
-            'ifpaId' => $row['ifpa_id'] ?? $row['ifpaId'] ?? null,
+            'playerName' => $row['player_name'] ?? null,
+            'ifpaId' => $row['ifpa_id'] ?? null,
             'matchplayId' => $row['matchplay_id'] ?? null,
             'userRole' => $row['role'] ?? null,
             'username' => $row['username'] ?? null,
             'email' => $row['email'] ?? null,
-            'userId' => isset($row['user_id']) ? (int)$row['user_id'] 
-                : (isset($row['userId']) ? (int)$row['userId'] : null)
+            'userId' => isset($row['user_id']) ? (int)$row['user_id'] : null
         ];
     }
 

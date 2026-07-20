@@ -52,6 +52,7 @@ class LeagueController extends ApiController {
                     }
 
                     $this->leagueService->addPlayerToLeague((int)$this->input['leagueId'], (int)$this->input['playerId']);
+                    $this->sendJson(['success' => true]);
 
                 } else if ($this->task === 'team') {
                     if (empty($this->input['leagueId']) || empty($this->input['teamId'])) {
@@ -66,8 +67,9 @@ class LeagueController extends ApiController {
                     }
 
                     $this->leagueService->addTeamToLeague((int)$this->input['leagueId'], (int)$this->input['teamId']);
+                    $this->sendJson(['success' => true]);
 
-                } else if ($this->task === 'startSeason') {
+                } else if ($this->task === 'startSeason' || $this->task === 'start_season') {
                     if (empty($this->input['leagueId'])) {
                         $this->sendError('leagueId is required', 400);
                     }
@@ -80,8 +82,18 @@ class LeagueController extends ApiController {
                     }
 
                     $this->leagueService->startSeason((int)$this->input['leagueId']);
+                    $this->sendJson(['success' => true]);
 
-                } else if ($this->task === 'startPlayoffs') {
+                } else if ($this->task === 'updateSeason' || $this->task === 'update_season') {
+                    if (empty($this->input['leagueId'])) {
+                        $this->sendError('leagueId is required', 400);
+                    }
+
+                    $this->validateTDAccess();
+                    $this->leagueService->updateSeason((int)$this->input['leagueId']);
+                    $this->sendJson(['success' => true]);
+
+                } else if ($this->task === 'startPlayoffs' || $this->task === 'start_playoffs') {
                     if (empty($this->input['leagueId']) || empty($this->input['seeds']) || !isset($this->input['seriesLength'])) {
                         $this->sendError('leagueId, seeds, and seriesLength are required', 400);
                     }
@@ -92,6 +104,7 @@ class LeagueController extends ApiController {
                         $this->input['seeds'],
                         (int)$this->input['seriesLength']
                     );
+                    $this->sendJson(['success' => true]);
 
                 } else if ($this->task === 'fixture') {
                     if (empty($this->input['leagueId']) || empty($this->input['eventName'])) {

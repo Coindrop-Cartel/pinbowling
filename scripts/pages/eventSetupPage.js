@@ -149,10 +149,59 @@ export async function initEventSetupPage() {
     nameInput.after(machineSelect);
   }
 
+  const getMachineTargets = (machineName, machineId, format) => {
+    const locMachine = currentSuggestedMachines.find(m => 
+      (machineId && String(m.machineId || m.id) === String(machineId)) || 
+      (machineName && m.machineName === machineName)
+    );
+    
+    if (locMachine) {
+      const locScores = locMachine.scores?.[format];
+      if (locScores && (locScores.targetEasy > 0 || locScores.targetMed > 0 || locScores.targetHard > 0)) {
+        return {
+          easy: locScores.targetEasy,
+          med: locScores.targetMed,
+          hard: locScores.targetHard
+        };
+      }
+      if ((!locMachine.scores || locMachine.format === format) && (locMachine.targetEasy > 0 || locMachine.targetMed > 0 || locMachine.targetHard > 0)) {
+        return {
+          easy: locMachine.targetEasy,
+          med: locMachine.targetMed,
+          hard: locMachine.targetHard
+        };
+      }
+    }
+
+    const masterMach = masterMachines.find(mm => 
+      (machineId && String(mm.id) === String(machineId)) || 
+      (machineName && mm.machineName === machineName)
+    );
+    
+    if (masterMach) {
+      const masterScores = masterMach.scores?.[format];
+      if (masterScores) {
+        return {
+          easy: masterScores.targetEasy,
+          med: masterScores.targetMed,
+          hard: masterScores.targetHard
+        };
+      }
+      if ((!masterMach.scores || masterMach.format === format) && (masterMach.targetEasy > 0 || masterMach.targetMed > 0 || masterMach.targetHard > 0)) {
+        return {
+          easy: masterMach.targetEasy,
+          med: masterMach.targetMed,
+          hard: masterMach.targetHard
+        };
+      }
+    }
+
+    return null;
+  };
+
   const updateQuickFillState = (machineName) => {
     const format = ScoringFormats.resolve(eventMatch?.scoringFormat || league?.scoringFormat);
-    const match = currentSuggestedMachines.find(m => m.machineName === machineName && m.format === format);
-    selectedMachineTargets = match ? { easy: match.targetEasy, med: match.targetMed, hard: match.targetHard } : null;
+    selectedMachineTargets = getMachineTargets(machineName, null, format);
     
     btnEasy.disabled = !selectedMachineTargets?.easy;
     btnMed.disabled = !selectedMachineTargets?.med;
@@ -396,8 +445,8 @@ export async function initEventSetupPage() {
           btn.onclick = () => {
             const type = btn.dataset.type;
             const format = ScoringFormats.resolve(eventMatch?.scoringFormat || league?.scoringFormat);
-            const match = currentSuggestedMachines.find(m => String(m.machineId || m.id) === String(round.machineId) && m.format === format);
-            const val = match ? match['target' + type.charAt(0).toUpperCase() + type.slice(1)] : null;
+            const targets = getMachineTargets(null, round.machineId, format);
+            const val = targets ? targets[type] : null;
             if (val) {
               s10.value = formatNumber(val);
               s1.value = formatNumber(Math.floor(val / 10));
