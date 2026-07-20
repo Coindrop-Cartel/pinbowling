@@ -6,9 +6,10 @@ import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { showDialog } from '@ui/dialogs.js';
 import { renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { filterLeaguesForUser } from '@services/auth.js';
-import { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer, groupScoresByPlayer, groupMatchupsByEvent } from '@services/normalizer.js';
-import { calculateSeasonSummary, calculateBaseballRecords } from '@services/seasonCalculator.js';
+import { normalizeTargets, normalizeScores, groupScoresByPlayer } from '@services/normalizer.js';
+import { calculateSeasonSummary, calculateBaseballRecords, fetchSeasonData } from '@services/seasonCalculator.js';
 import { TvModeManager } from '@ui/tvMode.js';
+import { renderStandingsTable } from '@scripts/renderers/standingsTableRenderer.js';
 
 /**
  * Logic for the Standings/Scoreboard page showing player rankings and season summaries.
@@ -184,21 +185,10 @@ export async function initStandingsPage() {
 
     const events = league?.events || [];
 
-    const [rawScores, allLeagueTargets, leagueMatchupsByEvent] = await Promise.all([
-      PB_API.scores.get(null, null, leagueId),
-      PB_API.machines.getTargets(null, leagueId),
-      engine.getMatchupDescription(1)
-        ? Promise.all(events.map(e => PB_API.matchups.get(e.id).catch(() => []))).then(results => groupMatchupsByEvent(results.flat()))
-        : Promise.resolve({})
-    ]);
-
-    const normalizedLeagueTargets = normalizeTargets(allLeagueTargets);
-    const targetsByEvent = groupTargetsByEvent(normalizedLeagueTargets);
-    const normalizedScores = normalizeScores(rawScores);
-    const scoresByEventAndPlayer = groupScoresByEventAndPlayer(normalizedScores);
+    const { targetsByEvent, scoresByEventAndPlayer, matchupsByEvent } = await fetchSeasonData(leagueId, events, PB_API, engine);
     
     try {
-      const result = calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, matchupsByEvent: leagueMatchupsByEvent, engine, selectedPlayerIds });
+      const result = calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, matchupsByEvent, engine, selectedPlayerIds });
       const rows = result.rows;
 
       if (!isTeamLeague) renderFilterUI(players);
@@ -208,70 +198,20 @@ export async function initStandingsPage() {
         tvTitle.textContent = `${league?.name || 'League'} - Season Summary`;
       }
 
-      const playerLabel = isTeamLeague ? 'Team' : 'Player';
-
-      const supportsMatchups = !!engine.getMatchupDescription(1);
-      if (isBaseball && !isTeamLeague) {
-        if (standingsHeader) {
-          standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-left">${playerLabel}</th>${events.map((e, i) => `<th class="text-center">W${i + 1}</th>`).join('')}<th class="text-center">Record</th><th class="text-center">Diff</th><th class="text-center">Win %</th></tr>`;
-        }
-        if (standingsBody) {
-          standingsBody.innerHTML = rows.map((res, idx) => {
-            const entityName = escapeHTML(res.entity.playerName);
-            const rec = res.record || { wins: 0, losses: 0, ties: 0, runDiff: 0, winRate: 0 };
-            const diffSign = rec.runDiff > 0 ? '+' : '';
-            const winPct = rec.winRate.toFixed(3);
-
-            const eventsHtml = events.map(e => {
-              const eventData = res.eventTotals[e.id];
-              if (!eventData || eventData.displayValue === undefined) return `<td class="standings-round">-</td>`;
-              return `<td class="standings-round">${eventData.displayValue}</td>`;
-            }).join('');
-
-            return `
-              <tr>
-                <td class="text-center">${idx + 1}</td>
-                <td class="player-name-cell">${entityName}</td>
-                ${eventsHtml}
-                <td class="text-center">${rec.wins}-${rec.losses}${rec.ties > 0 ? `-${rec.ties}` : ''}</td>
-                <td class="text-center">${diffSign}${rec.runDiff}</td>
-                <td class="standings-total text-center">${winPct}</td>
-              </tr>`;
-          }).join('');
-        }
-      } else {
-        if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${events.map((e, i) => `<th class="text-center">${i + 1}</th>`).join('')}${supportsMatchups ? '<th class="text-center">W-L</th>' : ''}<th class="text-center">Total</th></tr>`;
-        
-        if (standingsBody) {
-          standingsBody.innerHTML = rows.map((res, idx) => {
-            const entityName = isTeamLeague ? escapeHTML(res.entity.name) : escapeHTML(res.entity.playerName);
-            
-            const eventsHtml = events.map(e => {
-              const eventData = res.eventTotals[e.id];
-              if (!eventData || eventData.displayValue === undefined) return `<td class="standings-round">-</td>`;
-              const spanClass = eventData.isDropped ? ' class="dropped-score"' : '';
-              return `<td class="standings-round"><span${spanClass}>${eventData.displayValue}</span></td>`;
-            }).join('');
-
-            const totalDisplay = league?.seasonScoring === 'weekly' 
-              ? `${res.totalSeasonPoints} pts` 
-              : Engine.formatTotalScore(res.totalSeasonPoints);
-
-            const recordCell = supportsMatchups && res.displayRecord
-              ? `<td class="standings-record text-center">${res.displayRecord}</td>`
-              : (supportsMatchups ? '<td class="standings-record text-center">-</td>' : '');
-
-            return `
-              <tr>
-                <td>${idx + 1}</td>
-                <td class="player-name-cell">${entityName}</td>
-                ${eventsHtml}
-                ${recordCell}
-                <td class="standings-total">${totalDisplay}</td>
-              </tr>`;
-          }).join('');
-        }
-      }
+      renderStandingsTable({
+        headerEl: standingsHeader,
+        bodyEl: standingsBody,
+        isSummary: true,
+        league,
+        event: null,
+        isBaseball,
+        isTeamLeague,
+        rows,
+        columns: events,
+        engine,
+        supportsMatchups: !!engine.getMatchupDescription(1),
+        tvModeManager
+      });
 
       if (standingsEmpty) standingsEmpty.classList.add('hidden');
       if (standingsWrapper) standingsWrapper.classList.remove('hidden');
@@ -411,83 +351,34 @@ export async function initStandingsPage() {
     });
 
     const isTeamLeague = league?.participants === 'team';
-    const playerLabel = isTeamLeague ? 'Team' : 'Player';
-
     const supportsMatchups = !!Engine.getMatchupDescription(1);
-    if (standingsHeader) standingsHeader.innerHTML = `<tr><th class="text-center">#</th><th class="text-center">${playerLabel}</th>${machines.map(m => `<th class="text-center">${m.orderNumber}</th>`).join('')}${supportsMatchups ? '<th class="text-center">W-L</th>' : ''}<th class="text-center">Total</th></tr>`;
-    
-    if (standingsBody) {
-      if (isTeamLeague) {
-        const leagueTeamIds = new Set((league.teams || []).map(t => t.id));
-        const teams = allTeamsData.filter(t => leagueTeamIds.has(t.id));
 
-        const teamResults = teams.map(team => {
-          const memberIds = new Set(team.members.map(m => m.id));
-          const teamMembers = rows.filter(r => memberIds.has(r.player.id));
-          const teamTotal = teamMembers.reduce((sum, m) => sum + m.total, 0);
-          return { team, teamMembers, teamTotal };
-        }).sort((a, b) => Engine.compareScores(a.teamTotal, b.teamTotal));
-
-        standingsBody.innerHTML = teamResults.map((tr, idx) => {
-          const teamHeader = `<tr class="team-header"><td class="text-center">${idx + 1}</td><td colspan="${machines.length + 1}">${escapeHTML(tr.team.name)}</td><td class="standings-total">${Engine.formatTotalScore(tr.teamTotal)}</td></tr>`;
-          const memberRows = tr.teamMembers.map(res => {
-            let rowHasUpdate = false;
-            const turnsHtml = res.turnResults.map(t => {
-              const scoreKey = `${res.player.id}-${t.orderNumber}`;
-              const isNew = lastScoreState.has(scoreKey) && lastScoreState.get(scoreKey) !== currentScoreState.get(scoreKey);
-              if (isNew) rowHasUpdate = true;
-              return `<td class="standings-round ${t.played ? 'has-score' : 'no-score'} ${(tvModeManager.isTvMode && isNew) ? 'score-just-updated' : ''}"><div class="standings-mark">${t.displayMark}</div><div class="standings-round-score">${t.displayRoundTotal}</div></td>`;
-            }).join('');
-              return `<tr><td></td><td class="player-name-cell player-name-indent">${escapeHTML(res.player.playerName)}</td>${turnsHtml}<td class="standings-total ${rowHasUpdate ? 'score-just-updated' : ''}">${res.totalDisplay}</td></tr>`;
-          }).join('');
-          return teamHeader + memberRows;
-        }).join('');
-      } else {
-        let baseballRecordsMap = null;
-        if (supportsMatchups && eventMatchups.length > 0) {
-          const playersForRecords = filteredPlayers.map(p => ({ id: p.id }));
-          const matchupsByEvent = { [eventId]: eventMatchups };
-          const scoresByEvent = { [eventId]: scoresByPlayer };
-          const singleEventTargets = { [eventId]: machines };
-          baseballRecordsMap = calculateBaseballRecords(playersForRecords, [{ id: eventId }], matchupsByEvent, scoresByEvent, singleEventTargets, Engine);
-        }
-
-        const sortedRows = rows.sort((a, b) => {
-          if (supportsMatchups && baseballRecordsMap) {
-            const recA = baseballRecordsMap[a.player.id];
-            const recB = baseballRecordsMap[b.player.id];
-            if (recA && recB) {
-              const rateDiff = recB.winRate - recA.winRate;
-              if (Math.abs(rateDiff) > 0.001) return rateDiff;
-            }
-          }
-          return Engine.compareScores(a.total, b.total);
-        });
-        standingsBody.innerHTML = sortedRows.map((res, idx) => {
-          let rowHasUpdate = false;
-            const turnsHtml = res.turnResults.map(t => {
-              const scoreKey = `${res.player.id}-${t.orderNumber}`;
-              const isNew = lastScoreState.has(scoreKey) && lastScoreState.get(scoreKey) !== currentScoreState.get(scoreKey);
-              if (isNew) rowHasUpdate = true;
-              return `<td class="standings-round ${t.played ? 'has-score' : 'no-score'} ${(tvModeManager.isTvMode && isNew) ? 'score-just-updated' : ''}"><div class="standings-mark">${t.displayMark}</div><div class="standings-round-score">${t.displayRoundTotal}</div></td>`;
-            }).join('');
-
-          const rec = baseballRecordsMap?.[res.player.id];
-          const recordCell = supportsMatchups
-            ? `<td class="standings-record text-center">${rec ? `${rec.wins}-${rec.losses}${rec.ties > 0 ? `-${rec.ties}` : ''}` : '-'}</td>`
-            : '';
-
-          return `
-          <tr>
-            <td>${idx + 1}</td>
-            <td class="player-name-cell">${escapeHTML(res.player.playerName)}</td>
-            ${turnsHtml}
-            ${recordCell}
-            <td class="standings-total ${rowHasUpdate ? 'score-just-updated' : ''}">${res.totalDisplay}</td>
-          </tr>`;
-        }).join('');
-      }
-    }
+    renderStandingsTable({
+      headerEl: standingsHeader,
+      bodyEl: standingsBody,
+      isSummary: false,
+      league,
+      event,
+      isBaseball: format === ScoringFormats.BASEBALL,
+      isTeamLeague,
+      rows,
+      columns: machines,
+      engine: Engine,
+      supportsMatchups,
+      baseballRecordsMap: (supportsMatchups && eventMatchups.length > 0)
+        ? (() => {
+            const playersForRecords = filteredPlayers.map(p => ({ id: p.id }));
+            const matchupsByEvent = { [eventId]: eventMatchups };
+            const scoresByEvent = { [eventId]: scoresByPlayer };
+            const singleEventTargets = { [eventId]: machines };
+            return calculateBaseballRecords(playersForRecords, [{ id: eventId }], matchupsByEvent, scoresByEvent, singleEventTargets, Engine);
+          })()
+        : null,
+      allTeamsData,
+      tvModeManager,
+      lastScoreState,
+      currentScoreState
+    });
 
     lastScoreState = currentScoreState;
 
@@ -498,6 +389,7 @@ export async function initStandingsPage() {
   tournamentSelector = await initTournamentSelector('.tournament-selector-container', { 
     onRefresh: refresh, 
     existingLeagues: allLeagues, // Pass the full list of leagues
-    currentUser: currentUser // Pass the current user for filtering
+    currentUser: currentUser, // Pass the current user for filtering
+    filterLeagues: false
   });
 }

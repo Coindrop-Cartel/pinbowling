@@ -866,6 +866,31 @@ describe('initTournamentSelector (additional)', () => {
     expect(select.innerHTML).toContain('Session League');
   });
 
+  it('should not filter out leagues with only registered players when filterLeagues is false and user is null', async () => {
+    const leaguesWithOnlyRegistered = [
+      { id: '1', name: 'Registered Only League', type: 'standard', events: [], players: [{ id: '101', userId: 5 }] }
+    ];
+    await initTournamentSelector('.tournament-selector-container', { 
+      existingLeagues: leaguesWithOnlyRegistered, 
+      filterLeagues: false,
+      currentUser: null
+    });
+    const select = document.querySelector('.league-select-shared');
+    expect(select.innerHTML).toContain('Registered Only League');
+  });
+
+  it('should filter out leagues with only registered players by default (filterLeagues = true) when user is null', async () => {
+    const leaguesWithOnlyRegistered = [
+      { id: '1', name: 'Registered Only League', type: 'standard', events: [], players: [{ id: '101', userId: 5 }] }
+    ];
+    await initTournamentSelector('.tournament-selector-container', { 
+      existingLeagues: leaguesWithOnlyRegistered,
+      currentUser: null
+    });
+    const select = document.querySelector('.league-select-shared');
+    expect(select.innerHTML).not.toContain('Registered Only League');
+  });
+
   it('should pre-populate league and events when active IDs are set', async () => {
     getActiveLeagueId.mockReturnValue('1');
     getActiveEventId.mockReturnValue('10');

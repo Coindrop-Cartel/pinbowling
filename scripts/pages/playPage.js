@@ -9,6 +9,7 @@ import { showDialog, showPlayerSelectionDialog } from '@ui/dialogs.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
 import { renderPreviewRow } from '@scripts/renderers/roundRowRenderer.js';
 import { generateSessionName, selectRandomMachines, getTargetScoreForDifficulty } from '@services/sessionGenerator.js';
+import { wireTargetRow } from '@scripts/renderers/targetRowRenderer.js';
 
 /**
  * Logic for the Play page where players enter their scores for the current session.
@@ -423,87 +424,19 @@ export async function initPlayPage() {
           renderPreview();
         }
       });
-      const s10 = row.querySelector('.score10-input');
-      const s1 = row.querySelector('.score1-input');
-      if (s1) s1.dataset.allowDecimal = engine.getValue2AllowsDecimal?.() === true ? 'true' : 'false';
-      if (s10) applyScoreFormatting(s10);
-      if (s1) applyScoreFormatting(s1);
-
-      // Immediate data updates as user types
-      const updateValues = () => {
-        if (s10) frame.value1 = parseFormattedNumber(s10.value);
-        if (s1) frame.value2 = parseFormattedNumber(s1.value, engine.getValue2AllowsDecimal?.() === true);
-        frame.values = engine.buildRoundValues(frame.value1, frame.value2, frame.scaling);
-
-        // Update the visual grid without re-rendering the whole row to maintain input focus
-        const container = row.querySelector('.preview-values-container');
-        if (container) {
-            container.innerHTML = renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2);
-        }
-      };
-
-      if (s10) s10.oninput = updateValues;
-      if (s1) s1.oninput = updateValues;
-
-      // Searchable Select initialization (only if expanded)
-      if (isExpanded) {
-        const mSearch = row.querySelector('.row-machine-search');
-        const mSelect = row.querySelector('.row-machine-select');
-        
-        const mSearchInstance = createSearchableSelect(mSearch, mSelect, currentLocMachines, {
-          valueKey: 'machineId',
-          labelKey: 'machineName',
-          placeholder: '-- Select Machine --',
-          onSelect: (val) => {
-            const match = currentLocMachines.find(m => String(m.machineId) === String(val));
-            if (match) {
-              frame.machineName = match.machineName;
-              frame.machineId = Number(match.machineId);
-              frame.targets = { easy: match.targetEasy, med: match.targetMed, hard: match.targetHard };
-              updateValues();
-              renderPreview(); 
-            }
-          }
-        });
-
-        // Show all options unfiltered, then pre-select the assigned machine
-        mSearchInstance.updateOptions('');
-        if (frame.machineId) {
-          mSelect.value = String(frame.machineId);
-          mSearch.value = frame.machineName || '';
-        }
-        mSearch.addEventListener('focus', (e) => e.target.select());
-        setTimeout(() => mSearch.focus(), 50);
-
-        // Difficulty fills
-        row.querySelectorAll('.qfill').forEach(btn => {
-          btn.onclick = () => {
-            const type = btn.dataset.type;
-            const val = frame.targets?.[type];
-            if (val) {
-              const { value1, value2 } = engine.getInitialValues(val);
-              frame.value1 = value1;
-              frame.value2 = value2;
-              if (s10) s10.value = formatNumber(frame.value1);
-              if (s1) s1.value = formatNumber(frame.value2);
-              updateValues();
-              renderPreview();
-            }
-          };
-        });
-
-        // Scaling toggles
-        row.querySelectorAll('.scaling-btn').forEach(btn => {
-          btn.onclick = () => {
-            const newScale = btn.dataset.scale;
-            if (frame.scaling !== newScale) {
-              frame.scaling = newScale;
-              updateValues();
-              renderPreview();
-            }
-          }
-        });
-      }
+      wireTargetRow(row, frame, {
+        engine,
+        machines: currentLocMachines,
+        onUpdate: () => {},
+        onSelectMachine: (f, match) => {
+          f.targets = { easy: match.targetEasy, med: match.targetMed, hard: match.targetHard };
+        },
+        afterSelectMachine: () => renderPreview(),
+        afterQFill: () => renderPreview(),
+        afterScalingChange: () => renderPreview(),
+        clearSearchOnFocus: false,
+        focusSearchOnExpand: true
+      });
     });
   }
 

@@ -11,6 +11,7 @@ import { printMachineScores } from '@ui/printing.js';
 import { createSearchableSelect, setupSortableList, createExpandableRow, initReadOnlyTournamentDisplay } from '@ui/selectors.js';
 import { normalizeTargets } from '@services/normalizer.js';
 import { detectScalingFromValues } from '@scripts/utils.js';
+import { wireTargetRow } from '@scripts/renderers/targetRowRenderer.js';
 
 /**
  * Logic for configuring events within a league (dates, machines, target scores).
@@ -394,77 +395,18 @@ export async function initEventSetupPage() {
         }
       });
 
-      const s10 = row.querySelector('.score10-input');
-      const s1 = row.querySelector('.score1-input');
-      if (s1) s1.dataset.allowDecimal = Engine.getValue2AllowsDecimal?.() === true ? 'true' : 'false';
-      applyScoreFormatting(s10);
-      applyScoreFormatting(s1);
-
-      const updateValues = () => {
-        round.value1 = parseFormattedNumber(s10.value);
-        round.value2 = parseFormattedNumber(s1.value, Engine.getValue2AllowsDecimal?.() === true);
-
-        const currentScaling = row.querySelector('.scaling-btn.btn-standard').dataset.scale;
-        round.values = Engine.buildRoundValues(round.value1, round.value2, currentScaling);
-        
-        const container = row.querySelector('.preview-values-container');
-        if (container) container.innerHTML = renderThresholdGrid(Engine.filterThresholds(round.values), formatNumber, Engine, round.value1, round.value2);
-        
-        checkListDirty();
-      };
-
-      s10.oninput = updateValues;
-      s1.oninput = updateValues;
-
-      if (isExpanded) {
-        const mSearch = row.querySelector('.row-machine-search');
-        const mSelect = row.querySelector('.row-machine-select');
-        
-        const mSearchInstance = createSearchableSelect(mSearch, mSelect, currentSuggestedMachines, {
-          valueKey: 'machineId',
-          labelKey: 'machineName',
-          placeholder: '-- Select Machine --',
-          onSelect: (val) => {
-            const match = currentSuggestedMachines.find(m => String(m.machineId) === String(val));
-            if (match) {
-              round.machineName = match.machineName;
-              round.machineId = Number(match.machineId);
-              updateValues();
-              checkListDirty();
-              render();
-            }
-          }
-        });
-
-        // Ensure dropdown populates immediately on focus
-        mSearch.value = '';
-        mSearchInstance.updateOptions('');
-        mSearch.addEventListener('focus', (e) => e.target.select());
-
-        row.querySelectorAll('.qfill').forEach(btn => {
-          btn.onclick = () => {
-            const type = btn.dataset.type;
-            const format = ScoringFormats.resolve(eventMatch?.scoringFormat || league?.scoringFormat);
-            const targets = getMachineTargets(null, round.machineId, format);
-            const val = targets ? targets[type] : null;
-            if (val) {
-              s10.value = formatNumber(val);
-              s1.value = formatNumber(Math.floor(val / 10));
-              updateValues();
-              checkListDirty();
-            }
-          };
-        });
-
-        row.querySelectorAll('.scaling-btn').forEach(btn => {
-          btn.onclick = () => {
-            row.querySelectorAll('.scaling-btn').forEach(b => b.classList.replace('btn-standard', 'secondary'));
-            btn.classList.replace('secondary', 'btn-standard');
-            updateValues();
-            checkListDirty();
-          }
-        });
-      }
+      wireTargetRow(row, round, {
+        engine: Engine,
+        machines: currentSuggestedMachines,
+        onUpdate: () => checkListDirty(),
+        getMachineTargets: (machineId) => {
+          const format = ScoringFormats.resolve(eventMatch?.scoringFormat || league?.scoringFormat);
+          return getMachineTargets(null, machineId, format);
+        },
+        afterSelectMachine: () => render(),
+        clearSearchOnFocus: true,
+        focusSearchOnExpand: false
+      });
     });
   }
 

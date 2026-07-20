@@ -1,4 +1,13 @@
-import { groupTargetsByEvent, buildScoreMapFromRows, groupScoresByPlayer, buildBaseballScoreMapForPlayer } from '@services/normalizer.js';
+import { 
+  groupTargetsByEvent, 
+  buildScoreMapFromRows, 
+  groupScoresByPlayer, 
+  buildBaseballScoreMapForPlayer,
+  normalizeTargets,
+  normalizeScores,
+  groupScoresByEventAndPlayer,
+  groupMatchupsByEvent 
+} from '@services/normalizer.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 
 /**
@@ -304,4 +313,30 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
   });
 
   return { rows, isTeamLeague, baseballRecords };
+}
+
+/**
+ * Fetches and normalizes all targets, scores, and matchups required for season summary calculation.
+ *
+ * @param {number|string} leagueId - ID of the league
+ * @param {Object[]} events - Array of events for the league
+ * @param {Object} PB_API - API client wrapper
+ * @param {Object} engine - Active scoring engine instance
+ * @returns {Promise<{ targetsByEvent: Object, scoresByEventAndPlayer: Object, matchupsByEvent: Object }>}
+ */
+export async function fetchSeasonData(leagueId, events, PB_API, engine) {
+  const [rawScores, allLeagueTargets, leagueMatchupsByEvent] = await Promise.all([
+    PB_API.scores.get(null, null, leagueId),
+    PB_API.machines.getTargets(null, leagueId),
+    engine.getMatchupDescription(1)
+      ? Promise.all(events.map(e => PB_API.matchups.get(e.id).catch(() => []))).then(results => groupMatchupsByEvent(results.flat()))
+      : Promise.resolve({})
+  ]);
+
+  const normalizedLeagueTargets = normalizeTargets(allLeagueTargets);
+  const targetsByEvent = groupTargetsByEvent(normalizedLeagueTargets);
+  const normalizedScores = normalizeScores(rawScores);
+  const scoresByEventAndPlayer = groupScoresByEventAndPlayer(normalizedScores);
+
+  return { targetsByEvent, scoresByEventAndPlayer, matchupsByEvent: leagueMatchupsByEvent };
 }

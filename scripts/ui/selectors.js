@@ -174,7 +174,7 @@ export function renderActionSummary(container, title, actions = []) {
  * @param {Array<import('@scripts/types.js').League>|null} [options.existingLeagues=null] - Pre-fetched leagues to avoid an API call.
  * @returns {Promise<void>}
  */
-export async function initTournamentSelector(container, { onRefresh, typeFilter = 'standard', showEvents = true, existingLeagues = null, currentUser = null } = {}) {
+export async function initTournamentSelector(container, { onRefresh, typeFilter = 'standard', showEvents = true, existingLeagues = null, currentUser = null, filterLeagues = true } = {}) {
   const target = typeof container === 'string' ? document.querySelector(container) : container;
   if (!target) return;
   const initialEventId = getActiveEventId();
@@ -184,7 +184,7 @@ export async function initTournamentSelector(container, { onRefresh, typeFilter 
   // Apply user-based filtering (e.g. unregistered users only see leagues with guests)
   const getFilteredLeagues = (list) => {
     const currentActiveId = getActiveLeagueId();
-    let filtered = filterLeaguesForUser(list, currentUser);
+    let filtered = filterLeagues ? filterLeaguesForUser(list, currentUser) : list;
     return typeFilter 
       ? filtered.filter(l => l.type === typeFilter || String(l.id) === String(currentActiveId)) 
       : filtered;
