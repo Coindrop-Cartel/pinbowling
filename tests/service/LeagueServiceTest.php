@@ -51,4 +51,20 @@ class LeagueServiceTest extends TestCase {
         $this->assertIsArray($result['events']);
         $this->assertEmpty($result['events']);
     }
+
+    public function testSerializeLeagueWithLocationIds() {
+        $dbRow = [
+            'id' => 1,
+            'name' => 'Location Restricted League',
+            'type' => 'standard',
+            'start_date' => '2024-01-01',
+            'scoring_format' => 'bowling',
+            'location_ids' => [5, 12, 19]
+        ];
+
+        $result = Serializer::league($dbRow);
+
+        $this->assertEquals('Location Restricted League', $result['name']);
+        $this->assertEquals([5, 12, 19], $result['locationIds']);
+    }
 }

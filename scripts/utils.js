@@ -124,19 +124,19 @@ export function setCurrentPlayerIdSilent(playerId) {
   window.history.replaceState({}, '', url);
 }
 
-/** @returns {string|null} The currently active matchup ID from the URL. */
-export const getActiveMatchupId = () => getUrlParam('matchupId');
+/** @returns {string|null} The currently active event matchup ID from the URL. */
+export const getActiveEventMatchupId = () => getUrlParam('eventMatchupId');
 
-/** @param {string|null} id - Sets the active matchup ID in the URL. */
-export function setActiveMatchupId(id) {
-  setUrlParam('matchupId', id);
+/** @param {string|null} id - Sets the active event matchup ID in the URL. */
+export function setActiveEventMatchupId(id) {
+  setUrlParam('eventMatchupId', id);
 }
 
-/** Sets the active matchup ID in the URL silently. */
-export function setActiveMatchupIdSilent(id) {
+/** Sets the active event matchup ID in the URL silently. */
+export function setActiveEventMatchupIdSilent(id) {
   const url = new URL(window.location.href);
-  if (id) url.searchParams.set('matchupId', id);
-  else url.searchParams.delete('matchupId');
+  if (id) url.searchParams.set('eventMatchupId', id);
+  else url.searchParams.delete('eventMatchupId');
   window.history.replaceState({}, '', url);
 }
 

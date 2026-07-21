@@ -29,7 +29,7 @@ class SeasonService {
             $pdo->beginTransaction();
             
             // 1. Fetch league details directly
-            $stmt = $pdo->prepare('SELECT status, start_date, weeks_in_season, innings_per_game FROM leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT status, start_date, weeks_in_season, matchups_per_game FROM leagues WHERE id = ?');
             $stmt->execute([$leagueId]);
             $league = $stmt->fetch();
             if (!$league) {
@@ -44,7 +44,7 @@ class SeasonService {
                 throw new \Exception("Weeks in season must be greater than 0.");
             }
             
-            $inningsPerGame = (int)($league['innings_per_game'] ?? 2);
+            $inningsPerGame = (int)($league['matchups_per_game'] ?? 2);
             
             // Fetch roster
             $stmt = $pdo->prepare(
@@ -59,6 +59,18 @@ class SeasonService {
                 throw new \Exception("At least 2 players are required to start a head-to-head season.");
             }
             
+            // Fetch assigned locations for the league
+            $llStmt = $pdo->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
+            $llStmt->execute([$leagueId]);
+            $assignedLocationIds = $llStmt->fetchAll(PDO::FETCH_COLUMN);
+
+            // Fetch machine IDs grouped by location
+            $lmStmt = $pdo->query('SELECT location_id, machine_id FROM location_machines');
+            $machinesByLocation = [];
+            foreach ($lmStmt->fetchAll() as $row) {
+                $machinesByLocation[(int)$row['location_id']][] = (int)$row['machine_id'];
+            }
+
             // 2. Fetch all available machines
             $machinesStmt = $pdo->query('SELECT id FROM machines');
             $allMachineIds = $machinesStmt->fetchAll(PDO::FETCH_COLUMN);
@@ -123,23 +135,32 @@ class SeasonService {
                     if ($awayPlayer === null) {
                         // BYE Week matchup
                         $stmt = $pdo->prepare(
-                            'INSERT INTO event_matchups (event_id, home_player_id, away_player_id, home_runs, away_runs, winner_id, status, game_number)
+                            'INSERT INTO event_matchups (event_id, player1_id, player2_id, player1_score, player2_score, winner_id, status, game_number)
                              VALUES (?, ?, NULL, 0, 0, NULL, \'completed\', 1)'
                         );
                         $stmt->execute([$eventId, $homePlayer['id']]);
                     } else {
                         // Normal pending matchup
                         $stmt = $pdo->prepare(
-                            'INSERT INTO event_matchups (event_id, home_player_id, away_player_id, status, game_number)
+                            'INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number)
                              VALUES (?, ?, ?, \'pending\', 1)'
                         );
                         $stmt->execute([$eventId, $homePlayer['id'], $awayPlayer['id']]);
                         $eventMatchupId = (int)$pdo->lastInsertId();
  
+                        // Determine the machine pool for this matchup
+                        $matchupMachineIds = $allMachineIds;
+                        if (!empty($assignedLocationIds)) {
+                            // Pick a random location from the assigned locations
+                            $chosenLocId = (int)$assignedLocationIds[array_rand($assignedLocationIds)];
+                            if (!empty($machinesByLocation[$chosenLocId])) {
+                                $matchupMachineIds = $machinesByLocation[$chosenLocId];
+                            }
+                        }
+
                         MatchupGenerator::createInningSlots(
-                            $pdo, $eventId, $eventMatchupId,
-                            $homePlayer['id'], $awayPlayer['id'],
-                            $inningsPerGame, $allMachineIds
+                            $pdo, $eventMatchupId,
+                            $inningsPerGame, $matchupMachineIds
                         );
                     }
                 }
@@ -173,7 +194,7 @@ class SeasonService {
             $pdo->beginTransaction();
             
             // 1. Fetch league details directly
-            $stmt = $pdo->prepare('SELECT status, innings_per_game FROM leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT status, matchups_per_game FROM leagues WHERE id = ?');
             $stmt->execute([$leagueId]);
             $league = $stmt->fetch();
             if (!$league) {
@@ -183,7 +204,7 @@ class SeasonService {
                 throw new \Exception("League must be active to update the season schedule.");
             }
             
-            $inningsPerGame = (int)($league['innings_per_game'] ?? 2);
+            $inningsPerGame = (int)($league['matchups_per_game'] ?? 2);
             
             // Fetch roster
             $stmt = $pdo->prepare(
@@ -198,6 +219,18 @@ class SeasonService {
                 throw new \Exception("At least 2 players are required to update a head-to-head season.");
             }
             
+            // Fetch assigned locations for the league
+            $llStmt = $pdo->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
+            $llStmt->execute([$leagueId]);
+            $assignedLocationIds = $llStmt->fetchAll(PDO::FETCH_COLUMN);
+
+            // Fetch machine IDs grouped by location
+            $lmStmt = $pdo->query('SELECT location_id, machine_id FROM location_machines');
+            $machinesByLocation = [];
+            foreach ($lmStmt->fetchAll() as $row) {
+                $machinesByLocation[(int)$row['location_id']][] = (int)$row['machine_id'];
+            }
+
             // Fetch all available machines
             $machinesStmt = $pdo->query('SELECT id FROM machines');
             $allMachineIds = $machinesStmt->fetchAll(PDO::FETCH_COLUMN);
@@ -226,7 +259,7 @@ class SeasonService {
                 // Check if any matchups for this event are completed AND not a BYE (away_player_id is NOT NULL)
                 $checkStmt = $pdo->prepare(
                     "SELECT COUNT(*) FROM event_matchups 
-                     WHERE event_id = ? AND status = 'completed' AND away_player_id IS NOT NULL"
+                     WHERE event_id = ? AND status = 'completed' AND player2_id IS NOT NULL"
                 );
                 $checkStmt->execute([$eventId]);
                 $completedCount = (int)$checkStmt->fetchColumn();
@@ -301,7 +334,7 @@ class SeasonService {
                 }
                 
                 // Delete existing matchups for this unplayed week
-                $pdo->prepare('DELETE FROM matchups WHERE event_id = ?')->execute([$eventId]);
+                $pdo->prepare('DELETE FROM matchups WHERE event_matchup_id IN (SELECT id FROM event_matchups WHERE event_id = ?)')->execute([$eventId]);
                 $pdo->prepare('DELETE FROM event_matchups WHERE event_id = ?')->execute([$eventId]);
                 
                 // Get new pairings for this week (using the weekNum)
@@ -313,23 +346,32 @@ class SeasonService {
                     if ($awayPlayer === null) {
                         // BYE Week matchup
                         $stmt = $pdo->prepare(
-                            "INSERT INTO event_matchups (event_id, home_player_id, away_player_id, home_runs, away_runs, winner_id, status, game_number)
+                            "INSERT INTO event_matchups (event_id, player1_id, player2_id, player1_score, player2_score, winner_id, status, game_number)
                              VALUES (?, ?, NULL, 0, 0, NULL, 'completed', 1)"
                         );
                         $stmt->execute([$eventId, $homePlayer['id']]);
                     } else {
                         // Normal pending matchup
                         $stmt = $pdo->prepare(
-                            "INSERT INTO event_matchups (event_id, home_player_id, away_player_id, status, game_number)
+                            "INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number)
                              VALUES (?, ?, ?, 'pending', 1)"
                         );
                         $stmt->execute([$eventId, $homePlayer['id'], $awayPlayer['id']]);
                         $eventMatchupId = (int)$pdo->lastInsertId();
  
+                        // Determine the machine pool for this matchup
+                        $matchupMachineIds = $allMachineIds;
+                        if (!empty($assignedLocationIds)) {
+                            // Pick a random location from the assigned locations
+                            $chosenLocId = (int)$assignedLocationIds[array_rand($assignedLocationIds)];
+                            if (!empty($machinesByLocation[$chosenLocId])) {
+                                $matchupMachineIds = $machinesByLocation[$chosenLocId];
+                            }
+                        }
+
                         MatchupGenerator::createInningSlots(
-                            $pdo, $eventId, $eventMatchupId,
-                            $homePlayer['id'], $awayPlayer['id'],
-                            $inningsPerGame, $allMachineIds
+                            $pdo, $eventMatchupId,
+                            $inningsPerGame, $matchupMachineIds
                         );
                     }
                 }

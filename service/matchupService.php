@@ -20,12 +20,12 @@ class MatchupService {
      */
     public function getEventMatchups(int $eventId): array {
         $stmt = $this->db->query(
-            'SELECT m.*, p.player_name AS player_name, mac.machine_name
+            'SELECT m.*, mac.machine_name, em.event_id
              FROM matchups m
-             JOIN players p ON m.player_id = p.id
+             JOIN event_matchups em ON m.event_matchup_id = em.id
              JOIN machines mac ON m.machine_id = mac.id
-             WHERE m.event_id = ?
-             ORDER BY m.order_number ASC, m.player_order ASC, m.id ASC',
+             WHERE em.event_id = ?
+             ORDER BY m.order_number ASC, m.id ASC',
             [$eventId]
         );
         return $stmt->fetchAll();
@@ -39,12 +39,11 @@ class MatchupService {
      */
     public function getMatchupInnings(int $eventMatchupId): array {
         $stmt = $this->db->query(
-            'SELECT m.*, p.player_name AS player_name, mac.machine_name
+            'SELECT m.*, mac.machine_name
              FROM matchups m
-             JOIN players p ON m.player_id = p.id
              JOIN machines mac ON m.machine_id = mac.id
              WHERE m.event_matchup_id = ?
-             ORDER BY m.order_number ASC, m.player_order ASC, m.id ASC',
+             ORDER BY m.order_number ASC, m.id ASC',
             [$eventMatchupId]
         );
         return $stmt->fetchAll();
@@ -60,13 +59,13 @@ class MatchupService {
         $stmt = $this->db->query(
             'SELECT em.*, 
                     e.league_id,
-                    p1.player_name as home_player_name, 
-                    p2.player_name as away_player_name,
+                    p1.player_name as player1_name, 
+                    p2.player_name as player2_name,
                     w.player_name as winner_name
              FROM event_matchups em
              JOIN events e ON em.event_id = e.id
-             LEFT JOIN players p1 ON em.home_player_id = p1.id
-             LEFT JOIN players p2 ON em.away_player_id = p2.id
+             LEFT JOIN players p1 ON em.player1_id = p1.id
+             LEFT JOIN players p2 ON em.player2_id = p2.id
              LEFT JOIN players w ON em.winner_id = w.id
              WHERE em.id = ?',
             [$eventMatchupId]
@@ -82,9 +81,8 @@ class MatchupService {
      */
     public function getMatchup(int $matchupId) {
         $stmt = $this->db->query(
-            'SELECT m.*, p.player_name AS player_name, mac.machine_name
+            'SELECT m.*, mac.machine_name
              FROM matchups m
-             JOIN players p ON m.player_id = p.id
              JOIN machines mac ON m.machine_id = mac.id
              WHERE m.id = ?',
             [$matchupId]
@@ -109,19 +107,16 @@ class MatchupService {
             $pdo->beginTransaction();
 
             $stmt = $pdo->prepare(
-                'INSERT INTO matchups (event_id, event_matchup_id, order_number, player_id, machine_id, player_order)
-                 VALUES (?, ?, ?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE player_id = VALUES(player_id), machine_id = VALUES(machine_id), player_order = VALUES(player_order)'
+                'INSERT INTO matchups (event_matchup_id, order_number, machine_id)
+                 VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id)'
             );
 
             foreach ($matchups as $m) {
                 $stmt->execute([
-                    $m['eventId'] ?? 0,
                     $m['eventMatchupId'] ?? null,
                     $m['orderNumber'] ?? 0,
-                    $m['playerId'] ?? 0,
-                    $m['machineId'] ?? 0,
-                    $m['playerOrder'] ?? 1
+                    $m['machineId'] ?? 0
                 ]);
             }
 
@@ -155,7 +150,7 @@ class MatchupService {
      */
     public function deleteEventMatchups(int $eventId): bool {
         $pdo = $this->db->getPdo();
-        $stmt = $pdo->prepare('DELETE FROM matchups WHERE event_id = ?');
+        $stmt = $pdo->prepare('DELETE FROM matchups WHERE event_matchup_id IN (SELECT id FROM event_matchups WHERE event_id = ?)');
         return $stmt->execute([$eventId]);
     }
 }

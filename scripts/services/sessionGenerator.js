@@ -37,11 +37,18 @@ export function selectRandomMachines(machines, count) {
  * Difficulty is mapped to a machine property key (e.g. 'easy' → 'targetEasy').
  * @param {Object} machine - Machine object with targetEasy/targetMed/targetHard properties
  * @param {string} difficulty - Difficulty level ('easy', 'med', or 'hard')
- * @returns {number} Target score for the difficulty, or 1000000 as fallback
+ * @param {string} [format='bowling'] - The format to lookup targets for
+ * @returns {number} Target score for the difficulty, or 1000000 (5000000 for baseball) as fallback
  */
-export function getTargetScoreForDifficulty(machine, difficulty) {
+export function getTargetScoreForDifficulty(machine, difficulty, format = 'bowling') {
     const key = 'target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-    return machine[key] || 1000000;
+    if (machine.scores && machine.scores[format] && machine.scores[format][key]) {
+        return machine.scores[format][key];
+    }
+    if ((!machine.format || machine.format === format) && machine[key]) {
+        return machine[key];
+    }
+    return (format === 'baseball' ? 5000000 : 1000000);
 }
 
 

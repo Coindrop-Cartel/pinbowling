@@ -847,6 +847,88 @@ try {
         echo "Making leagues.innings_per_game nullable already applied.\n";
     }
 
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'league_locations_junction_table'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `league_locations` (
+            `league_id` INT NOT NULL,
+            `location_id` INT NOT NULL,
+            PRIMARY KEY (`league_id`, `location_id`),
+            CONSTRAINT `fk_ll_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE,
+            CONSTRAINT `fk_ll_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('league_locations_junction_table')")->execute();
+        echo "✓ Created league_locations junction table successfully.\n";
+    } else {
+        echo "League locations junction table migration already applied.\n";
+    }
+
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'refactor_head2head_matchups'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        try {
+            $pdo->exec("ALTER TABLE `matchups` DROP FOREIGN KEY `fk_matchup_player`");
+        } catch (\PDOException $e) {}
+        try {
+            $pdo->exec("ALTER TABLE `matchups` DROP FOREIGN KEY `fk_matchup_event`");
+        } catch (\PDOException $e) {}
+        try {
+            $pdo->exec("ALTER TABLE `matchups` DROP INDEX `unique_matchups_key`");
+        } catch (\PDOException $e) {}
+
+        $hasHomePlayerId = $pdo->query("SHOW COLUMNS FROM `event_matchups` LIKE 'home_player_id'")->fetch();
+        if ($hasHomePlayerId) {
+            $pdo->exec("ALTER TABLE `event_matchups` CHANGE COLUMN `home_player_id` `player1_id` INT NOT NULL");
+        }
+        $hasAwayPlayerId = $pdo->query("SHOW COLUMNS FROM `event_matchups` LIKE 'away_player_id'")->fetch();
+        if ($hasAwayPlayerId) {
+            $pdo->exec("ALTER TABLE `event_matchups` CHANGE COLUMN `away_player_id` `player2_id` INT DEFAULT NULL");
+        }
+        $hasHomeRuns = $pdo->query("SHOW COLUMNS FROM `event_matchups` LIKE 'home_runs'")->fetch();
+        if ($hasHomeRuns) {
+            $pdo->exec("ALTER TABLE `event_matchups` CHANGE COLUMN `home_runs` `player1_score` INT DEFAULT 0");
+        }
+        $hasAwayRuns = $pdo->query("SHOW COLUMNS FROM `event_matchups` LIKE 'away_runs'")->fetch();
+        if ($hasAwayRuns) {
+            $pdo->exec("ALTER TABLE `event_matchups` CHANGE COLUMN `away_runs` `player2_score` INT DEFAULT 0");
+        }
+
+        $hasPlayerOrder = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'player_order'")->fetch();
+        if ($hasPlayerOrder) {
+            $pdo->exec("UPDATE `matchups` SET `order_number` = (`order_number` - 1) * 2 + `player_order` WHERE `event_matchup_id` IS NOT NULL");
+        }
+
+        foreach (['match_key', 'event_id', 'player_id', 'player_order'] as $col) {
+            $hasCol = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE '$col'")->fetch();
+            if ($hasCol) {
+                $pdo->exec("ALTER TABLE `matchups` DROP COLUMN `$col`");
+            }
+        }
+
+        $hasUniqueRound = $pdo->query("SHOW INDEX FROM `matchups` WHERE Key_name = 'unique_matchup_round'")->fetch();
+        if (!$hasUniqueRound) {
+            $pdo->exec("ALTER TABLE `matchups` ADD UNIQUE KEY `unique_matchup_round` (`event_matchup_id`, `order_number`)");
+        }
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('refactor_head2head_matchups')")->execute();
+        echo "✓ Refactored head-to-head matchups table structure successfully.\n";
+    } else {
+        echo "Refactoring of head-to-head matchups table structure already applied.\n";
+    }
+
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'leagues_rename_innings_to_matchups'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $hasInningsCol = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'innings_per_game'")->fetch();
+        if ($hasInningsCol) {
+            $pdo->exec("ALTER TABLE `leagues` CHANGE COLUMN `innings_per_game` `matchups_per_game` INT DEFAULT NULL");
+        }
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('leagues_rename_innings_to_matchups')")->execute();
+        echo "✓ Renamed leagues.innings_per_game to matchups_per_game successfully.\n";
+    } else {
+        echo "Renaming of leagues.innings_per_game already applied.\n";
+    }
+
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
 } catch (PDOException $e) {
     echo "\n✗ Migration failed: " . $e->getMessage() . "\n";

@@ -86,7 +86,7 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
 
   const rowContext = engine.getRoundRowContext(round, engineContext);
   const displayRoundNumber = rowContext.displayRoundNumber ?? round.orderNumber;
-  const displayRoundLabel = rowContext.displayRoundLabel ?? engine.getRoundLabel();
+  const displayRoundLabel = rowContext.displayRoundLabel !== undefined ? rowContext.displayRoundLabel : engine.getRoundLabel();
   const isPitcher = rowContext.isPitcher ?? false;
   const hasMatchup = !!rowContext.matchup;
   const role = rowContext.role ?? '';
@@ -102,9 +102,11 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
     `;
   }
 
+  const roundTitle = displayRoundLabel ? `${escapeHTML(displayRoundLabel)} ${displayRoundNumber}` : `${displayRoundNumber}`;
+
   row.innerHTML = `
     <div class="round-info">
-      <div class="round-label"><b>${escapeHTML(displayRoundLabel)} ${displayRoundNumber}:</b> ${escapeHTML(round.machineName)}</div>
+      <div class="round-label"><b>${roundTitle}:</b> ${escapeHTML(round.machineName)}</div>
       ${roleHtml}
       ${summaryHtml}
       ${bonusHtml}

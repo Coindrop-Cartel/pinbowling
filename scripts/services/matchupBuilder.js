@@ -65,45 +65,76 @@ export function buildRoundRobinMatchups(players, inningCount, machines) {
  * @param {Array} eventMatchups
  * @returns {{ matchup: object|null, isPitcher: boolean, opponentName: string, displayRoundNumber: string, role: 'pitcher'|'batter' }}
  */
-export function resolveInningRole(playerId, machineId, eventMatchups) {
+export function resolveInningRole(playerId, roundIdentifier, eventMatchups) {
   const innings = flattenMatchupInnings(eventMatchups);
-  const machineMatch = innings.find(
-    (m) => Number(m.machineId ?? m.machine_id) === Number(machineId)
+  if (!eventMatchups || eventMatchups.length === 0 || !innings || innings.length === 0) {
+    return { matchup: null, isPitcher: true, opponentName: '', displayRoundNumber: '', role: 'pitcher' };
+  }
+
+  const targetMatchup = eventMatchups[0];
+
+  let slot = innings.find((m) =>
+    Number(m.machineId ?? m.machine_id) === Number(roundIdentifier)
+  ) || innings.find((m) =>
+    Number(m.orderNumber ?? m.order_number) === Number(roundIdentifier)
   );
-  const inningOrderNumber = machineMatch
-    ? Number(machineMatch.orderNumber ?? machineMatch.order_number)
-    : null;
 
-  const matchup = inningOrderNumber !== null
-    ? innings.find(
-        (m) =>
-          Number(m.orderNumber ?? m.order_number) === inningOrderNumber &&
-          Number(m.playerId ?? m.player_id) === Number(playerId)
-      )
-    : null;
+  if (!slot) {
+    return { matchup: null, isPitcher: true, opponentName: '', displayRoundNumber: '', role: 'pitcher' };
+  }
 
-  const sibling = inningOrderNumber !== null
-    ? innings.find(
-        (m) =>
-          Number(m.orderNumber ?? m.order_number) === inningOrderNumber &&
-          Number(m.playerId ?? m.player_id) !== Number(playerId)
-      )
-    : null;
+  const p1Id = targetMatchup.player1Id ?? targetMatchup.player1_id;
+  const p2Id = targetMatchup.player2Id ?? targetMatchup.player2_id;
 
-  const topMatchup = innings.find(
-    (m) =>
-      Number(m.orderNumber ?? m.order_number) === inningOrderNumber &&
-      Number(m.playerOrder ?? m.player_order) === 1
-  );
-  const isTop = topMatchup
-    ? Number(topMatchup.machineId ?? topMatchup.machine_id) === Number(machineId)
-    : true;
-  const isHome = matchup ? Number(matchup.playerOrder ?? matchup.player_order) === 1 : true;
-  const isPitcher = isHome ? isTop : !isTop;
-  const opponentName = sibling ? (sibling.playerName ?? sibling.player_name) : '';
-  const displayRoundNumber = matchup
-    ? `${isTop ? 'Top' : 'Bottom'} of ${Number(matchup.orderNumber ?? matchup.order_number)}`
-    : '';
+  let isPlayer1 = false;
+  let isPlayer2 = false;
+  let opponentName = '';
+
+  if (p1Id !== undefined && p2Id !== undefined) {
+    isPlayer1 = Number(playerId) === Number(p1Id);
+    isPlayer2 = Number(playerId) === Number(p2Id);
+    const p1Name = targetMatchup.player1Name ?? targetMatchup.player1_name ?? 'Home';
+    const p2Name = targetMatchup.player2Name ?? targetMatchup.player2_name ?? 'Away';
+    opponentName = isPlayer1 ? p2Name : (isPlayer2 ? p1Name : '');
+  } else {
+    const orderNum = Number(slot.orderNumber ?? slot.order_number);
+    const mySlot = innings.find(m =>
+      (Number(m.orderNumber ?? m.order_number) === orderNum) &&
+      Number(m.playerId ?? m.player_id) === Number(playerId)
+    ) || slot;
+    const oppSlot = innings.find(m =>
+      (Number(m.orderNumber ?? m.order_number) === orderNum) &&
+      Number(m.playerId ?? m.player_id) !== Number(playerId)
+    );
+    isPlayer1 = Number(mySlot.playerOrder ?? mySlot.player_order) === 1;
+    isPlayer2 = Number(mySlot.playerOrder ?? mySlot.player_order) === 2;
+    opponentName = oppSlot ? (oppSlot.playerName ?? oppSlot.player_name) : '';
+  }
+
+  const orderNumber = Number(slot.orderNumber ?? slot.order_number);
+  let isTop = true;
+  let inningNumber = orderNumber;
+
+  if (slot.playerOrder !== undefined || slot.player_order !== undefined) {
+    inningNumber = orderNumber;
+    const topSlot = innings.find(m => Number(m.orderNumber ?? m.order_number) === orderNumber && Number(m.playerOrder ?? m.player_order) === 1);
+    isTop = topSlot ? (Number(topSlot.machineId ?? topSlot.machine_id) === Number(roundIdentifier)) : true;
+  } else {
+    inningNumber = Math.ceil(orderNumber / 2);
+    isTop = (orderNumber % 2 !== 0);
+  }
+
+  let isPitcher = false;
+  if (isPlayer1) {
+    isPitcher = isTop;
+  } else if (isPlayer2) {
+    isPitcher = !isTop;
+  } else {
+    isPitcher = isTop;
+  }
+
+  const displayRoundNumber = `${isTop ? 'Top' : 'Bottom'} of ${inningNumber}`;
   const role = isPitcher ? 'pitcher' : 'batter';
-  return { matchup, isPitcher, opponentName, displayRoundNumber, role };
+
+  return { matchup: slot, isPitcher, opponentName, displayRoundNumber, role };
 }

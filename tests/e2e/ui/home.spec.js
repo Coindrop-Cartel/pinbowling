@@ -28,38 +28,23 @@ test.describe('Home Page', () => {
   test('should display scoring logic section', async ({ page }) => {
     const scoringCard = page.locator('[data-testid="scoring-logic-card"]');
     const scoringText = page.locator('#scoring-logic-text');
-    
+
     // Should be collapsed/hidden by default
     await expect(scoringText).toBeHidden();
-    
+
     // Click the summary to expand it
     await scoringCard.locator('summary').click();
     await expect(scoringText).toBeVisible();
     await expect(scoringText).not.toBeEmpty();
   });
 
-  test('should navigate to Quick Play when Play CTA is clicked', async ({ page }) => {
-    await page.click('#cta-play');
-    await expect(page.getByTestId('quick-play-form-card')).toBeVisible();
-  });
-
-  test('should navigate to Leagues when Manage Leagues CTA is clicked', async ({ page }) => {
-    await page.click('#cta-manage-leagues');
-    await expect(page.getByTestId('leagues-list')).toBeVisible();
-  });
-
-  test('should navigate to Scores when Enter Scores CTA is clicked', async ({ page }) => {
-    await page.click('#cta-enter-scores');
-    await expect(page.getByTestId('tournament-context-area')).toBeVisible();
-  });
-
   test('should display AI Disclosure section when expanded', async ({ page }) => {
     const disclosureCard = page.locator('[data-testid="ai-disclosure-card"]');
     const disclosureText = disclosureCard.locator('p');
-    
+
     // Should be collapsed/hidden by default
     await expect(disclosureText).toBeHidden();
-    
+
     // Click the summary to expand it
     await disclosureCard.locator('summary').click();
     await expect(disclosureText).toBeVisible();

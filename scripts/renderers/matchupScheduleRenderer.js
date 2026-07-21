@@ -55,28 +55,28 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup) {
   matchupsList.innerHTML = Object.entries(seriesMap).map(([sId, games]) => {
     games.sort((a, b) => a.gameNumber - b.gameNumber);
     const firstGame = games[0];
-    const homeName = escapeHTML(firstGame.homePlayerName);
-    const awayName = escapeHTML(firstGame.awayPlayerName);
+    const homeName = escapeHTML(firstGame.player1Name);
+    const awayName = escapeHTML(firstGame.player2Name);
     
     let homeWins = 0;
     let awayWins = 0;
     games.forEach(g => {
       if (g.status === 'completed') {
-        if (g.winnerId === g.homePlayerId) homeWins++;
-        else if (g.winnerId === g.awayPlayerId) awayWins++;
+        if (g.winnerId === g.player1Id) homeWins++;
+        else if (g.winnerId === g.player2Id) awayWins++;
       }
     });
     
     const gamesHtml = games.map(g => {
-      const winnerHome = g.status === 'completed' && g.winnerId === g.homePlayerId;
-      const winnerAway = g.status === 'completed' && g.winnerId === g.awayPlayerId;
+      const winnerHome = g.status === 'completed' && g.winnerId === g.player1Id;
+      const winnerAway = g.status === 'completed' && g.winnerId === g.player2Id;
       
       return `
         <div class="playoff-game-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-top: 6px; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #2196f3;">
           <span class="meta-strong" style="font-size: 0.9em;">Game ${g.gameNumber}</span>
           <div class="game-score" style="font-size: 0.9em;">
             ${g.status === 'completed' ? `
-              <span class="${winnerAway ? 'font-bold' : ''}">${g.awayRuns}</span> - <span class="${winnerHome ? 'font-bold' : ''}">${g.homeRuns}</span>
+              <span class="${winnerAway ? 'font-bold' : ''}">${g.player2Score}</span> - <span class="${winnerHome ? 'font-bold' : ''}">${g.player1Score}</span>
             ` : `
               <span class="badge pending" style="background: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">Pending</span>
             `}
@@ -112,22 +112,22 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup) {
  */
 function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup) {
   matchupsList.innerHTML = matchups.map(m => {
-    const isBye = m.awayPlayerId === null;
-    const winnerHome = m.status === 'completed' && m.winnerId === m.homePlayerId;
-    const winnerAway = m.status === 'completed' && m.winnerId === m.awayPlayerId;
+    const isBye = m.player2Id === null;
+    const winnerHome = m.status === 'completed' && m.winnerId === m.player1Id;
+    const winnerAway = m.status === 'completed' && m.winnerId === m.player2Id;
     
     return `
       <li class="list-item-row" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
         <div class="matchup-players" style="font-weight: 500;">
-          <span class="${winnerAway ? 'font-bold' : ''}" style="${winnerAway ? 'color: #2e7d32;' : ''}">${escapeHTML(m.awayPlayerName || 'BYE')}</span> 
+          <span class="${winnerAway ? 'font-bold' : ''}" style="${winnerAway ? 'color: #2e7d32;' : ''}">${escapeHTML(m.player2Name || 'BYE')}</span> 
           <span class="meta-muted" style="margin: 0 8px;">(Away) vs</span> 
-          <span class="${winnerHome ? 'font-bold' : ''}" style="${winnerHome ? 'color: #2e7d32;' : ''}">${escapeHTML(m.homePlayerName)}</span>
+          <span class="${winnerHome ? 'font-bold' : ''}" style="${winnerHome ? 'color: #2e7d32;' : ''}">${escapeHTML(m.player1Name)}</span>
           <span class="meta-muted" style="margin-left: 8px;">(Home)</span>
         </div>
         <div class="matchup-score-badge" style="display: flex; align-items: center; gap: 12px;">
           ${m.status === 'completed' ? `
             <span class="badge completed font-bold" style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px;">
-              ${m.awayRuns} - ${m.homeRuns}
+              ${m.player2Score} - ${m.player1Score}
             </span>
           ` : `
             <span class="badge pending" style="background: #fff3e0; color: #e65100; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;">

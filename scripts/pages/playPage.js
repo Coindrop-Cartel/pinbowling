@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { can, PERMISSIONS, filterPlayersForUser } from '@services/auth.js';
-import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
+import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
 import { getCookie, formatNumber, applyScoreFormatting, parseFormattedNumber, loadPage, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { createExpandableRow, setupSortableList, createSearchableSelect } from '@ui/selectors.js';
@@ -10,6 +10,7 @@ import { ROUTE_PATHS } from '@scripts/routes.js';
 import { renderPreviewRow } from '@scripts/renderers/roundRowRenderer.js';
 import { generateSessionName, selectRandomMachines, getTargetScoreForDifficulty } from '@services/sessionGenerator.js';
 import { wireTargetRow } from '@scripts/renderers/targetRowRenderer.js';
+import { finalizeSession } from '@services/sessionFinalizer.js';
 
 /**
  * Logic for the Play page where players enter their scores for the current session.
@@ -319,7 +320,7 @@ export async function initPlayPage() {
     const value2Defaults = engine.generateValue2Defaults(frameCount);
 
       generatedFrames = selected.map((m, index) => {
-        const baseScore = getTargetScoreForDifficulty(m, difficulty);
+        const baseScore = getTargetScoreForDifficulty(m, difficulty, currentSessionFormat);
         let { value1, value2 } = engine.getInitialValues(baseScore);
 
         // Apply default value2 for formats that support it (e.g., golf pars)
@@ -441,119 +442,20 @@ export async function initPlayPage() {
   }
 
   finalizeBtn.onclick = async () => {
-    const rawName = nameInput.value.trim();
-    const locId = Number(locSelect.value);
-    const location = locationsCache.find(l => l.id === locId);
-    const locName = location ? location.name : 'Unknown Location';
-    
-    const now = new Date();
-    const date = now.toLocaleDateString();
-    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    const eventName = generateSessionName(rawName, locName, date, time);
-
     finalizeBtn.disabled = true;
     finalizeBtn.textContent = 'Starting Session...';
 
     try {
-      const newLeague = await PB_API.leagues.create({ 
-        name: eventName, 
-        startDate: now.toISOString().split('T')[0],
-        type: 'session',
-        scoringFormat: currentSessionFormat
+      await finalizeSession({
+        rawName: nameInput.value.trim(),
+        locId: Number(locSelect.value),
+        locationsCache,
+        currentSessionFormat,
+        generatedFrames,
+        allPlayersCache,
+        PB_API,
+        showPlayerSelectionDialog
       });
-
-      if (!newLeague || !newLeague.id) {
-        throw new Error('Failed to create session league.');
-      }
-
-      const qpLeague = newLeague;
-
-      const newEvent = await PB_API.events.create({
-        leagueId: qpLeague.id,
-        eventName: eventName,
-        eventDate: now.toISOString().split('T')[0],
-        locationId: locId,
-        scoringFormat: currentSessionFormat
-      });
-
-      if (!newEvent || !newEvent.id) {
-        throw new Error('Failed to create event. Backend did not return an event ID. Check your createEvent endpoint.');
-      }
-
-      const event = newEvent;
-
-      const targetPayloads = generatedFrames
-        .filter(f => f.machineId)
-        .map(frame => {
-          return {
-            eventId: Number(event.id),
-            machineId: Number(frame.machineId),
-            orderNumber: frame.orderNumber,
-            value1: frame.value1,
-            value2: frame.value2,
-            values: frame.values
-          };
-        });
-
-      if (targetPayloads.length > 0) {
-        // Sending all targets in a single request prevents 403 Forbidden 
-        // errors caused by server-side rate-limiting or flood protection.
-        await PB_API.machines.saveTarget(targetPayloads);
-      }
-
-      // Redirect to the scoring page for the new session.
-      // If the user has a player profile, auto-join them and pre-select them.
-      const currentUser = await PB_API.auth.me();
-      if (currentUser?.player_id) {
-        await PB_API.leagues.addPlayer(qpLeague.id, currentUser.player_id);
-      }
-
-      // Generate matchups for formats that use them (e.g., baseball head-to-head)
-      const engine = getScoringEngine(currentSessionFormat);
-      const matchupInfo = engine.getMatchupDescription(generatedFrames.length);
-      if (matchupInfo) {
-        const leagueData = await PB_API.leagues.get(qpLeague.id);
-        const roster = leagueData?.players || [];
-
-        if (roster.length < 2 && allPlayersCache.length > 0) {
-          const opponentOptions = allPlayersCache
-            .filter(p => !roster.some(r => r.id === p.id))
-            .map(p => ({ value: p.id, label: p.playerName }));
-
-          if (opponentOptions.length > 0) {
-            const opponentId = await showPlayerSelectionDialog(
-              'Select Opponent',
-              'This format requires at least 2 players. Choose an opponent:',
-              opponentOptions,
-              'Add & Continue'
-            );
-            if (opponentId) {
-              await PB_API.leagues.addPlayer(qpLeague.id, Number(opponentId));
-              roster.push({ id: Number(opponentId) });
-            }
-          }
-        }
-
-        const updatedLeague = roster.length >= 2 ? { players: roster } : await PB_API.leagues.get(qpLeague.id);
-        const finalRoster = updatedLeague?.players || [];
-
-        if (finalRoster.length >= 2) {
-          const inningCount = generatedFrames.length / engine.getMachinesPerRound();
-          const machines = generatedFrames.map(f => ({ machineId: f.machineId }));
-          const matchups = engine.generateMatchupPayload(finalRoster, inningCount, machines);
-
-          if (matchups.length > 0) {
-            await PB_API.matchups.save(matchups.map(m => ({
-              ...m,
-              eventId: Number(event.id)
-            })));
-          }
-        }
-      }
-
-      loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, leagueId: qpLeague.id, playerId: currentUser?.player_id }));
-
     } catch (err) {
       console.error(err);
       alert(err.message);

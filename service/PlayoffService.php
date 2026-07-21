@@ -31,7 +31,7 @@ class PlayoffService {
             $pdo->beginTransaction();
             
             // 1. Fetch league details directly
-            $stmt = $pdo->prepare('SELECT status, innings_per_game FROM leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT status, matchups_per_game FROM leagues WHERE id = ?');
             $stmt->execute([$leagueId]);
             $league = $stmt->fetch();
             if (!$league) {
@@ -67,7 +67,7 @@ class PlayoffService {
                 throw new \Exception("No machines found in database.");
             }
             
-            $inningsPerGame = (int)($league['innings_per_game'] ?? 2);
+            $inningsPerGame = (int)($league['matchups_per_game'] ?? 2);
             
             // 4. Generate seed pairings
             $pairings = [];
@@ -86,16 +86,16 @@ class PlayoffService {
             // 5. Create Game 1 for each series
             foreach ($pairings as $pair) {
                 $stmt = $pdo->prepare(
-                    'INSERT INTO event_matchups (event_id, home_player_id, away_player_id, status, game_number, round_name, series_id)
+                    'INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number, round_name, series_id)
                      VALUES (?, ?, ?, \'pending\', 1, ?, ?)'
                 );
                 $stmt->execute([$eventId, $pair['home'], $pair['away'], $roundName, $pair['series_id']]);
                 $eventMatchupId = (int)$pdo->lastInsertId();
  
+                $matchupMachineIds = $this->getMatchupMachinePool($leagueId, $allMachineIds);
                 MatchupGenerator::createInningSlots(
-                    $pdo, $eventId, $eventMatchupId,
-                    $pair['home'], $pair['away'],
-                    $inningsPerGame, $allMachineIds
+                    $pdo, $eventMatchupId,
+                    $inningsPerGame, $matchupMachineIds
                 );
             }
             
@@ -132,14 +132,14 @@ class PlayoffService {
         $roundName = $matchup['round_name'];
         $seriesId = (int) $matchup['series_id'];
         $gameNumber = (int) $matchup['game_number'];
-        $homePlayerId = (int) $matchup['home_player_id'];
-        $awayPlayerId = (int) $matchup['away_player_id'];
+        $homePlayerId = (int) $matchup['player1_id'];
+        $awayPlayerId = (int) $matchup['player2_id'];
 
-        $leagueStmt = $this->db->prepare('SELECT playoff_series_length, innings_per_game FROM leagues WHERE id = ?');
+        $leagueStmt = $this->db->prepare('SELECT playoff_series_length, matchups_per_game FROM leagues WHERE id = ?');
         $leagueStmt->execute([$leagueId]);
         $league = $leagueStmt->fetch(\PDO::FETCH_ASSOC);
         $seriesLength = (int) ($league['playoff_series_length'] ?? 1);
-        $inningsPerGame = (int) ($league['innings_per_game'] ?? 2);
+        $inningsPerGame = (int) ($league['matchups_per_game'] ?? 2);
 
         $seriesStmt = $this->db->prepare(
             'SELECT winner_id FROM event_matchups 
@@ -176,7 +176,7 @@ class PlayoffService {
             }
 
             $allRoundStmt = $this->db->prepare(
-                'SELECT series_id, winner_id, home_player_id, away_player_id FROM event_matchups 
+                'SELECT series_id, winner_id, player1_id, player2_id FROM event_matchups 
                  WHERE event_id = ? AND round_name = ? AND status = \'completed\''
             );
             $allRoundStmt->execute([$eventId, $roundName]);
@@ -185,8 +185,8 @@ class PlayoffService {
             $seriesWinners = [];
             foreach ($allRoundGames as $g) {
                 $sId = (int) $g['series_id'];
-                $hId = (int) $g['home_player_id'];
-                $aId = (int) $g['away_player_id'];
+                $hId = (int) $g['player1_id'];
+                $aId = (int) $g['player2_id'];
 
                 if (!isset($seriesWinners[$sId])) {
                     $specStmt = $this->db->prepare(
@@ -234,7 +234,7 @@ class PlayoffService {
             $nextGameNumber = $gameNumber + 1;
 
             $insertStmt = $this->db->prepare(
-                'INSERT INTO event_matchups (event_id, home_player_id, away_player_id, status, game_number, round_name, series_id)
+                'INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number, round_name, series_id)
                  VALUES (?, ?, ?, \'pending\', ?, ?, ?)'
             );
             $insertStmt->execute([$eventId, $homePlayerId, $awayPlayerId, $nextGameNumber, $roundName, $seriesId]);
@@ -242,11 +242,11 @@ class PlayoffService {
 
             $machinesStmt = $this->db->query('SELECT id FROM machines');
             $allMachineIds = $machinesStmt->fetchAll(\PDO::FETCH_COLUMN);
+            $matchupMachineIds = $this->getMatchupMachinePool($leagueId, $allMachineIds);
 
             MatchupGenerator::createInningSlots(
-                $this->db->getPdo(), $eventId, $nextEventMatchupId,
-                $homePlayerId, $awayPlayerId,
-                $inningsPerGame, $allMachineIds
+                $this->db->getPdo(), $nextEventMatchupId,
+                $inningsPerGame, $matchupMachineIds
             );
         }
     }
@@ -265,17 +265,46 @@ class PlayoffService {
 
         foreach ($pairings as $pair) {
             $stmt = $this->db->prepare(
-                'INSERT INTO event_matchups (event_id, home_player_id, away_player_id, status, game_number, round_name, series_id)
+                'INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number, round_name, series_id)
                  VALUES (?, ?, ?, \'pending\', 1, ?, ?)'
             );
             $stmt->execute([$nextEventId, $pair['home'], $pair['away'], $nextRoundName, $pair['series_id']]);
             $eventMatchupId = (int) $this->db->lastInsertId();
 
+            $matchupMachineIds = $this->getMatchupMachinePool($leagueId, $allMachineIds);
             MatchupGenerator::createInningSlots(
-                $this->db->getPdo(), $nextEventId, $eventMatchupId,
-                $pair['home'], $pair['away'],
-                $inningsPerGame, $allMachineIds
+                $this->db->getPdo(), $eventMatchupId,
+                $inningsPerGame, $matchupMachineIds
             );
         }
+    }
+
+    /**
+     * Get target machine pool for a matchup, restricted to a single randomly picked location from the league's assigned locations.
+     */
+    private function getMatchupMachinePool(int $leagueId, array $allMachineIds): array
+    {
+        $pdo = $this->db->getPdo();
+        
+        $llStmt = $pdo->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
+        $llStmt->execute([$leagueId]);
+        $assignedLocationIds = $llStmt->fetchAll(\PDO::FETCH_COLUMN);
+
+        if (empty($assignedLocationIds)) {
+            return $allMachineIds;
+        }
+
+        $lmStmt = $pdo->query('SELECT location_id, machine_id FROM location_machines');
+        $machinesByLocation = [];
+        foreach ($lmStmt->fetchAll() as $row) {
+            $machinesByLocation[(int)$row['location_id']][] = (int)$row['machine_id'];
+        }
+
+        $chosenLocId = (int)$assignedLocationIds[array_rand($assignedLocationIds)];
+        if (!empty($machinesByLocation[$chosenLocId])) {
+            return $machinesByLocation[$chosenLocId];
+        }
+
+        return $allMachineIds;
     }
 }

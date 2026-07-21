@@ -56,6 +56,12 @@
             <option value="9">9 Innings</option>
           </select>
         </div>
+        <div id="league-locations-row" data-testid="league-locations-row" class="form-row hidden">
+          <label>Assigned Locations</label>
+          <div id="league-locations-container" data-testid="league-locations-container" class="checkbox-group" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 8px;">
+            <!-- Location checkboxes will be populated dynamically -->
+          </div>
+        </div>
         <div class="form-actions hidden" data-testid="league-form-actions">
           <button type="submit" id="create-league-btn" data-testid="create-league-button" class="btn-mgmt" disabled>Create League</button>
         </div>

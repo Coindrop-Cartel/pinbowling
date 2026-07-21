@@ -82,12 +82,12 @@ class LeagueService {
         // Fetch event matchups
         $stmt = $pdo->prepare(
             'SELECT em.*, 
-                    p1.player_name as home_player_name, 
-                    p2.player_name as away_player_name,
+                    p1.player_name as player1_name, 
+                    p2.player_name as player2_name,
                     w.player_name as winner_name
              FROM event_matchups em
-             JOIN players p1 ON em.home_player_id = p1.id
-             LEFT JOIN players p2 ON em.away_player_id = p2.id
+             JOIN players p1 ON em.player1_id = p1.id
+             LEFT JOIN players p2 ON em.player2_id = p2.id
              LEFT JOIN players w ON em.winner_id = w.id
              WHERE em.event_id IN (SELECT id FROM events WHERE league_id = ?)
              ORDER BY em.id ASC'
@@ -135,6 +135,11 @@ class LeagueService {
         }
         $league['teams'] = $teams;
 
+        // Fetch locations
+        $stmt = $pdo->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
+        $stmt->execute([$leagueId]);
+        $league['location_ids'] = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
         return $league;
     }
 
@@ -156,12 +161,12 @@ class LeagueService {
 
         $emStmt = $pdo->query(
             'SELECT em.*, 
-                    p1.player_name as home_player_name, 
-                    p2.player_name as away_player_name,
+                    p1.player_name as player1_name, 
+                    p2.player_name as player2_name,
                     w.player_name as winner_name
              FROM event_matchups em
-             JOIN players p1 ON em.home_player_id = p1.id
-             LEFT JOIN players p2 ON em.away_player_id = p2.id
+             JOIN players p1 ON em.player1_id = p1.id
+             LEFT JOIN players p2 ON em.player2_id = p2.id
              LEFT JOIN players w ON em.winner_id = w.id
              ORDER BY em.id ASC'
         );
@@ -205,11 +210,18 @@ class LeagueService {
             $teamsByLeague[(int)$lt['league_id']][] = $lt;
         }
 
+        $llStmt = $pdo->query('SELECT league_id, location_id FROM league_locations');
+        $locationsByLeague = [];
+        foreach ($llStmt->fetchAll() as $ll) {
+            $locationsByLeague[(int)$ll['league_id']][] = (int)$ll['location_id'];
+        }
+
         foreach ($leagues as &$league) {
             $id = (int)$league['id'];
             $league['events']  = $eventsByLeague[$id]  ?? [];
             $league['players'] = $playersByLeague[$id] ?? [];
             $league['teams']   = $teamsByLeague[$id]   ?? [];
+            $league['location_ids'] = $locationsByLeague[$id] ?? [];
         }
 
         return $leagues;
@@ -239,7 +251,7 @@ class LeagueService {
      * @param string $seasonScoring
      * @param int $dropLowestWeeks
      * @param int|null $weeksInSeason
-     * @param int $inningsPerGame
+     * @param int $matchupsPerGame
      * @return array Created league data
      */
     public function createLeague(
@@ -251,17 +263,31 @@ class LeagueService {
         string $seasonScoring = 'weekly',
         int $dropLowestWeeks = 0,
         ?int $weeksInSeason = null,
-        ?int $inningsPerGame = 2,
+        ?int $matchupsPerGame = 2,
         ?int $weeklyPoints = null,
-        ?int $pointSpread = null
+        ?int $pointSpread = null,
+        array $locationIds = []
     ): array {
         $pdo = $this->db->getPdo();
-        $stmt = $pdo->prepare(
-            'INSERT INTO leagues (name, start_date, type, participants, scoring_format, season_scoring, drop_lowest_weeks, weeks_in_season, innings_per_game, weekly_points, point_spread)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        );
-        $stmt->execute([$name, $startDate, $type, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $inningsPerGame, $weeklyPoints, $pointSpread]);
-        return $this->getLeague((int)$pdo->lastInsertId());
+        try {
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare(
+                'INSERT INTO leagues (name, start_date, type, participants, scoring_format, season_scoring, drop_lowest_weeks, weeks_in_season, matchups_per_game, weekly_points, point_spread)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $stmt->execute([$name, $startDate, $type, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $matchupsPerGame, $weeklyPoints, $pointSpread]);
+            $leagueId = (int)$pdo->lastInsertId();
+            
+            $this->syncLeagueLocations($pdo, $leagueId, $locationIds);
+            
+            $pdo->commit();
+            return $this->getLeague($leagueId);
+        } catch (\Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -275,7 +301,7 @@ class LeagueService {
      * @param string $seasonScoring
      * @param int $dropLowestWeeks
      * @param int|null $weeksInSeason
-     * @param int $inningsPerGame
+     * @param int $matchupsPerGame
      * @return array Updated league data
      */
     public function updateLeague(
@@ -287,16 +313,56 @@ class LeagueService {
         string $seasonScoring = 'weekly',
         int $dropLowestWeeks = 0,
         ?int $weeksInSeason = null,
-        ?int $inningsPerGame = 2,
+        ?int $matchupsPerGame = 2,
         ?int $weeklyPoints = null,
-        ?int $pointSpread = null
+        ?int $pointSpread = null,
+        array $locationIds = []
     ): array {
         $pdo = $this->db->getPdo();
-        $stmt = $pdo->prepare(
-            'UPDATE leagues SET name = ?, start_date = ?, participants = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ?, weeks_in_season = ?, innings_per_game = ?, weekly_points = ?, point_spread = ? WHERE id = ?'
-        );
-        $stmt->execute([$name, $startDate, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $inningsPerGame, $weeklyPoints, $pointSpread, $leagueId]);
-        return $this->getLeague($leagueId);
+        try {
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare(
+                'UPDATE leagues SET name = ?, start_date = ?, participants = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ?, weeks_in_season = ?, matchups_per_game = ?, weekly_points = ?, point_spread = ? WHERE id = ?'
+            );
+            $stmt->execute([$name, $startDate, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $matchupsPerGame, $weeklyPoints, $pointSpread, $leagueId]);
+            
+            $this->syncLeagueLocations($pdo, $leagueId, $locationIds);
+            
+            $pdo->commit();
+            return $this->getLeague($leagueId);
+        } catch (\Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Get assigned location IDs for a league.
+     *
+     * @param int $leagueId
+     * @return array
+     */
+    public function getLeagueLocations(int $leagueId): array {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
+        $stmt->execute([$leagueId]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /**
+     * Sync assigned locations for a league.
+     */
+    private function syncLeagueLocations(PDO $pdo, int $leagueId, array $locationIds): void {
+        $stmt = $pdo->prepare('DELETE FROM league_locations WHERE league_id = ?');
+        $stmt->execute([$leagueId]);
+        if (!empty($locationIds)) {
+            $stmt = $pdo->prepare('INSERT INTO league_locations (league_id, location_id) VALUES (?, ?)');
+            foreach ($locationIds as $locId) {
+                $stmt->execute([$leagueId, (int)$locId]);
+            }
+        }
     }
 
     /**

@@ -424,7 +424,7 @@ formatMark(turn, scoreOverride = null) {
     const currentPlayerId = Number(getCurrentPlayerId());
     const { matchup, isPitcher, opponentName, displayRoundNumber, role } = resolveInningRole(
       currentPlayerId,
-      round.machineId,
+      round.orderNumber ?? round.machineId,
       eventMatchups
     );
     // When no matchup is found, the helper returns an empty string for
@@ -432,6 +432,13 @@ formatMark(turn, scoreOverride = null) {
     // displayed in that case, so fall back to the round's order number.
     const roundNumber = round.orderNumber ?? 1;
     const finalDisplayRoundNumber = matchup ? displayRoundNumber : roundNumber;
-    return { matchup, isPitcher, opponentName, displayRoundNumber: finalDisplayRoundNumber, role };
+    return {
+      matchup,
+      isPitcher,
+      opponentName,
+      displayRoundNumber: finalDisplayRoundNumber,
+      displayRoundLabel: matchup ? '' : 'Inning',
+      role
+    };
   }
 }

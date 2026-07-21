@@ -91,12 +91,14 @@ class Serializer {
             'weeklyPoints' => isset($row['weekly_points']) ? (int)$row['weekly_points'] : null,
             'pointSpread' => isset($row['point_spread']) ? (int)$row['point_spread'] : null,
             'weeksInSeason' => isset($row['weeks_in_season']) && $row['weeks_in_season'] !== null ? (int)$row['weeks_in_season'] : null,
-            'inningsPerGame' => isset($row['innings_per_game']) && $row['innings_per_game'] !== null ? (int)$row['innings_per_game'] : null,
+            'matchupsPerGame' => isset($row['matchups_per_game']) && $row['matchups_per_game'] !== null ? (int)$row['matchups_per_game'] : null,
+            'inningsPerGame' => isset($row['matchups_per_game']) && $row['matchups_per_game'] !== null ? (int)$row['matchups_per_game'] : null,
             'status' => $row['status'] ?? 'setup',
             'playoffSeriesLength' => isset($row['playoff_series_length']) ? (int)$row['playoff_series_length'] : 1,
             'events' => isset($row['events']) ? array_map([self::class, 'event'], $row['events']) : [],
             'players' => isset($row['players']) ? array_map([self::class, 'player'], $row['players']) : [],
-            'teams' => isset($row['teams']) ? array_map([self::class, 'team'], $row['teams']) : []
+            'teams' => isset($row['teams']) ? array_map([self::class, 'team'], $row['teams']) : [],
+            'locationIds' => $row['location_ids'] ?? []
         ];
     }
 
@@ -232,13 +234,9 @@ class Serializer {
     public static function matchup($row) {
         return [
             'id' => (int)$row['id'],
-            'eventId' => (int)$row['event_id'],
             'eventMatchupId' => (isset($row['event_matchup_id']) && $row['event_matchup_id'] !== null) ? (int)$row['event_matchup_id'] : null,
             'orderNumber' => (int)$row['order_number'],
-            'playerId' => (int)$row['player_id'],
             'machineId' => (int)$row['machine_id'],
-            'playerOrder' => (int)($row['player_order'] ?? 1),
-            'playerName' => $row['player_name'] ?? null,
             'machineName' => $row['machine_name'] ?? null
         ];
     }
@@ -251,12 +249,12 @@ class Serializer {
             'id' => (int)$row['id'],
             'eventId' => (int)$row['event_id'],
             'leagueId' => isset($row['league_id']) ? (int)$row['league_id'] : null,
-            'homePlayerId' => (int)$row['home_player_id'],
-            'awayPlayerId' => (isset($row['away_player_id']) && $row['away_player_id'] !== null) ? (int)$row['away_player_id'] : null,
-            'homePlayerName' => $row['home_player_name'] ?? null,
-            'awayPlayerName' => $row['away_player_name'] ?? null,
-            'homeRuns' => (int)($row['home_runs'] ?? 0),
-            'awayRuns' => (int)($row['away_runs'] ?? 0),
+            'player1Id' => (int)$row['player1_id'],
+            'player2Id' => (isset($row['player2_id']) && $row['player2_id'] !== null) ? (int)$row['player2_id'] : null,
+            'player1Name' => $row['player1_name'] ?? null,
+            'player2Name' => $row['player2_name'] ?? null,
+            'player1Score' => (int)($row['player1_score'] ?? 0),
+            'player2Score' => (int)($row['player2_score'] ?? 0),
             'winnerId' => (isset($row['winner_id']) && $row['winner_id'] !== null) ? (int)$row['winner_id'] : null,
             'status' => $row['status'] ?? 'pending',
             'gameNumber' => (int)($row['game_number'] ?? 1),

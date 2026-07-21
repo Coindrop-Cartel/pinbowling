@@ -95,7 +95,7 @@ class EventService {
         $this->db->exec('SET FOREIGN_KEY_CHECKS = 0');
 
         $this->db->prepare('DELETE FROM scores WHERE event_id = ?')->execute([$eventId]);
-        $this->db->prepare('DELETE FROM matchups WHERE event_id = ?')->execute([$eventId]);
+        $this->db->prepare('DELETE FROM matchups WHERE event_matchup_id IN (SELECT id FROM event_matchups WHERE event_id = ?)')->execute([$eventId]);
         $this->db->prepare('DELETE FROM event_matchups WHERE event_id = ?')->execute([$eventId]);
         $this->db->prepare('DELETE FROM target_scores WHERE event_id = ?')->execute([$eventId]);
 

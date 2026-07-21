@@ -46,7 +46,20 @@ class LeagueController extends ApiController {
 
                     $meta = $this->leagueService->getLeagueMeta((int)$this->input['leagueId']);
                     if ($meta['type'] === 'session') {
-                        $this->validateSessionOrSecret();
+                        $apiSecret = \Configuration::getInstance()->getApiSecret();
+                        $providedSecret = getHeader('X-PB-Secret');
+                        $hasSecret = ($providedSecret && $providedSecret === $apiSecret);
+                        $currentUser = \App\Service\AuthService::getCurrentUser();
+
+                        if ($hasSecret || $currentUser) {
+                            $this->validateSessionOrSecret();
+                        } else {
+                            $playerService = $this->container->get(\App\Service\PlayerService::class);
+                            $player = $playerService->getPlayer((int)$this->input['playerId']);
+                            if (!$player || $player['user_id'] !== null) {
+                                $this->sendError('Unauthorized: Guests can only join unregistered players.', 401);
+                            }
+                        }
                     } else {
                         $this->validateTDAccess();
                     }
@@ -140,9 +153,10 @@ class LeagueController extends ApiController {
                         $this->input['seasonScoring'] ?? 'weekly',
                         (int)($this->input['dropLowestWeeks'] ?? 0),
                         isset($this->input['weeksInSeason']) ? (int)$this->input['weeksInSeason'] : null,
-                        isset($this->input['inningsPerGame']) && $this->input['inningsPerGame'] !== '' ? (int)$this->input['inningsPerGame'] : null,
+                        (isset($this->input['matchupsPerGame']) && $this->input['matchupsPerGame'] !== '') ? (int)$this->input['matchupsPerGame'] : (isset($this->input['inningsPerGame']) && $this->input['inningsPerGame'] !== '' ? (int)$this->input['inningsPerGame'] : null),
                         isset($this->input['weeklyPoints']) && $this->input['weeklyPoints'] !== '' ? (int)$this->input['weeklyPoints'] : null,
-                        isset($this->input['pointSpread']) && $this->input['pointSpread'] !== '' ? (int)$this->input['pointSpread'] : null
+                        isset($this->input['pointSpread']) && $this->input['pointSpread'] !== '' ? (int)$this->input['pointSpread'] : null,
+                        $this->input['locationIds'] ?? []
                     );
                     if (!$league) $this->sendError('League created but could not be retrieved.', 500);
                     $this->sendJson(Serializer::league($league));
@@ -175,9 +189,10 @@ class LeagueController extends ApiController {
                         $this->input['seasonScoring'] ?? 'weekly',
                         (int)($this->input['dropLowestWeeks'] ?? 0),
                         isset($this->input['weeksInSeason']) ? (int)$this->input['weeksInSeason'] : null,
-                        isset($this->input['inningsPerGame']) && $this->input['inningsPerGame'] !== '' ? (int)$this->input['inningsPerGame'] : null,
+                        (isset($this->input['matchupsPerGame']) && $this->input['matchupsPerGame'] !== '') ? (int)$this->input['matchupsPerGame'] : (isset($this->input['inningsPerGame']) && $this->input['inningsPerGame'] !== '' ? (int)$this->input['inningsPerGame'] : null),
                         isset($this->input['weeklyPoints']) && $this->input['weeklyPoints'] !== '' ? (int)$this->input['weeklyPoints'] : null,
-                        isset($this->input['pointSpread']) && $this->input['pointSpread'] !== '' ? (int)$this->input['pointSpread'] : null
+                        isset($this->input['pointSpread']) && $this->input['pointSpread'] !== '' ? (int)$this->input['pointSpread'] : null,
+                        $this->input['locationIds'] ?? []
                     );
                     if (!$league) $this->sendError('Resource updated but could not be retrieved.', 500);
                     $this->sendJson(Serializer::league($league));

@@ -1,6 +1,7 @@
 import { PB_API } from '@services/api.js';
-import { filterPlayersForUser, can, PERMISSIONS } from '@services/auth.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActiveEventIdSilent, formatNumber, setCurrentPlayerIdSilent, getCurrentPlayerId, escapeHTML, getActiveMatchupId, setActiveMatchupIdSilent, loadPage } from '@scripts/utils.js';
+import { can, PERMISSIONS } from '@services/auth.js';
+import { getSelectablePlayers, getAutoSelectedPlayerId, getSpectatorStatus } from '@services/playerSelector.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActiveEventIdSilent, formatNumber, setCurrentPlayerIdSilent, getCurrentPlayerId, escapeHTML, getActiveEventMatchupId, setActiveEventMatchupIdSilent, loadPage } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
@@ -112,14 +113,14 @@ export async function initScoresPage() {
           const scoreMap = getScoreMapFromInputs();
           printScoreSheet(machines, activeLeague?.name, activeEvent?.eventName, activeFormat, player, scoreMap, resultsPanel ? resultsPanel.innerHTML : '');
         },
-        hidden: !player || machines.length === 0 || !!getActiveMatchupId()
+        hidden: !player || machines.length === 0 || !!getActiveEventMatchupId()
       },
-      { text: 'Print Blank Score Sheet', onclick: () => printBlankScoreSheet(machines, activeLeague?.name, activeEvent?.eventName, activeFormat), hidden: machines.length === 0 || !!getActiveMatchupId() }
+      { text: 'Print Blank Score Sheet', onclick: () => printBlankScoreSheet(machines, activeLeague?.name, activeEvent?.eventName, activeFormat), hidden: machines.length === 0 || !!getActiveEventMatchupId() }
     ]);
   }
 
   const handleTournamentChange = () => {
-    setActiveMatchupIdSilent('');
+    setActiveEventMatchupIdSilent('');
     tournamentSelectorUI.classList.remove('hidden');
     tournamentSummary.classList.add('hidden');
     playerSelectionCard.classList.add('hidden');
@@ -182,59 +183,16 @@ export async function initScoresPage() {
       allPlayersCache.length = 0;
       allPlayersCache.push(...allPlayers);
 
-      selectablePlayers = [];
-
-      const activeMatchupId = getActiveMatchupId();
-      const isMatchupContext = !!activeMatchupId;
-      if (isMatchupContext) {
-        const matchup = eventMatchups[0];
-        selectablePlayers = [];
-        if (matchup) {
-          // Matchup players are always selectable — they're the ones being scored.
-          // Do NOT filter them by registration status; unregistered users need to
-          // be able to select unregistered players to enter scores, and spectators
-          // need to be able to select either player to view their scores.
-          if (matchup.awayPlayerId) {
-            const awayPlayer = allPlayers.find(p => String(p.id) === String(matchup.awayPlayerId));
-            selectablePlayers.push(awayPlayer || { id: matchup.awayPlayerId, playerName: matchup.awayPlayerName });
-          }
-          if (matchup.homePlayerId) {
-            const homePlayer = allPlayers.find(p => String(p.id) === String(matchup.homePlayerId));
-            selectablePlayers.push(homePlayer || { id: matchup.homePlayerId, playerName: matchup.homePlayerName });
-          }
-        }
-      } else if (leagueId) {
-        // Use the cached leagues to find the specific league and its roster
-        const league = allLeaguesCache.find(l => String(l.id) === String(leagueId));
-        
-        if (league?.participants === 'team') {
-          // In a team league, the selectable players are the members of the assigned teams
-          const memberMap = new Map();
-          (league.teams || []).forEach(team => {
-            (team.members || []).forEach(m => memberMap.set(String(m.id), m));
-          });
-          selectablePlayers = Array.from(memberMap.values());
-        } else {
-          selectablePlayers = league?.players || [];
-        }
-      } else {
-        selectablePlayers = allPlayers;
-      }
-
-      // Requirement: Unregistered users can only select players that are unregistered guests.
-      // EXCEPTION: In a matchup context, both players are always selectable so that
-      // unregistered players can be selected for score entry and spectators can view scores.
-      if (!isMatchupContext) {
-        selectablePlayers = filterPlayersForUser(selectablePlayers, currentUser);
-      }
-
-      // If a playerId is in the URL, ensure they are at least in the selectable list 
-      // for the current session, even if the roster fetch hasn't updated yet.
       const currentPlayerId = getCurrentPlayerId();
-      if (currentPlayerId && !selectablePlayers.some(p => String(p.id) === String(currentPlayerId))) {
-          const p = allPlayers.find(p => String(p.id) === String(currentPlayerId));
-          if (p) selectablePlayers.unshift(p);
-      }
+      selectablePlayers = getSelectablePlayers({
+        allPlayers,
+        leagueId,
+        allLeaguesCache,
+        activeMatchupId: getActiveEventMatchupId(),
+        eventMatchups,
+        currentUser,
+        currentPlayerId
+      });
 
       if (!playerSearchInstance) {
         let searchInput = document.getElementById('player-search');
@@ -290,7 +248,10 @@ export async function initScoresPage() {
    * @param {Object} player The player being scored.
    */
   async function loadScoresIntoForm(scoreRows, player) {
-    const normalized = normalizeScores(scoreRows || []);
+    console.log('[loadScoresIntoForm] Raw scoreRows:', scoreRows, 'for player:', player);
+    const playerId = Number(player?.id);
+    const normalized = normalizeScores(scoreRows || []).filter(s => Number(s.playerId) === playerId);
+    console.log('[loadScoresIntoForm] Filtered scores for player:', playerId, normalized);
     const scoreMap = normalized.reduce((map, row) => {
       map[String(row.orderNumber)] = row;
       return map;
@@ -317,7 +278,7 @@ export async function initScoresPage() {
         engineContext: getEngineContext(),
         getCurrentPlayerId,
         saveScoreCallback: async (scoreData) => {
-          const activeMatchupId = getActiveMatchupId();
+          const activeEventMatchupId = getActiveEventMatchupId();
           await PB_API.scores.save({
             playerId: scoreData.playerId,
             orderNumber: scoreData.orderNumber,
@@ -327,15 +288,15 @@ export async function initScoresPage() {
             ball1: scoreData.ball1,
             ball2: scoreData.ball2,
             ball3: scoreData.ball3,
-            eventMatchupId: activeMatchupId ? Number(activeMatchupId) : null
+            eventMatchupId: activeEventMatchupId ? Number(activeEventMatchupId) : null
           });
         },
         refreshCallback: async () => {
           if (Engine.getMatchupDescription?.(1)) {
             try {
-              const activeMatchupId = getActiveMatchupId();
-              if (activeMatchupId) {
-                allEventScores = await PB_API.scores.get(null, null, null, Number(activeMatchupId));
+              const activeEventMatchupId = getActiveEventMatchupId();
+              if (activeEventMatchupId) {
+                allEventScores = await PB_API.scores.get(null, null, null, Number(activeEventMatchupId));
               } else {
                 allEventScores = await PB_API.scores.get(null, Number(getActiveEventId()));
               }
@@ -374,37 +335,25 @@ export async function initScoresPage() {
    */
   async function refreshPlayerSelection() {
     let activePlayerId = await renderPlayerSelect();
-    const activeMatchupId = getActiveMatchupId();
+    const activeEventMatchupId = getActiveEventMatchupId();
     
-    // Auto-select logged in user if they are in the roster and no one is selected yet.
-    // In a matchup context, only auto-select if the user is one of the two participants.
-    if (!activePlayerId && currentUser?.player_id) {
-        const isInRoster = allPlayersCache.some(p => String(p.id) === String(currentUser.player_id));
-        const isMatchupParticipant = activeMatchupId && eventMatchups[0] && (
-            String(eventMatchups[0].homePlayerId) === String(currentUser.player_id) ||
-            String(eventMatchups[0].awayPlayerId) === String(currentUser.player_id)
-        );
-        // Skip auto-selection in matchup context if user is not a participant
-        if (isInRoster && (!activeMatchupId || isMatchupParticipant)) {
-            activePlayerId = String(currentUser.player_id);
-            // Silent: avoid pb:pageChanged loop during auto-selection within refresh()
-            setCurrentPlayerIdSilent(activePlayerId);
-            if (playerSelect) playerSelect.value = activePlayerId;
-            // Update search input text if exists
-            const search = document.getElementById('player-search');
-            const pObj = allPlayersCache.find(p => String(p.id) === activePlayerId);
-            if (search && pObj) search.value = pObj.playerName;
-        }
-    }
+    // Auto-select player if none selected yet
+    const autoId = getAutoSelectedPlayerId({
+      activePlayerId,
+      currentUser,
+      allPlayersCache,
+      activeMatchupId: activeEventMatchupId,
+      eventMatchups,
+      selectablePlayers
+    });
 
-    // Default to first matchup player if none selected
-    if (!activePlayerId && activeMatchupId && selectablePlayers && selectablePlayers.length > 0) {
-      activePlayerId = String(selectablePlayers[0].id);
-      // Silent: avoid pb:pageChanged loop during auto-selection within refresh()
+    if (autoId && autoId !== activePlayerId) {
+      activePlayerId = autoId;
       setCurrentPlayerIdSilent(activePlayerId);
       if (playerSelect) playerSelect.value = activePlayerId;
       const search = document.getElementById('player-search');
-      if (search) search.value = selectablePlayers[0].playerName;
+      const pObj = allPlayersCache.find(p => String(p.id) === activePlayerId);
+      if (search && pObj) search.value = pObj.playerName;
     }
 
     if (!activePlayerId) {
@@ -424,18 +373,20 @@ export async function initScoresPage() {
 
     const loader = createSkeletonLoader(roundsInput, { count: 5 });
     try {
-      const scores = activeMatchupId 
-        ? await PB_API.scores.get(Number(activePlayerId), null, null, Number(activeMatchupId))
+      const scores = activeEventMatchupId 
+        ? await PB_API.scores.get(Number(activePlayerId), null, null, Number(activeEventMatchupId))
         : await PB_API.scores.get(Number(activePlayerId), Number(getActiveEventId()));
       await loadScoresIntoForm(scores, player);
 
-      const matchup = eventMatchups[0];
-      const isParticipant = matchup && currentUser && (
-        String(matchup.homePlayerId) === String(currentUser.player_id) ||
-        String(matchup.awayPlayerId) === String(currentUser.player_id)
-      );
       const isTD = await can(PERMISSIONS.UPDATE_ANY_SCORE);
-      const isSpectator = activeMatchupId && !isParticipant;
+      const { isSpectator, canEditSelected } = getSpectatorStatus({
+        activePlayerId,
+        activeMatchupId: activeEventMatchupId,
+        eventMatchups,
+        currentUser,
+        allPlayersCache,
+        isTD
+      });
 
       scoringCard.classList.remove('hidden');
       resultsCard.classList.remove('hidden');
@@ -450,18 +401,12 @@ export async function initScoresPage() {
           { text: 'Change', onclick: handlePlayerChange }
         ]);
         
-        const awayName = matchup?.awayPlayerName || 'BYE';
-        const homeName = matchup?.homePlayerName || 'Unknown';
+        const matchup = eventMatchups[0];
+        const awayName = matchup?.player2Name || 'BYE';
+        const homeName = matchup?.player1Name || 'Unknown';
         warning.innerHTML = `<strong>Spectator Mode:</strong> Viewing matchup in progress between ${escapeHTML(awayName)} and ${escapeHTML(homeName)}.`;
         warning.classList.remove('hidden');
         
-        // Determine if the currently selected player is editable by this spectator.
-        // Unregistered (guest) players can be edited by anyone.
-        // Registered players can be edited by TDs/admins, but are view-only for others.
-        const selectedPlayerObj = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
-        const isSelectedPlayerUnregistered = !selectedPlayerObj?.userId;
-        const canEditSelected = isSelectedPlayerUnregistered || isTD;
-
         if (canEditSelected) {
           // Unregistered guest player — allow score entry
           warning.innerHTML += ' <span class="meta-muted">(You may enter scores for this unregistered player.)</span>';
@@ -556,10 +501,10 @@ export async function initScoresPage() {
   const refresh = async () => {
     let eventId = getActiveEventId();
     let leagueId = getActiveLeagueId();
-    const activeMatchupId = getActiveMatchupId();
+    const activeEventMatchupId = getActiveEventMatchupId();
 
-    if (activeMatchupId) {
-      const matchup = await PB_API.matchups.get(null, Number(activeMatchupId));
+    if (activeEventMatchupId) {
+      const matchup = await PB_API.matchups.get(null, Number(activeEventMatchupId));
       if (matchup) {
         eventId = String(matchup.eventId ?? matchup.event_id);
         leagueId = String(matchup.leagueId ?? matchup.league_id);
@@ -623,9 +568,9 @@ export async function initScoresPage() {
     // Ask the engine what additional data it needs for this event,
     // then fetch it generically — no format-specific branching required.
     const requiredData = Engine.getRequiredEventData(eventId, PB_API);
-    if (activeMatchupId) {
-      requiredData.eventMatchups = PB_API.matchups.get(null, Number(activeMatchupId)).then(m => [m]);
-      requiredData.allEventScores = PB_API.scores.get(null, null, null, Number(activeMatchupId));
+    if (activeEventMatchupId) {
+      requiredData.eventMatchups = PB_API.matchups.get(null, Number(activeEventMatchupId)).then(m => [m]);
+      requiredData.allEventScores = PB_API.scores.get(null, null, null, Number(activeEventMatchupId));
     }
     const requiredKeys = Object.keys(requiredData);
     const requiredValues = await Promise.all(Object.values(requiredData));
@@ -639,18 +584,30 @@ export async function initScoresPage() {
 
     // Customize the target machines list to be matchup-specific if deep-linked
     let machinesNormalized = normalizeTargets(eventTargets);
-    if (activeMatchupId && eventMatchups.length > 0) {
+    if (activeEventMatchupId && eventMatchups.length > 0) {
       const matchupDetails = eventMatchups[0];
-      machinesNormalized = (matchupDetails.innings || []).map(inningSlot => {
-        const tgt = eventTargets.find(t => t.orderNumber === inningSlot.orderNumber);
+      // IMPORTANT: inningSlot.orderNumber is the *inning* number (1, 2, …) and is
+      // shared by BOTH the top and bottom machines of the same inning.  If we used
+      // it directly, both half-innings would get the same orderNumber, causing score
+      // saves/lookups to collide — the bottom machine's scores would overwrite the
+      // top machine's and vice-versa.  Instead we derive a strict sequential position
+      // (1, 2, 3, 4, …) from the slot's index in the innings array, which matches
+      // how event target scores are numbered in the database.
+      machinesNormalized = (matchupDetails.innings || []).map((inningSlot, i) => {
+        const sequentialOrderNumber = i + 1;
+        const tgt = eventTargets.find(t => t.orderNumber === sequentialOrderNumber);
+        const value1 = tgt ? tgt.value1 : 5000000;
+        const value2 = tgt ? tgt.value2 : 1.5;
+        const values = tgt ? tgt.values : Engine.buildRoundValues(value1, value2);
         return {
           id: inningSlot.id,
           eventId: inningSlot.eventId,
-          orderNumber: inningSlot.orderNumber,
+          orderNumber: sequentialOrderNumber,
           machineId: inningSlot.machineId,
           machineName: inningSlot.machineName,
-          value1: tgt ? tgt.value1 : 5000000,
-          value2: tgt ? tgt.value2 : 1.5
+          value1,
+          value2,
+          values
         };
       });
     }
@@ -659,12 +616,12 @@ export async function initScoresPage() {
     activeEvent = event;
 
     const isSession = league?.type === 'session';
-    if (activeMatchupId && eventMatchups.length > 0) {
+    if (activeEventMatchupId && eventMatchups.length > 0) {
       const matchup = eventMatchups[0];
       summaryTitle = `
         <div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>
         <div class="meta-muted">Week: ${escapeHTML(event?.eventName || 'Week')}</div>
-        <div class="meta-muted">Matchup: ${escapeHTML(matchup?.awayPlayerName || 'BYE')} vs ${escapeHTML(matchup?.homePlayerName)}</div>
+        <div class="meta-muted">Matchup: ${escapeHTML(matchup?.player2Name || 'BYE')} vs ${escapeHTML(matchup?.player1Name)}</div>
       `;
     } else {
       const leagueTitle = isSession ? '' : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;
@@ -695,7 +652,7 @@ export async function initScoresPage() {
     const isH2H = league?.participants === 'head2head';
     const scheduleContainer = document.getElementById('matchups-schedule-container');
     
-    if (isH2H && !activeMatchupId) {
+    if (isH2H && !activeEventMatchupId) {
       playerSelectionCard.classList.add('hidden');
       scoringCard.classList.add('hidden');
       resultsCard.classList.add('hidden');
@@ -708,7 +665,7 @@ export async function initScoresPage() {
           onPlayMatchup: (matchupId, evId) => {
             setActiveLeagueIdSilent(league.id);
             setActiveEventIdSilent(evId);
-            loadPage(ROUTE_PATHS.SCORES({ eventId: evId, leagueId: league.id, matchupId }));
+            loadPage(ROUTE_PATHS.SCORES({ eventId: evId, leagueId: league.id, eventMatchupId: matchupId }));
           }
         });
       }

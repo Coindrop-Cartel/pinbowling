@@ -48,7 +48,38 @@ class ScoreController extends ApiController {
                     $this->sendError('eventId, playerId, machineId, and orderNumber are required', 400);
                 }
 
-                $this->validateSessionOrSecret();
+                $playerService = $this->container->get(\App\Service\PlayerService::class);
+                $targetPlayer = $playerService->getPlayer((int)$this->input['playerId']);
+                if (!$targetPlayer) {
+                    $this->sendError('Player not found.', 404);
+                }
+
+                $isTargetUnregistered = ($targetPlayer['user_id'] === null);
+
+                $apiSecret = \Configuration::getInstance()->getApiSecret();
+                $providedSecret = getHeader('X-PB-Secret');
+                $hasSecret = ($providedSecret && $providedSecret === $apiSecret);
+                $currentUser = \App\Service\AuthService::getCurrentUser();
+
+                if ($hasSecret) {
+                    // System/Admin override
+                } else if ($currentUser) {
+                    $role = $currentUser['role'] ?? 'player';
+                    if ($role === 'admin' || $role === 'td') {
+                        // TD and Admins can score anyone
+                    } else {
+                        // Logged-in player can score themselves or unregistered players
+                        $isSelf = ((int)$targetPlayer['id'] === (int)$currentUser['player_id']);
+                        if (!$isSelf && !$isTargetUnregistered) {
+                            $this->sendError('Unauthorized: Players can only score themselves or unregistered players.', 401);
+                        }
+                    }
+                } else {
+                    // Guest user (not logged in) can only score unregistered players
+                    if (!$isTargetUnregistered) {
+                        $this->sendError('Unauthorized: Guests can only score unregistered players.', 401);
+                    }
+                }
 
                 $this->scoreService->saveScore(
                     (int) $this->input['eventId'],

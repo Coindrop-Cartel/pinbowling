@@ -43,14 +43,14 @@ export function calculateBaseballRecords(players, events, matchupsByEvent, score
     matchups.forEach(m => {
       if (m.status !== 'completed') return;
 
-      const p1Id = Number(m.awayPlayerId ?? m.away_player_id);
-      const p2Id = Number(m.homePlayerId ?? m.home_player_id);
+      const p1Id = Number(m.player1Id ?? m.player1_id ?? m.awayPlayerId ?? m.away_player_id);
+      const p2Id = Number(m.player2Id ?? m.player2_id ?? m.homePlayerId ?? m.home_player_id);
 
       // If it's a bye week, ignore for records calculation
       if (!p1Id || !p2Id) return;
 
-      const r1 = Number(m.awayRuns ?? m.away_runs ?? 0);
-      const r2 = Number(m.homeRuns ?? m.home_runs ?? 0);
+      const r1 = Number(m.player1Score ?? m.player1_score ?? m.awayRuns ?? m.away_runs ?? 0);
+      const r2 = Number(m.player2Score ?? m.player2_score ?? m.homeRuns ?? m.home_runs ?? 0);
 
       if (records[p1Id]) {
         records[p1Id].totalRuns += r1;

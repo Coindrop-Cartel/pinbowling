@@ -66,12 +66,12 @@ class MatchupController extends ApiController {
                             'id' => null,
                             'eventId' => $eventId,
                             'leagueId' => null,
-                            'homePlayerId' => 0,
-                            'awayPlayerId' => 0,
-                            'homePlayerName' => null,
-                            'awayPlayerName' => null,
-                            'homeRuns' => 0,
-                            'awayRuns' => 0,
+                            'player1Id' => 0,
+                            'player2Id' => 0,
+                            'player1Name' => null,
+                            'player2Name' => null,
+                            'player1Score' => 0,
+                            'player2Score' => 0,
                             'winnerId' => null,
                             'status' => 'pending',
                             'gameNumber' => 1,
@@ -86,15 +86,92 @@ class MatchupController extends ApiController {
                 break;
 
             case 'POST':
-                $this->validateTDAccess();
-                
                 if (empty($this->input)) {
                     $this->sendError('Request body is empty', 400);
                 }
 
                 $matchups = isset($this->input[0]) ? $this->input : [$this->input];
+                if (empty($matchups)) {
+                    $this->sendError('Request body is empty', 400);
+                }
+
+                $firstMatchup = $matchups[0];
+                $eventId = (int)($firstMatchup['eventId'] ?? $firstMatchup['event_id'] ?? 0);
+
+                $leagueService = $this->container->get(\App\Service\LeagueService::class);
+                $isSession = false;
+                $scoringFormat = 'bowling';
+                if ($eventId) {
+                    $leagueId = $leagueService->getEventLeagueId($eventId);
+                    if ($leagueId) {
+                        $meta = $leagueService->getLeagueMeta($leagueId);
+                        $isSession = ($meta && $meta['type'] === 'session');
+                        $scoringFormat = $meta['scoring_format'] ?? 'bowling';
+                    }
+                }
+
+                if ($isSession) {
+                    $this->validateSessionOrSecret();
+                } else {
+                    $this->validateTDAccess();
+                }
+
+                $eventMatchupId = null;
+                // For baseball session/quickplay games, automatically create/resolve the event_matchup record
+                if ($scoringFormat === 'baseball') {
+                    $providedMatchupId = isset($firstMatchup['eventMatchupId']) ? (int)$firstMatchup['eventMatchupId'] : 0;
+                    if ($providedMatchupId) {
+                        $eventMatchupId = $providedMatchupId;
+                    } else {
+                        // Check if an event_matchup already exists for this event
+                        $db = $this->container->get(\App\Service\DatabaseService::class);
+                        $pdo = $db->getPdo();
+                        $stmt = $pdo->prepare('SELECT id FROM event_matchups WHERE event_id = ?');
+                        $stmt->execute([$eventId]);
+                        $existingId = $stmt->fetchColumn();
+
+                        if ($existingId) {
+                            $eventMatchupId = (int)$existingId;
+                        } else {
+                            // Find home (playerOrder=1) and away (playerOrder=2) players
+                            $homePlayerId = 0;
+                            $awayPlayerId = 0;
+                            foreach ($matchups as $m) {
+                                $pOrder = (int)($m['playerOrder'] ?? $m['player_order'] ?? 1);
+                                $pId = (int)($m['playerId'] ?? $m['player_id'] ?? 0);
+                                if ($pOrder === 1 && !$homePlayerId) {
+                                    $homePlayerId = $pId;
+                                } else if ($pOrder === 2 && !$awayPlayerId) {
+                                    $awayPlayerId = $pId;
+                                }
+                            }
+
+                            if ($homePlayerId && $awayPlayerId) {
+                                $stmt = $pdo->prepare(
+                                    'INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number)
+                                     VALUES (?, ?, ?, \'pending\', 1)'
+                                );
+                                $stmt->execute([$eventId, $homePlayerId, $awayPlayerId]);
+                                $eventMatchupId = (int)$pdo->lastInsertId();
+                            }
+                        }
+                    }
+
+                    // Assign the resolved eventMatchupId to all matchup slots
+                    if ($eventMatchupId) {
+                        foreach ($matchups as &$m) {
+                            $m['eventMatchupId'] = $eventMatchupId;
+                        }
+                        unset($m);
+                    }
+                }
+
                 $this->matchupService->saveMatchups($matchups);
-                $this->sendJson(['success' => true]);
+                $response = ['success' => true];
+                if ($eventMatchupId !== null) {
+                    $response['eventMatchupId'] = $eventMatchupId;
+                }
+                $this->sendJson($response);
                 break;
 
             case 'DELETE':

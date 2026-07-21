@@ -1,6 +1,6 @@
 import { SCORING_FORMATS } from '../core/engine.js';
 import { ScoringFormats } from '../services/scoringFormat.js';
-import { getCookie } from '../utils.js';
+import { getCookie, escapeHTML } from '../utils.js';
 
 export function createLeagueFormController(elements, options) {
   const {
@@ -37,9 +37,29 @@ export function createLeagueFormController(elements, options) {
   const dropLowestRow = document.getElementById('league-drop-weeks-row');
   const weeksRow = document.getElementById('league-weeks-in-season-row');
   const inningsRow = document.getElementById('league-innings-per-game-row');
+  const locationsRow = document.getElementById('league-locations-row');
+  const locationsContainer = document.getElementById('league-locations-container');
   const actionsRow = createBtn?.closest('.form-actions');
 
   let editingLeagueId = null;
+  let allLocations = [];
+
+  const loadLocations = async () => {
+    try {
+      allLocations = await options.PB_API.locations.getAll();
+      if (locationsContainer) {
+        locationsContainer.innerHTML = allLocations.map(loc => `
+          <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0;">
+            <input type="checkbox" name="league-locations" value="${loc.id}" data-testid="league-location-checkbox-${loc.id}" style="width: auto; margin: 0;" />
+            <span>${escapeHTML(loc.name)}${loc.city ? ` (${escapeHTML(loc.city)})` : ''}</span>
+          </label>
+        `).join('');
+      }
+    } catch (err) {
+      console.error('[leagueFormController] Failed to load locations:', err);
+    }
+  };
+  loadLocations();
 
   const handleSeasonScoringChange = () => {
     if (!leagueSeasonScoringInput) return;
@@ -100,7 +120,13 @@ export function createLeagueFormController(elements, options) {
     dropLowestRow?.classList.add('hidden');
     weeksRow?.classList.add('hidden');
     inningsRow?.classList.add('hidden');
+    locationsRow?.classList.add('hidden');
     actionsRow?.classList.add('hidden');
+
+    const checkboxes = locationsContainer?.querySelectorAll('input[name="league-locations"]');
+    if (checkboxes) {
+      checkboxes.forEach(cb => cb.checked = false);
+    }
 
     if (leagueFormatInput) leagueFormatInput.disabled = false;
     if (leagueParticipantsInput) leagueParticipantsInput.disabled = false;
@@ -124,14 +150,23 @@ export function createLeagueFormController(elements, options) {
     if (leagueWeeklyPointsInput) leagueWeeklyPointsInput.value = league.weeklyPoints !== null && league.weeklyPoints !== undefined ? league.weeklyPoints : '';
     if (leaguePointSpreadInput) leaguePointSpreadInput.value = league.pointSpread !== null && league.pointSpread !== undefined ? league.pointSpread : '';
     if (leagueWeeksInput) leagueWeeksInput.value = league.weeksInSeason || 8;
-    if (leagueInningsInput) leagueInningsInput.value = league.inningsPerGame || 2;
+    if (leagueInningsInput) leagueInningsInput.value = league.matchupsPerGame || league.inningsPerGame || 2;
 
     createBtn.textContent = 'Update League';
     if (leagueFormTitle) leagueFormTitle.textContent = `Edit League: ${league.name}`;
 
     dateRow?.classList.remove('hidden');
     formatRow?.classList.remove('hidden');
+    locationsRow?.classList.remove('hidden');
     if (participantsRow) participantsRow.classList.remove('hidden');
+
+    const checkboxes = locationsContainer?.querySelectorAll('input[name="league-locations"]');
+    if (checkboxes) {
+      const assignedSet = new Set((league.locationIds || []).map(Number));
+      checkboxes.forEach(cb => {
+        cb.checked = assignedSet.has(Number(cb.value));
+      });
+    }
 
     handleParticipantsChange();
     actionsRow?.classList.remove('hidden');
@@ -192,6 +227,7 @@ export function createLeagueFormController(elements, options) {
       } else {
         dateRow?.classList.remove('hidden');
         formatRow?.classList.remove('hidden');
+        locationsRow?.classList.remove('hidden');
         if (participantsRow) participantsRow.classList.remove('hidden');
         handleParticipantsChange();
         handleSeasonScoringChange();
@@ -221,12 +257,18 @@ export function createLeagueFormController(elements, options) {
     const isH2H = participants === 'head2head';
     const isWeekly = seasonScoring === 'weekly';
     const weeksInSeason = (isH2H && leagueWeeksInput) ? parseInt(leagueWeeksInput.value, 10) : null;
-    const inningsPerGame = (isH2H && leagueInningsInput) ? parseInt(leagueInningsInput.value, 10) : null;
+    const matchupsPerGame = (isH2H && leagueInningsInput) ? parseInt(leagueInningsInput.value, 10) : null;
     const weeklyPoints = (!isH2H && isWeekly && leagueWeeklyPointsInput?.value) ? parseInt(leagueWeeklyPointsInput.value, 10) : null;
     const pointSpread = (!isH2H && isWeekly && leaguePointSpreadInput?.value) ? parseInt(leaguePointSpreadInput.value, 10) : null;
 
     createBtn.disabled = true;
     createBtn.textContent = 'Saving...';
+
+    const locationIds = [];
+    const checkedBoxes = locationsContainer?.querySelectorAll('input[name="league-locations"]:checked');
+    if (checkedBoxes) {
+      checkedBoxes.forEach(cb => locationIds.push(Number(cb.value)));
+    }
 
     try {
       const payload = {
@@ -237,9 +279,11 @@ export function createLeagueFormController(elements, options) {
         seasonScoring,
         dropLowestWeeks,
         weeksInSeason,
-        inningsPerGame,
+        matchupsPerGame,
+        inningsPerGame: matchupsPerGame,
         weeklyPoints,
-        pointSpread
+        pointSpread,
+        locationIds
       };
       if (editingLeagueId) {
         await options.PB_API.leagues.update(editingLeagueId, payload);

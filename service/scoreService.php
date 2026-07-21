@@ -164,8 +164,15 @@ class ScoreService
         if (!$matchup)
             return;
 
+        $player1Id = (int) $matchup['player1_id'];
+        $player2Id = (int) $matchup['player2_id'];
+
+        if (!$player1Id || !$player2Id) {
+            return; // BYE week or incomplete matchup
+        }
+
         // Fetch detailed matchup slots (machine config, player roles)
-        $stmt = $pdo->prepare('SELECT * FROM matchups WHERE event_matchup_id = ? ORDER BY order_number ASC, player_order ASC');
+        $stmt = $pdo->prepare('SELECT * FROM matchups WHERE event_matchup_id = ? ORDER BY order_number ASC');
         $stmt->execute([$eventMatchupId]);
         $slots = $stmt->fetchAll();
 
@@ -192,94 +199,73 @@ class ScoreService
             $machineMap[(int) $mac['order_number']] = $mac;
         }
 
-        // Calculate runs for home and away
-        $homeId = (int) $matchup['home_player_id'];
-        $awayId = (int) $matchup['away_player_id'];
+        $player1Score = 0;
+        $player2Score = 0;
 
-        $homeRuns = 0;
-        $awayRuns = 0;
-
-        // Baseball top/bottom innings
-        // Odd slot indexes: Player 1 (Home) is batter (player_order = 1), Player 2 (Away) is pitcher (player_order = 2)
-        // Even slot indexes: Player 2 (Away) is batter (player_order = 2), Player 1 (Home) is pitcher (player_order = 1)
-        // Let's count runs inning-by-inning.
-        // Group slots by order_number (inning)
-        $inningSlots = [];
-        foreach ($slots as $sl) {
-            $inningSlots[(int) $sl['order_number']][(int) $sl['player_order']] = $sl;
-        }
-
-        // Check how many innings are played
-        $inningsCount = count($inningSlots);
+        // Baseball count of innings
+        $inningsCount = (int) (count($slots) / 2);
         $hasScores = false;
 
         for ($inning = 1; $inning <= $inningsCount; $inning++) {
-            $homeSlot = $inningSlots[$inning][1] ?? null;
-            $awaySlot = $inningSlots[$inning][2] ?? null;
-            if (!$homeSlot || !$awaySlot)
-                continue;
+            $topOrderNum    = ($inning - 1) * 2 + 1;
+            $bottomOrderNum = ($inning - 1) * 2 + 2;
 
-            $homeEntry = $scoreMap[$homeId][$inning] ?? ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
-            $awayEntry = $scoreMap[$awayId][$inning] ?? ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
+            $p1TopEntry    = $scoreMap[$player1Id][$topOrderNum]    ?? ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
+            $p2TopEntry    = $scoreMap[$player2Id][$topOrderNum]    ?? ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
+            $p1BottomEntry = $scoreMap[$player1Id][$bottomOrderNum] ?? ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
+            $p2BottomEntry = $scoreMap[$player2Id][$bottomOrderNum] ?? ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
 
-            if (($scoreMap[$homeId][$inning] ?? null) || ($scoreMap[$awayId][$inning] ?? null)) {
+            if (
+                isset($scoreMap[$player1Id][$topOrderNum]) ||
+                isset($scoreMap[$player2Id][$topOrderNum]) ||
+                isset($scoreMap[$player1Id][$bottomOrderNum]) ||
+                isset($scoreMap[$player2Id][$bottomOrderNum])
+            ) {
                 $hasScores = true;
             }
 
-            // Top of inning (even zero-based slot, odd 1-based inning? No, in generateMatchupPayload, order_number is $inning,
-            // so we alternate roles. Home pitches on Top, bats on Bottom.
-            // Let's determine who is batter and pitcher for this machine.
-            // Home is player_order 1, Away is player_order 2.
-            // In BaseballEngine:
-            // Top of inning (idx % 2 === 0): Pitcher is Home, Batter is Away.
-            // Bottom of inning (idx % 2 === 1): Batter is Home, Pitcher is Away.
-            // Here each inning has 2 machines: Top (index 2*(inning-1)) and Bottom (index 2*(inning-1)+1).
-            // Let's get the thresholds for the machines.
-            // Top Machine runs (Away batter):
-            $topMachine = $machineMap[($inning - 1) * 2 + 1] ?? null; // In database, order_number of target_scores
-            // Wait! In database, target_scores has `order_number` representing the machine slot (1 to 2 * innings_per_game)
-            $topOrderNum = ($inning - 1) * 2 + 1;
-            $bottomOrderNum = ($inning - 1) * 2 + 2;
-
-            $topTarget = $machineMap[$topOrderNum] ?? null;
-            $bottomTarget = $machineMap[$bottomOrderNum] ?? null;
+            $defaultTarget = ['value1' => 5000000, 'value2' => 1.5];
+            $topTarget    = $machineMap[$topOrderNum]    ?? $defaultTarget;
+            $bottomTarget = $machineMap[$bottomOrderNum] ?? $defaultTarget;
 
             if ($topTarget) {
-                // Away batter vs Home pitcher
-                $runs = $this->calculateRunsForInningHalf($topTarget, $awayEntry, $homeEntry);
-                $awayRuns += $runs;
+                // Top of inning: Player 2 (Away) is batter, Player 1 (Home) is pitcher
+                $runs = $this->calculateRunsForInningHalf($topTarget, $p2TopEntry, $p1TopEntry);
+                $player2Score += $runs;
             }
 
             if ($bottomTarget) {
-                // Home batter vs Away pitcher
-                $runs = $this->calculateRunsForInningHalf($bottomTarget, $homeEntry, $awayEntry);
-                $homeRuns += $runs;
+                // Bottom of inning: Player 1 (Home) is batter, Player 2 (Away) is pitcher
+                $runs = $this->calculateRunsForInningHalf($bottomTarget, $p1BottomEntry, $p2BottomEntry);
+                $player1Score += $runs;
             }
         }
 
-        // Update event matchup runs
-        $status = 'pending';
-        $winnerId = null;
-
         // Check if matchup is fully played/completed.
-        // Matchup is completed if we have entries for all rounds, or if it is a completed status.
-        // Wait, is it completed? If all inning entries are populated or TD locks it.
-        // Usually, if scores are submitted for the last inning, we can mark it complete.
-        // Let's say if we have scores for all innings:
         $fullyPlayed = true;
         for ($inning = 1; $inning <= $inningsCount; $inning++) {
-            if (!isset($scoreMap[$homeId][$inning]) || !isset($scoreMap[$awayId][$inning])) {
+            $topOrderNum    = ($inning - 1) * 2 + 1;
+            $bottomOrderNum = ($inning - 1) * 2 + 2;
+            if (
+                !isset($scoreMap[$player1Id][$topOrderNum]) ||
+                !isset($scoreMap[$player2Id][$topOrderNum]) ||
+                !isset($scoreMap[$player1Id][$bottomOrderNum]) ||
+                !isset($scoreMap[$player2Id][$bottomOrderNum])
+            ) {
                 $fullyPlayed = false;
                 break;
             }
         }
 
+        $status = 'pending';
+        $winnerId = null;
+
         if ($fullyPlayed && $hasScores) {
             $status = 'completed';
-            if ($homeRuns > $awayRuns) {
-                $winnerId = $homeId;
-            } elseif ($awayRuns > $homeRuns) {
-                $winnerId = $awayId;
+            if ($player1Score > $player2Score) {
+                $winnerId = $player1Id;
+            } elseif ($player2Score > $player1Score) {
+                $winnerId = $player2Id;
             } else {
                 $winnerId = null; // Tie
             }
@@ -287,17 +273,15 @@ class ScoreService
 
         $stmt = $pdo->prepare(
             'UPDATE event_matchups 
-             SET home_runs = ?, away_runs = ?, winner_id = ?, status = ? 
+             SET player1_score = ?, player2_score = ?, winner_id = ?, status = ? 
              WHERE id = ?'
         );
-        $stmt->execute([$homeRuns, $awayRuns, $winnerId, $status, $eventMatchupId]);
+        $stmt->execute([$player1Score, $player2Score, $winnerId, $status, $eventMatchupId]);
 
         if ($status === 'completed') {
             $this->playoffService->handlePlayoffAdvancement($eventMatchupId);
         }
     }
-
-
 
     /**
      * Inning half run calculator helper.
