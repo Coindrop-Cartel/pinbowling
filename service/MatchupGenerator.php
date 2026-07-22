@@ -43,11 +43,11 @@ class MatchupGenerator {
      * Insert the per-inning slot rows into the `matchups` table for one
      * head-to-head event matchup, and populate default/machine target_scores for the event.
      *
-     * Each inning produces two rows (top/bottom half-inning) with sequential order numbers.
+     * Each round produces `matchupsPerRound` rows with sequential order numbers.
      *
      * @param PDO   $pdo             Active PDO connection (already in a transaction).
      * @param int   $eventMatchupId  The event_matchup ID these innings belong to.
-     * @param int   $matchupsPerGame  Number of matchups (half-innings) per game.
+     * @param int   $matchupsPerGame  Total matchup rows per game (= rounds_per_game * matchups_per_round).
      * @param array $allMachineIds   Full pool of machine IDs to draw from.
      */
     public static function createInningSlots(
@@ -56,7 +56,7 @@ class MatchupGenerator {
         int $matchupsPerGame,
         array $allMachineIds
     ): void {
-        $machineSlots = self::selectMachines($allMachineIds, $matchupsPerGame * 2);
+        $machineSlots = self::selectMachines($allMachineIds, $matchupsPerGame);
 
         // Fetch event_id from event_matchups
         $stmt = $pdo->prepare('SELECT event_id FROM event_matchups WHERE id = ?');

@@ -929,6 +929,34 @@ try {
         echo "Renaming of leagues.innings_per_game already applied.\n";
     }
 
+    // Replace matchups_per_game with two format-agnostic axes.
+    // The combined matchups_per_game column conflated "how many rounds" with
+    // "how many sides per round", which made it ambiguous for any future
+    // head2head format with more than 2 sides. Splitting into the two
+    // independent axes removes the off-by-2 risk and keeps bowling/golf
+    // semantics identical (rounds_per_game = frames/holes, matchups_per_round
+    // unused / NULL).
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'leagues_split_matchups_per_game'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $hasMatchupsPerGame = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'matchups_per_game'")->fetch();
+        if ($hasMatchupsPerGame) {
+            $pdo->exec("ALTER TABLE `leagues` DROP COLUMN `matchups_per_game`");
+        }
+        $hasRoundsPerGame = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'rounds_per_game'")->fetch();
+        if (!$hasRoundsPerGame) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `rounds_per_game` INT DEFAULT NULL AFTER `point_spread`");
+        }
+        $hasMatchupsPerRound = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'matchups_per_round'")->fetch();
+        if (!$hasMatchupsPerRound) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `matchups_per_round` INT DEFAULT NULL AFTER `rounds_per_game`");
+        }
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('leagues_split_matchups_per_game')")->execute();
+        echo "✓ Replaced leagues.matchups_per_game with rounds_per_game + matchups_per_round successfully.\n";
+    } else {
+        echo "Replacing leagues.matchups_per_game already applied.\n";
+    }
+
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
 } catch (PDOException $e) {
     echo "\n✗ Migration failed: " . $e->getMessage() . "\n";

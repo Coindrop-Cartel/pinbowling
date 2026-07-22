@@ -38,7 +38,7 @@ pinbowling/
 │   ├── container.php       # Lightweight DI container implementation
 │   ├── router.php          # Request routing, auth guards, asset serving
 │   ├── auth.php            # Authorization helper functions
-│   ├── serializers.php     # Database row → API response normalizers
+│   ├── Serializer.php      # Database row → API response normalizer
 │   ├── engineMeta.php      # Engine branding metadata definitions
 │   ├── http.php            # CORS, CSRF, JSON response helpers
 │   ├── header.php          # Site header template
@@ -190,8 +190,10 @@ The version from `package.json` is the single source of truth — it's read by `
 See the [`docs/`](docs/) directory for detailed documentation:
 
 - **[Architecture](docs/architecture.md)** — System design, data flow, and component overview
-- **[Code Audit & Refactoring Roadmap](docs/code_audit.md)** — Identified issues and improvement plan
-- **[Workspace Setup](docs/WORKSPACE_SETUP.md)** — New developer environment guide
+- **[Database Schema](docs/database_schema.md)** — Full table reference, relationships, format matrix
+- **[Deployment](docs/deployment.md)** — Server setup, synchronization, cache-busting
+- **[Local Setup](docs/local_setup.md)** — New developer environment guide
+- **[Engine Contract](docs/engine-contract.md)** — Scoring engine public API specification
 - **[UI Testing Plan](docs/ui_testing_documentation.md)** — E2E and visual regression strategy
 
 ## License

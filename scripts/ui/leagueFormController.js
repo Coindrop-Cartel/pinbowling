@@ -36,7 +36,7 @@ export function createLeagueFormController(elements, options) {
   const participantsRow = document.getElementById('league-participants-row');
   const dropLowestRow = document.getElementById('league-drop-weeks-row');
   const weeksRow = document.getElementById('league-weeks-in-season-row');
-  const inningsRow = document.getElementById('league-innings-per-game-row');
+  const inningsRow = document.getElementById('league-rounds-per-game-row');
   const locationsRow = document.getElementById('league-locations-row');
   const locationsContainer = document.getElementById('league-locations-container');
   const actionsRow = createBtn?.closest('.form-actions');
@@ -150,7 +150,7 @@ export function createLeagueFormController(elements, options) {
     if (leagueWeeklyPointsInput) leagueWeeklyPointsInput.value = league.weeklyPoints !== null && league.weeklyPoints !== undefined ? league.weeklyPoints : '';
     if (leaguePointSpreadInput) leaguePointSpreadInput.value = league.pointSpread !== null && league.pointSpread !== undefined ? league.pointSpread : '';
     if (leagueWeeksInput) leagueWeeksInput.value = league.weeksInSeason || 8;
-    if (leagueInningsInput) leagueInningsInput.value = league.matchupsPerGame || league.inningsPerGame || 2;
+    if (leagueInningsInput) leagueInningsInput.value = league.roundsPerGame || 2;
 
     createBtn.textContent = 'Update League';
     if (leagueFormTitle) leagueFormTitle.textContent = `Edit League: ${league.name}`;
@@ -257,7 +257,8 @@ export function createLeagueFormController(elements, options) {
     const isH2H = participants === 'head2head';
     const isWeekly = seasonScoring === 'weekly';
     const weeksInSeason = (isH2H && leagueWeeksInput) ? parseInt(leagueWeeksInput.value, 10) : null;
-    const matchupsPerGame = (isH2H && leagueInningsInput) ? parseInt(leagueInningsInput.value, 10) : null;
+    const roundsPerGame = (isH2H && leagueInningsInput) ? parseInt(leagueInningsInput.value, 10) : null;
+    const matchupsPerRound = isH2H ? 2 : null;
     const weeklyPoints = (!isH2H && isWeekly && leagueWeeklyPointsInput?.value) ? parseInt(leagueWeeklyPointsInput.value, 10) : null;
     const pointSpread = (!isH2H && isWeekly && leaguePointSpreadInput?.value) ? parseInt(leaguePointSpreadInput.value, 10) : null;
 
@@ -279,8 +280,8 @@ export function createLeagueFormController(elements, options) {
         seasonScoring,
         dropLowestWeeks,
         weeksInSeason,
-        matchupsPerGame,
-        inningsPerGame: matchupsPerGame,
+        roundsPerGame,
+        matchupsPerRound,
         weeklyPoints,
         pointSpread,
         locationIds

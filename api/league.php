@@ -153,7 +153,8 @@ class LeagueController extends ApiController {
                         $this->input['seasonScoring'] ?? 'weekly',
                         (int)($this->input['dropLowestWeeks'] ?? 0),
                         isset($this->input['weeksInSeason']) ? (int)$this->input['weeksInSeason'] : null,
-                        (isset($this->input['matchupsPerGame']) && $this->input['matchupsPerGame'] !== '') ? (int)$this->input['matchupsPerGame'] : (isset($this->input['inningsPerGame']) && $this->input['inningsPerGame'] !== '' ? (int)$this->input['inningsPerGame'] : null),
+                        isset($this->input['roundsPerGame']) && $this->input['roundsPerGame'] !== '' ? (int)$this->input['roundsPerGame'] : null,
+                        isset($this->input['matchupsPerRound']) && $this->input['matchupsPerRound'] !== '' ? (int)$this->input['matchupsPerRound'] : null,
                         isset($this->input['weeklyPoints']) && $this->input['weeklyPoints'] !== '' ? (int)$this->input['weeklyPoints'] : null,
                         isset($this->input['pointSpread']) && $this->input['pointSpread'] !== '' ? (int)$this->input['pointSpread'] : null,
                         $this->input['locationIds'] ?? []
@@ -189,7 +190,8 @@ class LeagueController extends ApiController {
                         $this->input['seasonScoring'] ?? 'weekly',
                         (int)($this->input['dropLowestWeeks'] ?? 0),
                         isset($this->input['weeksInSeason']) ? (int)$this->input['weeksInSeason'] : null,
-                        (isset($this->input['matchupsPerGame']) && $this->input['matchupsPerGame'] !== '') ? (int)$this->input['matchupsPerGame'] : (isset($this->input['inningsPerGame']) && $this->input['inningsPerGame'] !== '' ? (int)$this->input['inningsPerGame'] : null),
+                        isset($this->input['roundsPerGame']) && $this->input['roundsPerGame'] !== '' ? (int)$this->input['roundsPerGame'] : null,
+                        isset($this->input['matchupsPerRound']) && $this->input['matchupsPerRound'] !== '' ? (int)$this->input['matchupsPerRound'] : null,
                         isset($this->input['weeklyPoints']) && $this->input['weeklyPoints'] !== '' ? (int)$this->input['weeklyPoints'] : null,
                         isset($this->input['pointSpread']) && $this->input['pointSpread'] !== '' ? (int)$this->input['pointSpread'] : null,
                         $this->input['locationIds'] ?? []

@@ -424,7 +424,7 @@ formatMark(turn, scoreOverride = null) {
     const currentPlayerId = Number(getCurrentPlayerId());
     const { matchup, isPitcher, opponentName, displayRoundNumber, role } = resolveInningRole(
       currentPlayerId,
-      round.orderNumber ?? round.machineId,
+      round.machineId,
       eventMatchups
     );
     // When no matchup is found, the helper returns an empty string for

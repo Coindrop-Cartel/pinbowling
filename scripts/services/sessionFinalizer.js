@@ -41,8 +41,8 @@ export async function finalizeSession(options) {
     type: 'session',
     scoringFormat: currentSessionFormat,
     participants: currentSessionFormat === 'baseball' ? 'head2head' : 'individual',
-    matchupsPerGame: currentSessionFormat === 'baseball' ? (generatedFrames.length / 2) : 2,
-    inningsPerGame: currentSessionFormat === 'baseball' ? (generatedFrames.length / 2) : 2
+    roundsPerGame: currentSessionFormat === 'baseball' ? (generatedFrames.length / 2) : 2,
+    matchupsPerRound: currentSessionFormat === 'baseball' ? 2 : null
   });
 
   if (!newLeague || !newLeague.id) {

@@ -93,14 +93,18 @@ erDiagram
 | `season_scoring` | enum(`cumulative`,`weekly`) | Season aggregation strategy |
 | `drop_lowest_weeks` | int | Season scoring tweak |
 | `weekly_points` / `point_spread` / `weeks_in_season` | int | Season config (standard leagues) |
-| `matchups_per_game` | int | **Baseball**: number of half-inning slots per game (= innings × 2) |
+| `rounds_per_game` | int (nullable) | Number of rounds in a game. Bowling = 10 (full), sessions often 3/6/10. Golf = 9 or 18. Baseball = innings. For a `standard` league, may be `NULL` if rounds are driven by `target_scores` row count instead. |
+| `matchups_per_round` | int (nullable) | **Head2head only.** Number of paired matchups within a round. Baseball = 2 (top/bottom). `NULL` for individual formats (bowling/golf). Total `matchups` rows for a head2head game = `rounds_per_game * matchups_per_round`. |
 | `status` | enum(`setup`,`active`,`completed`) | |
 
 **Relationships:** 1→many `events`, `league_players`, `league_teams`,
 `league_staff`, `league_locations`.
 
-> Note: `matchups_per_game` is metadata only. The actual half-inning rows are
-> materialized in the `matchups` table (one row per half-inning slot).
+> Game sizing is split across two independent columns instead of a single
+> `matchups_per_game` value, so the schema has no opinion about how many
+> sides a head2head format has. The engine materializes
+> `rounds_per_game * matchups_per_round` rows in the `matchups` table when
+> a head2head event is created.
 
 ---
 
@@ -360,12 +364,8 @@ Refer to `scripts/pages/playPage.js` (`generatePreview`) and
 
 1. **`leagues`** — `finalizeSession` calls `PB_API.leagues.create` with
    `type:'session'`, `scoring_format:'baseball'`, `participants:'head2head'`,
-   `matchups_per_game: generatedFrames.length / 2` (= inning count).
-   > ⚠️ **Known issue under review**: `matchups_per_game` is currently set to
-   > `generatedFrames.length / 2` (the inning count), but the actual number of
-   > half-inning slots is `generatedFrames.length` (= innings × 2). The
-   > materialized `matchups` rows are correct (4 for a 2-inning game); only
-   > this metadata field is mislabeled.
+   `rounds_per_game: generatedFrames.length / 2` (the inning count) and
+   `matchups_per_round: 2` (top + bottom per inning).
 2. **`events`** — One event created for the session date.
 3. **`target_scores`** — One row per generated frame (machine + order_number +
    value1/value2 + pre-computed `score1..score10` ladder). For a 2-inning
@@ -405,6 +405,8 @@ How engines interpret the generic columns:
 | Generic Column | Bowling | Golf | Baseball |
 |---|---|---|---|
 | `leagues.participants` | `individual` | `individual` | `head2head` |
+| `leagues.rounds_per_game` | Frames per game (10 full; sessions often 3/6/10) | Holes per game (9 or 18) | Innings per game |
+| `leagues.matchups_per_round` | — | — | Sides per inning (2) |
 | `event_matchups.player1_id` | — | — | Home |
 | `event_matchups.player2_id` | — | — | Away |
 | `event_matchups.player1_score` | — | — | Home Runs |
@@ -431,6 +433,9 @@ How engines interpret the generic columns:
   `MatchupService::saveMatchups` only persists `event_matchup_id`,
   `order_number`, and `machine_id` — player resolution happens at read time
   via `resolveInningRole` (`scripts/services/matchupBuilder.js`).
-- `leagues.matchups_per_game` is the only format-leaning metadata column and
-  is used solely for Baseball season scheduling. Its value should equal the
-  half-inning count (innings × 2), not the inning count.
+- Game sizing for head2head formats is the product of
+  `leagues.rounds_per_game` and `leagues.matchups_per_round`. The schema
+  stores these as two independent columns (rather than a single
+  combined count) so it has no opinion about how many sides a head2head
+  format has. For individual formats (bowling/golf), `rounds_per_game`
+  is the frame/hole count and `matchups_per_round` is unused.

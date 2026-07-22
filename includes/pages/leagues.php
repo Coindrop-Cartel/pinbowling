@@ -47,13 +47,13 @@
           <label for="league-weeks-in-season">Weeks in Season</label>
           <input id="league-weeks-in-season" data-testid="league-weeks-in-season-input" type="number" min="1" value="8" />
         </div>
-        <div id="league-innings-per-game-row" data-testid="league-innings-per-game-row" class="form-row hidden">
-          <label for="league-innings-per-game">Innings per Game</label>
-          <select id="league-innings-per-game" data-testid="league-innings-per-game-select">
-            <option value="2" selected>2 Innings</option>
-            <option value="4">4 Innings</option>
-            <option value="6">6 Innings</option>
-            <option value="9">9 Innings</option>
+        <div id="league-rounds-per-game-row" data-testid="league-rounds-per-game-row" class="form-row hidden">
+          <label for="league-rounds-per-game">Rounds per Game</label>
+          <select id="league-rounds-per-game" data-testid="league-rounds-per-game-select">
+            <option value="2" selected>2 Rounds</option>
+            <option value="4">4 Rounds</option>
+            <option value="6">6 Rounds</option>
+            <option value="9">9 Rounds</option>
           </select>
         </div>
         <div id="league-locations-row" data-testid="league-locations-row" class="form-row hidden">

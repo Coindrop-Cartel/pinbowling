@@ -31,15 +31,16 @@ export function buildRoundRobinMatchups(players, inningCount, machines) {
   const matchups = [];
   for (let inning = 0; inning < inningCount; inning++) {
     const pairing = pairings[inning % pairings.length];
-    const orderNumber = inning + 1;
 
     // Each inning has 2 machines: top (even index) and bottom (odd index)
     const topMachine = machines[inning * 2] || machines[0];
     const bottomMachine = machines[inning * 2 + 1] || machines[1] || topMachine;
 
+    // Each half-inning gets a unique order_number (1, 2, 3, 4, …) so that
+    // two rows per inning don't collide on the (event_matchup_id, order_number) UNIQUE key.
     // Home player (player_order 1) on the top machine
     matchups.push({
-      orderNumber,
+      orderNumber: inning * 2 + 1,
       playerId: pairing.player1Id,
       playerOrder: 1,
       machineId: topMachine.machineId || topMachine.id,
@@ -47,7 +48,7 @@ export function buildRoundRobinMatchups(players, inningCount, machines) {
 
     // Away player (player_order 2) on the bottom machine
     matchups.push({
-      orderNumber,
+      orderNumber: inning * 2 + 2,
       playerId: pairing.player2Id,
       playerOrder: 2,
       machineId: bottomMachine.machineId || bottomMachine.id,

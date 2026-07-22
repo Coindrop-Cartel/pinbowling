@@ -251,7 +251,8 @@ class LeagueService {
      * @param string $seasonScoring
      * @param int $dropLowestWeeks
      * @param int|null $weeksInSeason
-     * @param int $matchupsPerGame
+     * @param int|null $roundsPerGame
+     * @param int|null $matchupsPerRound
      * @return array Created league data
      */
     public function createLeague(
@@ -263,7 +264,8 @@ class LeagueService {
         string $seasonScoring = 'weekly',
         int $dropLowestWeeks = 0,
         ?int $weeksInSeason = null,
-        ?int $matchupsPerGame = 2,
+        ?int $roundsPerGame = null,
+        ?int $matchupsPerRound = null,
         ?int $weeklyPoints = null,
         ?int $pointSpread = null,
         array $locationIds = []
@@ -272,10 +274,10 @@ class LeagueService {
         try {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare(
-                'INSERT INTO leagues (name, start_date, type, participants, scoring_format, season_scoring, drop_lowest_weeks, weeks_in_season, matchups_per_game, weekly_points, point_spread)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO leagues (name, start_date, type, participants, scoring_format, season_scoring, drop_lowest_weeks, weeks_in_season, rounds_per_game, matchups_per_round, weekly_points, point_spread)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
-            $stmt->execute([$name, $startDate, $type, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $matchupsPerGame, $weeklyPoints, $pointSpread]);
+            $stmt->execute([$name, $startDate, $type, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread]);
             $leagueId = (int)$pdo->lastInsertId();
             
             $this->syncLeagueLocations($pdo, $leagueId, $locationIds);
@@ -301,7 +303,8 @@ class LeagueService {
      * @param string $seasonScoring
      * @param int $dropLowestWeeks
      * @param int|null $weeksInSeason
-     * @param int $matchupsPerGame
+     * @param int|null $roundsPerGame
+     * @param int|null $matchupsPerRound
      * @return array Updated league data
      */
     public function updateLeague(
@@ -313,7 +316,8 @@ class LeagueService {
         string $seasonScoring = 'weekly',
         int $dropLowestWeeks = 0,
         ?int $weeksInSeason = null,
-        ?int $matchupsPerGame = 2,
+        ?int $roundsPerGame = null,
+        ?int $matchupsPerRound = null,
         ?int $weeklyPoints = null,
         ?int $pointSpread = null,
         array $locationIds = []
@@ -322,9 +326,9 @@ class LeagueService {
         try {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare(
-                'UPDATE leagues SET name = ?, start_date = ?, participants = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ?, weeks_in_season = ?, matchups_per_game = ?, weekly_points = ?, point_spread = ? WHERE id = ?'
+                'UPDATE leagues SET name = ?, start_date = ?, participants = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ?, weeks_in_season = ?, rounds_per_game = ?, matchups_per_round = ?, weekly_points = ?, point_spread = ? WHERE id = ?'
             );
-            $stmt->execute([$name, $startDate, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $matchupsPerGame, $weeklyPoints, $pointSpread, $leagueId]);
+            $stmt->execute([$name, $startDate, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread, $leagueId]);
             
             $this->syncLeagueLocations($pdo, $leagueId, $locationIds);
             

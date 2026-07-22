@@ -506,9 +506,9 @@ describe('BaseballEngine', () => {
     // 2 innings × 2 players = 4 rows
     expect(matchups).toHaveLength(4);
     expect(matchups[0]).toEqual({ orderNumber: 1, playerId: 10, playerOrder: 1, machineId: 101 });
-    expect(matchups[1]).toEqual({ orderNumber: 1, playerId: 20, playerOrder: 2, machineId: 102 });
-    expect(matchups[2]).toEqual({ orderNumber: 2, playerId: 10, playerOrder: 1, machineId: 103 });
-    expect(matchups[3]).toEqual({ orderNumber: 2, playerId: 20, playerOrder: 2, machineId: 104 });
+    expect(matchups[1]).toEqual({ orderNumber: 2, playerId: 20, playerOrder: 2, machineId: 102 });
+    expect(matchups[2]).toEqual({ orderNumber: 3, playerId: 10, playerOrder: 1, machineId: 103 });
+    expect(matchups[3]).toEqual({ orderNumber: 4, playerId: 20, playerOrder: 2, machineId: 104 });
   });
 
   test('generateMatchupPayload - round-robin cycles pairings for 3 players', () => {

@@ -29,7 +29,7 @@ class SeasonService {
             $pdo->beginTransaction();
             
             // 1. Fetch league details directly
-            $stmt = $pdo->prepare('SELECT status, start_date, weeks_in_season, matchups_per_game FROM leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT status, start_date, weeks_in_season, rounds_per_game, matchups_per_round FROM leagues WHERE id = ?');
             $stmt->execute([$leagueId]);
             $league = $stmt->fetch();
             if (!$league) {
@@ -44,7 +44,11 @@ class SeasonService {
                 throw new \Exception("Weeks in season must be greater than 0.");
             }
             
-            $inningsPerGame = (int)($league['matchups_per_game'] ?? 2);
+            // Total matchups per game = rounds × matchups_per_round
+            // e.g. baseball: 2 innings × 2 sides = 4 matchup rows
+            $rounds = (int)($league['rounds_per_game'] ?? 2);
+            $matchupsPerRound = (int)($league['matchups_per_round'] ?? 2);
+            $matchupsPerGame = $rounds * $matchupsPerRound;
             
             // Fetch roster
             $stmt = $pdo->prepare(
@@ -160,7 +164,7 @@ class SeasonService {
 
                         MatchupGenerator::createInningSlots(
                             $pdo, $eventMatchupId,
-                            $inningsPerGame, $matchupMachineIds
+                            $matchupsPerGame, $matchupMachineIds
                         );
                     }
                 }
@@ -194,7 +198,7 @@ class SeasonService {
             $pdo->beginTransaction();
             
             // 1. Fetch league details directly
-            $stmt = $pdo->prepare('SELECT status, matchups_per_game FROM leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT status, rounds_per_game, matchups_per_round FROM leagues WHERE id = ?');
             $stmt->execute([$leagueId]);
             $league = $stmt->fetch();
             if (!$league) {
@@ -204,7 +208,11 @@ class SeasonService {
                 throw new \Exception("League must be active to update the season schedule.");
             }
             
-            $inningsPerGame = (int)($league['matchups_per_game'] ?? 2);
+            // Total matchups per game = rounds × matchups_per_round
+            // e.g. baseball: 2 innings × 2 sides = 4 matchup rows
+            $rounds = (int)($league['rounds_per_game'] ?? 2);
+            $matchupsPerRound = (int)($league['matchups_per_round'] ?? 2);
+            $matchupsPerGame = $rounds * $matchupsPerRound;
             
             // Fetch roster
             $stmt = $pdo->prepare(
@@ -371,12 +379,12 @@ class SeasonService {
 
                         MatchupGenerator::createInningSlots(
                             $pdo, $eventMatchupId,
-                            $inningsPerGame, $matchupMachineIds
+                            $matchupsPerGame, $matchupMachineIds
                         );
                     }
                 }
             }
-            
+
             $pdo->commit();
             return true;
         } catch (\Exception $e) {

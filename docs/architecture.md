@@ -53,10 +53,15 @@ A lightweight custom container (`includes/container.php`) manages all service in
 | `AuthService` | Login, registration, password reset, session management |
 | `PlayerService` | Player CRUD, role management, profile updates |
 | `LeagueService` | League/event CRUD, roster management, season config |
+| `EventService` | Individual event creation and lookup |
+| `SeasonService` | Season start/update logic, round-robin scheduling |
+| `PlayoffService` | Postseason bracket creation and series advancement |
+| `MatchupGenerator` | Shared helper for creating inning/matchup slots (static) |
 | `LocationService` | Venue management, machine-to-location mapping |
 | `MachineService` | Master machine registry, target score thresholds |
 | `ScoreService` | Score recording and retrieval |
 | `TeamService` | Team CRUD, member and league assignment |
+| `RosterService` | League roster management (players, staff, locations) |
 | `MatchupService` | Head-to-head matchup management (Baseball format) |
 | `CleanupService` | Session data cleanup |
 
@@ -93,22 +98,15 @@ graph LR
 
 Core tables managed by `migrate.php`:
 
-```mermaid
-erDiagram
-    users ||--o| players : "links to"
-    leagues ||--o{ events : contains
-    leagues ||--o{ league_players : "has roster"
-    players ||--o{ league_players : "belongs to"
-    events ||--o{ scores : "records"
-    events ||--o{ event_machines : "configures"
-    events ||--o{ matchups : "pairs"
-    players ||--o{ scores : submits
-    machines ||--o{ event_machines : "used in"
-    locations ||--o{ location_machines : "hosts"
-    machines ||--o{ location_machines : "placed at"
-    teams ||--o{ team_members : "has"
-    players ||--o{ team_members : "member of"
-```
+See `docs/database_schema.md` for the full ER diagram. Key relationships:
+
+- `leagues` → `events` (one-to-many)
+- `leagues` → `league_players` / `league_teams` / `league_locations` / `league_staff` (roster)
+- `events` → `scores` / `target_scores` (records + thresholds)
+- `events` → `event_matchups` → `matchups` (head2head pairing → half-inning slots)
+- `matchups` / `scores` → `machines` (played on)
+- `locations` → `location_machines` → `machines` (machine installation)
+- `players` ↔ `users` (optional 1:1 link for auth accounts)
 
 ---
 

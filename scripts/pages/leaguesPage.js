@@ -68,7 +68,7 @@ export async function initLeaguesPage() {
   const leagueParticipantsInput = document.getElementById('league-participants');
   const leagueDropLowestInput = document.getElementById('league-drop-weeks');
   const leagueWeeksInput = document.getElementById('league-weeks-in-season');
-  const leagueInningsInput = document.getElementById('league-innings-per-game');
+  const leagueInningsInput = document.getElementById('league-rounds-per-game');
 
   const getParticipantMeta = (league) => {
     if (league?.participants === 'team') return { mode: 'Team', countLabel: 'Teams', count: league.teams?.length || 0, listLabel: 'Teams', emptyLabel: 'teams' };
