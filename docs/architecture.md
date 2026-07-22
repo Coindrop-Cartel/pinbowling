@@ -44,7 +44,7 @@ graph TB
 
 ### Dependency Injection Container
 
-A lightweight custom container (`includes/container.php`) manages all service instances with lazy factory resolution:
+A lightweight custom container (`includes/Container.php`) manages all service instances with lazy factory resolution:
 
 | Service | Responsibility |
 |---------|---------------|

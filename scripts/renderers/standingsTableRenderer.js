@@ -31,13 +31,12 @@ function renderTurnCell(turn, scoreKey, lastScoreState, currentScoreState, isTvM
  * @param {boolean} options.isSummary - True if rendering season summary, false if event scoreboard
  * @param {Object} options.league - Active league configuration
  * @param {Object} options.event - Active event configuration (optional)
- * @param {boolean} options.isBaseball - True if scoring format is baseball
  * @param {boolean} options.isTeamLeague - True if league participates as teams
  * @param {Array} options.rows - Processed player result rows
  * @param {Array} options.columns - Event columns (for summary) or machine targets (for event scoreboard)
  * @param {Object} options.engine - Scoring engine instance
  * @param {boolean} options.supportsMatchups - True if the format supports head-to-head matchups
- * @param {Object} [options.baseballRecordsMap] - Pre-calculated records map (for baseball)
+ * @param {Object} [options.head2headRecordsMap] - Pre-calculated records map (for head-to-head formats)
  * @param {Array} [options.allTeamsData] - All teams database records (for team-based leagues)
  * @param {Object} [options.tvModeManager] - TV Mode Manager instance for display state checks
  * @param {Map} [options.lastScoreState] - Previous score state for change pulse animation
@@ -49,13 +48,12 @@ export function renderStandingsTable({
   isSummary,
   league,
   event,
-  isBaseball,
   isTeamLeague,
   rows,
   columns,
   engine,
   supportsMatchups,
-  baseballRecordsMap = null,
+  head2headRecordsMap = null,
   allTeamsData = [],
   tvModeManager = null,
   lastScoreState = new Map(),
@@ -66,8 +64,8 @@ export function renderStandingsTable({
 
   if (isSummary) {
     // --- SEASON SUMMARY RENDER PATHS ---
-    if (isBaseball && !isTeamLeague) {
-      // 1. Baseball Season Summary (Individual)
+    if (supportsMatchups && !isTeamLeague) {
+      // 1. Head-to-Head Season Summary (Individual)
       if (headerEl) {
         headerEl.innerHTML = `
           <tr>
@@ -152,15 +150,28 @@ export function renderStandingsTable({
   } else {
     // --- EVENT SCOREBOARD RENDER PATHS ---
     if (headerEl) {
-      headerEl.innerHTML = `
-        <tr>
-          <th class="text-center">#</th>
-          <th class="text-center">${playerLabel}</th>
-          ${columns.map(m => `<th class="text-center">${m.orderNumber}</th>`).join('')}
-          ${supportsMatchups ? '<th class="text-center">W-L</th>' : ''}
-          <th class="text-center">Total</th>
-        </tr>
-      `;
+      if (supportsMatchups && !isTeamLeague) {
+        // Head-to-head scoreboard: Result, W-L, Total Runs
+        headerEl.innerHTML = `
+          <tr>
+            <th class="text-center">#</th>
+            <th class="text-center">${playerLabel}</th>
+            <th class="text-center">Result</th>
+            <th class="text-center">W-L</th>
+            <th class="text-center">Total</th>
+          </tr>
+        `;
+      } else {
+        headerEl.innerHTML = `
+          <tr>
+            <th class="text-center">#</th>
+            <th class="text-center">${playerLabel}</th>
+            ${columns.map(m => `<th class="text-center">${m.orderNumber}</th>`).join('')}
+            ${supportsMatchups ? '<th class="text-center">W-L</th>' : ''}
+            <th class="text-center">Total</th>
+          </tr>
+        `;
+      }
     }
 
     if (bodyEl) {
@@ -207,9 +218,29 @@ export function renderStandingsTable({
 
           return teamHeader + memberRows;
         }).join('');
+      } else if (supportsMatchups) {
+        // 4a. Head-to-head scoreboard: Result, W-L (season), Total Runs (season)
+        const sortedRows = engine.sortStandings(rows, { head2headRecordsMap });
+
+        bodyEl.innerHTML = sortedRows.map((res, idx) => {
+          const rec = head2headRecordsMap?.[res.player.id];
+          const totalRuns = rec ? rec.totalRuns : res.total;
+          const recordStr = rec ? `${rec.wins}-${rec.losses}${rec.ties > 0 ? `-${rec.ties}` : ''}` : '-';
+          const resultDisplay = res.result || '-';
+
+          return `
+            <tr>
+              <td class="text-center">${idx + 1}</td>
+              <td class="player-name-cell">${escapeHTML(res.player.playerName)}</td>
+              <td class="text-center">${resultDisplay}</td>
+              <td class="text-center">${recordStr}</td>
+              <td class="standings-total">${engine.formatTotalScore(totalRuns)}</td>
+            </tr>
+          `;
+        }).join('');
       } else {
-        // 4. Individual scoreboard
-        const sortedRows = engine.sortStandings(rows, { baseballRecordsMap });
+        // 4b. Standard individual scoreboard
+        const sortedRows = engine.sortStandings(rows, { head2headRecordsMap });
 
         bodyEl.innerHTML = sortedRows.map((res, idx) => {
           let rowHasUpdate = false;
@@ -220,7 +251,7 @@ export function renderStandingsTable({
             return renderTurnCell(t, scoreKey, lastScoreState, currentScoreState, isTvMode);
           }).join('');
 
-          const rec = baseballRecordsMap?.[res.player.id];
+          const rec = head2headRecordsMap?.[res.player.id];
           const recordCell = supportsMatchups
             ? `<td class="standings-record text-center">${rec ? `${rec.wins}-${rec.losses}${rec.ties > 0 ? `-${rec.ties}` : ''}` : '-'}</td>`
             : '';

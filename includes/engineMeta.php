@@ -21,7 +21,7 @@ $engineMeta = [
         'thresholdStart' => 1, // Display ranks from 1 up to 10
         'thresholdEnd' => 10,
         'logic' => "Target scores are assigned for values 10-1, corresponding to how many bowling pins you knock down. Achieving 10 pins on ball 1 is a strike, 
-                    achvieving 10 pins by the end of ball 2 is a 9/. If you haven't reached 10 pins by the end of ball 2, you get the value of your score after ball 2 
+                    achieving 10 pins by the end of ball 2 is a 9/. If you haven't reached 10 pins by the end of ball 2, you get the value of your score after ball 2 
                     as your first pin total of the frame, and then on ball 3 you can achieve a spare if you get to the 10 score, or you just end up with whatever other
                     pins you manage to knock down.  Total game score uses standard bowling scores, linking spares and strikes can dramatically increase your score. "
     ],
@@ -40,7 +40,7 @@ $engineMeta = [
         'lastFrameHint' => "",
         'thresholdStart' => 3, // Display ranks from 3 up to 10
         'thresholdEnd' => 10,
-        'logic' => "Target Scores are assigned from 3-10, based on a target score and a par value.  Iif you reach the target score on one of your balls, you get that score 
+        'logic' => "Target Scores are assigned from 3-10, based on a target score and a par value.                      If you reach the target score on one of your balls, you get that score 
                     as your score for the hole (1, 2, 3).  If you don't reach the target score after your 3rd ball, then your score is assigned by whatever score you did 
                     reach, given the target score (4-10)."
     ],

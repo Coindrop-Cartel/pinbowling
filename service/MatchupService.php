@@ -32,12 +32,12 @@ class MatchupService {
     }
 
     /**
-     * Get all detailed matchups/innings for a specific event matchup.
+     * Get all individual matchup entries for a specific event matchup.
      *
      * @param int $eventMatchupId
      * @return array
      */
-    public function getMatchupInnings(int $eventMatchupId): array {
+    public function getMatchupEntries(int $eventMatchupId): array {
         $stmt = $this->db->query(
             'SELECT m.*, mac.machine_name
              FROM matchups m
@@ -93,9 +93,9 @@ class MatchupService {
     /**
      * Save or update multiple matchups.
      *
-     * Each matchup row represents a single player's slot in a half-inning:
-     *   eventId, eventMatchupId, orderNumber (inning/slot index), playerId, machineId, playerOrder (1=home, 2=away).
-     * The unique key (match_key, player_order) drives the upsert.
+     * Each matchup row represents a machine assigned to a half-inning slot:
+     *   eventMatchupId, orderNumber, machineId.
+     * The unique key (event_matchup_id, order_number) drives the upsert.
      *
      * @param array $matchups Array of matchup data
      * @return bool

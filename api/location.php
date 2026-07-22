@@ -12,6 +12,7 @@ use App\Service\LocationService;
 
 class LocationController extends ApiController {
     private LocationService $locationService;
+    private const ALLOWED_MACHINE_FIELDS = ['format', 'target_easy', 'target_med', 'target_hard'];
 
     public function __construct($container) {
         parent::__construct($container);
@@ -53,8 +54,7 @@ class LocationController extends ApiController {
                     $isPlayer = $user && in_array($user['role'], ['player', 'td', 'admin']);
                     if (!$isPlayer) $this->validateTDAccess();
                     
-                    $allowed = ['format', 'target_easy', 'target_med', 'target_hard'];
-                    $data = array_intersect_key($this->input, array_flip($allowed));
+                    $data = array_intersect_key($this->input, array_flip(self::ALLOWED_MACHINE_FIELDS));
                     $this->locationService->addMachineToLocation(
                         (int)$this->input['locationId'],
                         (int)$this->input['machineId'],
@@ -91,8 +91,7 @@ class LocationController extends ApiController {
                     if (empty($this->input['locationId']) || empty($this->input['machineId'])) {
                         $this->sendError('locationId and machineId are required', 400);
                     }
-                    $allowed = ['format', 'target_easy', 'target_med', 'target_hard'];
-                    $data = array_intersect_key($this->input, array_flip($allowed));
+                    $data = array_intersect_key($this->input, array_flip(self::ALLOWED_MACHINE_FIELDS));
                     $this->locationService->updateLocationMachine((int)$this->input['locationId'], (int)$this->input['machineId'], $data);
                     $this->sendJson(['success' => true]);
                 } else {

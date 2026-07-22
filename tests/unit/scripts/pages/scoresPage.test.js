@@ -79,6 +79,14 @@ vi.mock('@core/engine.js', () => ({
     filterThresholds: vi.fn(v => v),
     formatTotalScore: vi.fn((t) => String(t)),
     getLastFrameHint: vi.fn(() => ''),
+    getMatchupDescription: () => ({ description: '', details: [] }),
+    buildPlayerScoreMap: (_playerId, playerScores) => {
+      const map = {};
+      for (const s of (playerScores || [])) {
+        if (s.orderNumber != null) map[`order_${s.orderNumber}`] = s;
+      }
+      return map;
+    },
   })),
 }));
 
@@ -375,7 +383,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
       if (eventMatchupId) {
         return Promise.resolve({
           id: 50, eventId: 101, player1Id: 10, player1Name: 'Home P', player2Id: 20, player2Name: 'Away P', status: 'pending',
-          innings: [{ id: 1, orderNumber: 1, machineId: 5, machineName: 'M1' }]
+          entries: [{ id: 1, orderNumber: 1, machineId: 5, machineName: 'M1' }]
         });
       }
       return Promise.resolve([
@@ -410,7 +418,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
       if (eventMatchupId) {
         return Promise.resolve({
           id: 50, eventId: 101, player1Id: 10, player1Name: 'Home P', player2Id: 20, player2Name: 'Away P', status: 'pending',
-          innings: [{ id: 1, orderNumber: 1, machineId: 5, machineName: 'M1' }]
+          entries: [{ id: 1, orderNumber: 1, machineId: 5, machineName: 'M1' }]
         });
       }
       return Promise.resolve([

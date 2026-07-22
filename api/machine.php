@@ -64,10 +64,7 @@ class MachineController extends ApiController {
                         $this->sendError('machineName is required', 400);
                     }
                     
-                    $currentUser = \App\Service\AuthService::getCurrentUser();
-                    if (!$currentUser || !in_array($currentUser['role'], ['admin', 'td'])) {
-                        $this->sendError('Unauthorized to add machines', 403);
-                    }
+                    $this->validateTDAccess();
                     
                     $machine = $this->machineService->createMachine(
                         $this->input['machineName'],
@@ -92,10 +89,6 @@ class MachineController extends ApiController {
                     $this->machineService->saveTargetScores($eventId, [$this->input]);
                 } else {
                     // Update machine
-                    $currentUser = \App\Service\AuthService::getCurrentUser();
-                    if (!$currentUser || !in_array($currentUser['role'], ['admin', 'td'])) {
-                        $this->sendError('Unauthorized to update machines', 403);
-                    }
                     $this->machineService->updateMachine(
                         $id,
                         $this->input['machineName'] ?? null,

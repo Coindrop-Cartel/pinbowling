@@ -31,7 +31,7 @@ class PlayerService {
                 [$role]
             );
         } else {
-            $stmt = $this->db->getPdo()->query(
+            $stmt = $this->db->query(
                 "SELECT p.*, u.role, u.id as user_id, u.username, u.email 
                  FROM players p 
                  LEFT JOIN users u ON p.id = u.player_id 
@@ -352,43 +352,38 @@ class PlayerService {
             $stmt = $pdo->prepare("UPDATE team_members SET player_id = ? WHERE player_id = ?");
             $stmt->execute([$playerAId, $playerBId]);
 
-            // 5. Merge Matchups (detailed inning slots)
-            // Update player B's matchups to player A
-            $stmt = $pdo->prepare("UPDATE matchups SET player_id = ? WHERE player_id = ?");
-            $stmt->execute([$playerAId, $playerBId]);
-
-            // 6. Merge Event Matchups
+            // 5. Merge Event Matchups
             // event_matchups has three player-referencing columns. All must be
-            // reassigned before player B is deleted, because home_player_id is
+            // reassigned before player B is deleted, because player1_id is
             // NOT NULL with ON DELETE CASCADE — cascade would silently wipe rows.
             //
             // Edge case: if A and B appeared against each other in the same matchup
-            // (possible with duplicate accounts), we skip the home/away swap to avoid
+            // (possible with duplicate accounts), we skip the player1/player2 swap to avoid
             // creating a self-referential row, but we still promote winner_id to A.
 
-            // 6a. Rows where B is the home player and A is NOT already the away player
+            // 5a. Rows where B is player1 and A is NOT already player2
             $stmt = $pdo->prepare("
                 UPDATE event_matchups
-                SET home_player_id = ?
-                WHERE home_player_id = ?
-                  AND (away_player_id IS NULL OR away_player_id != ?)
+                SET player1_id = ?
+                WHERE player1_id = ?
+                  AND (player2_id IS NULL OR player2_id != ?)
             ");
             $stmt->execute([$playerAId, $playerBId, $playerAId]);
 
-            // 6b. Rows where B is the away player and A is NOT already the home player
+            // 5b. Rows where B is player2 and A is NOT already player1
             $stmt = $pdo->prepare("
                 UPDATE event_matchups
-                SET away_player_id = ?
-                WHERE away_player_id = ?
-                  AND home_player_id != ?
+                SET player2_id = ?
+                WHERE player2_id = ?
+                  AND player1_id != ?
             ");
             $stmt->execute([$playerAId, $playerBId, $playerAId]);
 
-            // 6c. Promote winner references unconditionally (safe regardless of the above)
+            // 5c. Promote winner references unconditionally (safe regardless of the above)
             $stmt = $pdo->prepare("UPDATE event_matchups SET winner_id = ? WHERE winner_id = ?");
             $stmt->execute([$playerAId, $playerBId]);
 
-            // 7. Delete player B's player record
+            // 6. Delete player B's player record
             $stmt = $pdo->prepare("DELETE FROM players WHERE id = ?");
             $stmt->execute([$playerBId]);
 

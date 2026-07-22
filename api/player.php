@@ -82,8 +82,6 @@ class PlayerController extends ApiController {
 
                 $currentUser = \App\Service\AuthService::getCurrentUser();
                 $isOwner = $currentUser && !empty($existing['user_id']) && $currentUser['id'] == $existing['user_id'];
-                $isAdmin = $currentUser && $currentUser['role'] === 'admin';
-                $isTD = $currentUser && $currentUser['role'] === 'td';
 
                 $newName = $this->input['playerName'] ?? $existing['player_name'];
                 $ifpa_id = $this->input['ifpaId'] ?? $existing['ifpa_id'];
@@ -98,22 +96,8 @@ class PlayerController extends ApiController {
                     $this->playerService->updateUserRole((int)$existing['user_id'], $newRole);
                 }
 
-                // Rule: ChangingplayerName, IFPA, or MatchPlay ID requires TD/Admin Access OR being the profile owner.
+                // Rule: Changing playerName, IFPA, or MatchPlay ID requires TD/Admin Access OR being the profile owner.
                 if ($newName !== $existing['player_name'] || $ifpa_id !== $existing['ifpa_id'] || $matchplay_id !== $existing['matchplay_id']) {
-                    if (!$isOwner) {
-                        $this->validateTDAccess();
-                    }
-                }
-
-                // Rule: Changing username requires TD/Admin Access OR being the profile owner.
-                if ($newUsername !== null && !empty($existing['user_id']) && $newUsername !== $existing['username']) {
-                    if (!$isOwner) {
-                        $this->validateTDAccess();
-                    }
-                }
-
-                // Rule: Changing email requires TD/Admin Access OR being the profile owner.
-                if ($newEmail !== null && !empty($existing['user_id']) && $newEmail !== $existing['email']) {
                     if (!$isOwner) {
                         $this->validateTDAccess();
                     }
@@ -124,9 +108,15 @@ class PlayerController extends ApiController {
                 }
 
                 if ($newUsername !== null && !empty($existing['user_id']) && $newUsername !== $existing['username']) {
+                    if (!$isOwner) {
+                        $this->validateTDAccess();
+                    }
                     $this->playerService->updateUserUsername((int)$existing['user_id'], $newUsername);
                 }
                 if ($newEmail !== null && !empty($existing['user_id']) && $newEmail !== $existing['email']) {
+                    if (!$isOwner) {
+                        $this->validateTDAccess();
+                    }
                     $this->playerService->updateUserEmail((int)$existing['user_id'], $newEmail);
                 }
                 $player = $this->playerService->updatePlayer($id, $newName, $ifpa_id, $matchplay_id);

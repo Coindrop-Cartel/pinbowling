@@ -29,45 +29,6 @@ function authorizeRequest(array $allowedRoles, string $unauthorizedMessage) {
 }
 
 /**
- * Checks if the current user has permission to manage a specific league.
- */
-function canManageLeague($pdo, $leagueId) {
-    $user = \App\Service\AuthService::getCurrentUser();
-    if (!$user) return false;
-    if ($user['role'] === 'admin') return true;
-    
-    if ($user['role'] === 'td') {
-        $stmt = $pdo->prepare("SELECT 1 FROM league_staff WHERE league_id = ? AND user_id = ?");
-        $stmt->execute([$leagueId, $user['id']]);
-        return (bool)$stmt->fetch();
-    }
-    return false;
-}
-
-/**
- * Validates access to a specific league.
- * Access is granted if the global admin secret is correct OR if the
- * provided league-specific password matches.
- */
-function validateLeagueAccess($pdo, $leagueId) {
-    $apiSecret = Configuration::getInstance()->getApiSecret();
-    $providedSecret = getHeader('X-PB-Secret');
-
-    // 1. Master Overrides: Session Role or API Secret
-    $user = \App\Service\AuthService::getCurrentUser();
-    if ($user && ($user['role'] === 'admin' || $user['role'] === 'td')) {
-        if (!verifyCsrfToken()) {
-            sendJson(['error' => 'CSRF validation failed'], 403);
-        }
-        return;
-    }
-
-    if ($providedSecret && $providedSecret === $apiSecret) {
-        return;
-    }
-}
-
-/**
  * Verifies that the provided credentials match the Global Admin Password or API Secret.
  * Used for system-wide modifications like master machine/player editing.
  */

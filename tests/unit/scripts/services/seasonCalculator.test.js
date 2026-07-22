@@ -6,6 +6,14 @@ import { calculateSeasonSummary } from '@services/seasonCalculator.js';
 // Provides a controllable engine for testing seasonCalculator logic
 function createMockEngine(overrides = {}) {
   return {
+    getMatchupDescription: vi.fn(() => null),
+    buildPlayerScoreMap: vi.fn((_playerId, playerScores) => {
+      const map = {};
+      for (const s of (playerScores || [])) {
+        if (s.orderNumber != null) map[`order_${s.orderNumber}`] = s;
+      }
+      return map;
+    }),
     calculateTurnResults: vi.fn((machines, scoreMap) => {
       // Default: sum all ball values as the total
       const total = Object.values(scoreMap).reduce(
@@ -889,7 +897,10 @@ describe('calculateSeasonSummary', () => {
 
       const targetsByEvent = {};
       const scoresByEventAndPlayer = {};
-      const engine = createMockEngine();
+      const engine = createMockEngine({
+        getMatchupDescription: vi.fn(() => ({ description: 'head-to-head', details: [] })),
+        buildPlayerScoreMap: vi.fn(() => ({ isPlayer1: true, opponent: {} }))
+      });
 
       const result = calculateSeasonSummary({
         league,

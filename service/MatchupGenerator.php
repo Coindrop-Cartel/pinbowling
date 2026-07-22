@@ -10,7 +10,7 @@ use PDO;
  * Extracted from LeagueService (startSeason, updateSeason, startPlayoffs)
  * and ScoreService (handlePlayoffAdvancement, advanceToPlayoffRound) to
  * eliminate five near-identical copies of the machine selection and
- * inning-slot creation logic.
+ * matchup-slot creation logic.
  */
 class MatchupGenerator {
 
@@ -19,7 +19,7 @@ class MatchupGenerator {
      * available pool if more slots are needed than there are distinct machines.
      *
      * @param array $allMachineIds Full pool of machine IDs to draw from.
-     * @param int   $count         Number of machine slots needed (innings * 2).
+     * @param int   $count         Number of machine slots needed (rounds * matchupsPerRound).
      * @return array               Ordered list of machine IDs, length === $count.
      */
     public static function selectMachines(array $allMachineIds, int $count): array {
@@ -40,23 +40,26 @@ class MatchupGenerator {
     }
 
     /**
-     * Insert the per-inning slot rows into the `matchups` table for one
-     * head-to-head event matchup, and populate default/machine target_scores for the event.
+     * Insert the slot rows into the `matchups` table for one head-to-head
+     * event matchup, and populate default/machine target_scores for the event.
      *
-     * Each round produces `matchupsPerRound` rows with sequential order numbers.
+     * Total slots created = $rounds * $matchupsPerRound with sequential order numbers.
      *
-     * @param PDO   $pdo             Active PDO connection (already in a transaction).
-     * @param int   $eventMatchupId  The event_matchup ID these innings belong to.
-     * @param int   $matchupsPerGame  Total matchup rows per game (= rounds_per_game * matchups_per_round).
-     * @param array $allMachineIds   Full pool of machine IDs to draw from.
+     * @param PDO   $pdo              Active PDO connection (already in a transaction).
+     * @param int   $eventMatchupId   The event_matchup ID these slots belong to.
+     * @param int   $rounds           Number of rounds per game.
+     * @param int   $matchupsPerRound Number of matchup slots per round.
+     * @param array $allMachineIds    Full pool of machine IDs to draw from.
      */
-    public static function createInningSlots(
+    public static function createMatchupSlots(
         PDO $pdo,
         int $eventMatchupId,
-        int $matchupsPerGame,
+        int $rounds,
+        int $matchupsPerRound,
         array $allMachineIds
     ): void {
-        $machineSlots = self::selectMachines($allMachineIds, $matchupsPerGame);
+        $totalSlots = $rounds * $matchupsPerRound;
+        $machineSlots = self::selectMachines($allMachineIds, $totalSlots);
 
         // Fetch event_id from event_matchups
         $stmt = $pdo->prepare('SELECT event_id FROM event_matchups WHERE id = ?');
@@ -69,9 +72,20 @@ class MatchupGenerator {
         );
 
         $tsStmt = $pdo->prepare(
-            'INSERT INTO target_scores (event_id, machine_id, order_number, value1, value2)
-             VALUES (?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), value1 = VALUES(value1), value2 = VALUES(value2)'
+            'INSERT INTO target_scores
+                (event_id, machine_id, order_number, value1, value2,
+                 score1, score2, score3, score4, score5,
+                 score6, score7, score8, score9, score10)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                machine_id = VALUES(machine_id),
+                value1 = VALUES(value1),
+                value2 = VALUES(value2),
+                score1 = VALUES(score1),  score2  = VALUES(score2),
+                score3 = VALUES(score3),  score4  = VALUES(score4),
+                score5 = VALUES(score5),  score6  = VALUES(score6),
+                score7 = VALUES(score7),  score8  = VALUES(score8),
+                score9 = VALUES(score9),  score10 = VALUES(score10)'
         );
 
         foreach ($machineSlots as $i => $machineId) {
@@ -83,7 +97,17 @@ class MatchupGenerator {
                 $value1 = $targetScores['value1'] ?? 5000000;
                 $value2 = $targetScores['value2'] ?? 1.5;
 
-                $tsStmt->execute([$eventId, $machineId, $orderNum, $value1, $value2]);
+                // Compute full 1-10 values map from baseline and multiplier
+                $scoreValues = [];
+                for ($rank = 1; $rank <= 10; $rank++) {
+                    $scoreValues[$rank] = (int)round($value1 * pow($value2, $rank - 1));
+                }
+
+                $tsStmt->execute([
+                    $eventId, $machineId, $orderNum, $value1, $value2,
+                    $scoreValues[1], $scoreValues[2], $scoreValues[3], $scoreValues[4], $scoreValues[5],
+                    $scoreValues[6], $scoreValues[7], $scoreValues[8], $scoreValues[9], $scoreValues[10]
+                ]);
             }
         }
     }

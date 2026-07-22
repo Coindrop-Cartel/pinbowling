@@ -129,12 +129,12 @@
   white-space: nowrap;
 }
 
-.theme-baseball .scoreboard-row .inning-header {
+.theme-baseball .scoreboard-row .round-header {
   min-width: 48px;
   font-size: 0.8em;
 }
 
-.theme-baseball .scoreboard-row .inning-score {
+.theme-baseball .scoreboard-row .round-score {
   min-width: 36px;
 }
 

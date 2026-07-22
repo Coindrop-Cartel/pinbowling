@@ -1,5 +1,5 @@
 import { escapeHTML } from '@scripts/utils.js';
-import { flattenMatchupInnings } from '@services/normalizer.js';
+import { flattenMatchupEntries } from '@services/normalizer.js';
 
 /**
  * Renders the standard table scoreboard for formats like Bowling and Golf.
@@ -42,19 +42,18 @@ export function renderStandardScoreboard(calcResult, domRefs) {
 }
 
 /**
- * Renders the head-to-head scoreboard grid for Baseball (PinBaseball).
- * Displays teams, alternating halves (top/bottom), run outcomes, and Walk-offs.
+ * Renders a head-to-head scoreboard grid showing all players'
+ * results side-by-side organized by round.
  * 
  * @param {Object} calcResult The outputs from calculateTurnResults.
- * @param {Array} machines Inning target configurations.
- * @param {Object} scoreMap The player's active scores map.
+ * @param {Array} machines Round target configurations.
  * @param {Object} context Matchup details, scores by player, and caches.
  * @param {Object} domRefs References to results panel DOM nodes.
- * @param {Object} engine The active baseball engine instance.
+ * @param {Object} engine The active engine instance.
  */
-export function renderBaseballScoreboard(calcResult, machines, scoreMap, context, domRefs, engine) {
+export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs, engine) {
   const { resultsPanel, resultsBody, totalScore, resultsEmpty } = domRefs;
-  const { allEventScores, eventMatchups, allPlayersCache, getCurrentPlayerId, normalizeScores, groupScoresByPlayer, buildBaseballScoreMapForPlayer } = context;
+  const { allEventScores, eventMatchups, allPlayersCache, getCurrentPlayerId, normalizeScores, groupScoresByPlayer } = context;
 
   if (!eventMatchups || eventMatchups.length === 0) {
     // Fall back to standard scoreboard rendering if no matchups exist
@@ -63,26 +62,31 @@ export function renderBaseballScoreboard(calcResult, machines, scoreMap, context
   }
 
   const currentPlayerId = Number(getCurrentPlayerId());
-  const innings = flattenMatchupInnings(eventMatchups);
-  const myMatchups = innings.filter(m => Number(m.playerId) === currentPlayerId);
-  const opponentIds = [...new Set(
-    myMatchups.flatMap(m =>
-      innings
-        .filter(s => Number(s.orderNumber) === Number(m.orderNumber) && Number(s.playerOrder) !== Number(m.playerOrder))
-        .map(s => Number(s.playerId))
-    )
-  )];
+  const allEntries = flattenMatchupEntries(eventMatchups);
+
+  // Player IDs come from the wrapper object, not individual entries
+  const wrapper = eventMatchups[0];
+  const p1Id = Number(wrapper.player1Id ?? wrapper.player1_id);
+  const p2Id = Number(wrapper.player2Id ?? wrapper.player2_id);
+  const isCurrentPlayer1 = currentPlayerId === p1Id;
+  const opponentId = isCurrentPlayer1 ? p2Id : p1Id;
+  const opponentIds = opponentId ? [opponentId] : [];
+
+  console.log('[renderHead2HeadScoreboard] currentPlayerId:', currentPlayerId, 'p1Id:', p1Id, 'p2Id:', p2Id, 'opponentId:', opponentId);
+  console.log('[renderHead2HeadScoreboard] allEntries:', allEntries);
 
   const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
+  console.log('[renderHead2HeadScoreboard] scoresByPlayer:', scoresByPlayer);
 
   const playerResults = [
-    { id: currentPlayerId, name: allPlayersCache.find(p => p.id === currentPlayerId)?.playerName || `You`, scoreMap: buildBaseballScoreMapForPlayer(currentPlayerId, scoresByPlayer, eventMatchups) },
+    { id: currentPlayerId, name: allPlayersCache.find(p => p.id === currentPlayerId)?.playerName || `You`, scoreMap: engine.buildPlayerScoreMap(currentPlayerId, scoresByPlayer[currentPlayerId] || [], scoresByPlayer, eventMatchups) },
     ...opponentIds.map(oppId => ({
       id: oppId,
       name: allPlayersCache.find(p => p.id === oppId)?.playerName || `Opponent ${oppId}`,
-      scoreMap: buildBaseballScoreMapForPlayer(oppId, scoresByPlayer, eventMatchups)
+      scoreMap: engine.buildPlayerScoreMap(oppId, scoresByPlayer[oppId] || [], scoresByPlayer, eventMatchups)
     }))
   ];
+  console.log('[renderHead2HeadScoreboard] playerResults:', playerResults);
 
   // Sort: Away (playerOrder 2) always first, Home (playerOrder 1) second.
   playerResults.sort((a, b) => {
@@ -92,35 +96,37 @@ export function renderBaseballScoreboard(calcResult, machines, scoreMap, context
   });
 
   const playerTotalScores = {};
-  const inningData = {};
+  const roundScores = {};
   const playerEngineResults = {};
 
   playerResults.forEach(pResult => {
     const playerIdNum = Number(pResult.id);
-    const { turnResults: pTurnResults } = engine.calculateTurnResults(machines, pResult.scoreMap);
-    playerEngineResults[playerIdNum] = pTurnResults;
+    const pTurnResults = engine.calculateTurnResults(machines, pResult.scoreMap);
+    const turnResults = Array.isArray(pTurnResults) ? pTurnResults : (pTurnResults.turnResults || []);
+    playerEngineResults[playerIdNum] = turnResults;
+    console.log('[renderHead2HeadScoreboard] player ' + playerIdNum + ' scoreMap:', pResult.scoreMap, 'turnResults:', turnResults);
 
     let currentTotal = 0;
-    for (let i = 0; i < pTurnResults.length; i++) {
-      const turn = pTurnResults[i];
-      const inningNumber = Math.floor(i / 2) + 1;
-      const inningKey = String(inningNumber);
-      if (!inningData[inningKey]) inningData[inningKey] = {};
+    for (let i = 0; i < turnResults.length; i++) {
+      const turn = turnResults[i];
+      const roundNumber = Math.floor(i / 2) + 1;
+      const roundKey = String(roundNumber);
+      if (!roundScores[roundKey]) roundScores[roundKey] = {};
 
       if (turn.played) {
         currentTotal += turn.score;
-        if (turn.isBatter && inningData[inningKey][playerIdNum] === undefined) {
-          inningData[inningKey][playerIdNum] = String(turn.score);
-        } else if (inningData[inningKey][playerIdNum] === undefined) {
-          inningData[inningKey][playerIdNum] = '0';
+        if (turn.isBatter && roundScores[roundKey][playerIdNum] === undefined) {
+          roundScores[roundKey][playerIdNum] = String(turn.score);
+        } else if (roundScores[roundKey][playerIdNum] === undefined) {
+          roundScores[roundKey][playerIdNum] = '0';
         }
       } else if (turn.isWalkOff) {
-        if (inningData[inningKey][playerIdNum] === undefined) {
-          inningData[inningKey][playerIdNum] = 'X';
+        if (roundScores[roundKey][playerIdNum] === undefined) {
+          roundScores[roundKey][playerIdNum] = 'X';
         }
       } else {
-        if (inningData[inningKey][playerIdNum] === undefined) {
-          inningData[inningKey][playerIdNum] = '-';
+        if (roundScores[roundKey][playerIdNum] === undefined) {
+          roundScores[roundKey][playerIdNum] = '-';
         }
       }
     }
@@ -133,18 +139,18 @@ export function renderBaseballScoreboard(calcResult, machines, scoreMap, context
   const existingGrid = resultsPanel.querySelector('.scoreboard-grid');
   if (existingGrid) existingGrid.remove();
 
-  const inningGroups = [];
-  const totalInnings = Math.ceil(machines.length / 2);
-  for (let i = 1; i <= totalInnings; i++) {
-    inningGroups.push({ inningNumber: i });
+  const roundGroups = [];
+  const totalRounds = Math.ceil(machines.length / 2);
+  for (let i = 1; i <= totalRounds; i++) {
+    roundGroups.push({ roundNumber: i });
   }
 
   let scoreboardHTML = '<div class="scoreboard-grid">';
 
   // 1. Header Row
   scoreboardHTML += '<div class="scoreboard-row header"><span class="player-col">Player</span>';
-  for (const ig of inningGroups) {
-    scoreboardHTML += `<span class="inning-header">${ig.inningNumber}</span>`;
+  for (const rg of roundGroups) {
+    scoreboardHTML += `<span class="round-header">${rg.roundNumber}</span>`;
   }
   scoreboardHTML += '<span class="total-header">TOTAL</span></div>';
 
@@ -156,9 +162,9 @@ export function renderBaseballScoreboard(calcResult, machines, scoreMap, context
 
     scoreboardHTML += '<div class="scoreboard-row player-row">';
     scoreboardHTML += `<span class="player-name"><span class="home-away-label">${homeAwayLabel}:</span> ${escapeHTML(pResult.name)}</span>`;
-    for (const ig of inningGroups) {
-      const score = inningData[String(ig.inningNumber)]?.[playerIdNum] || '-';
-      scoreboardHTML += `<span class="inning-score">${score}</span>`;
+    for (const rg of roundGroups) {
+      const score = roundScores[String(rg.roundNumber)]?.[playerIdNum] || '-';
+      scoreboardHTML += `<span class="round-score">${score}</span>`;
     }
     scoreboardHTML += `<span class="total-score">${totalScoreValue}</span></div>`;
   });

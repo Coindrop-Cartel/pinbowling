@@ -1,14 +1,4 @@
-<?php
-/**
- * Management interface for physical pinball venues.
- * 
- * This page provides UI for:
- * 1. Registering and editing Locations (Venues) where events take place.
- * 2. Mapping global Machines to specific Locations.
- * 3. Defining "baseline" target scores for machines at a venue to simplify event setup.
- */
-$pageTitle = 'Manage Locations';
-?>
+<?php $pageTitle = 'Manage Locations'; ?>
   <main class="page-container">
     <header>
       <h1>Manage Locations</h1>

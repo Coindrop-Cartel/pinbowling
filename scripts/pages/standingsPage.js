@@ -7,7 +7,7 @@ import { showDialog } from '@ui/dialogs.js';
 import { renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { filterLeaguesForUser } from '@services/auth.js';
 import { normalizeTargets, normalizeScores, groupScoresByPlayer } from '@services/normalizer.js';
-import { calculateSeasonSummary, calculateBaseballRecords, fetchSeasonData } from '@services/seasonCalculator.js';
+import { calculateSeasonSummary, calculateHead2HeadRecords, fetchSeasonData } from '@services/seasonCalculator.js';
 import { TvModeManager } from '@ui/tvMode.js';
 import { renderStandingsTable } from '@scripts/renderers/standingsTableRenderer.js';
 
@@ -169,7 +169,6 @@ export async function initStandingsPage() {
     const format = ScoringFormats.resolve(league?.scoringFormat);
     const engine = getScoringEngine(format);
     const isTeamLeague = league?.participants === 'team';
-    const isBaseball = format === ScoringFormats.BASEBALL;
 
     applyPreferredTheme(format);
     const loader = createSkeletonLoader(standingsBody, { type: 'table', count: 10 });
@@ -204,7 +203,6 @@ export async function initStandingsPage() {
         isSummary: true,
         league,
         event: null,
-        isBaseball,
         isTeamLeague,
         rows,
         columns: events,
@@ -333,6 +331,8 @@ export async function initStandingsPage() {
     renderFilterUI(players);
 
     const filteredPlayers = selectedPlayerIds.length > 0 ? players.filter(p => selectedPlayerIds.includes(String(p.id))) : players;
+    const isTeamLeague = league?.participants === 'team';
+    const supportsMatchups = !!Engine.getMatchupDescription(1);
 
     const rows = filteredPlayers.map(player => {
       const scores = scoresByPlayer[player.id] || [];
@@ -354,11 +354,28 @@ export async function initStandingsPage() {
       }, 0);
       const parDiff = playedTurns.length > 0 ? total - totalPar : 0;
 
-      return { player, turnResults, total, totalDisplay, ordersWithScores, parDiff, hasScores: playedTurns.length > 0 };
-    });
+      // Determine weekly result for matchup-based formats
+      let result = null;
+      if (supportsMatchups) {
+        const playerMatchup = eventMatchups.find(m => {
+          if (m.status !== 'completed') return false;
+          const p1 = Number(m.player1Id ?? m.player1_id);
+          const p2 = Number(m.player2Id ?? m.player2_id);
+          return p1 === player.id || p2 === player.id;
+        });
+        if (playerMatchup) {
+          const p1Id = Number(playerMatchup.player1Id ?? playerMatchup.player1_id);
+          const r1 = Number(playerMatchup.player1Score ?? playerMatchup.player1_score ?? 0);
+          const r2 = Number(playerMatchup.player2Score ?? playerMatchup.player2_score ?? 0);
+          const isPlayer1 = p1Id === player.id;
+          const pScore = isPlayer1 ? r1 : r2;
+          const oScore = isPlayer1 ? r2 : r1;
+          result = pScore > oScore ? 'Win' : (pScore < oScore ? 'Loss' : 'Tie');
+        }
+      }
 
-    const isTeamLeague = league?.participants === 'team';
-    const supportsMatchups = !!Engine.getMatchupDescription(1);
+      return { player, turnResults, total, totalDisplay, ordersWithScores, parDiff, hasScores: playedTurns.length > 0, result };
+    });
 
     renderStandingsTable({
       headerEl: standingsHeader,
@@ -366,19 +383,18 @@ export async function initStandingsPage() {
       isSummary: false,
       league,
       event,
-      isBaseball: format === ScoringFormats.BASEBALL,
       isTeamLeague,
       rows,
       columns: machines,
       engine: Engine,
       supportsMatchups,
-      baseballRecordsMap: (supportsMatchups && eventMatchups.length > 0)
+      head2headRecordsMap: (supportsMatchups && eventMatchups.length > 0)
         ? (() => {
             const playersForRecords = filteredPlayers.map(p => ({ id: p.id }));
             const matchupsByEvent = { [eventId]: eventMatchups };
             const scoresByEvent = { [eventId]: scoresByPlayer };
             const singleEventTargets = { [eventId]: machines };
-            return calculateBaseballRecords(playersForRecords, [{ id: eventId }], matchupsByEvent, scoresByEvent, singleEventTargets, Engine);
+            return calculateHead2HeadRecords(playersForRecords, [{ id: eventId }], matchupsByEvent, scoresByEvent, singleEventTargets, Engine);
           })()
         : null,
       allTeamsData,

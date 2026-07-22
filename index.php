@@ -87,7 +87,7 @@ if (file_exists($targetFile)) {
 $pageContent = ob_get_clean();
 
 // 6. Render Layout
-if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+if (request()->isAjax()) {
     // For partial loads via AJAX, only return the page content
     echo $pageContent;
 } else {

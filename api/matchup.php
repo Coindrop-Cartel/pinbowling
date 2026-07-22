@@ -28,9 +28,9 @@ class MatchupController extends ApiController {
                         $this->sendError('Matchup not found', 404);
                     }
                     
-                    $innings = $this->matchupService->getMatchupInnings($eventMatchupId);
+                    $entries = $this->matchupService->getMatchupEntries($eventMatchupId);
                     $serialized = Serializer::eventMatchup($matchupInfo);
-                    $serialized['innings'] = array_map([Serializer::class, 'matchup'], $innings);
+                    $serialized['entries'] = array_map([Serializer::class, 'matchup'], $entries);
                     
                     $this->sendJson($serialized);
                 } else {
@@ -53,12 +53,12 @@ class MatchupController extends ApiController {
                     }
 
                     $result = [];
-                    foreach ($grouped as $emId => $inningRows) {
+                    foreach ($grouped as $emId => $entryRows) {
                         $emInfo = $this->matchupService->getEventMatchup($emId);
                         $serialized = $emInfo
                             ? Serializer::eventMatchup($emInfo)
                             : ['id' => $emId, 'eventId' => $eventId];
-                        $serialized['innings'] = array_map([Serializer::class, 'matchup'], $inningRows);
+                        $serialized['entries'] = array_map([Serializer::class, 'matchup'], $entryRows);
                         $result[] = $serialized;
                     }
                     if (!empty($ungrouped)) {
@@ -77,7 +77,7 @@ class MatchupController extends ApiController {
                             'gameNumber' => 1,
                             'roundName' => null,
                             'seriesId' => null,
-                            'innings' => array_map([Serializer::class, 'matchup'], $ungrouped)
+                            'entries' => array_map([Serializer::class, 'matchup'], $ungrouped)
                         ];
                     }
 

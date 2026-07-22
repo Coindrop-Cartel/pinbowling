@@ -24,9 +24,6 @@ if (empty($_SESSION['csrf_token'])) {
 $config = Configuration::getInstance();
 $siteContent = new SiteContent();
 
-// Asset Configuration
-$stylesDir = 'styles'; // Folder name for CSS files. Set to '' if files are in the root.
-
 // UI_VERSION is used for asset cache-busting.
 // package.json is the single source of truth for versioning across the project.
 $packageFile = PB_BASE_DIR . '/package.json';

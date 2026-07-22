@@ -5,12 +5,12 @@ import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActive
 import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
-import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildBaseballScoreMapForPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
+import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { printBlankScoreSheet, printScoreSheet } from '@ui/printing.js';
 import { buildRoundRow } from '../renderers/roundRowRenderer.js';
 import { FormatBranding } from '@services/scoringFormatBranding.js';
-import { renderStandardScoreboard, renderBaseballScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
+import { renderStandardScoreboard, renderHead2HeadScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
 import { renderMatchupSchedule } from '@scripts/renderers/matchupScheduleRenderer.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
 
@@ -248,10 +248,8 @@ export async function initScoresPage() {
    * @param {Object} player The player being scored.
    */
   async function loadScoresIntoForm(scoreRows, player) {
-    console.log('[loadScoresIntoForm] Raw scoreRows:', scoreRows, 'for player:', player);
     const playerId = Number(player?.id);
     const normalized = normalizeScores(scoreRows || []).filter(s => Number(s.playerId) === playerId);
-    console.log('[loadScoresIntoForm] Filtered scores for player:', playerId, normalized);
     const scoreMap = normalized.reduce((map, row) => {
       map[String(row.orderNumber)] = row;
       return map;
@@ -454,7 +452,6 @@ export async function initScoresPage() {
       getCurrentPlayerId,
       normalizeScores,
       groupScoresByPlayer,
-      buildBaseballScoreMapForPlayer,
       escapeHTML
     };
   }
@@ -477,7 +474,7 @@ export async function initScoresPage() {
     const calcResult = Engine.calculateTurnResults(machines, scoreMap);
 
     if (activeFormat === ScoringFormats.BASEBALL) {
-      renderBaseballScoreboard(calcResult, machines, scoreMap, getEngineContext(), {
+      renderHead2HeadScoreboard(calcResult, machines, getEngineContext(), {
         resultsPanel,
         resultsBody,
         totalScore,
@@ -584,27 +581,38 @@ export async function initScoresPage() {
 
     // Customize the target machines list to be matchup-specific if deep-linked
     let machinesNormalized = normalizeTargets(eventTargets);
+    // Recompute all-zero values maps (defensive: handles legacy data where
+    // score1-score10 were never stored, e.g. league events created before the
+    // refactor that added individual score columns)
+    machinesNormalized = machinesNormalized.map(m => {
+      if (m.values && Object.values(m.values).every(v => Number(v) === 0)) {
+        m.values = Engine.buildRoundValues(m.value1, m.value2);
+      }
+      return m;
+    });
     if (activeEventMatchupId && eventMatchups.length > 0) {
       const matchupDetails = eventMatchups[0];
-      // IMPORTANT: inningSlot.orderNumber is the *inning* number (1, 2, …) and is
-      // shared by BOTH the top and bottom machines of the same inning.  If we used
-      // it directly, both half-innings would get the same orderNumber, causing score
-      // saves/lookups to collide — the bottom machine's scores would overwrite the
-      // top machine's and vice-versa.  Instead we derive a strict sequential position
-      // (1, 2, 3, 4, …) from the slot's index in the innings array, which matches
-      // how event target scores are numbered in the database.
-      machinesNormalized = (matchupDetails.innings || []).map((inningSlot, i) => {
+      // IMPORTANT: Each entry's orderNumber is the round number (1, 2, …) and is
+      // shared by BOTH matchups within the same round (e.g., top and bottom).
+      // If we used it directly, both entries would get the same orderNumber,
+      // causing score saves/lookups to collide. Instead we derive a strict
+      // sequential position (1, 2, 3, 4, …) from the entry's index in the
+      // entries array, which matches how event target scores are numbered.
+      machinesNormalized = (matchupDetails.entries || []).map((entry, i) => {
         const sequentialOrderNumber = i + 1;
         const tgt = eventTargets.find(t => t.orderNumber === sequentialOrderNumber);
         const value1 = tgt ? tgt.value1 : 5000000;
         const value2 = tgt ? tgt.value2 : 1.5;
-        const values = tgt ? tgt.values : Engine.buildRoundValues(value1, value2);
+        let values = tgt ? tgt.values : null;
+        if (!values || Object.values(values).every(v => Number(v) === 0)) {
+          values = Engine.buildRoundValues(value1, value2);
+        }
         return {
-          id: inningSlot.id,
-          eventId: inningSlot.eventId,
+          id: entry.id,
+          eventId: entry.eventId,
           orderNumber: sequentialOrderNumber,
-          machineId: inningSlot.machineId,
-          machineName: inningSlot.machineName,
+          machineId: entry.machineId,
+          machineName: entry.machineName,
           value1,
           value2,
           values

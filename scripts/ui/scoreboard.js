@@ -1,1 +1,1 @@
-export { renderBaseballScoreboard, renderStandardScoreboard } from '../renderers/scoreboardRenderer.js';
+export { renderHead2HeadScoreboard, renderStandardScoreboard } from '../renderers/scoreboardRenderer.js';

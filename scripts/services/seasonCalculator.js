@@ -2,7 +2,6 @@ import {
   groupTargetsByEvent, 
   buildScoreMapFromRows, 
   groupScoresByPlayer, 
-  buildBaseballScoreMapForPlayer,
   normalizeTargets,
   normalizeScores,
   groupScoresByEventAndPlayer,
@@ -11,12 +10,12 @@ import {
 import { ScoringFormats } from '@services/scoringFormat.js';
 
 /**
- * Calculate head-to-head win/loss records for baseball format.
+ * Calculate head-to-head win/loss records for matchup-based formats.
  * For each matchup, compares the total runs scored by each player to determine the winner.
  *
  * @param {Object[]} players - Array of player objects (each with `id`).
  * @param {Object[]} events - Array of event objects (each with `id`).
- * @param {Object<number, Object[]>} matchupsByEvent - Baseball matchups keyed by event ID.
+ * @param {Object<number, Object[]>} matchupsByEvent - Matchups keyed by event ID.
  * @param {Object<number, Object<number, Object[]>>} scoresByEventAndPlayer
  *   Nested map of `{ [eventId]: { [playerId]: score[] } }`.
  * @param {Object<number, Object[]>} targetsByEvent - Map of `{ [eventId]: target[] }`.
@@ -24,7 +23,7 @@ import { ScoringFormats } from '@services/scoringFormat.js';
  * @returns {Object<number, {wins: number, losses: number, ties: number, winRate: number}>}
  *   Map of playerId to their W-L record and win rate.
  */
-export function calculateBaseballRecords(players, events, matchupsByEvent, scoresByEventAndPlayer, targetsByEvent, engine) {
+export function calculateHead2HeadRecords(players, events, matchupsByEvent, scoresByEventAndPlayer, targetsByEvent, engine) {
   const records = {};
   players.forEach(p => { 
     records[p.id] = { 
@@ -129,12 +128,11 @@ export function calculateBaseballRecords(players, events, matchupsByEvent, score
  */
 export function calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, matchupsByEvent = {}, engine, selectedPlayerIds = [] }) {
   const isTeamLeague = league?.participants === 'team';
-  const isBaseball = league?.scoringFormat === ScoringFormats.BASEBALL;
+  const supportsMatchups = !!engine.getMatchupDescription(1);
 
   const getScoreMapForPlayer = (eventId, playerId, scores) => {
-    if (!isBaseball) return buildScoreMapFromRows(scores);
-    const scoresByPlayer = groupScoresByPlayer(Object.values(scoresByEventAndPlayer[eventId] || {}).flat());
-    return buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchupsByEvent[eventId] || []);
+    const allScoresByPlayer = groupScoresByPlayer(Object.values(scoresByEventAndPlayer[eventId] || {}).flat());
+    return engine.buildPlayerScoreMap(playerId, scores, allScoresByPlayer, matchupsByEvent[eventId] || []);
   };
 
   // Helper: which targets a player touched across the league
@@ -238,7 +236,30 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
       }
 
       if (hasData) {
-        const displayValue = league?.seasonScoring === 'weekly' ? `${scoreValue} pts` : engine.formatTotalScore(scoreValue);
+        let displayValue;
+        if (supportsMatchups && !isTeamLeague) {
+          // Determine win/loss/tie from matchup data
+          const eventMatchups = matchupsByEvent[event.id] || [];
+          const playerMatchup = eventMatchups.find(m => {
+            if (m.status !== 'completed') return false;
+            const p1 = Number(m.player1Id ?? m.player1_id);
+            const p2 = Number(m.player2Id ?? m.player2_id);
+            return p1 === entity.id || p2 === entity.id;
+          });
+          if (playerMatchup) {
+            const r1 = Number(playerMatchup.player1Score ?? playerMatchup.player1_score ?? 0);
+            const r2 = Number(playerMatchup.player2Score ?? playerMatchup.player2_score ?? 0);
+            const p1 = Number(playerMatchup.player1Id ?? playerMatchup.player1_id);
+            const isPlayer1 = p1 === entity.id;
+            const playerScore = isPlayer1 ? r1 : r2;
+            const oppScore = isPlayer1 ? r2 : r1;
+            displayValue = playerScore > oppScore ? 'Win' : (playerScore < oppScore ? 'Loss' : 'Tie');
+          } else {
+            displayValue = '-';
+          }
+        } else {
+          displayValue = league?.seasonScoring === 'weekly' ? `${scoreValue} pts` : engine.formatTotalScore(scoreValue);
+        }
         eventTotals[event.id] = { displayValue, isDropped: false };
         individualScores.push({ eventId: event.id, value: scoreValue, hasData: true });
       } else {
@@ -272,12 +293,12 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
     return { entity, eventTotals, totalSeasonPoints, playedTargets: isTeamLeague ? [] : getPlayedTargets(entity.id, normalizedTargetsFlat) };
   });
 
-  // For baseball, calculate head-to-head W-L records and attach to rows
-  let baseballRecords = null;
-  if (isBaseball && !isTeamLeague) {
-    baseballRecords = calculateBaseballRecords(players, events, matchupsByEvent, scoresByEventAndPlayer, targetsByEvent, engine);
+  // For head-to-head formats, calculate W-L records and attach to rows
+  let head2headRecords = null;
+  if (supportsMatchups && !isTeamLeague) {
+    head2headRecords = calculateHead2HeadRecords(players, events, matchupsByEvent, scoresByEventAndPlayer, targetsByEvent, engine);
     rows.forEach(row => {
-      const rec = baseballRecords[row.entity.id];
+      const rec = head2headRecords[row.entity.id];
       if (rec) {
         row.record = rec;
         row.displayRecord = `${rec.wins}-${rec.losses}${rec.ties > 0 ? `-${rec.ties}` : ''}`;
@@ -286,8 +307,8 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
   }
 
   rows.sort((a, b) => {
-    // For baseball, sort by win rate, then head-to-head, then run diff, then total runs
-    if (isBaseball && a.record && b.record) {
+    // For matchup formats, sort by win rate, then head-to-head, then run diff, then total runs
+    if (supportsMatchups && a.record && b.record) {
       const rateDiff = b.record.winRate - a.record.winRate;
       if (Math.abs(rateDiff) > 0.001) return rateDiff;
 
@@ -312,7 +333,7 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
     return engine.compareScores(a.totalSeasonPoints, b.totalSeasonPoints);
   });
 
-  return { rows, isTeamLeague, baseballRecords };
+  return { rows, isTeamLeague, head2headRecords };
 }
 
 /**

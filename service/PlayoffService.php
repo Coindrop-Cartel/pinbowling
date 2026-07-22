@@ -69,7 +69,6 @@ class PlayoffService {
             
             $rounds = (int)($league['rounds_per_game'] ?? 2);
             $matchupsPerRound = (int)($league['matchups_per_round'] ?? 2);
-            $matchupsPerGame = $rounds * $matchupsPerRound;
             
             // 4. Generate seed pairings
             $pairings = [];
@@ -95,9 +94,9 @@ class PlayoffService {
                 $eventMatchupId = (int)$pdo->lastInsertId();
  
                 $matchupMachineIds = $this->getMatchupMachinePool($leagueId, $allMachineIds);
-        MatchupGenerator::createInningSlots(
+                MatchupGenerator::createMatchupSlots(
                         $pdo, $eventMatchupId,
-                        $matchupsPerGame, $matchupMachineIds
+                        $rounds, $matchupsPerRound, $matchupMachineIds
                 );
             }
             
@@ -146,7 +145,6 @@ class PlayoffService {
         // e.g. baseball: 2 innings × 2 sides = 4 matchup rows
         $rounds = (int)($league['rounds_per_game'] ?? 2);
         $matchupsPerRound = (int)($league['matchups_per_round'] ?? 2);
-        $matchupsPerGame = $rounds * $matchupsPerRound;
 
         $seriesStmt = $this->db->prepare(
             'SELECT winner_id FROM event_matchups 
@@ -227,11 +225,11 @@ class PlayoffService {
                     $this->advanceToPlayoffRound($leagueId, 'Semifinals', [
                         ['home' => $seriesWinners[1], 'away' => $seriesWinners[2], 'series_id' => 1],
                         ['home' => $seriesWinners[3], 'away' => $seriesWinners[4], 'series_id' => 2]
-                    ], $matchupsPerGame, $seriesLength);
+                    ], $rounds, $matchupsPerRound, $seriesLength);
                 } elseif ($roundName === 'Semifinals') {
                     $this->advanceToPlayoffRound($leagueId, 'Finals', [
                         ['home' => $seriesWinners[1], 'away' => $seriesWinners[2], 'series_id' => 1]
-                    ], $matchupsPerGame, $seriesLength);
+                    ], $rounds, $matchupsPerRound, $seriesLength);
                 } else {
                     $stmt = $this->db->prepare('UPDATE leagues SET status = \'completed\' WHERE id = ?');
                     $stmt->execute([$leagueId]);
@@ -251,9 +249,9 @@ class PlayoffService {
             $allMachineIds = $machinesStmt->fetchAll(\PDO::FETCH_COLUMN);
             $matchupMachineIds = $this->getMatchupMachinePool($leagueId, $allMachineIds);
 
-            MatchupGenerator::createInningSlots(
+            MatchupGenerator::createMatchupSlots(
                 $this->db->getPdo(), $nextEventMatchupId,
-                $matchupsPerGame, $matchupMachineIds
+                $rounds, $matchupsPerRound, $matchupMachineIds
             );
         }
     }
@@ -261,7 +259,7 @@ class PlayoffService {
     /**
      * Helper to create next round events and matches.
      */
-    private function advanceToPlayoffRound(int $leagueId, string $nextRoundName, array $pairings, int $matchupsPerGame, int $seriesLength): void
+    private function advanceToPlayoffRound(int $leagueId, string $nextRoundName, array $pairings, int $rounds, int $matchupsPerRound, int $seriesLength): void
     {
         $eventStmt = $this->db->prepare('INSERT INTO events (league_id, event_name, status, scoring_format) VALUES (?, ?, \'pending\', \'baseball\')');
         $eventStmt->execute([$leagueId, "Playoffs: " . $nextRoundName]);
@@ -279,9 +277,9 @@ class PlayoffService {
             $eventMatchupId = (int) $this->db->lastInsertId();
 
             $matchupMachineIds = $this->getMatchupMachinePool($leagueId, $allMachineIds);
-            MatchupGenerator::createInningSlots(
+            MatchupGenerator::createMatchupSlots(
                 $this->db->getPdo(), $eventMatchupId,
-                $matchupsPerGame, $matchupMachineIds
+                $rounds, $matchupsPerRound, $matchupMachineIds
             );
         }
     }

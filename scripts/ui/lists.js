@@ -423,7 +423,7 @@ export function renderLeagueList(container, filteredLeagues, {
 }
 
 /**
- * TD Tool modal to swap machines for unplayed inning halves of a matchup.
+ * TD Tool modal to swap machines for unplayed matchup entries.
  */
 async function openEditMachinesModal(matchupId) {
   try {
@@ -459,20 +459,20 @@ async function openEditMachinesModal(matchupId) {
         <tbody>
     `;
 
-    const slots = matchup.innings || [];
-    const inningSlots = {};
-    slots.forEach(s => {
-      if (!inningSlots[s.orderNumber]) inningSlots[s.orderNumber] = {};
-      inningSlots[s.orderNumber][s.playerOrder] = s;
+    const entries = matchup.entries || [];
+    const roundMap = {};
+    entries.forEach(e => {
+      if (!roundMap[e.orderNumber]) roundMap[e.orderNumber] = {};
+      roundMap[e.orderNumber][e.playerOrder] = e;
     });
 
-    const inningsCount = Object.keys(inningSlots).length;
+    const roundCount = Object.keys(roundMap).length;
 
-    for (let i = 1; i <= inningsCount; i++) {
-      const topSlot = inningSlots[i][1]; 
-      const bottomSlot = inningSlots[i][2]; 
+    for (let i = 1; i <= roundCount; i++) {
+      const topEntry = roundMap[i][1]; 
+      const bottomEntry = roundMap[i][2]; 
 
-      if (!topSlot || !bottomSlot) continue;
+      if (!topEntry || !bottomEntry) continue;
 
       const topPlayed = (scoreMap[`${awayId}_${i}`]?.ball1 > 0 || scoreMap[`${homeId}_${i}`]?.ball1 > 0);
       const bottomPlayed = (scoreMap[`${homeId}_${i}`]?.ball1 > 0 || scoreMap[`${awayId}_${i}`]?.ball1 > 0);
@@ -481,14 +481,14 @@ async function openEditMachinesModal(matchupId) {
         <tr style="border-bottom: 1px solid #ddd;">
           <td style="padding: 8px; font-weight: bold;">Inning ${i}</td>
           <td style="padding: 8px;">
-            <select class="machine-select-top" data-inning="${i}" ${topPlayed ? 'disabled style="background: #f4f4f4; cursor: not-allowed;"' : ''}>
-              ${allMachines.map(m => `<option value="${m.id}" ${m.id === topSlot.machineId ? 'selected' : ''}>${escapeHTML(m.machineName)}</option>`).join('')}
+            <select class="machine-select-top" data-round="${i}" ${topPlayed ? 'disabled style="background: #f4f4f4; cursor: not-allowed;"' : ''}>
+              ${allMachines.map(m => `<option value="${m.id}" ${m.id === topEntry.machineId ? 'selected' : ''}>${escapeHTML(m.machineName)}</option>`).join('')}
             </select>
             ${topPlayed ? '<div style="color: #d32f2f; font-size: 0.75em; margin-top: 2px;">In progress / Played</div>' : ''}
           </td>
           <td style="padding: 8px;">
-            <select class="machine-select-bottom" data-inning="${i}" ${bottomPlayed ? 'disabled style="background: #f4f4f4; cursor: not-allowed;"' : ''}>
-              ${allMachines.map(m => `<option value="${m.id}" ${m.id === bottomSlot.machineId ? 'selected' : ''}>${escapeHTML(m.machineName)}</option>`).join('')}
+            <select class="machine-select-bottom" data-round="${i}" ${bottomPlayed ? 'disabled style="background: #f4f4f4; cursor: not-allowed;"' : ''}>
+              ${allMachines.map(m => `<option value="${m.id}" ${m.id === bottomEntry.machineId ? 'selected' : ''}>${escapeHTML(m.machineName)}</option>`).join('')}
             </select>
             ${bottomPlayed ? '<div style="color: #d32f2f; font-size: 0.75em; margin-top: 2px;">In progress / Played</div>' : ''}
           </td>
@@ -504,28 +504,28 @@ async function openEditMachinesModal(matchupId) {
 
     const resolveValue = () => {
       const updates = [];
-      for (let i = 1; i <= inningsCount; i++) {
-        const topSelect = formContainer.querySelector(`.machine-select-top[data-inning="${i}"]`);
-        const bottomSelect = formContainer.querySelector(`.machine-select-bottom[data-inning="${i}"]`);
+      for (let i = 1; i <= roundCount; i++) {
+        const topSelect = formContainer.querySelector(`.machine-select-top[data-round="${i}"]`);
+        const bottomSelect = formContainer.querySelector(`.machine-select-bottom[data-round="${i}"]`);
 
         if (topSelect && !topSelect.disabled) {
-          const topSlot = inningSlots[i][1];
+          const topEntry = roundMap[i][1];
           updates.push({
             eventId: matchup.eventId,
             eventMatchupId: matchupId,
             orderNumber: i,
-            playerId: topSlot.playerId,
+            playerId: topEntry.playerId,
             playerOrder: 1,
             machineId: Number(topSelect.value)
           });
         }
         if (bottomSelect && !bottomSelect.disabled) {
-          const bottomSlot = inningSlots[i][2];
+          const bottomEntry = roundMap[i][2];
           updates.push({
             eventId: matchup.eventId,
             eventMatchupId: matchupId,
             orderNumber: i,
-            playerId: bottomSlot.playerId,
+            playerId: bottomEntry.playerId,
             playerOrder: 2,
             machineId: Number(bottomSelect.value)
           });
@@ -536,7 +536,7 @@ async function openEditMachinesModal(matchupId) {
 
     const result = await showDialog({
       title: 'Edit Matchup Machines',
-      message: 'Modify machine assignments for unplayed innings. Already played innings are locked.',
+      message: 'Modify machine assignments for unplayed rounds. Already played rounds are locked.',
       confirmText: 'Save Changes',
       customElement: formContainer,
       resolveValue

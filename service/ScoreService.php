@@ -10,6 +10,8 @@ class ScoreService
     private DatabaseService $db;
     private PlayoffService $playoffService;
 
+    private const SCORE_COLUMNS = 's.id, s.player_id, s.event_id, s.event_matchup_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name';
+
     public function __construct(DatabaseService $db, PlayoffService $playoffService)
     {
         $this->db = $db;
@@ -25,7 +27,7 @@ class ScoreService
     public function getLeagueScores(int $leagueId): array
     {
         $stmt = $this->db->query(
-            'SELECT s.id, s.player_id, s.event_id, s.event_matchup_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
+            'SELECT ' . self::SCORE_COLUMNS . '
              FROM scores s
              JOIN machines m ON m.id = s.machine_id
              JOIN events e ON s.event_id = e.id
@@ -47,7 +49,7 @@ class ScoreService
     {
         if ($playerId) {
             $stmt = $this->db->query(
-                'SELECT s.id, s.player_id, s.event_id, s.event_matchup_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
+                'SELECT ' . self::SCORE_COLUMNS . '
                  FROM scores s
                  JOIN machines m ON m.id = s.machine_id
                  WHERE s.player_id = ? AND s.event_id = ?
@@ -56,7 +58,7 @@ class ScoreService
             );
         } else {
             $stmt = $this->db->query(
-                'SELECT s.id, s.player_id, s.event_id, s.event_matchup_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
+                'SELECT ' . self::SCORE_COLUMNS . '
                  FROM scores s
                  JOIN machines m ON m.id = s.machine_id
                  WHERE s.event_id = ?
@@ -76,7 +78,7 @@ class ScoreService
     public function getMatchupScores(int $eventMatchupId): array
     {
         $stmt = $this->db->query(
-            'SELECT s.id, s.player_id, s.event_id, s.event_matchup_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name
+            'SELECT ' . self::SCORE_COLUMNS . '
              FROM scores s
              JOIN machines m ON m.id = s.machine_id
              WHERE s.event_matchup_id = ?
@@ -179,7 +181,7 @@ class ScoreService
         // Fetch all scores submitted for this matchup
         $scores = $this->getMatchupScores($eventMatchupId);
 
-        // Structure scores by player and order_number (inning)
+        // Structure scores by player and order_number (slot)
         $scoreMap = [];
         foreach ($scores as $s) {
             $scoreMap[(int) $s['player_id']][(int) $s['order_number']] = $s;
@@ -202,13 +204,13 @@ class ScoreService
         $player1Score = 0;
         $player2Score = 0;
 
-        // Baseball count of innings
-        $inningsCount = (int) (count($slots) / 2);
+        // Number of rounds (each round = top + bottom)
+        $roundsCount = (int) (count($slots) / 2);
         $hasScores = false;
 
-        for ($inning = 1; $inning <= $inningsCount; $inning++) {
-            $topOrderNum    = ($inning - 1) * 2 + 1;
-            $bottomOrderNum = ($inning - 1) * 2 + 2;
+        for ($round = 1; $round <= $roundsCount; $round++) {
+            $topOrderNum    = ($round - 1) * 2 + 1;
+            $bottomOrderNum = ($round - 1) * 2 + 2;
 
             $p1TopEntry    = $scoreMap[$player1Id][$topOrderNum]    ?? ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
             $p2TopEntry    = $scoreMap[$player2Id][$topOrderNum]    ?? ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
@@ -229,23 +231,23 @@ class ScoreService
             $bottomTarget = $machineMap[$bottomOrderNum] ?? $defaultTarget;
 
             if ($topTarget) {
-                // Top of inning: Player 2 (Away) is batter, Player 1 (Home) is pitcher
-                $runs = $this->calculateRunsForInningHalf($topTarget, $p2TopEntry, $p1TopEntry);
+                // Top of round: Player 2 (Away) is batter, Player 1 (Home) is pitcher
+                $runs = $this->calculateRunsForHalfRound($topTarget, $p2TopEntry, $p1TopEntry);
                 $player2Score += $runs;
             }
 
             if ($bottomTarget) {
-                // Bottom of inning: Player 1 (Home) is batter, Player 2 (Away) is pitcher
-                $runs = $this->calculateRunsForInningHalf($bottomTarget, $p1BottomEntry, $p2BottomEntry);
+                // Bottom of round: Player 1 (Home) is batter, Player 2 (Away) is pitcher
+                $runs = $this->calculateRunsForHalfRound($bottomTarget, $p1BottomEntry, $p2BottomEntry);
                 $player1Score += $runs;
             }
         }
 
         // Check if matchup is fully played/completed.
         $fullyPlayed = true;
-        for ($inning = 1; $inning <= $inningsCount; $inning++) {
-            $topOrderNum    = ($inning - 1) * 2 + 1;
-            $bottomOrderNum = ($inning - 1) * 2 + 2;
+        for ($round = 1; $round <= $roundsCount; $round++) {
+            $topOrderNum    = ($round - 1) * 2 + 1;
+            $bottomOrderNum = ($round - 1) * 2 + 2;
             if (
                 !isset($scoreMap[$player1Id][$topOrderNum]) ||
                 !isset($scoreMap[$player2Id][$topOrderNum]) ||
@@ -284,9 +286,9 @@ class ScoreService
     }
 
     /**
-     * Inning half run calculator helper.
+     * Half-round run calculator helper.
      */
-    private function calculateRunsForInningHalf(array $target, array $batterEntry, array $pitcherEntry): int
+    private function calculateRunsForHalfRound(array $target, array $batterEntry, array $pitcherEntry): int
     {
         $b1 = (int) ($batterEntry['ball1'] ?? 0);
         $b2 = (int) ($batterEntry['ball2'] ?? 0);

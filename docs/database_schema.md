@@ -92,19 +92,22 @@ erDiagram
 | `scoring_format` | varchar(50) | `bowling` / `golf` / `baseball` |
 | `season_scoring` | enum(`cumulative`,`weekly`) | Season aggregation strategy |
 | `drop_lowest_weeks` | int | Season scoring tweak |
-| `weekly_points` / `point_spread` / `weeks_in_season` | int | Season config (standard leagues) |
+| `weekly_points` | int (nullable) | Season config (standard leagues) |
+| `point_spread` | int (nullable) | Season config (standard leagues) |
 | `rounds_per_game` | int (nullable) | Number of rounds in a game. Bowling = 10 (full), sessions often 3/6/10. Golf = 9 or 18. Baseball = innings. For a `standard` league, may be `NULL` if rounds are driven by `target_scores` row count instead. |
 | `matchups_per_round` | int (nullable) | **Head2head only.** Number of paired matchups within a round. Baseball = 2 (top/bottom). `NULL` for individual formats (bowling/golf). Total `matchups` rows for a head2head game = `rounds_per_game * matchups_per_round`. |
+| `weeks_in_season` | int (nullable) | Number of weeks/events in a standard season |
 | `status` | enum(`setup`,`active`,`completed`) | |
+| `playoff_series_length` | int (nullable) | Number of games per playoff series |
 
 **Relationships:** 1→many `events`, `league_players`, `league_teams`,
 `league_staff`, `league_locations`.
 
-> Game sizing is split across two independent columns instead of a single
-> `matchups_per_game` value, so the schema has no opinion about how many
-> sides a head2head format has. The engine materializes
-> `rounds_per_game * matchups_per_round` rows in the `matchups` table when
-> a head2head event is created.
+> Game sizing is split across two independent columns (`rounds_per_game` ×
+> `matchups_per_round`) instead of a single combined count, so the schema
+> has no opinion about how many sides a head2head format has. The engine
+> materializes `rounds_per_game * matchups_per_round` rows in the `matchups`
+> table when a head2head event is created.
 
 ---
 
@@ -165,6 +168,8 @@ One row per half-inning per game. For an N-inning baseball game there are
 | `order_number` | int | Sequential slot index (1-based). Engine maps to Top/Bottom of inning N |
 | `machine_id` | int FK→`machines.id` | The machine played for this half-inning |
 
+**Unique key:** `unique_matchup_round` (`event_matchup_id`, `order_number`) — drives `ON DUPLICATE KEY UPDATE` in matchup saves.
+
 **Relationships:** belongs to `event_matchups`; references `machines`.
 
 > `order_number` semantics by format:
@@ -180,14 +185,15 @@ One row per half-inning per game. For an N-inning baseball game there are
 | Column | Type | Notes |
 |---|---|---|
 | `id` | int PK auto | |
-| `event_id` | int (FK logically) | |
+| `event_id` | int FK→`events.id` | |
 | `event_matchup_id` | int FK→`event_matchups.id` (nullable) | Set for head2head formats |
 | `player_id` | int FK→`players.id` | |
-| `machine_id` | int FK→`machines.id` | |
 | `order_number` | int | Round/frame/hole/half-inning index |
+| `machine_id` | int FK→`machines.id` | |
 | `ball1` / `ball2` / `ball3` | bigint | The three ball scores for the round |
-| `status` | enum(`pending`,`approved`) | |
-| `match_key` | varchar(100) STORED GENERATED | Composite key for upserts |
+| `match_key` | varchar(100) STORED GENERATED | Composite key for upserts. Computed from `event_id`/`event_matchup_id` + `order_number` |
+
+**Unique key:** `unique_scores_key` (`player_id`, `match_key`) — drives `ON DUPLICATE KEY UPDATE` in score saves.
 
 **Relationships:** belongs to `events`, `event_matchups` (optional),
 `players`, `machines`.
@@ -411,7 +417,7 @@ How engines interpret the generic columns:
 | `event_matchups.player2_id` | — | — | Away |
 | `event_matchups.player1_score` | — | — | Home Runs |
 | `event_matchups.player2_score` | — | — | Away Runs |
-| `matchups.order_number` | — | — | Half-inning slot (Top/Bottom of N) |
+| `matchups.order_number` | — | — | Half-inning slot (1-based; odd=Top, even=Bottom) |
 | `scores.order_number` | Frame # | Hole # | Half-inning slot |
 | `target_scores.value1` | Strike score (10-pin threshold) | Target Score (anchored at par) | Run baseline |
 | `target_scores.value2` | 1-pin baseline score | Par value per hole (3/4/5) | Exponential multiplier |
@@ -425,10 +431,10 @@ How engines interpret the generic columns:
   events have no rows here; their scores join directly to `events`.
 - `scores.event_matchup_id` is nullable for the same reason — individual
   formats leave it NULL.
-- `matchups` has no `player_id`/`player_order` columns in the current schema;
-  player assignment for each half-inning is derived from the parent
-  `event_matchups.player1_id`/`player2_id` plus the `order_number` parity
-  (odd = Top = player1 pitches, even = Bottom = player2 pitches). The JS
+- `matchups` has no `player_id`/`player_order` or `event_id` columns in the
+  current schema; player assignment for each half-inning is derived from the
+  parent `event_matchups.player1_id`/`player2_id` plus the `order_number`
+  parity (odd = Top = player1 pitches, even = Bottom = player2 pitches). The JS
   `buildRoundRobinMatchups` emits `playerOrder` in the payload, but the PHP
   `MatchupService::saveMatchups` only persists `event_matchup_id`,
   `order_number`, and `machine_id` — player resolution happens at read time

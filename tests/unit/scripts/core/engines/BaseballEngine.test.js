@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import { BaseballEngine } from '@core/engines/BaseballEngine.js';
 import { FormatBranding } from '@services/scoringFormatBranding.js';
-import { renderBaseballScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
+import { renderHead2HeadScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
 
 describe('BaseballEngine', () => {
   beforeEach(() => {
@@ -569,32 +569,29 @@ describe('BaseballEngine', () => {
   test('enrichScoreMap - correctly enriches scoreMap with opponent data', () => {
     const context = {
       allEventScores: [
-        { playerId: 1, machineOrder: 1, ball1: 100, ball2: 200, ball3: 300 },
-        { playerId: 2, machineOrder: 1, ball1: 150, ball2: 250, ball3: 350 },
+        { playerId: 1, orderNumber: 1, ball1: 100, ball2: 200, ball3: 300 },
+        { playerId: 2, orderNumber: 1, ball1: 150, ball2: 250, ball3: 350 },
       ],
       eventMatchups: [
-        { playerId: 1, orderNumber: 1, playerOrder: 1 },
-        { playerId: 2, orderNumber: 1, playerOrder: 2 },
+        {
+          player1Id: 1,
+          player2Id: 2,
+          entries: [
+            { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10 },
+            { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11 },
+          ],
+        },
       ],
       getCurrentPlayerId: () => 1,
       normalizeScores: (scores) => scores,
       groupScoresByPlayer: (scores) => {
         const grouped = {};
         scores.forEach(s => {
-          if (!grouped[s.playerId]) grouped[s.playerId] = {};
-          grouped[s.playerId][s.machineOrder] = { ball1: s.ball1, ball2: s.ball2, ball3: s.ball3 };
+          if (!grouped[s.playerId]) grouped[s.playerId] = [];
+          grouped[s.playerId].push(s);
         });
         return grouped;
       },
-      buildBaseballScoreMapForPlayer: (playerId, scoresByPlayer, matchups) => {
-        // Mocking the actual buildBaseballScoreMapForPlayer logic
-        const isPlayer1 = matchups.find(m => m.playerId === playerId)?.playerOrder === 1;
-        const opponentId = isPlayer1 ? 2 : 1;
-        return {
-          isPlayer1,
-          opponent: scoresByPlayer[opponentId] || {}
-        };
-      }
     };
 
     const scoreMap = { '1': { ball1: 100, ball2: 200, ball3: 300 } };
@@ -614,24 +611,15 @@ describe('BaseballEngine', () => {
       groupScoresByPlayer: (scores) => {
         const grouped = {};
         scores.forEach(s => {
-          if (!grouped[s.playerId]) grouped[s.playerId] = {};
-          grouped[s.playerId][s.machineOrder] = { ball1: s.ball1, ball2: s.ball2, ball3: s.ball3 };
+          if (!grouped[s.playerId]) grouped[s.playerId] = [];
+          grouped[s.playerId].push(s);
         });
         return grouped;
       },
-      buildBaseballScoreMapForPlayer: (playerId, scoresByPlayer, matchups) => {
-        // Mocking the actual buildBaseballScoreMapForPlayer logic
-        const isPlayer1 = matchups.find(m => m.playerId === playerId)?.playerOrder === 1;
-        const opponentId = isPlayer1 ? 2 : 1;
-        return {
-          isPlayer1,
-          opponent: scoresByPlayer[opponentId] || {}
-        };
-      }
     };
     const result = engine.enrichScoreMap(scoreMap, context);
     expect(result.opponent).toEqual({});
-    expect(result.isPlayer1).toBe(false); // matchups.find(...)?.playerOrder === 1 is false if find returns undefined
+    expect(result.isPlayer1).toBe(true); // defaults to true when no matchups
   });
 
   // ── buildPlayerScoreMap ──────────────────────────────────────────────
@@ -646,10 +634,16 @@ describe('BaseballEngine', () => {
   // ── getRoundRowContext ───────────────────────────────────────────────
   test('getRoundRowContext - away player is batter when viewing home top machine', () => {
     const matchups = [
-      { innings: [
-        { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
-        { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' }
-      ]}
+      {
+        player1Id: 1,
+        player2Id: 2,
+        player1Name: 'Kyle',
+        player2Name: 'Brian',
+        entries: [
+          { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
+          { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' },
+        ],
+      },
     ];
     const context = { eventMatchups: matchups, getCurrentPlayerId: () => 2 };
     const round = { machineId: 10, orderNumber: 1 };
@@ -664,10 +658,16 @@ describe('BaseballEngine', () => {
 
   test('getRoundRowContext - away player is pitcher when viewing own bottom machine', () => {
     const matchups = [
-      { innings: [
-        { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
-        { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' }
-      ]}
+      {
+        player1Id: 1,
+        player2Id: 2,
+        player1Name: 'Kyle',
+        player2Name: 'Brian',
+        entries: [
+          { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
+          { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' },
+        ],
+      },
     ];
     const context = { eventMatchups: matchups, getCurrentPlayerId: () => 2 };
     const round = { machineId: 11, orderNumber: 1 };
@@ -680,10 +680,16 @@ describe('BaseballEngine', () => {
 
   test('getRoundRowContext - home player is pitcher when viewing own top machine', () => {
     const matchups = [
-      { innings: [
-        { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
-        { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' }
-      ]}
+      {
+        player1Id: 1,
+        player2Id: 2,
+        player1Name: 'Kyle',
+        player2Name: 'Brian',
+        entries: [
+          { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
+          { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' },
+        ],
+      },
     ];
     const context = { eventMatchups: matchups, getCurrentPlayerId: () => 1 };
     const round = { machineId: 10, orderNumber: 1 };
@@ -698,10 +704,16 @@ describe('BaseballEngine', () => {
 
   test('getRoundRowContext - home player is batter when viewing away bottom machine', () => {
     const matchups = [
-      { innings: [
-        { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
-        { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' }
-      ]}
+      {
+        player1Id: 1,
+        player2Id: 2,
+        player1Name: 'Kyle',
+        player2Name: 'Brian',
+        entries: [
+          { orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10, playerName: 'Kyle' },
+          { orderNumber: 1, playerId: 2, playerOrder: 2, machineId: 11, playerName: 'Brian' },
+        ],
+      },
     ];
     const context = { eventMatchups: matchups, getCurrentPlayerId: () => 1 };
     const round = { machineId: 11, orderNumber: 1 };
@@ -772,7 +784,7 @@ describe('BaseballEngine', () => {
 
     // We don't need to spy on ScoringEngine.prototype.renderResults if we just want to ensure it doesn't crash
     // and follows the fallback path.
-    renderBaseballScoreboard(calcResult, machines, scoreMap, context, domRefs, engine);
+    renderHead2HeadScoreboard(calcResult, machines, context, domRefs, engine);
     expect(domRefs.resultsPanel.classList.add).not.toHaveBeenCalled();
   });
 
@@ -804,10 +816,16 @@ describe('BaseballEngine', () => {
 
     const context = {
       eventMatchups: [
-        { innings: [
-          { playerId: 1, orderNumber: 1, playerOrder: 1 }, // Player 1 home
-          { playerId: 2, orderNumber: 1, playerOrder: 2 }, // Player 2 away
-        ]}
+        {
+          player1Id: 1,
+          player2Id: 2,
+          player1Name: 'Player One',
+          player2Name: 'Player Two',
+          entries: [
+            { playerId: 1, orderNumber: 1, playerOrder: 1, machineId: 10 },
+            { playerId: 2, orderNumber: 1, playerOrder: 2, machineId: 11 },
+          ],
+        },
       ],
       allPlayersCache: [
         { id: 1, playerName: 'Player One' },
@@ -816,9 +834,6 @@ describe('BaseballEngine', () => {
       getCurrentPlayerId: () => '1',
       normalizeScores: (s) => s,
       groupScoresByPlayer: (s) => s,
-      buildBaseballScoreMapForPlayer: (id, scores, matchups) => {
-        return { isPlayer1: id === 1 };
-      },
       allEventScores: []
     };
 
@@ -845,7 +860,7 @@ describe('BaseballEngine', () => {
       escapeHTML: (s) => s
     };
 
-    renderBaseballScoreboard(calcResult, machines, scoreMap, context, domRefs, engine);
+    renderHead2HeadScoreboard(calcResult, machines, context, domRefs, engine);
 
     // Verify mock interactions
     expect(mockTable.classList.add).toHaveBeenCalledWith('hidden');
@@ -879,17 +894,20 @@ describe('BaseballEngine', () => {
 
     const context = {
       eventMatchups: [
-        { innings: [
-          { playerId: 1, orderNumber: 1, playerOrder: 1 }, // Player 1 home, no opponent
-        ]}
+        {
+          player1Id: 1,
+          player2Id: undefined,
+          player1Name: 'Player One',
+          player2Name: undefined,
+          entries: [
+            { playerId: 1, orderNumber: 1, playerOrder: 1, machineId: 10 },
+          ],
+        },
       ],
       allPlayersCache: [], // Empty cache to trigger fallback names
       getCurrentPlayerId: () => '1',
       normalizeScores: (s) => s,
       groupScoresByPlayer: (s) => s,
-      buildBaseballScoreMapForPlayer: (id, scores, matchups) => {
-        return { isPlayer1: id === 1 };
-      },
       allEventScores: []
     };
 
@@ -912,7 +930,7 @@ describe('BaseballEngine', () => {
       escapeHTML: (s) => s
     };
 
-    renderBaseballScoreboard(calcResult, machines, scoreMap, context, domRefs, engine);
+    renderHead2HeadScoreboard(calcResult, machines, context, domRefs, engine);
 
     // Verify insertion fallback (no total-score div)
     expect(domRefs.resultsPanel.insertAdjacentHTML).toHaveBeenCalledWith('beforeend', expect.stringContaining('scoreboard-grid'));
@@ -939,17 +957,20 @@ describe('BaseballEngine', () => {
 
     const context = {
       eventMatchups: [
-        { innings: [
-          { playerId: 2, orderNumber: 1, playerOrder: 2 }, // Player 2 away, no home team
-        ]}
+        {
+          player1Id: undefined,
+          player2Id: 2,
+          player1Name: undefined,
+          player2Name: 'Player Two',
+          entries: [
+            { playerId: 2, orderNumber: 1, playerOrder: 2, machineId: 10 },
+          ],
+        },
       ],
       allPlayersCache: [], // Empty cache to trigger fallback names
       getCurrentPlayerId: () => '2',
       normalizeScores: (s) => s,
       groupScoresByPlayer: (s) => s,
-      buildBaseballScoreMapForPlayer: (id, scores, matchups) => {
-        return { isPlayer1: id === 1 };
-      },
       allEventScores: []
     };
 
@@ -972,7 +993,7 @@ describe('BaseballEngine', () => {
       escapeHTML: (s) => s
     };
 
-    renderBaseballScoreboard(calcResult, machines, scoreMap, context, domRefs, engine);
+    renderHead2HeadScoreboard(calcResult, machines, context, domRefs, engine);
 
     // Away defaults to 'You' (because current player is player 2), Home defaults to 'Home' (because it's missing)
     expect(domRefs.totalScore.innerHTML).toContain('You 7');

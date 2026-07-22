@@ -30,7 +30,7 @@
   <?php echo $pageContent; ?>
 
   <footer class="site-footer">
-    <p>@2026 PinballAndStuff.com</p>
+    <p>&copy;2026 PinballAndStuff.com</p>
   </footer>
 
   <script src="<?php echo versionedAsset($baseUrl . '/js-config.php'); ?>"></script>

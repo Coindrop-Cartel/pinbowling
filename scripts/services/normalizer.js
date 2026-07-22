@@ -139,18 +139,18 @@ export function groupMatchupsByEvent(matchups) {
 }
 
 /**
- * Flattens a list of event-matchup wrappers into a single array of inning rows.
+ * Flattens a list of event-matchup wrappers into a single array of matchup entries.
  *
  * The API always returns matchups as a list of wrapper objects, each with an
- * `innings` array (this is true for both league sessions and one-off sessions).
- * This helper extracts all inning rows from every wrapper into a flat list so
- * callers can iterate innings without checking two different data shapes.
+ * `entries` array. This helper extracts all individual matchup entries from
+ * every wrapper into a flat list so callers can iterate them without checking
+ * two different data shapes.
  *
  * @param {Object[]} eventMatchups Array of event-matchup wrapper objects.
- * @returns {Object[]} Flat array of inning/matchup row objects.
+ * @returns {Object[]} Flat array of matchup entry objects.
  */
-export function flattenMatchupInnings(eventMatchups) {
-  return (eventMatchups || []).flatMap(em => em.innings || (Array.isArray(em) ? em : []));
+export function flattenMatchupEntries(eventMatchups) {
+  return (eventMatchups || []).flatMap(em => em.entries || (Array.isArray(em) ? em : []));
 }
 
 export function buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchups) {
@@ -160,8 +160,8 @@ export function buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchup
   const opponent = {};
 
   const targetMatchup = matchups?.[0];
-  const innings = flattenMatchupInnings(matchups);
-  if (!targetMatchup || !innings || innings.length === 0) {
+  const entries = flattenMatchupEntries(matchups);
+  if (!targetMatchup || !entries || entries.length === 0) {
     scoreMap.isPlayer1 = true;
     scoreMap.opponent = opponent;
     return scoreMap;
@@ -175,7 +175,7 @@ export function buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchup
 
   scoreMap.isPlayer1 = isPlayer1;
 
-  innings.forEach(matchup => {
+  entries.forEach(matchup => {
     const roundNumber = Number(matchup.orderNumber ?? matchup.order_number);
     const opponentRow = opponentScores.find(s => Number(s.orderNumber ?? s.order_number) === roundNumber);
     if (opponentRow) {

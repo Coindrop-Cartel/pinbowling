@@ -18,6 +18,32 @@ class LeagueController extends ApiController {
         $this->leagueService = $container->get(LeagueService::class);
     }
 
+    private function authorizeLeagueAccess(int $leagueId): void {
+        $meta = $this->leagueService->getLeagueMeta($leagueId);
+        if ($meta['type'] === 'session') {
+            $this->validateSessionOrSecret();
+        } else {
+            $this->validateTDAccess();
+        }
+    }
+
+    private function buildLeagueParams(): array {
+        return [
+            'name' => $this->input['name'],
+            'startDate' => $this->input['startDate'] ?? null,
+            'participants' => $this->input['participants'] ?? 'individual',
+            'scoringFormat' => $this->input['scoringFormat'] ?? 'bowling',
+            'seasonScoring' => $this->input['seasonScoring'] ?? 'weekly',
+            'dropLowestWeeks' => (int)($this->input['dropLowestWeeks'] ?? 0),
+            'weeksInSeason' => isset($this->input['weeksInSeason']) ? (int)$this->input['weeksInSeason'] : null,
+            'roundsPerGame' => isset($this->input['roundsPerGame']) && $this->input['roundsPerGame'] !== '' ? (int)$this->input['roundsPerGame'] : null,
+            'matchupsPerRound' => isset($this->input['matchupsPerRound']) && $this->input['matchupsPerRound'] !== '' ? (int)$this->input['matchupsPerRound'] : null,
+            'weeklyPoints' => isset($this->input['weeklyPoints']) && $this->input['weeklyPoints'] !== '' ? (int)$this->input['weeklyPoints'] : null,
+            'pointSpread' => isset($this->input['pointSpread']) && $this->input['pointSpread'] !== '' ? (int)$this->input['pointSpread'] : null,
+            'locationIds' => $this->input['locationIds'] ?? [],
+        ];
+    }
+
     protected function handle(): void {
         switch ($this->method) {
             case 'GET':
@@ -72,32 +98,22 @@ class LeagueController extends ApiController {
                         $this->sendError('leagueId and teamId are required', 400);
                     }
 
-                    $meta = $this->leagueService->getLeagueMeta((int)$this->input['leagueId']);
-                    if ($meta['type'] === 'session') {
-                        $this->validateSessionOrSecret();
-                    } else {
-                        $this->validateTDAccess();
-                    }
+                    $this->authorizeLeagueAccess((int)$this->input['leagueId']);
 
                     $this->leagueService->addTeamToLeague((int)$this->input['leagueId'], (int)$this->input['teamId']);
                     $this->sendJson(['success' => true]);
 
-                } else if ($this->task === 'startSeason' || $this->task === 'start_season') {
+                } else if ($this->task === 'start_season') {
                     if (empty($this->input['leagueId'])) {
                         $this->sendError('leagueId is required', 400);
                     }
 
-                    $meta = $this->leagueService->getLeagueMeta((int)$this->input['leagueId']);
-                    if ($meta['type'] === 'session') {
-                        $this->validateSessionOrSecret();
-                    } else {
-                        $this->validateTDAccess();
-                    }
+                    $this->authorizeLeagueAccess((int)$this->input['leagueId']);
 
                     $this->leagueService->startSeason((int)$this->input['leagueId']);
                     $this->sendJson(['success' => true]);
 
-                } else if ($this->task === 'updateSeason' || $this->task === 'update_season') {
+                } else if ($this->task === 'update_season') {
                     if (empty($this->input['leagueId'])) {
                         $this->sendError('leagueId is required', 400);
                     }
@@ -106,7 +122,7 @@ class LeagueController extends ApiController {
                     $this->leagueService->updateSeason((int)$this->input['leagueId']);
                     $this->sendJson(['success' => true]);
 
-                } else if ($this->task === 'startPlayoffs' || $this->task === 'start_playoffs') {
+                } else if ($this->task === 'start_playoffs') {
                     if (empty($this->input['leagueId']) || empty($this->input['seeds']) || !isset($this->input['seriesLength'])) {
                         $this->sendError('leagueId, seeds, and seriesLength are required', 400);
                     }
@@ -124,12 +140,7 @@ class LeagueController extends ApiController {
                         $this->sendError('leagueId and eventName are required', 400);
                     }
 
-                    $meta = $this->leagueService->getLeagueMeta((int)$this->input['leagueId']);
-                    if ($meta['type'] === 'session') {
-                        $this->validateSessionOrSecret();
-                    } else {
-                        $this->validateTDAccess();
-                    }
+                    $this->authorizeLeagueAccess((int)$this->input['leagueId']);
 
                     $event = $this->leagueService->createEvent(
                         (int)$this->input['leagueId'],
@@ -144,20 +155,21 @@ class LeagueController extends ApiController {
                 } else {
                     if (empty($this->input['name'])) $this->sendError('name is required', 400);
 
+                    $p = $this->buildLeagueParams();
                     $league = $this->leagueService->createLeague(
-                        $this->input['name'],
-                        $this->input['startDate'] ?? null,
+                        $p['name'],
+                        $p['startDate'],
                         $this->input['type'] ?? 'standard',
-                        $this->input['participants'] ?? 'individual',
-                        $this->input['scoringFormat'] ?? 'bowling',
-                        $this->input['seasonScoring'] ?? 'weekly',
-                        (int)($this->input['dropLowestWeeks'] ?? 0),
-                        isset($this->input['weeksInSeason']) ? (int)$this->input['weeksInSeason'] : null,
-                        isset($this->input['roundsPerGame']) && $this->input['roundsPerGame'] !== '' ? (int)$this->input['roundsPerGame'] : null,
-                        isset($this->input['matchupsPerRound']) && $this->input['matchupsPerRound'] !== '' ? (int)$this->input['matchupsPerRound'] : null,
-                        isset($this->input['weeklyPoints']) && $this->input['weeklyPoints'] !== '' ? (int)$this->input['weeklyPoints'] : null,
-                        isset($this->input['pointSpread']) && $this->input['pointSpread'] !== '' ? (int)$this->input['pointSpread'] : null,
-                        $this->input['locationIds'] ?? []
+                        $p['participants'],
+                        $p['scoringFormat'],
+                        $p['seasonScoring'],
+                        $p['dropLowestWeeks'],
+                        $p['weeksInSeason'],
+                        $p['roundsPerGame'],
+                        $p['matchupsPerRound'],
+                        $p['weeklyPoints'],
+                        $p['pointSpread'],
+                        $p['locationIds']
                     );
                     if (!$league) $this->sendError('League created but could not be retrieved.', 500);
                     $this->sendJson(Serializer::league($league));
@@ -181,20 +193,21 @@ class LeagueController extends ApiController {
                     if (!$event) $this->sendError('Resource updated but could not be retrieved.', 500);
                     $this->sendJson(Serializer::event($event));
                 } else {
+                    $p = $this->buildLeagueParams();
                     $league = $this->leagueService->updateLeague(
                         $id,
-                        $this->input['name'],
-                        $this->input['startDate'] ?? null,
-                        $this->input['participants'] ?? 'individual',
-                        $this->input['scoringFormat'] ?? 'bowling',
-                        $this->input['seasonScoring'] ?? 'weekly',
-                        (int)($this->input['dropLowestWeeks'] ?? 0),
-                        isset($this->input['weeksInSeason']) ? (int)$this->input['weeksInSeason'] : null,
-                        isset($this->input['roundsPerGame']) && $this->input['roundsPerGame'] !== '' ? (int)$this->input['roundsPerGame'] : null,
-                        isset($this->input['matchupsPerRound']) && $this->input['matchupsPerRound'] !== '' ? (int)$this->input['matchupsPerRound'] : null,
-                        isset($this->input['weeklyPoints']) && $this->input['weeklyPoints'] !== '' ? (int)$this->input['weeklyPoints'] : null,
-                        isset($this->input['pointSpread']) && $this->input['pointSpread'] !== '' ? (int)$this->input['pointSpread'] : null,
-                        $this->input['locationIds'] ?? []
+                        $p['name'],
+                        $p['startDate'],
+                        $p['participants'],
+                        $p['scoringFormat'],
+                        $p['seasonScoring'],
+                        $p['dropLowestWeeks'],
+                        $p['weeksInSeason'],
+                        $p['roundsPerGame'],
+                        $p['matchupsPerRound'],
+                        $p['weeklyPoints'],
+                        $p['pointSpread'],
+                        $p['locationIds']
                     );
                     if (!$league) $this->sendError('Resource updated but could not be retrieved.', 500);
                     $this->sendJson(Serializer::league($league));
@@ -206,12 +219,7 @@ class LeagueController extends ApiController {
                     $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
                     $playerId = isset($_GET['playerId']) ? (int)$_GET['playerId'] : 0;
 
-                    $meta = $this->leagueService->getLeagueMeta($leagueId);
-                    if ($meta['type'] === 'session') {
-                        $this->validateSessionOrSecret();
-                    } else {
-                        $this->validateTDAccess();
-                    }
+                    $this->authorizeLeagueAccess($leagueId);
 
                     $this->leagueService->removePlayerFromLeague($leagueId, $playerId);
                 } else {

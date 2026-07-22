@@ -1,7 +1,7 @@
 import { ScoringEngine } from '../ScoringEngine.js';
 import { formatNumber, escapeHTML } from '../../utils.js';
 import { buildBaseballScoreMapForPlayer } from '../../services/normalizer.js';
-import { buildRoundRobinMatchups, resolveInningRole } from '../../services/matchupBuilder.js';
+import { buildRoundRobinMatchups, resolveMatchupRole } from '../../services/matchupBuilder.js';
 
 /**
  * Implementation of Baseball-style scoring logic (PinBaseball).
@@ -263,15 +263,15 @@ formatMark(turn, scoreOverride = null) {
   }
 
   /**
-   * Sorts baseball standings by win rate, then run diff, then total runs.
+   * Sorts head-to-head standings by win rate, then run diff, then total runs.
    */
-  sortStandings(rows, { baseballRecordsMap } = {}) {
+  sortStandings(rows, { head2headRecordsMap } = {}) {
     return [...rows].sort((a, b) => {
       if (a.hasScores !== b.hasScores) return a.hasScores ? -1 : 1;
 
-      if (baseballRecordsMap) {
-        const recA = baseballRecordsMap[a.player.id];
-        const recB = baseballRecordsMap[b.player.id];
+      if (head2headRecordsMap) {
+        const recA = head2headRecordsMap[a.player.id];
+        const recB = head2headRecordsMap[b.player.id];
         if (recA && recB) {
           const rateDiff = recB.winRate - recA.winRate;
           if (Math.abs(rateDiff) > 0.001) return rateDiff;
@@ -288,8 +288,8 @@ formatMark(turn, scoreOverride = null) {
     return [2, 4, 6, 9];
   }
 
-  getRoundLabel() { return this.config.roundLabel || 'Inning'; }
-  getTurnHeaderPrefix() { return this.config.turnHeaderPrefix || 'Inning'; }
+  getRoundLabel() { return this.config.roundLabel || 'Round'; }
+  getTurnHeaderPrefix() { return this.config.turnHeaderPrefix || 'Round'; }
   getPrimaryTargetLabel() { return this.config.primaryTargetLabel || 'Run Baseline'; }
   getValue1Label() { return this.config.value1Label || 'Baseline Score'; }
   getValue2Label() { return this.config.value2Label || 'Multiplier'; }
@@ -386,24 +386,23 @@ formatMark(turn, scoreOverride = null) {
   // --- Score Map & Results Rendering Overrides ---
 
   /**
-   * Enriches the score map with opponent data for baseball head-to-head scoring.
+   * Enriches the score map with opponent data for head-to-head scoring.
    * Attaches `opponent` score map and `isPlayer1` flag used by calculateTurnResults.
    *
    * @param {Object} scoreMap Map of orderNumber to ball scores from the DOM.
-   * @param {Object} context Baseball-specific context.
+   * @param {Object} context Format-specific context.
    * @param {Array} context.allEventScores All scores for the current event.
    * @param {Array} context.eventMatchups Matchup data for the current event.
    * @param {Function} context.getCurrentPlayerId Returns the selected player ID.
    * @param {Function} context.normalizeScores Normalizes raw score rows.
    * @param {Function} context.groupScoresByPlayer Groups scores by player ID.
-   * @param {Function} context.buildBaseballScoreMapForPlayer Builds a baseball score map.
    * @returns {Object} The enriched score map with opponent data.
    */
   enrichScoreMap(scoreMap, context) {
-    const { allEventScores, eventMatchups, getCurrentPlayerId, normalizeScores, groupScoresByPlayer, buildBaseballScoreMapForPlayer } = context;
+    const { allEventScores, eventMatchups, getCurrentPlayerId, normalizeScores, groupScoresByPlayer } = context;
     const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
     const selectedPlayerId = getCurrentPlayerId();
-    const opponentMap = buildBaseballScoreMapForPlayer(selectedPlayerId, scoresByPlayer, eventMatchups);
+    const opponentMap = this.buildPlayerScoreMap(selectedPlayerId, scoresByPlayer[selectedPlayerId] || [], scoresByPlayer, eventMatchups);
     scoreMap.opponent = opponentMap.opponent || {};
     scoreMap.isPlayer1 = opponentMap.isPlayer1;
     return scoreMap;
@@ -434,17 +433,17 @@ formatMark(turn, scoreOverride = null) {
   }
 
   /**
-   * Returns baseball-specific context for a round row in the scoring form.
-   * Provides matchup, role, and inning display information.
+   * Returns head-to-head context for a round row in the scoring form.
+   * Provides matchup, role, and round display information.
    *
    * @param {Object} round The machine configuration for this round.
-   * @param {Object} context Baseball-specific context.
+   * @param {Object} context Head-to-head context.
    * @returns {{matchup: Object|null, isPitcher: boolean, opponentName: string, displayRoundNumber: string, roleHtml: string}}
    */
   getRoundRowContext(round, context) {
     const { eventMatchups, getCurrentPlayerId } = context;
     const currentPlayerId = Number(getCurrentPlayerId());
-    const { matchup, isPitcher, opponentName, displayRoundNumber, role } = resolveInningRole(
+    const { matchup, isPitcher, opponentName, displayRoundNumber, role } = resolveMatchupRole(
       currentPlayerId,
       round.machineId,
       eventMatchups
@@ -459,7 +458,7 @@ formatMark(turn, scoreOverride = null) {
       isPitcher,
       opponentName,
       displayRoundNumber: finalDisplayRoundNumber,
-      displayRoundLabel: matchup ? '' : 'Inning',
+      displayRoundLabel: matchup ? '' : 'Round',
       role
     };
   }

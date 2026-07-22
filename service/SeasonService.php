@@ -48,7 +48,6 @@ class SeasonService {
             // e.g. baseball: 2 innings × 2 sides = 4 matchup rows
             $rounds = (int)($league['rounds_per_game'] ?? 2);
             $matchupsPerRound = (int)($league['matchups_per_round'] ?? 2);
-            $matchupsPerGame = $rounds * $matchupsPerRound;
             
             // Fetch roster
             $stmt = $pdo->prepare(
@@ -162,9 +161,9 @@ class SeasonService {
                             }
                         }
 
-                        MatchupGenerator::createInningSlots(
+                        MatchupGenerator::createMatchupSlots(
                             $pdo, $eventMatchupId,
-                            $matchupsPerGame, $matchupMachineIds
+                            $rounds, $matchupsPerRound, $matchupMachineIds
                         );
                     }
                 }
@@ -212,7 +211,6 @@ class SeasonService {
             // e.g. baseball: 2 innings × 2 sides = 4 matchup rows
             $rounds = (int)($league['rounds_per_game'] ?? 2);
             $matchupsPerRound = (int)($league['matchups_per_round'] ?? 2);
-            $matchupsPerGame = $rounds * $matchupsPerRound;
             
             // Fetch roster
             $stmt = $pdo->prepare(
@@ -264,7 +262,7 @@ class SeasonService {
             $playedMap = [];
             foreach ($regSeasonEvents as $event) {
                 $eventId = (int)$event['id'];
-                // Check if any matchups for this event are completed AND not a BYE (away_player_id is NOT NULL)
+                // Check if any matchups for this event are completed AND not a BYE (player2_id is NOT NULL)
                 $checkStmt = $pdo->prepare(
                     "SELECT COUNT(*) FROM event_matchups 
                      WHERE event_id = ? AND status = 'completed' AND player2_id IS NOT NULL"
@@ -377,9 +375,9 @@ class SeasonService {
                             }
                         }
 
-                        MatchupGenerator::createInningSlots(
+                        MatchupGenerator::createMatchupSlots(
                             $pdo, $eventMatchupId,
-                            $matchupsPerGame, $matchupMachineIds
+                            $rounds, $matchupsPerRound, $matchupMachineIds
                         );
                     }
                 }

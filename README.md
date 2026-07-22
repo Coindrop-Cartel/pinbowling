@@ -35,7 +35,7 @@ pinbowling/
 │   ├── bootstrap.php       # DI container setup and service registration
 │   ├── config.php          # Environment loading, versioning, branding
 │   ├── Configuration.php   # .env parser and config value accessor
-│   ├── container.php       # Lightweight DI container implementation
+│   ├── Container.php       # Lightweight DI container implementation
 │   ├── router.php          # Request routing, auth guards, asset serving
 │   ├── auth.php            # Authorization helper functions
 │   ├── Serializer.php      # Database row → API response normalizer

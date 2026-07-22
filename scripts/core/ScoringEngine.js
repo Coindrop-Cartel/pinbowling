@@ -338,7 +338,7 @@ export class ScoringEngine {
   /**
    * Enriches the score map with format-specific data before calculation.
    * Default implementation returns the score map unchanged.
-   * Baseball overrides this to attach opponent scores and player-role info.
+   * Head-to-head formats override this to attach opponent scores and player-role info.
    *
    * @param {Object} scoreMap Map of orderNumber to ball scores from the DOM.
    * @param {Object} context Format-specific context data.
@@ -348,7 +348,6 @@ export class ScoringEngine {
    * @param {Function} context.getCurrentPlayerId Returns the selected player ID.
    * @param {Function} context.normalizeScores Normalizes raw score rows.
    * @param {Function} context.groupScoresByPlayer Groups scores by player ID.
-   * @param {Function} context.buildBaseballScoreMapForPlayer Builds a baseball score map.
    * @returns {Object} The enriched score map.
    */
   enrichScoreMap(scoreMap, context) {
@@ -358,7 +357,7 @@ export class ScoringEngine {
   /**
    * Returns format-specific context for a round row in the scoring form.
    * Default implementation returns an empty object (no extra context).
-   * Baseball overrides this to provide matchup/role information.
+   * Head-to-head formats override this to provide matchup/role information.
    *
    * @param {Object} round The machine configuration for this round.
    * @param {Object} context Format-specific context data (same keys as enrichScoreMap).

@@ -7,7 +7,7 @@
  * roles.
  */
 
-import { flattenMatchupInnings } from './normalizer.js';
+import { flattenMatchupEntries } from './normalizer.js';
 
 /**
  * Build a round‑robin matchup payload for a baseball session.
@@ -66,21 +66,21 @@ export function buildRoundRobinMatchups(players, inningCount, machines) {
  * @param {Array} eventMatchups
  * @returns {{ matchup: object|null, isPitcher: boolean, opponentName: string, displayRoundNumber: string, role: 'pitcher'|'batter' }}
  */
-export function resolveInningRole(playerId, roundIdentifier, eventMatchups) {
-  const innings = flattenMatchupInnings(eventMatchups);
-  if (!eventMatchups || eventMatchups.length === 0 || !innings || innings.length === 0) {
+export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups) {
+  const entries = flattenMatchupEntries(eventMatchups);
+  if (!eventMatchups || eventMatchups.length === 0 || !entries || entries.length === 0) {
     return { matchup: null, isPitcher: true, opponentName: '', displayRoundNumber: '', role: 'pitcher' };
   }
 
   const targetMatchup = eventMatchups[0];
 
-  let slot = innings.find((m) =>
+  let item = entries.find((m) =>
     Number(m.machineId ?? m.machine_id) === Number(roundIdentifier)
-  ) || innings.find((m) =>
+  ) || entries.find((m) =>
     Number(m.orderNumber ?? m.order_number) === Number(roundIdentifier)
   );
 
-  if (!slot) {
+  if (!item) {
     return { matchup: null, isPitcher: true, opponentName: '', displayRoundNumber: '', role: 'pitcher' };
   }
 
@@ -98,12 +98,12 @@ export function resolveInningRole(playerId, roundIdentifier, eventMatchups) {
     const p2Name = targetMatchup.player2Name ?? targetMatchup.player2_name ?? 'Away';
     opponentName = isPlayer1 ? p2Name : (isPlayer2 ? p1Name : '');
   } else {
-    const orderNum = Number(slot.orderNumber ?? slot.order_number);
-    const mySlot = innings.find(m =>
+    const orderNum = Number(item.orderNumber ?? item.order_number);
+    const mySlot = entries.find(m =>
       (Number(m.orderNumber ?? m.order_number) === orderNum) &&
       Number(m.playerId ?? m.player_id) === Number(playerId)
-    ) || slot;
-    const oppSlot = innings.find(m =>
+    ) || item;
+    const oppSlot = entries.find(m =>
       (Number(m.orderNumber ?? m.order_number) === orderNum) &&
       Number(m.playerId ?? m.player_id) !== Number(playerId)
     );
@@ -112,13 +112,13 @@ export function resolveInningRole(playerId, roundIdentifier, eventMatchups) {
     opponentName = oppSlot ? (oppSlot.playerName ?? oppSlot.player_name) : '';
   }
 
-  const orderNumber = Number(slot.orderNumber ?? slot.order_number);
+  const orderNumber = Number(item.orderNumber ?? item.order_number);
   let isTop = true;
   let inningNumber = orderNumber;
 
-  if (slot.playerOrder !== undefined || slot.player_order !== undefined) {
+  if (item.playerOrder !== undefined || item.player_order !== undefined) {
     inningNumber = orderNumber;
-    const topSlot = innings.find(m => Number(m.orderNumber ?? m.order_number) === orderNumber && Number(m.playerOrder ?? m.player_order) === 1);
+    const topSlot = entries.find(m => Number(m.orderNumber ?? m.order_number) === orderNumber && Number(m.playerOrder ?? m.player_order) === 1);
     isTop = topSlot ? (Number(topSlot.machineId ?? topSlot.machine_id) === Number(roundIdentifier)) : true;
   } else {
     inningNumber = Math.ceil(orderNumber / 2);
@@ -137,5 +137,5 @@ export function resolveInningRole(playerId, roundIdentifier, eventMatchups) {
   const displayRoundNumber = `${isTop ? 'Top' : 'Bottom'} of ${inningNumber}`;
   const role = isPitcher ? 'pitcher' : 'batter';
 
-  return { matchup: slot, isPitcher, opponentName, displayRoundNumber, role };
+  return { matchup: item, isPitcher, opponentName, displayRoundNumber, role };
 }

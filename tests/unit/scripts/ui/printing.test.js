@@ -11,7 +11,9 @@ vi.mock('@core/engine.js', () => ({
     getBonusTargets: () => ({ t1: 13000, t2: 16900 }),
     calculateTurnResults: () => ({ total: 100, turnResults: [] }),
     compareScores: (a, b) => b - a,
-    formatTotalScore: (score) => String(score)
+    formatTotalScore: (score) => String(score),
+    getMatchupDescription: () => ({ description: '', details: [] }),
+    buildPlayerScoreMap: () => ({ isPlayer1: true, opponent: {} })
   })),
 }));
 
@@ -173,7 +175,15 @@ describe('Printing Utilities (printing.js)', () => {
         getRoundLabel: () => 'Frame',
         calculateTurnResults: () => ({ total: 100, turnResults: [{ orderNumber: 1, machineName: 'Addams Family', displayMark: 'Strike', displayRunningTotal: '100' }] }),
         compareScores: (a, b) => b - a,
-        formatTotalScore: (score) => String(score)
+        formatTotalScore: (score) => String(score),
+        getMatchupDescription: () => null,
+        buildPlayerScoreMap: (_playerId, playerScores) => {
+          const map = {};
+          for (const s of (playerScores || [])) {
+            if (s.orderNumber != null) map[`order_${s.orderNumber}`] = s;
+          }
+          return map;
+        },
       };
 
       printSeasonResults(league, players, events, locations, allLeagueTargets, rawScores, engine);
@@ -195,7 +205,9 @@ describe('Printing Utilities (printing.js)', () => {
       printSeasonResults(league, [], [], [], [], [], {
         calculateTurnResults: () => ({ total: 0 }),
         compareScores: () => 0,
-        formatTotalScore: () => ''
+        formatTotalScore: () => '',
+        getMatchupDescription: () => null,
+        buildPlayerScoreMap: () => ({}),
       });
       vi.advanceTimersByTime(250);
       expect(mockPrintWindow.print).toHaveBeenCalledTimes(1);
@@ -221,7 +233,15 @@ describe('Printing Utilities (printing.js)', () => {
         getRoundLabel: () => 'Frame',
         calculateTurnResults: () => ({ total: 100, turnResults: [{ orderNumber: 1, machineName: 'Addams Family', displayMark: 'Strike', displayRunningTotal: '100' }] }),
         compareScores: (a, b) => b - a,
-        formatTotalScore: (score) => String(score)
+        formatTotalScore: (score) => String(score),
+        getMatchupDescription: () => null,
+        buildPlayerScoreMap: (_playerId, playerScores) => {
+          const map = {};
+          for (const s of (playerScores || [])) {
+            if (s.orderNumber != null) map[`order_${s.orderNumber}`] = s;
+          }
+          return map;
+        },
       };
 
       printSeasonResults(league, players, events, locations, allLeagueTargets, rawScores, engine);
