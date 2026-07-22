@@ -209,17 +209,7 @@ export function renderStandingsTable({
         }).join('');
       } else {
         // 4. Individual scoreboard
-        const sortedRows = rows.sort((a, b) => {
-          if (supportsMatchups && baseballRecordsMap) {
-            const recA = baseballRecordsMap[a.player.id];
-            const recB = baseballRecordsMap[b.player.id];
-            if (recA && recB) {
-              const rateDiff = recB.winRate - recA.winRate;
-              if (Math.abs(rateDiff) > 0.001) return rateDiff;
-            }
-          }
-          return engine.compareScores(a.total, b.total);
-        });
+        const sortedRows = engine.sortStandings(rows, { baseballRecordsMap });
 
         bodyEl.innerHTML = sortedRows.map((res, idx) => {
           let rowHasUpdate = false;

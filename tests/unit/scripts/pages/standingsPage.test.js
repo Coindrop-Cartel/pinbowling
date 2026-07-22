@@ -36,6 +36,7 @@ vi.mock('@core/engine.js', () => ({
       scores.forEach(s => { scoreMap[s.orderNumber] = s; });
       return scoreMap;
     }),
+    sortStandings: vi.fn((rows) => [...rows]),
   }))
 }));
 

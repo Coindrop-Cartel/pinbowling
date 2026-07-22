@@ -132,6 +132,21 @@ export class ScoringEngine {
   compareScores(a, b) { return b - a; }
 
   /**
+   * Sorts standings rows for display. Players with no scores go to the bottom.
+   * Format-specific engines override this to add their own tiebreaking rules.
+   *
+   * @param {Array} rows - Player result rows ({ hasScores, total, ... })
+   * @param {Object} [_options] - Engine-specific sort options
+   * @returns {Array} Sorted copy of rows
+   */
+  sortStandings(rows, _options = {}) {
+    return [...rows].sort((a, b) => {
+      if (a.hasScores !== b.hasScores) return a.hasScores ? -1 : 1;
+      return this.compareScores(a.total, b.total);
+    });
+  }
+
+  /**
    * Formats the total score for display (e.g., adds par relativity).
    * @param {number} total The raw points.
    * @param {Array} machines The target definitions for context.

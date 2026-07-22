@@ -204,6 +204,20 @@ export class GolfEngine extends ScoringEngine {
   compareScores(a, b) { return a - b; } // Low score wins
 
   /**
+   * Sorts standings by par-relative diff, then by raw total as tiebreak.
+   */
+  sortStandings(rows, _options = {}) {
+    return [...rows].sort((a, b) => {
+      if (a.hasScores !== b.hasScores) return a.hasScores ? -1 : 1;
+      if (a.parDiff !== undefined && b.parDiff !== undefined) {
+        const d = a.parDiff - b.parDiff;
+        if (d !== 0) return d;
+      }
+      return this.compareScores(a.total, b.total);
+    });
+  }
+
+  /**
    * Standardized round options for Golf.
    * @returns {Array<number>} [9, 18]
    */

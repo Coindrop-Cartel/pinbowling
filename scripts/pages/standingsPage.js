@@ -347,7 +347,14 @@ export async function initStandingsPage() {
 
       const { turnResults, total, totalDisplay } = Engine.calculateTurnResults(machines, scoreMap);
 
-      return { player, turnResults, total, totalDisplay, ordersWithScores };
+      const playedTurns = turnResults.filter(t => t.played);
+      const totalPar = playedTurns.reduce((sum, t) => {
+        const machine = machines.find(m => m.orderNumber === t.orderNumber);
+        return sum + Number(machine?.value2 || 3);
+      }, 0);
+      const parDiff = playedTurns.length > 0 ? total - totalPar : 0;
+
+      return { player, turnResults, total, totalDisplay, ordersWithScores, parDiff, hasScores: playedTurns.length > 0 };
     });
 
     const isTeamLeague = league?.participants === 'team';

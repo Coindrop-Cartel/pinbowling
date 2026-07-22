@@ -262,6 +262,28 @@ formatMark(turn, scoreOverride = null) {
     return b - a; // High score wins (total runs)
   }
 
+  /**
+   * Sorts baseball standings by win rate, then run diff, then total runs.
+   */
+  sortStandings(rows, { baseballRecordsMap } = {}) {
+    return [...rows].sort((a, b) => {
+      if (a.hasScores !== b.hasScores) return a.hasScores ? -1 : 1;
+
+      if (baseballRecordsMap) {
+        const recA = baseballRecordsMap[a.player.id];
+        const recB = baseballRecordsMap[b.player.id];
+        if (recA && recB) {
+          const rateDiff = recB.winRate - recA.winRate;
+          if (Math.abs(rateDiff) > 0.001) return rateDiff;
+          const diffDiff = recB.runDiff - recA.runDiff;
+          if (diffDiff !== 0) return diffDiff;
+        }
+      }
+
+      return this.compareScores(a.total, b.total);
+    });
+  }
+
   getRoundCountOptions() {
     return [2, 4, 6, 9];
   }
