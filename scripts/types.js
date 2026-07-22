@@ -9,8 +9,8 @@
  * @property {function(Object): {t1: number, t2: number}} [getBonusTargets]
  * @property {function(): (a: [string, any], b: [string, any]) => number} getThresholdSort
  * @property {function(string|number, number, number): string} getThresholdLabel
- * @property {function(string|number, number, number): string} getThresholdRowStyle
- * @property {function(Object, function): string} getRowSummaryHtml
+ * @property {function(string|number, number, number): string} getThresholdRowClass
+ * @property {function(Object, function): string} getRowSummaryData
  * @property {function(Object, number): string} formatMark
  * @property {function(number, number): string} getMarkFormatting
  * @property {function(): string} getValue1Label

@@ -134,7 +134,6 @@ export class BaseballEngine extends ScoringEngine {
         const marginalGain = Math.max(0, totalPossibleRuns - runsAccumulated);
         runsAccumulated += marginalGain;
 
-        if (!silent) {}
       }
       runs = runsAccumulated;
       played = p1 > 0 || o1 > 0 || p2 > 0 || o2 > 0 || p3 > 0 || o3 > 0;
@@ -252,11 +251,11 @@ export class BaseballEngine extends ScoringEngine {
     };
   }
 
-formatMark(turn, scoreOverride = null) {
-  if (!turn.played) return turn.mark || '-';
-  if (!turn.isBatter) return turn.mark || 'P';
-  return scoreOverride !== null ? `${scoreOverride}R` : (turn.mark || `${turn.score}R`);
-}
+  formatMark(turn, scoreOverride = null) {
+    if (!turn.played) return turn.mark || '-';
+    if (!turn.isBatter) return turn.mark || 'P';
+    return scoreOverride !== null ? `${scoreOverride}R` : (turn.mark || `${turn.score}R`);
+  }
 
   compareScores(a, b) {
     return b - a; // High score wins (total runs)
@@ -407,18 +406,6 @@ formatMark(turn, scoreOverride = null) {
     scoreMap.isPlayer1 = opponentMap.isPlayer1;
     return scoreMap;
   }
-
-  /**
-   * Renders a head-to-head scoreboard grid for baseball, showing all players'
-   * results side-by-side organized by inning.
-   *
-   * @param {{turnResults: Array, totalDisplay: string}} calcResult Output from calculateTurnResults.
-   * @param {Array} machines Target definitions for the event.
-   * @param {Object} scoreMap The enriched score map used for calculation.
-   * @param {Object} context Baseball-specific context.
-   * @param {Object} domRefs DOM element references for the results panel.
-   */
-
 
   /**
    * Builds a baseball score map for a player including opponent scores.

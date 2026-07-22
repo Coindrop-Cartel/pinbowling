@@ -89,7 +89,7 @@ export async function initEventSetupPage() {
   if (printMachinesBtn) {
     printMachinesBtn.addEventListener('click', async () => {
       const eventId = getActiveEventId();
-      if (!eventId) return alert('Select an event first.');
+      if (!eventId) return showAlert('Select an event first.');
       const leagues = await PB_API.leagues.getAll();
       const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
       printMachineScores(eventTargets, ScoringFormats.resolve(league?.scoringFormat));
@@ -442,7 +442,7 @@ export async function initEventSetupPage() {
       expandedTargetId = null;
       await refresh();
     } catch (err) {
-      alert('Failed to save changes: ' + err.message);
+      showAlert('Failed to save changes: ' + err.message);
     }
   });
 
@@ -566,7 +566,7 @@ export async function initEventSetupPage() {
       resetForm();
     } catch (err) {
       console.error('Save failed:', err);
-      alert(`Failed to save: ${err.message}`);
+      showAlert(`Failed to save: ${err.message}`);
     } finally {
       submitBtn.textContent = 'Save';
     }

@@ -7,7 +7,6 @@ import {
   groupScoresByEventAndPlayer,
   groupMatchupsByEvent 
 } from '@services/normalizer.js';
-import { ScoringFormats } from '@services/scoringFormat.js';
 
 /**
  * Calculate head-to-head win/loss records for matchup-based formats.

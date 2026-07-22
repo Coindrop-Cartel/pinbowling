@@ -3,7 +3,7 @@ import { createExpandableRow } from '@ui/selectors.js';
 import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 import { formatNumber, applyScoreFormatting, escapeHTML } from '@scripts/utils.js';
-import { showConfirm } from '@ui/dialogs.js';
+import { showConfirm, showAlert } from '@ui/dialogs.js';
 import { requireAdmin } from '@services/auth.js';
 
 /**
@@ -448,7 +448,7 @@ export async function initLocationsPage() {
         machineFormCard.classList.add('hidden');
         await renderLocations();
       } catch (err) {
-        alert(`Failed to save machine: ${err.message}`);
+        showAlert(`Failed to save machine: ${err.message}`);
       }
     };
   }
@@ -474,7 +474,7 @@ export async function initLocationsPage() {
       }
       renderLocations();
     } catch (err) {
-      alert(`Failed to save location: ${err.message}`);
+      showAlert(`Failed to save location: ${err.message}`);
     }
   });
 
@@ -492,7 +492,7 @@ export async function initLocationsPage() {
       await PB_API.locations.delete(id);
       renderLocations();
     } catch (err) {
-      alert(`Failed to delete location: ${err.message}`);
+      showAlert(`Failed to delete location: ${err.message}`);
     }
   }
 

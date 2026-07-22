@@ -95,7 +95,7 @@ export class TvModeManager {
   }
 
   /**
-   * Visbility change tab observer.
+   * Visibility change tab observer.
    */
   async handleVisibilityChange() {
     if (this.isTvMode && document.visibilityState === 'visible' && 'wakeLock' in navigator) {

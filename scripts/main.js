@@ -16,8 +16,6 @@ import { initLeaguesPage } from '@pages/leaguesPage.js';
 import { initPlayPage } from '@pages/playPage.js';
 import { initManagementPage } from '@pages/managementPage.js';
 import { getDebugEnabled } from '@services/state.js';
-import { getScoringEngine } from '@core/engine.js';
-import { getCookie } from '@scripts/utils.js';
 import { initAuthHeader } from '@services/auth.js';
 import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { loadPage } from '@scripts/utils.js';

@@ -5,7 +5,7 @@ import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
 import { getCookie, formatNumber, applyScoreFormatting, parseFormattedNumber, loadPage, renderThresholdGrid, escapeHTML } from '@scripts/utils.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { createExpandableRow, setupSortableList, createSearchableSelect } from '@ui/selectors.js';
-import { showDialog, showPlayerSelectionDialog } from '@ui/dialogs.js';
+import { showDialog, showPlayerSelectionDialog, showAlert } from '@ui/dialogs.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
 import { renderPreviewRow } from '@scripts/renderers/roundRowRenderer.js';
 import { generateSessionName, selectRandomMachines, getTargetScoreForDifficulty } from '@services/sessionGenerator.js';
@@ -180,7 +180,7 @@ export async function initPlayPage() {
             if (message.includes('Unauthorized') || message.includes('401')) {
               showPlayerSelectionDialog('Access Denied', 'Guests can only join as unregistered players. Please select a guest profile or log in.', [], 'Close');
             } else {
-              alert('Failed to join session: ' + message);
+              showAlert('Failed to join session: ' + message);
             }
           }
         }
@@ -269,7 +269,7 @@ export async function initPlayPage() {
 
   form.onsubmit = (e) => {
     e.preventDefault();
-    generatePreview().catch(err => { console.error('[generatePreview]', err); alert(err.message); });
+    generatePreview().catch(err => { console.error('[generatePreview]', err); showAlert(err.message); });
   };
 
   renderExistingSessions();
@@ -303,7 +303,7 @@ export async function initPlayPage() {
     currentLocMachines = locMachines;
     
     if (locMachines.length === 0) {
-      alert('This location has no machines configured.');
+      showAlert('This location has no machines configured.');
       return;
     }
 
@@ -458,7 +458,7 @@ export async function initPlayPage() {
       });
     } catch (err) {
       console.error(err);
-      alert(err.message);
+      showAlert(err.message);
       finalizeBtn.disabled = false;
       finalizeBtn.textContent = 'Create Session';
     }

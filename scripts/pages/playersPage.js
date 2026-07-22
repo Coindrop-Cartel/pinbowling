@@ -394,7 +394,7 @@ export async function initPlayersPage() {
       await refresh();
       resetForm();
     } catch (error) {
-      alert(`Error saving player: ${error.message}`);
+      showAlert(`Error saving player: ${error.message}`);
     } finally {
       savePlayerButton.disabled = false;
       savePlayerButton.textContent = id ? 'Update Player' : 'Save Player';
@@ -417,7 +417,7 @@ export async function initPlayersPage() {
       await PB_API.players.delete(playerId);
       await refresh();
     } catch (error) {
-      alert(`Error deleting player: ${error.message}`);
+      showAlert(`Error deleting player: ${error.message}`);
     }
   }
 
@@ -455,7 +455,7 @@ export async function initPlayersPage() {
       await refresh();
       showAlert(`Successfully merged "${escapeHTML(mergePlayerObj.playerName)}" into "${escapeHTML(keepPlayer.playerName)}".`, 'Merge Complete');
     } catch (error) {
-      alert(`Error merging players: ${error.message}`);
+      showAlert(`Error merging players: ${error.message}`);
     }
   }
 
