@@ -129,13 +129,13 @@ export async function initStandingsPage() {
     const league = leagues.find(l => String(l.id) === String(leagueId));
     const format = ScoringFormats.resolve(league?.scoringFormat);
     const engine = getScoringEngine(format);
-    const isTeamLeague = league?.participants === 'team';
+    const isTeamLeague = league?.participationType === 'team';
 
     applyPreferredTheme(format);
     const loader = createSkeletonLoader(standingsBody, { type: 'table', count: 10 });
     
     let players = league?.players || [];
-    if (league?.participants === 'team') {
+    if (league?.participationType === 'team') {
       const memberMap = new Map();
       (league.teams || []).forEach(t => {
         (t.members || []).forEach(m => memberMap.set(String(m.id), { ...m, id: Number(m.id) }));
@@ -258,7 +258,7 @@ export async function initStandingsPage() {
     if (eventId === 'summary') return renderLeagueSummary(leagueId);
 
     let players = league?.players || [];
-    if (league?.participants === 'team') {
+    if (league?.participationType === 'team') {
       const memberMap = new Map();
       (league.teams || []).forEach(t => {
         (t.members || []).forEach(m => memberMap.set(String(m.id), { ...m, id: Number(m.id) }));
@@ -292,7 +292,7 @@ export async function initStandingsPage() {
     renderFilterUI(players);
 
     const filteredPlayers = selectedPlayerIds.length > 0 ? players.filter(p => selectedPlayerIds.includes(String(p.id))) : players;
-    const isTeamLeague = league?.participants === 'team';
+    const isTeamLeague = league?.participationType === 'team';
     const supportsMatchups = !!Engine.getMatchupDescription(1);
 
     const rows = filteredPlayers.map(player => {

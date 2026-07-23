@@ -113,7 +113,7 @@ export function calculateHead2HeadRecords(players, events, matchupsByEvent, scor
  * scoring modes, team leagues, and optional lowest-week drops.
  *
  * @param {Object} params - Destructured parameters.
- * @param {Object} params.league - League object with `participants` ('team'|'individual'),
+ * @param {Object} params.league - League object with `participationType` ('team'|'individual'),
  *   `seasonScoring` ('weekly'|cumulative), `dropLowestWeeks` (number), and `teams` array (for team leagues).
  * @param {Object[]} params.players - Array of player objects (each with `id`).
  * @param {Object[]} params.events - Array of event objects (each with `id`).
@@ -126,7 +126,7 @@ export function calculateHead2HeadRecords(players, events, matchupsByEvent, scor
  * @returns {Object} The calculated season summary.
  */
 export function calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, matchupsByEvent = {}, engine, selectedPlayerIds = [] }) {
-  const isTeamLeague = league?.participants === 'team';
+  const isTeamLeague = league?.participationType === 'team';
   const supportsMatchups = !!engine.getMatchupDescription(1);
 
   const getScoreMapForPlayer = (eventId, playerId, scores) => {

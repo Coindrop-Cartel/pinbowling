@@ -164,7 +164,7 @@ describe('Printing Utilities (printing.js)', () => {
 
   describe('printSeasonResults', () => {
     it('should open a new window and write season results booklet HTML', () => {
-      const league = { id: 1, name: 'My League', startDate: '2026-01-01', participants: 'individual', scoringFormat: 'bowling', seasonScoring: 'weekly', dropLowestWeeks: 1 };
+      const league = { id: 1, name: 'My League', startDate: '2026-01-01', competitionFormat: 'group', participationType: 'individual', scoringFormat: 'bowling', seasonScoring: 'weekly', dropLowestWeeks: 1 };
       const players = [{ id: 1, playerName: 'John Doe', ifpaNumber: '12345' }];
       const events = [{ id: 101, eventName: 'Week 1', eventDate: '2026-01-08', locationId: 201 }];
       const locations = [{ id: 201, name: 'Test Pinball Hall' }];
@@ -201,7 +201,7 @@ describe('Printing Utilities (printing.js)', () => {
     });
 
     it('should call print and close after a timeout', async () => {
-      const league = { id: 1, name: 'L', participants: 'individual', scoringFormat: 'bowling' };
+      const league = { id: 1, name: 'L', competitionFormat: 'group', participationType: 'individual', scoringFormat: 'bowling' };
       printSeasonResults(league, [], [], [], [], [], {
         calculateTurnResults: () => ({ total: 0 }),
         compareScores: () => 0,
@@ -216,13 +216,13 @@ describe('Printing Utilities (printing.js)', () => {
 
     it('should alert if window.open fails', () => {
       window.open.mockReturnValue(null);
-      const league = { id: 1, name: 'L', participants: 'individual', scoringFormat: 'bowling' };
+      const league = { id: 1, name: 'L', competitionFormat: 'group', participationType: 'individual', scoringFormat: 'bowling' };
       printSeasonResults(league, [], [], [], [], [], {});
       expect(window.alert).toHaveBeenCalledWith('Please allow popups to print.');
     });
 
     it('should skip player scorecard if they have no scores for that week', () => {
-      const league = { id: 1, name: 'My League', startDate: '2026-01-01', participants: 'individual', scoringFormat: 'bowling', seasonScoring: 'weekly', dropLowestWeeks: 1 };
+      const league = { id: 1, name: 'My League', startDate: '2026-01-01', competitionFormat: 'group', participationType: 'individual', scoringFormat: 'bowling', seasonScoring: 'weekly', dropLowestWeeks: 1 };
       const players = [{ id: 1, playerName: 'John Doe', ifpaNumber: '12345' }, { id: 2, playerName: 'Jane Smith' }];
       const events = [{ id: 101, eventName: 'Week 1', eventDate: '2026-01-08', locationId: 201 }];
       const locations = [{ id: 201, name: 'Test Pinball Hall' }];

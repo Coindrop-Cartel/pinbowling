@@ -154,8 +154,11 @@ describe('Leagues Page (leaguesPage.js)', () => {
           <div id="league-point-spread-row" class="form-row hidden">
             <input id="league-point-spread" type="number" />
           </div>
+          <div id="league-competition-row" class="form-row hidden">
+            <select id="league-competition"><option value="group">Group Play</option><option value="head2head">Head to Head</option></select>
+          </div>
           <div id="league-participants-row" class="form-row hidden">
-            <input id="league-participants" type="number" />
+            <select id="league-participants"><option value="individual">Individual</option><option value="team">Team</option></select>
           </div>
           <div id="league-drop-weeks-row" class="form-row hidden">
             <input id="league-drop-weeks" type="number" />
@@ -288,7 +291,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
   it('should populate form fields when editing a league', async () => {
     isManagementAuthorized.mockResolvedValue(true);
-    const mockLeague = { id: 5, name: 'EditMe', startDate: '2024-06-01', scoringFormat: 'golf', participants: 'team', seasonScoring: 'cumulative', dropLowestWeeks: 2, players: [], events: [] };
+    const mockLeague = { id: 5, name: 'EditMe', startDate: '2024-06-01', scoringFormat: 'golf', competitionFormat: 'group', participationType: 'team', seasonScoring: 'cumulative', dropLowestWeeks: 2, players: [], events: [] };
     PB_API.leagues.getAll.mockResolvedValue([mockLeague]);
     PB_API.players.getAll.mockResolvedValue([]);
 
@@ -307,7 +310,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
   it('should call PB_API.leagues.update when editing and submitting', async () => {
     isManagementAuthorized.mockResolvedValue(true);
-    const mockLeague = { id: 5, name: 'EditMe', startDate: '2024-06-01', scoringFormat: 'bowling', participants: 'individual', seasonScoring: 'weekly', dropLowestWeeks: 0, players: [], events: [] };
+    const mockLeague = { id: 5, name: 'EditMe', startDate: '2024-06-01', scoringFormat: 'bowling', competitionFormat: 'group', participationType: 'individual', seasonScoring: 'weekly', dropLowestWeeks: 0, players: [], events: [] };
     PB_API.leagues.getAll.mockResolvedValue([mockLeague]);
     PB_API.players.getAll.mockResolvedValue([]);
 
@@ -509,7 +512,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
   it('should add a team to a league via selection dialog', async () => {
     isManagementAuthorized.mockResolvedValue(true);
-    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', participants: 'team', teams: [], players: [], events: [] }]);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', competitionFormat: 'group', participationType: 'team', teams: [], players: [], events: [] }]);
     PB_API.players.getAll.mockResolvedValue([]);
     PB_API.teams.getAll.mockResolvedValue([{ id: 20, name: 'TeamA', city: 'NYC' }]);
     showPlayerSelectionDialog.mockResolvedValue('20');
@@ -528,7 +531,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
   it('should alert when all teams are already in the league', async () => {
     isManagementAuthorized.mockResolvedValue(true);
     const existingTeam = { id: 20, name: 'TeamA', city: 'NYC' };
-    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', participants: 'team', teams: [existingTeam], players: [], events: [] }]);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', competitionFormat: 'group', participationType: 'team', teams: [existingTeam], players: [], events: [] }]);
     PB_API.players.getAll.mockResolvedValue([]);
     PB_API.teams.getAll.mockResolvedValue([existingTeam]);
 
@@ -544,7 +547,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
   it('should remove a team from a league after confirmation', async () => {
     isManagementAuthorized.mockResolvedValue(true);
-    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', participants: 'team', teams: [{ id: 20, name: 'TeamA', city: 'NYC' }], players: [], events: [] }]);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', competitionFormat: 'group', participationType: 'team', teams: [{ id: 20, name: 'TeamA', city: 'NYC' }], players: [], events: [] }]);
     PB_API.players.getAll.mockResolvedValue([]);
     showConfirm.mockResolvedValue(true);
 
@@ -684,7 +687,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
   it('should update league header stats for team leagues', async () => {
     isManagementAuthorized.mockResolvedValue(true);
-    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', participants: 'team', teams: [{ id: 1, name: 'T1' }], players: [], events: [{ id: 1 }], seasonScoring: 'weekly', dropLowestWeeks: 2 }]);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', competitionFormat: 'group', participationType: 'team', teams: [{ id: 1, name: 'T1' }], players: [], events: [{ id: 1 }], seasonScoring: 'weekly', dropLowestWeeks: 2 }]);
     PB_API.players.getAll.mockResolvedValue([]);
 
     await initLeaguesPage();
@@ -697,7 +700,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
   it('should update league header stats for individual leagues', async () => {
     isManagementAuthorized.mockResolvedValue(true);
-    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', participants: 'individual', players: [{ id: 1, playerName: 'P1' }], teams: [], events: [], seasonScoring: 'cumulative', dropLowestWeeks: 0 }]);
+    PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', competitionFormat: 'group', participationType: 'individual', players: [{ id: 1, playerName: 'P1' }], teams: [], events: [], seasonScoring: 'cumulative', dropLowestWeeks: 0 }]);
     PB_API.players.getAll.mockResolvedValue([]);
 
     await initLeaguesPage();
@@ -713,7 +716,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
     const mockLeague = { 
       id: 1, 
       name: 'L1', 
-      participants: 'head2head', 
+      competitionFormat: 'head2head', participationType: 'individual', 
       status: 'active', 
       players: [{ id: 1, playerName: 'P1' }], 
       events: [{ id: 100, eventName: 'Week 1', matchups: [] }] 
@@ -742,7 +745,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
     const mockLeagueWithEvents = {
       id: 1,
       name: 'League With Events',
-      participants: 'individual',
+      competitionFormat: 'group', participationType: 'individual',
       scoringFormat: 'bowling',
       players: [],
       events: [{ id: 10, eventName: 'Week 1', matchups: [] }]
@@ -763,8 +766,10 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
     // Verify format and participant inputs are disabled
     const formatInput = document.getElementById('league-scoring-format');
+    const competitionInput = document.getElementById('league-competition');
     const participantsInput = document.getElementById('league-participants');
     expect(formatInput.disabled).toBe(true);
+    expect(competitionInput.disabled).toBe(true);
     expect(participantsInput.disabled).toBe(true);
 
     // Cancel / reset the form
@@ -773,6 +778,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
     // Verify they are re-enabled
     expect(formatInput.disabled).toBe(false);
+    expect(competitionInput.disabled).toBe(false);
     expect(participantsInput.disabled).toBe(false);
   });
 });

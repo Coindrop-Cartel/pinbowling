@@ -68,7 +68,8 @@ function initializeDatabaseSchema($pdo) {
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(255) NOT NULL,
         `type` ENUM('standard', 'session') DEFAULT 'standard',
-        `participants` ENUM('individual', 'team', 'head2head') DEFAULT 'individual',
+        `competition_format` ENUM('group', 'head2head') DEFAULT 'group',
+        `participation_type` ENUM('individual', 'team') DEFAULT 'individual',
         `start_date` DATE DEFAULT NULL,
         `scoring_format` VARCHAR(50) DEFAULT 'bowling',
         `season_scoring` ENUM('cumulative', 'weekly') DEFAULT 'weekly',
@@ -269,6 +270,8 @@ function alignTableColumns($pdo) {
     if ($checkTable) {
         $cols = [
             'type'                     => "ALTER TABLE `leagues` ADD COLUMN `type` ENUM('standard', 'session') DEFAULT 'standard' AFTER `name`",
+            'competition_format'       => "ALTER TABLE `leagues` ADD COLUMN `competition_format` ENUM('group', 'head2head') DEFAULT 'group' AFTER `type`",
+            'participation_type'       => "ALTER TABLE `leagues` ADD COLUMN `participation_type` ENUM('individual', 'team') DEFAULT 'individual' AFTER `competition_format`",
             'weekly_points'            => "ALTER TABLE `leagues` ADD COLUMN `weekly_points` INT DEFAULT NULL AFTER `drop_lowest_weeks`",
             'point_spread'             => "ALTER TABLE `leagues` ADD COLUMN `point_spread` INT DEFAULT NULL AFTER `weekly_points`",
             'rounds_per_game'          => "ALTER TABLE `leagues` ADD COLUMN `rounds_per_game` INT DEFAULT NULL AFTER `point_spread`",
@@ -487,6 +490,33 @@ try {
         echo "✓ Added 'archived' to leagues.status ENUM.\n";
     } else {
         echo "Archived status already added.\n";
+    }
+
+    // -----------------------------------------------------------------------
+    // Migration 4: split_participants_into_format_and_type
+    // -----------------------------------------------------------------------
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'split_participants_into_format_and_type'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        // Add new columns
+        $hasCompFmt = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'competition_format'")->fetch();
+        if (!$hasCompFmt) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `competition_format` ENUM('group', 'head2head') DEFAULT 'group' AFTER `type`");
+        }
+        $hasPartType = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'participation_type'")->fetch();
+        if (!$hasPartType) {
+            $pdo->exec("ALTER TABLE `leagues` ADD COLUMN `participation_type` ENUM('individual', 'team') DEFAULT 'individual' AFTER `competition_format`");
+        }
+
+        // Migrate existing data: individual → group+individual, team → group+team, head2head → head2head+individual
+        $pdo->exec("UPDATE `leagues` SET competition_format = 'group', participation_type = 'individual' WHERE participants = 'individual'");
+        $pdo->exec("UPDATE `leagues` SET competition_format = 'group', participation_type = 'team' WHERE participants = 'team'");
+        $pdo->exec("UPDATE `leagues` SET competition_format = 'head2head', participation_type = 'individual' WHERE participants = 'head2head'");
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('split_participants_into_format_and_type')")->execute();
+        echo "✓ Split participants into competition_format and participation_type.\n";
+    } else {
+        echo "Competition format/participation type columns already exist.\n";
     }
 
     echo "\n✓ All migrations complete.\n";

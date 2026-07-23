@@ -169,7 +169,7 @@ export function renderLeagueList(container, filteredLeagues, {
   filteredLeagues.forEach(league => {
     const shouldExpand = activeLeagueId && String(league.id) === String(activeLeagueId);
     const participantMeta = getParticipantMeta(league);
-    const isH2H = league.participants === 'head2head';
+    const isH2H = league.competitionFormat === 'head2head';
     const isSeasonActive = isH2H && (league.status === 'active' || league.status === 'completed');
 
     const playoffEvents = (league.events || []).filter(e => e.eventName && e.eventName.startsWith('Playoffs:'));
@@ -303,7 +303,7 @@ export function renderLeagueList(container, filteredLeagues, {
       <div class="league-players-section roster-section">
         <div class="section-bar">
           <h4 class="section-subheading">${participantMeta.listLabel}</h4>
-          ${isAuthorized ? `<button class="${league.participants === 'team' ? 'add-team-btn' : 'add-player-btn'} secondary btn-row" data-league-id="${league.id}">Add ${league.participants === 'team' ? 'Team' : 'Player'}</button>` : ''}
+          ${isAuthorized ? `<button class="${league.participationType === 'team' ? 'add-team-btn' : 'add-player-btn'} secondary btn-row" data-league-id="${league.id}">Add ${league.participationType === 'team' ? 'Team' : 'Player'}</button>` : ''}
         </div>
         <ul class="league-participants-list list-unstyled"></ul>
         <div class="notice league-participants-empty hidden">No ${participantMeta.emptyLabel} assigned to this league.</div>
@@ -406,7 +406,7 @@ export function renderLeagueList(container, filteredLeagues, {
     if (shouldExpand) {
       // Weekly schedule matchups are now managed on the separate Scores Page.
 
-      if (league.participants === 'team') {
+      if (league.participationType === 'team') {
         renderRegistryTeams(row, league.teams, {
           isAuthorized,
           onRemoveTeam: (teamId, teamName) => onRemoveTeam(league.id, teamId, teamName)

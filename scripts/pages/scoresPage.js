@@ -657,7 +657,7 @@ export async function initScoresPage() {
 
     machines = machinesNormalized;
 
-    const isH2H = league?.participants === 'head2head';
+    const isH2H = league?.competitionFormat === 'head2head';
     const scheduleContainer = document.getElementById('matchups-schedule-container');
     
     if (isH2H && !activeEventMatchupId) {

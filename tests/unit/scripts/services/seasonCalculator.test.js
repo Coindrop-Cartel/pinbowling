@@ -32,7 +32,8 @@ function createMockEngine(overrides = {}) {
 function makeLeague(overrides = {}) {
   return {
     id: 1,
-    participants: 'individual',
+    competitionFormat: 'group',
+    participationType: 'individual',
     seasonScoring: 'cumulative',
     dropLowestWeeks: 0,
     teams: [],
@@ -109,7 +110,7 @@ describe('calculateSeasonSummary', () => {
   });
 
   it('should set isTeamLeague to true for team leagues', () => {
-    const league = makeLeague({ participants: 'team', teams: [{ id: 't1', members: [] }] });
+    const league = makeLeague({ participationType: 'team', teams: [{ id: 't1', members: [] }] });
     const result = calculateSeasonSummary({
       league, players: [], events: [], targetsByEvent: {}, scoresByEventAndPlayer: {}, engine
     });
@@ -117,7 +118,7 @@ describe('calculateSeasonSummary', () => {
   });
 
   it('should set isTeamLeague to false for individual leagues', () => {
-    const league = makeLeague({ participants: 'individual' });
+    const league = makeLeague({});
     const result = calculateSeasonSummary({
       league, players: [], events: [], targetsByEvent: {}, scoresByEventAndPlayer: {}, engine
     });
@@ -312,7 +313,7 @@ describe('calculateSeasonSummary', () => {
   describe('team league', () => {
     it('should aggregate member scores for team totals', () => {
       const league = makeLeague({
-        participants: 'team',
+        participationType: 'team',
         teams: [
           { id: 't1', members: [{ id: 1 }, { id: 2 }] },
           { id: 't2', members: [{ id: 3 }] }
@@ -347,7 +348,7 @@ describe('calculateSeasonSummary', () => {
 
     it('should return empty playedTargets for team leagues', () => {
       const league = makeLeague({
-        participants: 'team',
+        participationType: 'team',
         teams: [{ id: 't1', members: [{ id: 1 }] }]
       });
       const events = makeEvents(1);
@@ -665,7 +666,7 @@ describe('calculateSeasonSummary', () => {
   describe('weekly team league', () => {
     it('should calculate team totals in weekly pre-calc and assign points', () => {
       const league = makeLeague({
-        participants: 'team',
+        participationType: 'team',
         seasonScoring: 'weekly',
         teams: [
           { id: 't1', members: [{ id: 1 }, { id: 2 }] },
@@ -701,7 +702,7 @@ describe('calculateSeasonSummary', () => {
 
     it('should skip teams with no member scores in weekly pre-calc', () => {
       const league = makeLeague({
-        participants: 'team',
+        participationType: 'team',
         seasonScoring: 'weekly',
         teams: [
           { id: 't1', members: [{ id: 1 }] },
@@ -733,7 +734,7 @@ describe('calculateSeasonSummary', () => {
 
     it('should handle team with partial member scores in weekly pre-calc', () => {
       const league = makeLeague({
-        participants: 'team',
+        participationType: 'team',
         seasonScoring: 'weekly',
         teams: [
           { id: 't1', members: [{ id: 1 }, { id: 2 }, { id: 3 }] },
@@ -847,7 +848,7 @@ describe('calculateSeasonSummary', () => {
   describe('cumulative team edge cases', () => {
     it('should handle team where no members have scores for an event', () => {
       const league = makeLeague({
-        participants: 'team',
+        participationType: 'team',
         teams: [
           { id: 't1', members: [{ id: 1 }] },
           { id: 't2', members: [{ id: 2 }] },

@@ -107,7 +107,9 @@ export async function initReadOnlyTournamentDisplay(container, onRefresh, existi
       const { league, event } = _resolveTournamentData(leagues, activeEventId, activeLeagueId);
       if (league) {
         if (String(league.id) !== String(activeLeagueId)) setActiveLeagueId(league.id);
-        container.innerHTML = `<section class="card tournament-display mb-20"><div class="flex-col"><h2 class="mb-0">Current Selection:</h2><p class="mb-0"><strong>League:</strong> ${league.name}</p><p class="mb-0"><strong>Event:</strong> ${event?.eventName || 'Season Summary'}</p></div></section>`;
+        const eventDate = event?.eventDate ? new Date(event.eventDate).toLocaleDateString() : '';
+        const locationName = event?.locationName || '';
+        container.innerHTML = `<section class="card tournament-display mb-20"><div class="flex-col"><h2 class="mb-0">Current Selection:</h2><p class="mb-0"><strong>League:</strong> ${league.name}</p><p class="mb-0"><strong>Event:</strong> ${event?.eventName || 'Season Summary'}${eventDate ? ` &mdash; ${eventDate}` : ''}${locationName ? ` &mdash; ${locationName}` : ''}</p></div></section>`;
       } else throw new Error('Selection invalid');
     } catch (error) { container.innerHTML = `<div class="notice">Selection context lost.</div>`; }
   } else {
@@ -222,7 +224,7 @@ export async function initTournamentSelector(container, { onRefresh, typeFilter 
   const populateEvents = (leagueId, selectedEventId) => {
     const isStandingsPage = !!document.getElementById('standings-body');
     const league = allLeagues.find(l => String(l.id) === String(leagueId));
-    const isH2H = league?.participants === 'head2head';
+    const isH2H = league?.competitionFormat === 'head2head';
     
     const labelEl = eventWrapper.querySelector('label');
     if (labelEl) {

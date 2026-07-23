@@ -224,7 +224,7 @@ export async function addPlayerToLeague({ leagueId, leagueName, allLeagues, allP
   const league = allLeagues.find(l => l.id === leagueId);
   if (!league) return;
   
-  if (league.participants === 'head2head' && league.status === 'active') {
+  if (league.competitionFormat === 'head2head' && league.status === 'active') {
     const weeksInSeason = league.weeksInSeason || 8;
     const midpoint = Math.ceil(weeksInSeason / 2);
     

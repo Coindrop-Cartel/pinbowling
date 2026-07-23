@@ -40,7 +40,8 @@ export async function finalizeSession(options) {
     startDate: now.toISOString().split('T')[0],
     type: 'session',
     scoringFormat: currentSessionFormat,
-    participants: currentSessionFormat === 'baseball' ? 'head2head' : 'individual',
+    competitionFormat: currentSessionFormat === 'baseball' ? 'head2head' : 'group',
+    participationType: 'individual',
     roundsPerGame: currentSessionFormat === 'baseball' ? (generatedFrames.length / 2) : 2,
     matchupsPerRound: currentSessionFormat === 'baseball' ? 2 : null
   });

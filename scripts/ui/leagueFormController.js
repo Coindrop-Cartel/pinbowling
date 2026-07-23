@@ -16,6 +16,7 @@ export function createLeagueFormController(elements, options) {
     leagueWeeklyPointsInput,
     leaguePointSpreadInput,
     leagueParticipantsInput,
+    leagueCompetitionInput,
     leagueDropLowestInput,
     leagueWeeksInput,
     leagueInningsInput
@@ -34,6 +35,7 @@ export function createLeagueFormController(elements, options) {
   const seasonScoringRow = document.getElementById('league-season-scoring-row');
   const weeklyPointsRow = document.getElementById('league-weekly-points-row');
   const pointSpreadRow = document.getElementById('league-point-spread-row');
+  const competitionRow = document.getElementById('league-competition-row');
   const participantsRow = document.getElementById('league-participants-row');
   const dropLowestRow = document.getElementById('league-drop-weeks-row');
   const weeksRow = document.getElementById('league-weeks-in-season-row');
@@ -115,7 +117,7 @@ export function createLeagueFormController(elements, options) {
   const handleSeasonScoringChange = () => {
     if (!leagueSeasonScoringInput) return;
     const isWeekly = leagueSeasonScoringInput.value === 'weekly';
-    const isH2H = leagueParticipantsInput?.value === 'head2head';
+    const isH2H = leagueCompetitionInput?.value === 'head2head';
     if (isWeekly && !isH2H && dateRow && !dateRow.classList.contains('hidden')) {
       weeklyPointsRow?.classList.remove('hidden');
       pointSpreadRow?.classList.remove('hidden');
@@ -145,9 +147,9 @@ export function createLeagueFormController(elements, options) {
     }
   };
 
-  const handleParticipantsChange = () => {
-    if (!leagueParticipantsInput) return;
-    const isH2H = leagueParticipantsInput.value === 'head2head';
+  const handleCompetitionChange = () => {
+    if (!leagueCompetitionInput) return;
+    const isH2H = leagueCompetitionInput.value === 'head2head';
     updateFormatOptions(isH2H);
     if (isH2H) {
       seasonScoringRow?.classList.add('hidden');
@@ -175,6 +177,7 @@ export function createLeagueFormController(elements, options) {
 
     dateRow?.classList.add('hidden');
     formatRow?.classList.add('hidden');
+    competitionRow?.classList.add('hidden');
     participantsRow?.classList.add('hidden');
     seasonScoringRow?.classList.add('hidden');
     weeklyPointsRow?.classList.add('hidden');
@@ -189,6 +192,7 @@ export function createLeagueFormController(elements, options) {
     updateLocationsSummary();
 
     if (leagueFormatInput) leagueFormatInput.disabled = false;
+    if (leagueCompetitionInput) leagueCompetitionInput.disabled = false;
     if (leagueParticipantsInput) leagueParticipantsInput.disabled = false;
 
     if (createToggle) {
@@ -203,7 +207,8 @@ export function createLeagueFormController(elements, options) {
     editingLeagueId = league.id;
     leagueNameInput.value = league.name;
     leagueDateInput.value = league.startDate || '';
-    if (leagueParticipantsInput) leagueParticipantsInput.value = league.participants || 'individual';
+    if (leagueCompetitionInput) leagueCompetitionInput.value = league.competitionFormat || 'group';
+    if (leagueParticipantsInput) leagueParticipantsInput.value = league.participationType || 'individual';
     if (leagueSeasonScoringInput) leagueSeasonScoringInput.value = league.seasonScoring || 'weekly';
     if (leagueDropLowestInput) leagueDropLowestInput.value = league.dropLowestWeeks || 0;
     if (leagueWeeklyPointsInput) leagueWeeklyPointsInput.value = league.weeklyPoints !== null && league.weeklyPoints !== undefined ? league.weeklyPoints : '';
@@ -217,15 +222,16 @@ export function createLeagueFormController(elements, options) {
     dateRow?.classList.remove('hidden');
     formatRow?.classList.remove('hidden');
     locationsRow?.classList.remove('hidden');
+    if (competitionRow) competitionRow.classList.remove('hidden');
     if (participantsRow) participantsRow.classList.remove('hidden');
 
     selectedLocationIds = (league.locationIds || []).map(String);
     console.log('[Locations] editLeague set selectedLocationIds from league:', JSON.stringify(league.locationIds), '->', JSON.stringify(selectedLocationIds));
     updateLocationsSummary();
 
-    // Rebuild format options with the correct participant type first,
+    // Rebuild format options with the correct competition type first,
     // so the scoring format option exists before we try to select it.
-    handleParticipantsChange();
+    handleCompetitionChange();
     leagueFormatInput.value = ScoringFormats.resolve(league.scoringFormat);
     console.log('[editLeague] Format set to:', leagueFormatInput.value, '(league.scoringFormat:', league.scoringFormat, ')');
     actionsRow?.classList.remove('hidden');
@@ -243,18 +249,19 @@ export function createLeagueFormController(elements, options) {
 
     const hasEvents = league.events && league.events.length > 0;
     if (leagueFormatInput) leagueFormatInput.disabled = hasEvents;
+    if (leagueCompetitionInput) leagueCompetitionInput.disabled = hasEvents;
     if (leagueParticipantsInput) leagueParticipantsInput.disabled = hasEvents;
 
     if (options.onEditTriggered) options.onEditTriggered();
   }
 
   // Bind Listeners
-  if (leagueParticipantsInput) {
-    leagueParticipantsInput.onchange = handleParticipantsChange;
+  if (leagueCompetitionInput) {
+    leagueCompetitionInput.onchange = handleCompetitionChange;
   }
 
   if (leagueFormatInput) {
-    const isH2H = leagueParticipantsInput?.value === 'head2head';
+    const isH2H = leagueCompetitionInput?.value === 'head2head';
     updateFormatOptions(isH2H);
     leagueFormatInput.onchange = () => {
       applyPreferredTheme(leagueFormatInput.value);
@@ -286,8 +293,9 @@ export function createLeagueFormController(elements, options) {
         dateRow?.classList.remove('hidden');
         formatRow?.classList.remove('hidden');
         locationsRow?.classList.remove('hidden');
+        if (competitionRow) competitionRow.classList.remove('hidden');
         if (participantsRow) participantsRow.classList.remove('hidden');
-        handleParticipantsChange();
+        handleCompetitionChange();
         handleSeasonScoringChange();
         actionsRow?.classList.remove('hidden');
         createToggle.classList.replace('mt-10', 'mt-0');
@@ -311,10 +319,11 @@ export function createLeagueFormController(elements, options) {
     const name = leagueNameInput.value.trim();
     const date = leagueDateInput.value;
     const scoringFormat = leagueFormatInput.value;
-    const participants = leagueParticipantsInput?.value || 'individual';
+    const competitionFormat = leagueCompetitionInput?.value || 'group';
+    const participationType = leagueParticipantsInput?.value || 'individual';
     const seasonScoring = leagueSeasonScoringInput?.value || 'weekly';
     const dropLowestWeeks = parseInt(leagueDropLowestInput?.value || '0', 10);
-    const isH2H = participants === 'head2head';
+    const isH2H = competitionFormat === 'head2head';
     const isWeekly = seasonScoring === 'weekly';
     const weeksInSeason = (isH2H && leagueWeeksInput) ? parseInt(leagueWeeksInput.value, 10) : null;
     const roundsPerGame = (isH2H && leagueInningsInput) ? parseInt(leagueInningsInput.value, 10) : null;
@@ -340,7 +349,8 @@ export function createLeagueFormController(elements, options) {
         name,
         startDate: date,
         scoringFormat,
-        participants,
+        competitionFormat,
+        participationType,
         seasonScoring,
         dropLowestWeeks,
         weeksInSeason,

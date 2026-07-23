@@ -15,12 +15,18 @@
           <label for="league-start-date">Start Date</label>
           <input id="league-start-date" data-testid="league-start-date-input" type="date" required />
         </div>
+        <div id="league-competition-row" data-testid="league-competition-row" class="form-row hidden">
+          <label for="league-competition">Competition Format</label>
+          <select id="league-competition" data-testid="league-competition-select">
+            <option value="group" selected>Group Play</option>
+            <option value="head2head">Head to Head</option>
+          </select>
+        </div>
         <div id="league-participants-row" data-testid="league-participants-row" class="form-row hidden">
-          <label for="league-participants">League Type</label>
+          <label for="league-participants">Player Assignment</label>
           <select id="league-participants" data-testid="league-participants-select">
             <option value="individual" selected>Individual</option>
             <option value="team">Team</option>
-            <option value="head2head">Head to Head</option>
           </select>
         </div>
         <div id="league-format-row" data-testid="league-format-row" class="form-row hidden">

@@ -68,14 +68,15 @@ export async function initLeaguesPage() {
   const leagueSeasonScoringInput = document.getElementById('league-season-scoring');
   const leagueWeeklyPointsInput = document.getElementById('league-weekly-points');
   const leaguePointSpreadInput = document.getElementById('league-point-spread');
+  const leagueCompetitionInput = document.getElementById('league-competition');
   const leagueParticipantsInput = document.getElementById('league-participants');
   const leagueDropLowestInput = document.getElementById('league-drop-weeks');
   const leagueWeeksInput = document.getElementById('league-weeks-in-season');
   const leagueInningsInput = document.getElementById('league-rounds-per-game');
 
   const getParticipantMeta = (league) => {
-    if (league?.participants === 'team') return { mode: 'Team', countLabel: 'Teams', count: league.teams?.length || 0, listLabel: 'Teams', emptyLabel: 'teams' };
-    if (league?.participants === 'head2head') return { mode: 'Head-to-head', countLabel: 'Players', count: league.players?.length || 0, listLabel: 'Roster', emptyLabel: 'players' };
+    if (league?.participationType === 'team') return { mode: 'Team', countLabel: 'Teams', count: league.teams?.length || 0, listLabel: 'Teams', emptyLabel: 'teams' };
+    if (league?.competitionFormat === 'head2head') return { mode: 'Head-to-head', countLabel: 'Players', count: league.players?.length || 0, listLabel: 'Roster', emptyLabel: 'players' };
     return { mode: 'Individual', countLabel: 'Players', count: league?.players?.length || 0, listLabel: 'Roster', emptyLabel: 'players' };
   };
 
@@ -95,6 +96,7 @@ export async function initLeaguesPage() {
     leagueSeasonScoringInput,
     leagueWeeklyPointsInput,
     leaguePointSpreadInput,
+    leagueCompetitionInput,
     leagueParticipantsInput,
     leagueDropLowestInput,
     leagueWeeksInput,

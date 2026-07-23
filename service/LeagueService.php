@@ -246,7 +246,8 @@ class LeagueService {
      * @param string $name
      * @param string|null $startDate
      * @param string $type
-     * @param string $participants
+     * @param string $competitionFormat
+     * @param string $participationType
      * @param string $scoringFormat
      * @param string $seasonScoring
      * @param int $dropLowestWeeks
@@ -259,7 +260,8 @@ class LeagueService {
         string $name,
         ?string $startDate = null,
         string $type = 'standard',
-        string $participants = 'individual',
+        string $competitionFormat = 'group',
+        string $participationType = 'individual',
         string $scoringFormat = 'bowling',
         string $seasonScoring = 'weekly',
         int $dropLowestWeeks = 0,
@@ -274,10 +276,10 @@ class LeagueService {
         try {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare(
-                'INSERT INTO leagues (name, start_date, type, participants, scoring_format, season_scoring, drop_lowest_weeks, weeks_in_season, rounds_per_game, matchups_per_round, weekly_points, point_spread)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO leagues (name, start_date, type, competition_format, participation_type, scoring_format, season_scoring, drop_lowest_weeks, weeks_in_season, rounds_per_game, matchups_per_round, weekly_points, point_spread)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
-            $stmt->execute([$name, $startDate, $type, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread]);
+            $stmt->execute([$name, $startDate, $type, $competitionFormat, $participationType, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread]);
             $leagueId = (int)$pdo->lastInsertId();
             
             $this->syncLeagueLocations($pdo, $leagueId, $locationIds);
@@ -298,7 +300,8 @@ class LeagueService {
      * @param int $leagueId
      * @param string $name
      * @param string|null $startDate
-     * @param string $participants
+     * @param string $competitionFormat
+     * @param string $participationType
      * @param string $scoringFormat
      * @param string $seasonScoring
      * @param int $dropLowestWeeks
@@ -311,7 +314,8 @@ class LeagueService {
         int $leagueId,
         string $name,
         ?string $startDate = null,
-        string $participants = 'individual',
+        string $competitionFormat = 'group',
+        string $participationType = 'individual',
         string $scoringFormat = 'bowling',
         string $seasonScoring = 'weekly',
         int $dropLowestWeeks = 0,
@@ -327,8 +331,8 @@ class LeagueService {
         try {
             $pdo->beginTransaction();
 
-            $updateFields = 'SET name = ?, start_date = ?, participants = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ?, weeks_in_season = ?, rounds_per_game = ?, matchups_per_round = ?, weekly_points = ?, point_spread = ?';
-            $updateParams = [$name, $startDate, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread];
+            $updateFields = 'SET name = ?, start_date = ?, competition_format = ?, participation_type = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ?, weeks_in_season = ?, rounds_per_game = ?, matchups_per_round = ?, weekly_points = ?, point_spread = ?';
+            $updateParams = [$name, $startDate, $competitionFormat, $participationType, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread];
 
             if ($status !== null) {
                 $updateFields .= ', status = ?';

@@ -234,7 +234,7 @@ describe('Standings Page (standingsPage.js)', () => {
     getActiveLeagueId.mockReturnValue('1');
     getActiveEventId.mockReturnValue('101');
     PB_API.leagues.getAll.mockResolvedValue([{ 
-      id: '1', name: 'L1', participants: 'team', 
+      id: '1', name: 'L1', competitionFormat: 'group', participationType: 'team', 
       teams: [{ id: 50, name: 'Team Rocket', members: [{ id: 7 }] }],
       events: [{ id: '101' }] 
     }]);

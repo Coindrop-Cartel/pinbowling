@@ -34,7 +34,7 @@ export function getSelectablePlayers(params) {
     }
   } else if (leagueId) {
     const league = allLeaguesCache.find(l => String(l.id) === String(leagueId));
-    if (league?.participants === 'team') {
+    if (league?.participationType === 'team') {
       const memberMap = new Map();
       (league.teams || []).forEach(team => {
         (team.members || []).forEach(m => memberMap.set(String(m.id), m));

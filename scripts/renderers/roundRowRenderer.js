@@ -46,7 +46,7 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   if (activeLeague) {
     if (activeLeague.type === 'session') {
       isTargetInRoster = true;
-    } else if (activeLeague.participants === 'team') {
+    } else if (activeLeague.participationType === 'team') {
       isTargetInRoster = (activeLeague.teams || []).some(t => (t.members || []).some(m => String(m.id) === String(targetPlayer?.id)));
     } else {
       isTargetInRoster = (activeLeague.players || []).some(p => String(p.id) === String(targetPlayer?.id));

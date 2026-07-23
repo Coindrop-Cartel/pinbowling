@@ -330,7 +330,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
     PB_API.leagues.getAll.mockResolvedValue([
       {
         id: 1,
-        participants: 'team',
+        competitionFormat: 'group', participationType: 'team',
         teams: [
           { id: 10, name: 'Team A', members: [{ id: 20, playerName: 'Alice' }] }
         ],
@@ -368,7 +368,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
       { 
         id: 1, 
         name: 'H2H League', 
-        participants: 'head2head', 
+        competitionFormat: 'head2head', participationType: 'individual', 
         scoringFormat: 'baseball',
         events: [{ 
           id: 101, 
@@ -409,7 +409,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
       { 
         id: 1, 
         name: 'H2H League', 
-        participants: 'head2head', 
+        competitionFormat: 'head2head', participationType: 'individual', 
         scoringFormat: 'baseball',
         events: [{ id: 101, eventName: 'Week 1' }] 
       }

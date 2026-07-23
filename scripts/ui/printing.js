@@ -337,7 +337,7 @@ export function printSeasonResults(league, players, events, locations, allLeague
 
   const format = ScoringFormats.resolve(league.scoringFormat);
   const isBaseball = format === ScoringFormats.BASEBALL;
-  const isTeamLeague = league.participants === 'team';
+  const isTeamLeague = league.participationType === 'team';
   
   const normalizedTargets = normalizeTargets(allLeagueTargets);
   const targetsByEvent = groupTargetsByEvent(normalizedTargets);
@@ -506,7 +506,7 @@ export function printSeasonResults(league, players, events, locations, allLeague
         <h1>League Summary</h1>
         <div class="print-mb-4"><strong>League Name:</strong> ${escapeHTML(league.name)}</div>
         <div class="print-mb-4"><strong>Start Date:</strong> ${escapeHTML(league.startDate || 'N/A')}</div>
-        <div class="print-mb-4"><strong>League Type:</strong> ${escapeHTML(league.participants === 'team' ? 'Team' : (league.participants === 'head2head' ? 'Head-to-head' : 'Individual'))}</div>
+        <div class="print-mb-4"><strong>League Type:</strong> ${escapeHTML(league.participationType === 'team' ? 'Team' : (league.competitionFormat === 'head2head' ? 'Head-to-head' : 'Individual'))}</div>
         <div class="print-mb-4"><strong>Scoring Format:</strong> ${escapeHTML(format)}</div>
         <div class="print-mb-4"><strong>Season Scoring:</strong> ${escapeHTML(league.seasonScoring === 'weekly' ? 'Weekly Points' : 'Cumulative')}</div>
         <div class="print-mb-4"><strong>Drop Lowest Weeks:</strong> ${escapeHTML(String(league.dropLowestWeeks || 0))}</div>
