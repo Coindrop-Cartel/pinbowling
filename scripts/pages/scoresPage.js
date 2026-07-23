@@ -5,6 +5,7 @@ import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActive
 import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
+import { showDialog } from '@ui/dialogs.js';
 import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { printBlankScoreSheet, printScoreSheet } from '@ui/printing.js';
@@ -115,7 +116,16 @@ export async function initScoresPage() {
         },
         hidden: !player || machines.length === 0 || !!getActiveEventMatchupId()
       },
-      { text: 'Print Blank Score Sheet', onclick: () => printBlankScoreSheet(machines, activeLeague?.name, activeEvent?.eventName, activeFormat), hidden: machines.length === 0 || !!getActiveEventMatchupId() }
+      { text: 'Print Blank Score Sheet', onclick: async () => {
+        const includeThresholds = await showDialog({
+          title: 'Blank Score Sheet',
+          message: 'Include threshold value reference?',
+          confirmText: 'Yes',
+          cancelText: 'No',
+          cancelValue: false
+        });
+        printBlankScoreSheet(machines, activeLeague?.name, activeEvent?.eventName, activeFormat, includeThresholds === true);
+      }, hidden: machines.length === 0 || !!getActiveEventMatchupId() }
     ]);
   }
 

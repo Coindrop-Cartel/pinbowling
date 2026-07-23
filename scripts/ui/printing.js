@@ -1,7 +1,7 @@
 import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 import { FormatBranding } from '@services/scoringFormatBranding.js';
-import { formatNumber, escapeHTML } from '@scripts/utils.js';
+import { formatNumber, escapeHTML, renderThresholdGrid } from '@scripts/utils.js';
 import { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer, buildScoreMapFromRows, buildBaseballScoreMapForPlayer, groupScoresByPlayer } from '@services/normalizer.js';
 import { calculateSeasonSummary } from '@services/seasonCalculator.js';
 
@@ -72,7 +72,7 @@ export function printMachineScores(machines, format = ScoringFormats.DEFAULT) {
  * @param {string} [format=ScoringFormats.DEFAULT] - The scoring format ('bowling' or 'golf').
  * @returns {void}
  */
-export function printBlankScoreSheet(machines, leagueName, eventName, format = ScoringFormats.DEFAULT) {
+export function printBlankScoreSheet(machines, leagueName, eventName, format = ScoringFormats.DEFAULT, showThresholds = false) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) return alert('Please allow popups to print.');
 
@@ -106,19 +106,27 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = S
   const machineSectionsHtml = machines.map((m) => {
     const isLast = m.orderNumber === maxOrder;
     const lfHint = isLast ? FormatBranding.get(format).lastFrameHint : null;
-    let targetsHtml = Engine.getPrintTargetSummaryHtml(m, isLast, formatNumber);
+    const targetSummary = Engine.getPrintTargetSummaryHtml(m, isLast, formatNumber);
+
+    const thresholdsSection = showThresholds && m.values ? `
+      <div class="thresholds-section">
+        ${renderThresholdGrid(Engine.filterThresholds(m.values), formatNumber, Engine, m.value1, m.value2)}
+      </div>
+    ` : '';
 
     return `
       <div class="print-block">
         <div class="print-block-header">
           <h3 class="print-mt-0">${escapeHTML(Engine.getRoundLabel())} ${m.orderNumber}: ${escapeHTML(m.machineName)}</h3>
-          <div class="targets-summary">${targetsHtml}</div>
+          <div class="targets-summary">${targetSummary}</div>
         </div>
+        ${thresholdsSection}
         ${lfHint ? `<div class="muted small print-hint-italic">${lfHint}</div>` : ''}
         <div class="flex gap-15">
           <div class="flex-1"><small>Ball 1</small><div class="score-line"></div></div>
           <div class="flex-1"><small>Ball 2</small><div class="score-line"></div></div>
           <div class="flex-1"><small>Ball 3</small><div class="score-line"></div></div>
+          <div class="flex-1"><small>Score</small><div class="score-line"></div></div>
         </div>
       </div>`;
   }).join('');
@@ -146,6 +154,9 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = S
     .text-right { text-align: right; }
     .ml-15 { margin-left: 15px; }
     .gap-15 { gap: 15px; }
+    .thresholds-section { padding: 8px 0; font-size: 0.85rem; border-bottom: 1px dashed #ccc; margin-bottom: 6px; }
+    .thresholds-section .threshold-grid { display: flex; flex-wrap: wrap; gap: 2px 16px; }
+    .thresholds-section .threshold-grid .threshold-row { margin: 0; white-space: nowrap; }
   `;
 
   printWindow.document.write(`
@@ -201,6 +212,9 @@ export function printScoreSheet(machines, leagueName, eventName, format = Scorin
     </div>
   `;
 
+  // Compute per-round scores for the Score column
+  const turnResults = Engine.calculateTurnResults(machines, scoreMap);
+
   // Iterate through machines to create individual frame/hole sections with scores
   const machineSectionsHtml = machines.map((m) => {
     const isLast = m.orderNumber === maxOrder;
@@ -211,6 +225,9 @@ export function printScoreSheet(machines, leagueName, eventName, format = Scorin
     const ball1Val = (playerScores.ball1 !== undefined && playerScores.ball1 !== null && playerScores.ball1 !== '') ? formatNumber(playerScores.ball1) : '';
     const ball2Val = (playerScores.ball2 !== undefined && playerScores.ball2 !== null && playerScores.ball2 !== '') ? formatNumber(playerScores.ball2) : '';
     const ball3Val = (playerScores.ball3 !== undefined && playerScores.ball3 !== null && playerScores.ball3 !== '') ? formatNumber(playerScores.ball3) : '';
+
+    const turnResult = turnResults.turnResults.find(t => t.orderNumber === m.orderNumber);
+    const scoreVal = turnResult?.displayRunningTotal ?? '';
 
     return `
       <div class="print-block">
@@ -223,6 +240,7 @@ export function printScoreSheet(machines, leagueName, eventName, format = Scorin
           <div class="flex-1"><small>Ball 1</small><div class="score-line filled-score">${ball1Val}</div></div>
           <div class="flex-1"><small>Ball 2</small><div class="score-line filled-score">${ball2Val}</div></div>
           <div class="flex-1"><small>Ball 3</small><div class="score-line filled-score">${ball3Val}</div></div>
+          <div class="flex-1"><small>Score</small><div class="score-line filled-score">${scoreVal}</div></div>
         </div>
       </div>`;
   }).join('');
@@ -559,6 +577,9 @@ export function printSeasonResults(league, players, events, locations, allLeague
         </div>
       `;
 
+      // Compute per-round scores for the Score column
+      const seasonTurnResults = engine.calculateTurnResults(eventMachinesNormalized, scoreMap);
+
       const machineSectionsHtml = eventMachinesNormalized.map((m) => {
         const isLast = m.orderNumber === eventMaxOrder;
         const lfHint = isLast ? FormatBranding.get(format).lastFrameHint : null;
@@ -568,6 +589,9 @@ export function printSeasonResults(league, players, events, locations, allLeague
         const ball1Val = (currentTurnScores.ball1 !== undefined && currentTurnScores.ball1 !== null && currentTurnScores.ball1 !== '') ? formatNumber(currentTurnScores.ball1) : '';
         const ball2Val = (currentTurnScores.ball2 !== undefined && currentTurnScores.ball2 !== null && currentTurnScores.ball2 !== '') ? formatNumber(currentTurnScores.ball2) : '';
         const ball3Val = (currentTurnScores.ball3 !== undefined && currentTurnScores.ball3 !== null && currentTurnScores.ball3 !== '') ? formatNumber(currentTurnScores.ball3) : '';
+
+        const seasonTurnResult = seasonTurnResults.turnResults.find(t => t.orderNumber === m.orderNumber);
+        const seasonScoreVal = seasonTurnResult?.displayRunningTotal ?? '';
 
         return `
           <div class="print-block">
@@ -580,6 +604,7 @@ export function printSeasonResults(league, players, events, locations, allLeague
               <div class="flex-1"><small>Ball 1</small><div class="score-line filled-score">${ball1Val}</div></div>
               <div class="flex-1"><small>Ball 2</small><div class="score-line filled-score">${ball2Val}</div></div>
               <div class="flex-1"><small>Ball 3</small><div class="score-line filled-score">${ball3Val}</div></div>
+              <div class="flex-1"><small>Score</small><div class="score-line filled-score">${seasonScoreVal}</div></div>
             </div>
           </div>`;
       }).join('');

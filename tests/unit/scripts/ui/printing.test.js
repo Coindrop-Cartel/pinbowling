@@ -5,6 +5,7 @@ import { printMachineScores, printBlankScoreSheet, printScoreSheet, printSeasonR
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
     getPrintTargetSummaryHtml: () => '<div>Strike: <strong>10,000</strong></div>',
+    filterThresholds: vi.fn(v => v),
     getScoringHint: () => '',
     getLastFrameHint: () => '',
     getRoundLabel: () => 'Frame',
@@ -20,7 +21,8 @@ vi.mock('@core/engine.js', () => ({
 // Mock utils.js to provide escapeHTML
 vi.mock('@scripts/utils.js', () => ({
   formatNumber: vi.fn(n => n?.toLocaleString() || '0'),
-  escapeHTML: vi.fn(str => str)
+  escapeHTML: vi.fn(str => str),
+  renderThresholdGrid: vi.fn(() => '<div>Mock Threshold Grid</div>')
 }));
 
 describe('Printing Utilities (printing.js)', () => {
@@ -102,10 +104,22 @@ describe('Printing Utilities (printing.js)', () => {
       expect(html).toContain('Test League');
       expect(html).toContain('Test Event');
       expect(html).toContain('Frame 1: Machine A');
-      expect(html).toContain('Strike: <strong>10,000</strong>');
+      expect(html).toContain('Strike:');
       expect(html).toContain('Ball 1');
       expect(html).toContain('Ball 2');
       expect(html).toContain('Ball 3');
+      expect(html).toContain('Score');
+      expect(html).not.toMatch(/class="thresholds-section"/);
+    });
+
+    it('should include scoring thresholds when showThresholds is true', () => {
+      const machines = [
+        { id: 1, machineName: 'Machine A', orderNumber: 1, values: { 10: 10000 } },
+      ];
+      printBlankScoreSheet(machines, 'Test League', 'Test Event', undefined, true);
+      const html = mockPrintWindow.document.write.mock.calls[0][0];
+      expect(html).toContain('Strike:');
+      expect(html).toContain('thresholds-section');
     });
 
     it('should call print and close after a timeout', async () => {

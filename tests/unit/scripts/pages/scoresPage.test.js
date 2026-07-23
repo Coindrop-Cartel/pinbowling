@@ -115,6 +115,7 @@ vi.mock('@ui/dialogs.js', async (importOriginal) => {
   return {
     ...actual,
     showAlert: vi.fn(),
+    showDialog: vi.fn().mockResolvedValue(false),
   };
 });
 
@@ -228,7 +229,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
     const tourSummary = document.getElementById('tournament-summary');
     const printAction = tourSummary._actions.find(a => a.text === 'Print Blank Score Sheet');
     expect(printAction).toBeDefined();
-    printAction.onclick();
+    await printAction.onclick();
     expect(printBlankScoreSheet).toHaveBeenCalled();
   });
 
