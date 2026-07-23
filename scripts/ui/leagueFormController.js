@@ -131,12 +131,17 @@ export function createLeagueFormController(elements, options) {
     const allowed = isH2H
       ? SCORING_FORMATS
       : SCORING_FORMATS.filter(f => f.value !== ScoringFormats.BASEBALL);
+    console.log('[FormatDropdown] rebuild: isH2H=%s, currentValue=%s, allowed=%o', isH2H, currentValue, allowed.map(f => f.value));
     leagueFormatInput.innerHTML = allowed.map(f =>
       `<option value="${f.value}">${f.label}</option>`
     ).join('');
-    if (!allowed.some(f => f.value === currentValue)) {
+    if (allowed.some(f => f.value === currentValue)) {
+      leagueFormatInput.value = currentValue;
+      console.log('[FormatDropdown] restored currentValue:', currentValue);
+    } else {
       const preferred = ScoringFormats.resolve(getCookie('pb_preferred_format'));
       leagueFormatInput.value = allowed.some(f => f.value === preferred) ? preferred : allowed[0].value;
+      console.log('[FormatDropdown] currentValue not in allowed, fell back to:', leagueFormatInput.value, '(preferred:', preferred, ')');
     }
   };
 
@@ -198,7 +203,6 @@ export function createLeagueFormController(elements, options) {
     editingLeagueId = league.id;
     leagueNameInput.value = league.name;
     leagueDateInput.value = league.startDate || '';
-    leagueFormatInput.value = ScoringFormats.resolve(league.scoringFormat);
     if (leagueParticipantsInput) leagueParticipantsInput.value = league.participants || 'individual';
     if (leagueSeasonScoringInput) leagueSeasonScoringInput.value = league.seasonScoring || 'weekly';
     if (leagueDropLowestInput) leagueDropLowestInput.value = league.dropLowestWeeks || 0;
@@ -219,7 +223,11 @@ export function createLeagueFormController(elements, options) {
     console.log('[Locations] editLeague set selectedLocationIds from league:', JSON.stringify(league.locationIds), '->', JSON.stringify(selectedLocationIds));
     updateLocationsSummary();
 
+    // Rebuild format options with the correct participant type first,
+    // so the scoring format option exists before we try to select it.
     handleParticipantsChange();
+    leagueFormatInput.value = ScoringFormats.resolve(league.scoringFormat);
+    console.log('[editLeague] Format set to:', leagueFormatInput.value, '(league.scoringFormat:', league.scoringFormat, ')');
     actionsRow?.classList.remove('hidden');
 
     if (createToggle) {

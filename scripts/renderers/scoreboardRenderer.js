@@ -115,7 +115,7 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
 
       if (turn.played) {
         currentTotal += turn.score;
-        if (turn.isBatter && roundScores[roundKey][playerIdNum] === undefined) {
+        if (turn.isBatter) {
           roundScores[roundKey][playerIdNum] = String(turn.score);
         } else if (roundScores[roundKey][playerIdNum] === undefined) {
           roundScores[roundKey][playerIdNum] = '0';

@@ -108,7 +108,9 @@ export async function initLeaguesPage() {
       await refresh();
     },
     onEditTriggered: () => {
+      skipScrollOnNextRender = true;
       if (filterInstance) filterInstance.performFilter();
+      skipScrollOnNextRender = false;
     }
   });
 

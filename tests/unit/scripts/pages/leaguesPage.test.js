@@ -302,6 +302,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
     expect(document.getElementById('league-form-title').textContent).toContain('Edit League');
     expect(document.getElementById('create-league-btn').textContent).toBe('Update League');
     expect(document.getElementById('league-date-row').classList.contains('hidden')).toBe(false);
+    expect(document.getElementById('league-scoring-format').value).toBe('golf');
   });
 
   it('should call PB_API.leagues.update when editing and submitting', async () => {
