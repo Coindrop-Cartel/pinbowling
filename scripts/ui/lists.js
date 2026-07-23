@@ -159,6 +159,7 @@ export function renderLeagueList(container, filteredLeagues, {
   onStartPlayoffs,
   onUpdateSeason,
   onPrintSeasonResults,
+  onArchiveLeague,
   getParticipantMeta,
   getLocationName,
   skipScroll
@@ -314,6 +315,7 @@ export function renderLeagueList(container, filteredLeagues, {
         ${isAuthorized && isH2H && league.status === 'active' ? `<button class="update-season-btn primary btn-row" data-league-id="${league.id}">Update Season</button>` : ''}
         ${isAuthorized ? `<button class="print-season-results-btn secondary btn-row" data-league-id="${league.id}">Print Season Results</button>` : ''}
         ${isAuthorized ? '<button class="edit-league-btn secondary btn-row">Edit League</button>' : ''}
+        ${isAuthorized ? `<button class="archive-league-btn btn-row">${league.status === 'archived' ? 'Unarchive' : 'Archive'}</button>` : ''}
         ${isAuthorized ? '<button class="delete-league-btn btn-row">Delete League</button>' : ''}
       </div>
     `;
@@ -336,6 +338,7 @@ export function renderLeagueList(container, filteredLeagues, {
     // Action listeners
     if (isAuthorized) {
       row.querySelector('.edit-league-btn').onclick = () => onEditLeague(league);
+      row.querySelector('.archive-league-btn').onclick = (e) => { e.stopPropagation(); if (onArchiveLeague) onArchiveLeague(league); };
       row.querySelector('.delete-league-btn').onclick = () => onDeleteLeague(league.id, league.name);
       
       const startSeasonBtn = row.querySelector('.start-season-btn');

@@ -62,6 +62,7 @@ const uiMocks = vi.hoisted(() => ({
     if (container) container.classList.remove('hidden');
   }),
   showDialog: vi.fn(),
+  showMultiSelectDialog: vi.fn(() => Promise.resolve([])),
   createSkeletonLoader: vi.fn(() => ({
     remove: vi.fn()
   })),
@@ -179,16 +180,15 @@ describe('Standings Page (standingsPage.js)', () => {
     
     await initStandingsPage();
 
-    const { showDialog } = await import('@ui/dialogs.js');
-    vi.mocked(showDialog).mockResolvedValue(true); // User clicks Apply
+    const { showMultiSelectDialog } = await import('@ui/dialogs.js');
+    vi.mocked(showMultiSelectDialog).mockResolvedValueOnce(['7']);
 
     const calls = vi.mocked(renderActionSummary).mock.calls;
     const filterAction = calls.find(c => c[1].includes('Showing Everyone'))[2][0];
     
     await filterAction.onclick();
 
-    // Verify dialog content creation
-    expect(showDialog).toHaveBeenCalledWith(expect.objectContaining({
+    expect(showMultiSelectDialog).toHaveBeenCalledWith(expect.objectContaining({
       title: 'Select Players to Show'
     }));
   });
@@ -290,7 +290,7 @@ describe('Standings Page (standingsPage.js)', () => {
     consoleWarnSpy.mockRestore();
   });
 
-  it('should handle Select All and Clear All inside the player filter dialog', async () => {
+  it('should update player filter text based on multi-select dialog result', async () => {
     const players = [
       { id: '1', playerName: 'Alice' },
       { id: '2', playerName: 'Bob' }
@@ -298,28 +298,22 @@ describe('Standings Page (standingsPage.js)', () => {
     getActiveLeagueId.mockReturnValue('1');
     getActiveEventId.mockReturnValue('101');
     PB_API.leagues.getAll.mockResolvedValue([{ id: '1', name: 'L1', players, events: [{ id: '101' }] }]);
+    PB_API.machines.getTargets.mockResolvedValue([]);
+    PB_API.scores.get.mockResolvedValue([]);
 
     await initStandingsPage();
 
-    const { showDialog } = await import('@ui/dialogs.js');
-    const showDialogMock = vi.mocked(showDialog).mockResolvedValue(true);
+    const { showMultiSelectDialog } = await import('@ui/dialogs.js');
+    vi.mocked(showMultiSelectDialog).mockResolvedValue(['1']);
 
     const calls = vi.mocked(renderActionSummary).mock.calls;
     const filterAction = calls.find(c => c[1].includes('Showing Everyone'))[2][0];
-    
-    await filterAction.onclick();
+    filterAction.onclick();
 
-    const dialogArgs = showDialogMock.mock.calls[0][0];
-    const container = dialogArgs.customElement;
-
-    const selectAllBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'Select All');
-    const clearAllBtn = [...container.querySelectorAll('button')].find(b => b.textContent === 'Clear All');
-
-    selectAllBtn.click();
-    container.querySelectorAll('input[type="checkbox"]').forEach(i => expect(i.checked).toBe(true));
-
-    clearAllBtn.click();
-    container.querySelectorAll('input[type="checkbox"]').forEach(i => expect(i.checked).toBe(false));
+    // refresh() is fire-and-forget, wait for the filter UI to update
+    await vi.waitFor(() => {
+      expect(vi.mocked(renderActionSummary).mock.calls.some(c => c[1].includes('Viewing'))).toBe(true);
+    });
   });
 
   it('should handle matchup description for baseball engine in league summary', async () => {

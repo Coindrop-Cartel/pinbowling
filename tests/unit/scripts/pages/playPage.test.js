@@ -104,6 +104,8 @@ vi.mock('@scripts/renderers/roundRowRenderer.js', () => ({
 const uiMocks = vi.hoisted(() => ({
   createSearchableSelect: vi.fn(() => ({ updateOptions: vi.fn() })),
   showPlayerSelectionDialog: vi.fn(),
+  showDialog: vi.fn(),
+  showAlert: vi.fn(),
   createExpandableRow: vi.fn((container, options) => {
     const div = document.createElement('div');
     div.className = options.className || '';
@@ -144,7 +146,7 @@ import { initPlayPage } from '@scripts/pages/playPage.js';
 import { PB_API } from '@services/api.js';
 import { can } from '@services/auth.js';
 import { loadPage } from '@scripts/utils.js';
-import { showPlayerSelectionDialog } from '@ui/dialogs.js';
+import { showPlayerSelectionDialog, showAlert, showDialog } from '@ui/dialogs.js';
 import { selectRandomMachines, generateSessionName } from '@services/sessionGenerator.js';
 
 describe('Play Page (playPage.js)', () => {
@@ -364,7 +366,7 @@ describe('Play Page (playPage.js)', () => {
     document.getElementById('qp-location').value = '1';
     await document.getElementById('quick-play-form').dispatchEvent(new Event('submit'));
 
-    expect(alert).toHaveBeenCalledWith(expect.stringContaining('no machines'));
+    expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('no machines'));
   });
 
   it('should auto-join player on Play button click when user has player_id', async () => {
@@ -446,7 +448,7 @@ describe('Play Page (playPage.js)', () => {
     const finalizeBtn = document.getElementById('finalize-qp-btn');
     await finalizeBtn.onclick();
 
-    expect(alert).toHaveBeenCalledWith(expect.stringContaining('Server error'));
+    expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Server error'));
     expect(finalizeBtn.disabled).toBe(false);
     expect(finalizeBtn.textContent).toBe('Create Session');
   });
@@ -574,7 +576,7 @@ describe('Play Page (playPage.js)', () => {
     const finalizeBtn = document.getElementById('finalize-qp-btn');
     await finalizeBtn.onclick();
 
-    expect(alert).toHaveBeenCalledWith(expect.stringContaining('Failed to create session'));
+    expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Failed to create session'));
   });
 
   it('should throw error when event creation returns no id on finalize', async () => {
@@ -590,7 +592,7 @@ describe('Play Page (playPage.js)', () => {
     const finalizeBtn = document.getElementById('finalize-qp-btn');
     await finalizeBtn.onclick();
 
-    expect(alert).toHaveBeenCalledWith(expect.stringContaining('Failed to create event'));
+    expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Failed to create event'));
   });
 
   describe('Additional playPage Coverage', () => {

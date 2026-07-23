@@ -320,15 +320,24 @@ class LeagueService {
         ?int $matchupsPerRound = null,
         ?int $weeklyPoints = null,
         ?int $pointSpread = null,
-        array $locationIds = []
+        array $locationIds = [],
+        ?string $status = null
     ): array {
         $pdo = $this->db->getPdo();
         try {
             $pdo->beginTransaction();
-            $stmt = $pdo->prepare(
-                'UPDATE leagues SET name = ?, start_date = ?, participants = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ?, weeks_in_season = ?, rounds_per_game = ?, matchups_per_round = ?, weekly_points = ?, point_spread = ? WHERE id = ?'
-            );
-            $stmt->execute([$name, $startDate, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread, $leagueId]);
+
+            $updateFields = 'SET name = ?, start_date = ?, participants = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ?, weeks_in_season = ?, rounds_per_game = ?, matchups_per_round = ?, weekly_points = ?, point_spread = ?';
+            $updateParams = [$name, $startDate, $participants, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread];
+
+            if ($status !== null) {
+                $updateFields .= ', status = ?';
+                $updateParams[] = $status;
+            }
+
+            $updateParams[] = $leagueId;
+            $stmt = $pdo->prepare("UPDATE leagues {$updateFields} WHERE id = ?");
+            $stmt->execute($updateParams);
             
             $this->syncLeagueLocations($pdo, $leagueId, $locationIds);
             
@@ -340,6 +349,19 @@ class LeagueService {
             }
             throw $e;
         }
+    }
+
+    /**
+     * Update only the status of a league (archive/unarchive).
+     *
+     * @param int $leagueId
+     * @param string $status
+     * @return void
+     */
+    public function updateLeagueStatus(int $leagueId, string $status): void {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare('UPDATE leagues SET status = ? WHERE id = ?');
+        $stmt->execute([$status, $leagueId]);
     }
 
     /**

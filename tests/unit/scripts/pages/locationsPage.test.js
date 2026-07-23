@@ -3,7 +3,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { initLocationsPage } from '@pages/locationsPage.js';
 import { PB_API } from '@services/api.js';
 import { requireAdmin } from '@services/auth.js';
-import { showConfirm } from '@ui/dialogs.js';
+import { showConfirm, showAlert } from '@ui/dialogs.js';
 import { createExpandableRow } from '@ui/selectors.js';
 import { getScoringEngine } from '@core/engine.js';
 
@@ -322,14 +322,12 @@ describe('Locations Management Page (locationsPage.js)', () => {
 
     it('should handle API error on delete', async () => {
       PB_API.locations.delete.mockRejectedValue(new Error('Delete failed'));
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       await initLocationsPage();
       const deleteBtn = document.querySelector('.delete-loc-btn');
       deleteBtn.click();
       await vi.waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to delete'));
+        expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Failed to delete'));
       });
-      alertSpy.mockRestore();
     });
   });
 
@@ -533,7 +531,6 @@ describe('Locations Management Page (locationsPage.js)', () => {
     it('should handle API error when saving machine', async () => {
       PB_API.machines.getAll.mockResolvedValue([{ id: 10, machineName: 'Iron Maiden' }]);
       PB_API.locations.addMachine.mockRejectedValue(new Error('Save failed'));
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       await initLocationsPage();
       const addBtn = document.querySelector('.add-mach-btn');
       await addBtn.click();
@@ -547,10 +544,9 @@ describe('Locations Management Page (locationsPage.js)', () => {
       if (saveMachBtn) {
         saveMachBtn.click();
         await vi.waitFor(() => {
-          expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to save machine'));
+          expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Failed to save machine'));
         });
       }
-      alertSpy.mockRestore();
     });
   });
 

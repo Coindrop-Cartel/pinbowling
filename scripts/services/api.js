@@ -159,6 +159,7 @@ export const PB_API = {
     startSeason: (leagueId) => fetchJSON('api/league.php?task=start_season', { method: 'POST', body: JSON.stringify({ leagueId }) }),
     updateSeason: (leagueId) => fetchJSON('api/league.php?task=update_season', { method: 'POST', body: JSON.stringify({ leagueId }) }),
     startPlayoffs: (leagueId, seeds, seriesLength) => fetchJSON('api/league.php?task=start_playoffs', { method: 'POST', body: JSON.stringify({ leagueId, seeds, seriesLength }) }),
+    updateStatus: (id, status) => fetchJSON(`api/league.php?id=${id}&task=updateStatus`, { method: 'PUT', body: JSON.stringify({ status }) }),
   },
 
   events: {

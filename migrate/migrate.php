@@ -78,7 +78,7 @@ function initializeDatabaseSchema($pdo) {
         `rounds_per_game` INT DEFAULT NULL,
         `matchups_per_round` INT DEFAULT NULL,
         `weeks_in_season` INT DEFAULT NULL,
-        `status` ENUM('setup', 'active', 'completed') DEFAULT 'setup',
+        `status` ENUM('setup', 'active', 'completed', 'archived') DEFAULT 'setup',
         `playoff_series_length` INT DEFAULT 1
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
@@ -274,7 +274,7 @@ function alignTableColumns($pdo) {
             'rounds_per_game'          => "ALTER TABLE `leagues` ADD COLUMN `rounds_per_game` INT DEFAULT NULL AFTER `point_spread`",
             'matchups_per_round'       => "ALTER TABLE `leagues` ADD COLUMN `matchups_per_round` INT DEFAULT NULL AFTER `rounds_per_game`",
             'weeks_in_season'          => "ALTER TABLE `leagues` ADD COLUMN `weeks_in_season` INT DEFAULT NULL AFTER `drop_lowest_weeks`",
-            'status'                   => "ALTER TABLE `leagues` ADD COLUMN `status` ENUM('setup', 'active', 'completed') DEFAULT 'setup'",
+            'status'                   => "ALTER TABLE `leagues` ADD COLUMN `status` ENUM('setup', 'active', 'completed', 'archived') DEFAULT 'setup'",
             'playoff_series_length'    => "ALTER TABLE `leagues` ADD COLUMN `playoff_series_length` INT DEFAULT 1",
         ];
         foreach ($cols as $col => $sql) {
@@ -474,6 +474,19 @@ try {
         echo "✓ Cleaned up unused tables/columns (score_history, location_machines.note, users.created_at) successfully.\n";
     } else {
         echo "Cleanup of unused tables/columns already applied.\n";
+    }
+
+    // -----------------------------------------------------------------------
+    // Migration 3: add_archived_to_league_status
+    // -----------------------------------------------------------------------
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'add_archived_to_league_status'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("ALTER TABLE `leagues` MODIFY COLUMN `status` ENUM('setup', 'active', 'completed', 'archived') DEFAULT 'setup'");
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('add_archived_to_league_status')")->execute();
+        echo "✓ Added 'archived' to leagues.status ENUM.\n";
+    } else {
+        echo "Archived status already added.\n";
     }
 
     echo "\n✓ All migrations complete.\n";

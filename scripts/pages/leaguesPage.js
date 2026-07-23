@@ -60,6 +60,8 @@ export async function initLeaguesPage() {
   let filterInstance = null;
   let editingLeagueId = null;
   let skipScrollOnNextRender = false;
+  const showArchivedCheckbox = document.getElementById('show-archived-leagues');
+  let showArchived = false;
 
   // Setup "Create League" toggle behavior
   const leagueFormatInput = document.getElementById('league-scoring-format');
@@ -150,6 +152,7 @@ export async function initLeaguesPage() {
     onEditLeague: (l) => leagueFormController.editLeague(l),
     onAddEvent: (leagueId, leagueName) => eventFormController.showEventForm(leagueId, leagueName),
     onDeleteLeague: deleteLeague,
+    onArchiveLeague: archiveLeague,
     onAddPlayer: addPlayerToLeague,
     onAddTeam: addTeamToLeagueLocal,
     onSetupEvent: (eventId, leagueId) => {
@@ -172,13 +175,15 @@ export async function initLeaguesPage() {
   const onFilterUpdate = (filtered, query) => {
     const activeLeagueId = getActiveLeagueId();
 
-    if (filtered.length === 0) {
+    const displayLeagues = showArchived ? filtered : filtered.filter(l => l.status !== 'archived');
+
+    if (displayLeagues.length === 0) {
       leaguesList.innerHTML = '';
       emptyNotice.classList.remove('hidden');
       emptyNotice.textContent = allLeagues.length === 0 ? 'No leagues created yet.' : 'No matching leagues found.';
     } else {
       emptyNotice.classList.add('hidden');
-      renderLeagueList(leaguesList, filtered, buildListCallbacks(filtered, query));
+      renderLeagueList(leaguesList, displayLeagues, buildListCallbacks(displayLeagues, query));
     }
 
     // Duplicate Name Prevention
@@ -210,6 +215,13 @@ export async function initLeaguesPage() {
     labelKey: 'name',
     onFilter: onFilterUpdate
   });
+
+  if (showArchivedCheckbox) {
+    showArchivedCheckbox.addEventListener('change', () => {
+      showArchived = showArchivedCheckbox.checked;
+      filterInstance.performFilter();
+    });
+  }
 
   leagueDateInput.oninput = () => filterInstance.performFilter();
 
@@ -336,6 +348,18 @@ export async function initLeaguesPage() {
     });
   }
 
+  async function archiveLeague(league) {
+    const newStatus = league.status === 'archived' ? 'active' : 'archived';
+    const actionLabel = newStatus === 'archived' ? 'archive' : 'unarchive';
+    if (!await showConfirm(`Are you sure you want to ${actionLabel} "${league.name}"?`, actionLabel === 'archive' ? 'Archive League' : 'Unarchive League')) return;
+
+    await runAuthorizedLeagueAction(league.id, async () => {
+      league.status = newStatus;
+      await PB_API.leagues.updateStatus(league.id, newStatus);
+      await refresh();
+    });
+  }
+
   async function deleteLeague(id, name) {
     if (!await showConfirm(`Are you sure you want to delete the entire league "${name}"? This will delete all associated events and target scores.`, 'Delete League')) return;
 
@@ -364,6 +388,9 @@ export async function initLeaguesPage() {
       }
     });
   }
+
+  const archivedLabel = document.getElementById('show-archived-label');
+  if (archivedLabel) archivedLabel.classList.toggle('hidden', !isAuthorized);
 
   await refresh(leaguesData);
 }

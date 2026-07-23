@@ -411,16 +411,14 @@ describe('Player Management Page (playersPage.js)', () => {
 
     it('should handle API error on create', async () => {
       PB_API.players.create.mockRejectedValue(new Error('Create failed'));
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       await initPlayersPage();
       const toggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Create New Player'));
       toggle.click();
       document.getElementById('player-name').value = 'New Player';
       await document.getElementById('player-form').dispatchEvent(new Event('submit'));
       await vi.waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Error saving player'));
+        expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Error saving player'));
       });
-      alertSpy.mockRestore();
     });
   });
 
@@ -472,16 +470,14 @@ describe('Player Management Page (playersPage.js)', () => {
 
     it('should handle API error on update', async () => {
       PB_API.players.update.mockRejectedValue(new Error('Update failed'));
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       await initPlayersPage();
       const editBtn = document.querySelector('.edit-player-btn');
       editBtn.click();
       document.getElementById('player-name').value = 'Alice Updated';
       await document.getElementById('player-form').dispatchEvent(new Event('submit')); // Ensure await
       await vi.waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Error saving player'));
+        expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Error saving player'));
       });
-      alertSpy.mockRestore();
     });
   });
 
@@ -546,16 +542,14 @@ describe('Player Management Page (playersPage.js)', () => {
 
     it('should handle API error on delete', async () => {
       PB_API.players.delete.mockRejectedValue(new Error('Delete failed'));
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       await initPlayersPage();
       const deleteBtn = document.querySelector('.delete-player-btn-inline');
       if (deleteBtn) {
         deleteBtn.click();
         await vi.waitFor(() => {
-          expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Error deleting player'));
+          expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Error deleting player'));
         });
       }
-      alertSpy.mockRestore();
     });
 
     it('should only show delete button for admin users', async () => {

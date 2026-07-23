@@ -41,6 +41,7 @@ class LeagueController extends ApiController {
             'weeklyPoints' => isset($this->input['weeklyPoints']) && $this->input['weeklyPoints'] !== '' ? (int)$this->input['weeklyPoints'] : null,
             'pointSpread' => isset($this->input['pointSpread']) && $this->input['pointSpread'] !== '' ? (int)$this->input['pointSpread'] : null,
             'locationIds' => $this->input['locationIds'] ?? [],
+            'status' => $this->input['status'] ?? null,
         ];
     }
 
@@ -182,7 +183,16 @@ class LeagueController extends ApiController {
                 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
                 if (!$id) $this->sendError('id query parameter is required', 400);
 
-                if ($this->task === 'fixture') {
+                if ($this->task === 'updateStatus') {
+                    $status = $this->input['status'] ?? null;
+                    $validStatuses = ['setup', 'active', 'completed', 'archived'];
+                    if (!$status || !in_array($status, $validStatuses, true)) {
+                        $this->sendError('Valid status is required (' . implode(', ', $validStatuses) . ')', 400);
+                    }
+                    $this->leagueService->updateLeagueStatus($id, $status);
+                    $this->sendJson(['success' => true]);
+
+                } else if ($this->task === 'fixture') {
                     $event = $this->leagueService->updateEvent(
                         $id,
                         $this->input['eventName'] ?? null,
@@ -207,7 +217,8 @@ class LeagueController extends ApiController {
                         $p['matchupsPerRound'],
                         $p['weeklyPoints'],
                         $p['pointSpread'],
-                        $p['locationIds']
+                        $p['locationIds'],
+                        $p['status']
                     );
                     if (!$league) $this->sendError('Resource updated but could not be retrieved.', 500);
                     $this->sendJson(Serializer::league($league));
