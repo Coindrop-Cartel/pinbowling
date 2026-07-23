@@ -257,6 +257,121 @@ export async function initStandingsPage() {
 
     if (eventId === 'summary') return renderLeagueSummary(leagueId);
 
+    const isPlayoffs = event?.eventName && event.eventName.startsWith('Playoffs:');
+    const standingsTable = document.getElementById('standings-table') || standingsWrapper?.querySelector('table');
+    let playoffBracketContainer = document.getElementById('playoff-bracket-container');
+
+    if (!playoffBracketContainer && standingsWrapper) {
+      playoffBracketContainer = document.createElement('div');
+      playoffBracketContainer.id = 'playoff-bracket-container';
+      playoffBracketContainer.className = 'hidden';
+      standingsWrapper.appendChild(playoffBracketContainer);
+    }
+
+    if (isPlayoffs) {
+      if (standingsTable) standingsTable.classList.add('hidden');
+      if (playoffBracketContainer) {
+        playoffBracketContainer.classList.remove('hidden');
+
+        // Build bracket HTML
+        const playoffEvents = (league.events || []).filter(e => e.eventName && e.eventName.startsWith('Playoffs:'));
+        let rounds = [];
+        if (playoffEvents.some(e => e.eventName.includes('Quarterfinals'))) {
+          rounds = ['Quarterfinals', 'Semifinals', 'Finals'];
+        } else if (playoffEvents.some(e => e.eventName.includes('Semifinals'))) {
+          rounds = ['Semifinals', 'Finals'];
+        } else {
+          rounds = ['Finals'];
+        }
+
+        const roundData = {};
+        playoffEvents.forEach(e => {
+          const match = e.eventName.match(/Playoffs:\s*(Quarterfinals|Semifinals|Finals)/);
+          if (match) {
+            const rName = match[1];
+            roundData[rName] = e.matchups || [];
+          }
+        });
+
+        const columnsHtml = rounds.map((rName) => {
+          let seriesCount = 1;
+          if (rName === 'Quarterfinals') seriesCount = 4;
+          else if (rName === 'Semifinals') seriesCount = 2;
+
+          const cardsHtml = [];
+          for (let sId = 1; sId <= seriesCount; sId++) {
+            const games = (roundData[rName] || []).filter(m => (m.seriesId || 1) === sId);
+            games.sort((a, b) => a.gameNumber - b.gameNumber);
+
+            let awayName = 'TBD';
+            let homeName = 'TBD';
+            let awayWins = 0;
+            let homeWins = 0;
+
+            if (games.length > 0) {
+              const firstGame = games[0];
+              awayName = firstGame.player2Name || 'BYE';
+              homeName = firstGame.player1Name || 'TBD';
+
+              games.forEach(g => {
+                if (g.status === 'completed') {
+                  if (g.winnerId === g.player1Id) homeWins++;
+                  else if (g.winnerId === g.player2Id) awayWins++;
+                }
+              });
+            }
+
+            const clinchCount = Math.ceil((league.playoffSeriesLength || 1) / 2);
+            const finished = (homeWins >= clinchCount || awayWins >= clinchCount);
+            const homeClinched = homeWins >= clinchCount;
+            const awayClinched = awayWins >= clinchCount;
+
+            cardsHtml.push(`
+              <div class="bracket-series-card" style="padding: 12px; margin: 10px 0; border: 1px solid ${finished ? '#2e7d32' : (games.length > 0 ? '#2196f3' : '#ccc')}; border-radius: 6px; background: ${games.length > 0 ? '#fff' : '#f5f5f5'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-width: 180px;">
+                <div style="font-size: 0.8em; font-weight: bold; color: ${games.length > 0 ? '#1976d2' : '#888'}; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px;">
+                  Series ${sId}
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 4px; ${awayClinched ? 'font-weight: bold; color: #2e7d32;' : ''}">
+                  <span style="${games.length === 0 ? 'color: #888;' : ''}">${escapeHTML(awayName)}</span>
+                  <span>${games.length > 0 ? awayWins : '-'}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.9em; ${homeClinched ? 'font-weight: bold; color: #2e7d32;' : ''}">
+                  <span style="${games.length === 0 ? 'color: #888;' : ''}">${escapeHTML(homeName)}</span>
+                  <span>${games.length > 0 ? homeWins : '-'}</span>
+                </div>
+              </div>
+            `);
+          }
+
+          return `
+            <div class="bracket-column" style="display: flex; flex-direction: column; justify-content: space-around; align-items: center; min-width: 200px;">
+              <h4 style="text-align: center; color: #333; border-bottom: 2px solid #ddd; padding-bottom: 6px; width: 100%; margin-bottom: 10px; font-size: 0.95em;">${escapeHTML(rName)}</h4>
+              <div style="display: flex; flex-direction: column; height: 100%; justify-content: space-around; width: 100%;">
+                ${cardsHtml.join('')}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        playoffBracketContainer.innerHTML = `
+          <div class="playoff-bracket-section" style="padding: 10px 0;">
+            <div class="playoff-bracket-tree" style="display: flex; gap: 40px; overflow-x: auto; padding: 20px; background: #fafafa; border-radius: 6px; border: 1px solid #eaeaea; justify-content: center; min-height: 350px;">
+              ${columnsHtml}
+            </div>
+          </div>
+        `;
+      }
+
+      if (standingsEmpty) standingsEmpty.classList.add('hidden');
+      if (standingsWrapper) standingsWrapper.classList.remove('hidden');
+      if (playerFilterContainer) playerFilterContainer.classList.add('hidden');
+      return;
+    } else {
+      if (standingsTable) standingsTable.classList.remove('hidden');
+      if (playoffBracketContainer) playoffBracketContainer.classList.add('hidden');
+      if (playerFilterContainer) playerFilterContainer.classList.remove('hidden');
+    }
+
     let players = league?.players || [];
     if (league?.participationType === 'team') {
       const memberMap = new Map();

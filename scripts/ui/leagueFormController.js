@@ -334,6 +334,13 @@ export function createLeagueFormController(elements, options) {
     createBtn.disabled = true;
     createBtn.textContent = 'Saving...';
 
+    if (scoringFormat === 'baseball' && competitionFormat !== 'head2head' && competitionFormat !== 'head_to_head') {
+      showAlert('Baseball scoring format is only supported for head-to-head competitions.');
+      createBtn.disabled = false;
+      createBtn.textContent = editingLeagueId ? 'Update League' : 'Save League';
+      return;
+    }
+
     if (isH2H && weeksInSeason && selectedLocationIds.length === 0) {
       showAlert('Please select at least one location for head-to-head seasons.');
       createBtn.disabled = false;
@@ -369,7 +376,7 @@ export function createLeagueFormController(elements, options) {
       await onSaveSuccess();
     } catch (err) {
       console.error('League save failed:', err);
-      alert(`Failed to save league: ${err.message}`);
+      showAlert(`Failed to save league: ${err.message}`, 'Save League');
     } finally {
       createBtn.disabled = false;
       createBtn.textContent = editingLeagueId ? 'Update League' : 'Save League';

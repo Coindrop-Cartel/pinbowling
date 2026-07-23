@@ -261,26 +261,83 @@ class PlayoffService {
      */
     private function advanceToPlayoffRound(int $leagueId, string $nextRoundName, array $pairings, int $rounds, int $matchupsPerRound, int $seriesLength): void
     {
-        $eventStmt = $this->db->prepare('INSERT INTO events (league_id, event_name, status, scoring_format) VALUES (?, ?, \'pending\', \'baseball\')');
-        $eventStmt->execute([$leagueId, "Playoffs: " . $nextRoundName]);
-        $nextEventId = (int) $this->db->lastInsertId();
+        $pdo = $this->db->getPdo();
 
-        $machinesStmt = $this->db->query('SELECT id FROM machines');
+        // 1. Check if the playoffs event for nextRoundName already exists
+        $stmt = $pdo->prepare('SELECT id FROM events WHERE league_id = ? AND event_name = ?');
+        $stmt->execute([$leagueId, "Playoffs: " . $nextRoundName]);
+        $nextEventId = $stmt->fetchColumn();
+
+        if ($nextEventId) {
+            $nextEventId = (int)$nextEventId;
+        } else {
+            $event = $this->eventService->createEvent($leagueId, "Playoffs: " . $nextRoundName, null, null, 'baseball');
+            $nextEventId = (int) $event['id'];
+        }
+
+        $machinesStmt = $pdo->query('SELECT id FROM machines');
         $allMachineIds = $machinesStmt->fetchAll(\PDO::FETCH_COLUMN);
 
         foreach ($pairings as $pair) {
-            $stmt = $this->db->prepare(
-                'INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number, round_name, series_id)
-                 VALUES (?, ?, ?, \'pending\', 1, ?, ?)'
+            // 2. Check if a matchup for this series already exists (Game 1)
+            $stmt = $pdo->prepare(
+                'SELECT id, player1_id, player2_id FROM event_matchups 
+                 WHERE event_id = ? AND series_id = ? AND game_number = 1'
             );
-            $stmt->execute([$nextEventId, $pair['home'], $pair['away'], $nextRoundName, $pair['series_id']]);
-            $eventMatchupId = (int) $this->db->lastInsertId();
+            $stmt->execute([$nextEventId, $pair['series_id']]);
+            $existingMatchup = $stmt->fetch(\PDO::FETCH_ASSOC);
 
-            $matchupMachineIds = $this->getMatchupMachinePool($leagueId, $allMachineIds);
-            MatchupGenerator::createMatchupSlots(
-                $this->db->getPdo(), $eventMatchupId,
-                $rounds, $matchupsPerRound, $matchupMachineIds
-            );
+            if ($existingMatchup) {
+                $emId = (int)$existingMatchup['id'];
+                $oldHome = (int)$existingMatchup['player1_id'];
+                $oldAway = (int)$existingMatchup['player2_id'];
+
+                // 3. If participants have changed, reset/update the series and clear old scores
+                if ($oldHome !== (int)$pair['home'] || $oldAway !== (int)$pair['away']) {
+                    $updateStmt = $pdo->prepare(
+                        'UPDATE event_matchups 
+                         SET player1_id = ?, player2_id = ?, winner_id = NULL, player1_score = 0, player2_score = 0, status = \'pending\' 
+                         WHERE id = ?'
+                    );
+                    $updateStmt->execute([$pair['home'], $pair['away'], $emId]);
+
+                    // Delete scores for game 1
+                    $delScoresStmt = $pdo->prepare('DELETE FROM scores WHERE event_matchup_id = ?');
+                    $delScoresStmt->execute([$emId]);
+
+                    // Fetch and delete subsequent games (game_number > 1) in this series
+                    $subStmt = $pdo->prepare('SELECT id FROM event_matchups WHERE event_id = ? AND series_id = ? AND game_number > 1');
+                    $subStmt->execute([$nextEventId, $pair['series_id']]);
+                    $subMatchupIds = $subStmt->fetchAll(\PDO::FETCH_COLUMN);
+
+                    if (!empty($subMatchupIds)) {
+                        $placeholders = implode(',', array_fill(0, count($subMatchupIds), '?'));
+                        
+                        $delSubScores = $pdo->prepare("DELETE FROM scores WHERE event_matchup_id IN ($placeholders)");
+                        $delSubScores->execute($subMatchupIds);
+
+                        $delSubMatchups = $pdo->prepare("DELETE FROM matchups WHERE event_matchup_id IN ($placeholders)");
+                        $delSubMatchups->execute($subMatchupIds);
+
+                        $delSubEventMatchups = $pdo->prepare("DELETE FROM event_matchups WHERE id IN ($placeholders)");
+                        $delSubEventMatchups->execute($subMatchupIds);
+                    }
+                }
+            } else {
+                // 4. Create Game 1 matchup
+                $stmt = $pdo->prepare(
+                    'INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number, round_name, series_id)
+                     VALUES (?, ?, ?, \'pending\', 1, ?, ?)'
+                );
+                $stmt->execute([$nextEventId, $pair['home'], $pair['away'], $nextRoundName, $pair['series_id']]);
+                $eventMatchupId = (int) $pdo->lastInsertId();
+
+                $matchupMachineIds = $this->getMatchupMachinePool($leagueId, $allMachineIds);
+                MatchupGenerator::createMatchupSlots(
+                    $pdo, $eventMatchupId,
+                    $rounds, $matchupsPerRound, $matchupMachineIds
+                );
+            }
         }
     }
 

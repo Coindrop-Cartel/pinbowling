@@ -664,7 +664,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
     document.getElementById('league-form').dispatchEvent(new Event('submit'));
 
     await vi.waitFor(() => {
-      expect(alert).toHaveBeenCalledWith(expect.stringContaining('Server error'));
+      expect(uiMocks.showAlert).toHaveBeenCalledWith(expect.stringContaining('Server error'), expect.any(String));
     });
   });
 

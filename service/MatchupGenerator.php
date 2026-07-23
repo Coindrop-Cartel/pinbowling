@@ -129,7 +129,7 @@ class MatchupGenerator {
         if ($row && !empty($row['target_easy'])) {
             return [
                 'value1' => (int)$row['target_easy'],
-                'value2' => !empty($row['target_med']) ? (float)$row['target_med'] : 1.5
+                'value2' => 1.5
             ];
         }
 
@@ -145,7 +145,7 @@ class MatchupGenerator {
         if ($row && !empty($row['target_easy'])) {
             return [
                 'value1' => (int)$row['target_easy'],
-                'value2' => !empty($row['target_med']) ? (float)$row['target_med'] : 1.5
+                'value2' => 1.5
             ];
         }
 

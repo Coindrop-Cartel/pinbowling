@@ -24,11 +24,12 @@
       <h2 class="no-tv">Current Standings</h2>
       <p id="standings-empty" data-testid="standings-empty-notice" class="hint">View specific event results or select <b>Season Summary</b> to see total bowling points accumulated across all events in the league.</p>
       <div id="standings-wrapper" data-testid="standings-wrapper">
-        <table class="data-table standings-table">
+        <table id="standings-table" class="data-table standings-table">
           <thead id="standings-header" data-testid="standings-table-header">
           </thead>
           <tbody id="standings-body" data-testid="standings-table-body"></tbody>
         </table>
+        <div id="playoff-bracket-container" class="hidden"></div>
       </div>
     </section>
   </main>

@@ -29,7 +29,7 @@ class SeasonService {
             $pdo->beginTransaction();
             
             // 1. Fetch league details directly
-            $stmt = $pdo->prepare('SELECT status, start_date, weeks_in_season, rounds_per_game, matchups_per_round FROM leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT status, start_date, weeks_in_season, rounds_per_game, matchups_per_round, participation_type FROM leagues WHERE id = ?');
             $stmt->execute([$leagueId]);
             $league = $stmt->fetch();
             if (!$league) {
@@ -48,18 +48,33 @@ class SeasonService {
             // e.g. baseball: 2 innings × 2 sides = 4 matchup rows
             $rounds = (int)($league['rounds_per_game'] ?? 2);
             $matchupsPerRound = (int)($league['matchups_per_round'] ?? 2);
+            $isTeam = ($league['participation_type'] ?? 'individual') === 'team';
             
-            // Fetch roster
-            $stmt = $pdo->prepare(
-                'SELECT p.id, p.player_name 
-                 FROM players p 
-                 JOIN league_players lp ON p.id = lp.player_id 
-                 WHERE lp.league_id = ?'
-            );
-            $stmt->execute([$leagueId]);
-            $players = $stmt->fetchAll();
-            if (count($players) < 2) {
-                throw new \Exception("At least 2 players are required to start a head-to-head season.");
+            // Fetch roster / participants
+            if ($isTeam) {
+                $stmt = $pdo->prepare(
+                    'SELECT t.id, t.name as player_name 
+                     FROM teams t 
+                     JOIN league_teams lt ON t.id = lt.team_id 
+                     WHERE lt.league_id = ?'
+                );
+                $stmt->execute([$leagueId]);
+                $players = $stmt->fetchAll();
+                if (count($players) < 2) {
+                    throw new \Exception("At least 2 teams are required to start a head-to-head season.");
+                }
+            } else {
+                $stmt = $pdo->prepare(
+                    'SELECT p.id, p.player_name 
+                     FROM players p 
+                     JOIN league_players lp ON p.id = lp.player_id 
+                     WHERE lp.league_id = ?'
+                );
+                $stmt->execute([$leagueId]);
+                $players = $stmt->fetchAll();
+                if (count($players) < 2) {
+                    throw new \Exception("At least 2 players are required to start a head-to-head season.");
+                }
             }
             
             // Fetch assigned locations for the league
@@ -197,7 +212,7 @@ class SeasonService {
             $pdo->beginTransaction();
             
             // 1. Fetch league details directly
-            $stmt = $pdo->prepare('SELECT status, rounds_per_game, matchups_per_round FROM leagues WHERE id = ?');
+            $stmt = $pdo->prepare('SELECT status, rounds_per_game, matchups_per_round, participation_type FROM leagues WHERE id = ?');
             $stmt->execute([$leagueId]);
             $league = $stmt->fetch();
             if (!$league) {
@@ -211,18 +226,33 @@ class SeasonService {
             // e.g. baseball: 2 innings × 2 sides = 4 matchup rows
             $rounds = (int)($league['rounds_per_game'] ?? 2);
             $matchupsPerRound = (int)($league['matchups_per_round'] ?? 2);
+            $isTeam = ($league['participation_type'] ?? 'individual') === 'team';
             
-            // Fetch roster
-            $stmt = $pdo->prepare(
-                'SELECT p.id, p.player_name 
-                 FROM players p 
-                 JOIN league_players lp ON p.id = lp.player_id 
-                 WHERE lp.league_id = ?'
-            );
-            $stmt->execute([$leagueId]);
-            $players = $stmt->fetchAll();
-            if (count($players) < 2) {
-                throw new \Exception("At least 2 players are required to update a head-to-head season.");
+            // Fetch roster / participants
+            if ($isTeam) {
+                $stmt = $pdo->prepare(
+                    'SELECT t.id, t.name as player_name 
+                     FROM teams t 
+                     JOIN league_teams lt ON t.id = lt.team_id 
+                     WHERE lt.league_id = ?'
+                );
+                $stmt->execute([$leagueId]);
+                $players = $stmt->fetchAll();
+                if (count($players) < 2) {
+                    throw new \Exception("At least 2 teams are required to update a head-to-head season.");
+                }
+            } else {
+                $stmt = $pdo->prepare(
+                    'SELECT p.id, p.player_name 
+                     FROM players p 
+                     JOIN league_players lp ON p.id = lp.player_id 
+                     WHERE lp.league_id = ?'
+                );
+                $stmt->execute([$leagueId]);
+                $players = $stmt->fetchAll();
+                if (count($players) < 2) {
+                    throw new \Exception("At least 2 players are required to update a head-to-head season.");
+                }
             }
             
             // Fetch assigned locations for the league

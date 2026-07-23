@@ -1,7 +1,7 @@
 import { createExpandableRow } from '@ui/selectors.js';
 import { escapeHTML, setActiveLeagueId, setActiveEventId, loadPage } from '@scripts/utils.js';
 import { PB_API } from '@services/api.js';
-import { showDialog, showConfirm } from '@ui/dialogs.js';
+import { showDialog, showConfirm, showAlert } from '@ui/dialogs.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
 import { updateLeagueHeaderStats } from '@scripts/renderers/leagueRegistryRenderer.js';
 
@@ -172,97 +172,6 @@ export function renderLeagueList(container, filteredLeagues, {
     const isH2H = league.competitionFormat === 'head2head';
     const isSeasonActive = isH2H && (league.status === 'active' || league.status === 'completed');
 
-    const playoffEvents = (league.events || []).filter(e => e.eventName && e.eventName.startsWith('Playoffs:'));
-    let bracketHtml = '';
-    if (playoffEvents.length > 0) {
-      let rounds = [];
-      if (playoffEvents.some(e => e.eventName.includes('Quarterfinals'))) {
-        rounds = ['Quarterfinals', 'Semifinals', 'Finals'];
-      } else if (playoffEvents.some(e => e.eventName.includes('Semifinals'))) {
-        rounds = ['Semifinals', 'Finals'];
-      } else {
-        rounds = ['Finals'];
-      }
-      
-      const roundData = {};
-      playoffEvents.forEach(e => {
-        const match = e.eventName.match(/Playoffs:\s*(Quarterfinals|Semifinals|Finals)/);
-        if (match) {
-          const rName = match[1];
-          roundData[rName] = e.matchups || [];
-        }
-      });
-      
-      const columnsHtml = rounds.map((rName) => {
-        let seriesCount = 1;
-        if (rName === 'Quarterfinals') seriesCount = 4;
-        else if (rName === 'Semifinals') seriesCount = 2;
-        
-        const cardsHtml = [];
-        for (let sId = 1; sId <= seriesCount; sId++) {
-          const games = (roundData[rName] || []).filter(m => (m.seriesId || 1) === sId);
-          games.sort((a, b) => a.gameNumber - b.gameNumber);
-          
-          let awayName = 'TBD';
-          let homeName = 'TBD';
-          let awayWins = 0;
-          let homeWins = 0;
-          
-          if (games.length > 0) {
-            const firstGame = games[0];
-            awayName = firstGame.awayPlayerName || 'BYE';
-            homeName = firstGame.homePlayerName || 'TBD';
-            
-            games.forEach(g => {
-              if (g.status === 'completed') {
-                if (g.winnerId === g.homePlayerId) homeWins++;
-                else if (g.winnerId === g.awayPlayerId) awayWins++;
-              }
-            });
-          }
-          
-          const clinchCount = Math.ceil((league.playoffSeriesLength || 1) / 2);
-          const finished = (homeWins >= clinchCount || awayWins >= clinchCount);
-          const homeClinched = homeWins >= clinchCount;
-          const awayClinched = awayWins >= clinchCount;
-          
-          cardsHtml.push(`
-            <div class="bracket-series-card" style="padding: 10px; margin: 10px 0; border: 1px solid ${finished ? '#2e7d32' : (games.length > 0 ? '#2196f3' : '#ccc')}; border-radius: 6px; background: ${games.length > 0 ? '#fff' : '#f5f5f5'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-width: 150px;">
-              <div style="font-size: 0.8em; font-weight: bold; color: ${games.length > 0 ? '#1976d2' : '#888'}; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px;">
-                Series ${sId}
-              </div>
-              <div style="display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 4px; ${awayClinched ? 'font-weight: bold; color: #2e7d32;' : ''}">
-                <span style="${games.length === 0 ? 'color: #888;' : ''}">${escapeHTML(awayName)}</span>
-                <span>${games.length > 0 ? awayWins : '-'}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; font-size: 0.9em; ${homeClinched ? 'font-weight: bold; color: #2e7d32;' : ''}">
-                <span style="${games.length === 0 ? 'color: #888;' : ''}">${escapeHTML(homeName)}</span>
-                <span>${games.length > 0 ? homeWins : '-'}</span>
-              </div>
-            </div>
-          `);
-        }
-        
-        return `
-          <div class="bracket-column" style="display: flex; flex-direction: column; justify-content: space-around; align-items: center; min-width: 180px;">
-            <h4 style="text-align: center; color: #333; border-bottom: 2px solid #ddd; padding-bottom: 4px; width: 100%; margin-bottom: 10px; font-size: 0.95em;">${escapeHTML(rName)}</h4>
-            <div style="display: flex; flex-direction: column; height: 100%; justify-content: space-around;">
-              ${cardsHtml.join('')}
-            </div>
-          </div>
-        `;
-      }).join('');
-      
-      bracketHtml = `
-        <div class="playoff-bracket-section mt-15" style="border-top: 2px solid #eee; padding-top: 15px; margin-top: 15px;">
-          <h4 class="section-subheading mb-10" style="color: #1976d2;">Postseason Playoff Bracket</h4>
-          <div class="playoff-bracket-tree" style="display: flex; gap: 30px; overflow-x: auto; padding: 10px 0; min-height: 250px; background: #fafafa; border-radius: 6px; border: 1px solid #eaeaea;">
-            ${columnsHtml}
-          </div>
-        </div>
-      `;
-    }
-
     let showStartPlayoffsBtn = false;
     if (isH2H && league.status === 'active' && league.events && league.events.length > 0) {
       const hasPlayoffs = league.events.some(e => e.eventName && e.eventName.startsWith('Playoffs:'));
@@ -308,7 +217,6 @@ export function renderLeagueList(container, filteredLeagues, {
         <ul class="league-participants-list list-unstyled"></ul>
         <div class="notice league-participants-empty hidden">No ${participantMeta.emptyLabel} assigned to this league.</div>
       </div>
-      ${bracketHtml}
       <div class="action-buttons">
         ${isAuthorized && isH2H && league.status === 'setup' ? '<button class="start-season-btn primary btn-row">Start Season</button>' : ''}
         ${isAuthorized && showStartPlayoffsBtn ? `<button class="start-playoffs-btn primary btn-row" data-league-id="${league.id}">Start Playoffs</button>` : ''}
@@ -355,7 +263,7 @@ export function renderLeagueList(container, filteredLeagues, {
               await PB_API.leagues.startSeason(league.id);
               loadPage(ROUTE_PATHS.LEAGUES());
             } catch (err) {
-              alert(`Failed to start season: ${err.message}`);
+              showAlert(`Failed to start season: ${err.message}`, 'Start Season');
               startSeasonBtn.disabled = false;
               startSeasonBtn.textContent = 'Start Season';
             }

@@ -161,58 +161,81 @@ export class BaseballEngine extends ScoringEngine {
    * If opponent scoreMap is not present, we assume 0 for opponent.
    */
   calculateTurnResults(machines, scoreMap) {
-    let runningTotal = 0;
     const opponentMap = scoreMap?.opponent || {};
-    // Default to player being Player 1 (home) if not specified
     const isPlayer1 = scoreMap?.isPlayer1 !== false;
 
-    // Pre-compute opponent's running total to support walk-off detection.
-    // Walk-off: if the home team is already ahead going into the bottom of
-    // the last inning, they win — no need to play it (like real baseball).
-    let opponentRunningTotal = 0;
-    const opponentResults = machines.map((machine, idx) => {
-      const orderStr = String(machine.orderNumber);
-      const opponentEntry = opponentMap[orderStr] || { ball1: 0, ball2: 0, ball3: 0 };
-      const playerEntry = scoreMap?.[orderStr] || { ball1: 0, ball2: 0, ball3: 0 };
-
-      // For baseball with top/bottom structure:
-      // Each inning has 2 machines (top and bottom)
-      // Top of inning (even index): Player 1 is Pitcher, Player 2 is Batter
-      // Bottom of inning (odd index): Player 1 is Batter, Player 2 is Pitcher
-      // When computing the OPPONENT's results, their isBatter is the inverse
-      // of the player's isBatter for the same machine.
-      const playerIsBatter = idx % 2 === 1 ? isPlayer1 : !isPlayer1;
-      const opponentIsBatter = !playerIsBatter;
-      const turn = this.getInningData(machine, opponentEntry, playerEntry, opponentIsBatter, true);
-      if (turn.played) opponentRunningTotal += turn.score;
-      return turn;
-    });
+    // Symmetrically calculate top/bottom runs sequentially to handle walk-offs
+    let homeScore = 0;
+    let awayScore = 0;
 
     const lastMachineIdx = machines.length - 1;
+    const roundPlayStatus = [];
 
-    const results = machines.map((machine, idx) => {
+    // First pre-calculate runs for each machine index sequentially
+    const roundDetails = machines.map((machine, idx) => {
       const orderStr = String(machine.orderNumber);
       const playerEntry = scoreMap?.[orderStr] || { ball1: 0, ball2: 0, ball3: 0 };
       const opponentEntry = opponentMap[orderStr] || { ball1: 0, ball2: 0, ball3: 0 };
 
-      // For baseball with top/bottom structure:
-      // Each inning has 2 machines (top and bottom)
-      // Top of inning (even index): Player 1 is Pitcher, Player 2 is Batter
-      // Bottom of inning (odd index): Player 1 is Batter, Player 2 is Pitcher
+      // Map who is Home (Player 1) vs Away (Player 2)
+      const p1Entry = isPlayer1 ? playerEntry : opponentEntry;
+      const p2Entry = isPlayer1 ? opponentEntry : playerEntry;
+
+      const isTop = idx % 2 === 0;
+
+      let runs = 0;
+      let played = false;
+      let isWalkOff = false;
+
+      if (isTop) {
+        // Top of inning: Player 2 (Away) is batter, Player 1 (Home) is pitcher
+        const actualTurn = this.getInningData(machine, p2Entry, p1Entry, true, true);
+        runs = actualTurn.score;
+        played = actualTurn.played;
+        if (played) {
+          awayScore += runs;
+        }
+      } else {
+        // Bottom of inning: Player 1 (Home) is batter, Player 2 (Away) is pitcher
+        const isLastInning = idx === lastMachineIdx;
+        const awayTopOfLastInningPlayed = lastMachineIdx >= 1 && roundPlayStatus[lastMachineIdx - 1];
+
+        if (isLastInning && awayTopOfLastInningPlayed && homeScore > awayScore) {
+          isWalkOff = true;
+          runs = 0;
+          played = false;
+        } else {
+          const actualTurn = this.getInningData(machine, p1Entry, p2Entry, true, true);
+          runs = actualTurn.score;
+          played = actualTurn.played;
+          if (played) {
+            homeScore += runs;
+          }
+        }
+      }
+
+      roundPlayStatus[idx] = played;
+
+      return {
+        idx,
+        machine,
+        runs,
+        played,
+        isWalkOff
+      };
+    });
+
+    let runningTotal = 0;
+    const results = roundDetails.map((rd, idx) => {
+      const orderStr = String(rd.machine.orderNumber);
+      const playerEntry = scoreMap?.[orderStr] || { ball1: 0, ball2: 0, ball3: 0 };
+      const opponentEntry = opponentMap[orderStr] || { ball1: 0, ball2: 0, ball3: 0 };
       const isBatter = idx % 2 === 1 ? isPlayer1 : !isPlayer1;
 
-      // Walk-off: In baseball, if the batter is already ahead going into the
-      // bottom of the last inning, they win without needing to bat.
-      // This only applies on the very last machine (bottom of last inning)
-      // when the player is the batter and already leads.
-      // Only mark as walk-off if the away team has completed the top of the
-      // last inning (i.e., the opponent's top-of-last-inning turn was played).
-      const isBottomOfLastInning = idx === lastMachineIdx && isBatter;
-      const awayTopOfLastInningPlayed = lastMachineIdx >= 1 && opponentResults[lastMachineIdx - 1]?.played;
-      if (isBottomOfLastInning && awayTopOfLastInningPlayed && runningTotal > opponentRunningTotal) {
+      if (rd.isWalkOff) {
         return {
-          orderNumber: machine.orderNumber,
-          machineName: machine.machineName,
+          orderNumber: rd.machine.orderNumber,
+          machineName: rd.machine.machineName,
           isBatter,
           played: false,
           score: 0,
@@ -224,7 +247,7 @@ export class BaseballEngine extends ScoringEngine {
         };
       }
 
-      const turn = this.getInningData(machine, playerEntry, opponentEntry, isBatter);
+      const turn = this.getInningData(rd.machine, playerEntry, opponentEntry, isBatter);
 
       if (turn.played) {
         runningTotal += turn.score;

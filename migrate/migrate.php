@@ -205,10 +205,7 @@ function initializeDatabaseSchema($pdo) {
         `game_number` INT DEFAULT 1,
         `round_name` VARCHAR(50) DEFAULT NULL,
         `series_id` INT DEFAULT NULL,
-        CONSTRAINT `fk_em_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
-        CONSTRAINT `fk_em_home` FOREIGN KEY (`player1_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
-        CONSTRAINT `fk_em_away` FOREIGN KEY (`player2_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
-        CONSTRAINT `fk_em_winner` FOREIGN KEY (`winner_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
+        CONSTRAINT `fk_em_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `matchups` (
@@ -364,6 +361,18 @@ function alignTableColumns($pdo) {
                 $pdo->exec($sql);
             }
         }
+
+        // Drop legacy player foreign key constraints on event_matchups if present
+        $fkConstraints = ['fk_em_home', 'fk_em_away', 'fk_em_winner'];
+        foreach ($fkConstraints as $fk) {
+            $fkExists = $pdo->query(
+                "SELECT 1 FROM information_schema.KEY_COLUMN_USAGE
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'event_matchups' AND CONSTRAINT_NAME = '$fk'"
+            )->fetch();
+            if ($fkExists) {
+                $pdo->exec("ALTER TABLE `event_matchups` DROP FOREIGN KEY `$fk`");
+            }
+        }
     }
 
     // --- location_machine_scores ---
@@ -448,12 +457,14 @@ try {
     $stmt->execute();
     if (!$stmt->fetch()) {
         initializeDatabaseSchema($pdo);
-        alignTableColumns($pdo);
         $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('initial_schema')")->execute();
         echo "✓ Initial schema applied successfully.\n";
     } else {
         echo "Initial schema already applied.\n";
     }
+
+    // Always align table columns to ensure any missing columns from upgrades are added
+    alignTableColumns($pdo);
 
     // -----------------------------------------------------------------------
     // Migration 2: clean_unused_tables_and_columns
@@ -517,6 +528,38 @@ try {
         echo "✓ Split participants into competition_format and participation_type.\n";
     } else {
         echo "Competition format/participation type columns already exist.\n";
+    }
+
+    // -----------------------------------------------------------------------
+    // Migration 5: fix_baseball_corrupted_multipliers
+    // -----------------------------------------------------------------------
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'fix_baseball_corrupted_multipliers'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("
+            UPDATE target_scores 
+            SET value2 = 1.5,
+                score1 = CAST(ROUND(value1 * 1.0) AS SIGNED),
+                score2 = CAST(ROUND(value1 * 1.5) AS SIGNED),
+                score3 = CAST(ROUND(value1 * 2.25) AS SIGNED),
+                score4 = CAST(ROUND(value1 * 3.375) AS SIGNED),
+                score5 = CAST(ROUND(value1 * 5.0625) AS SIGNED),
+                score6 = CAST(ROUND(value1 * 7.59375) AS SIGNED),
+                score7 = CAST(ROUND(value1 * 11.390625) AS SIGNED),
+                score8 = CAST(ROUND(value1 * 17.0859375) AS SIGNED),
+                score9 = CAST(ROUND(value1 * 25.62890625) AS SIGNED),
+                score10 = CAST(ROUND(value1 * 38.443359375) AS SIGNED)
+            WHERE value2 > 10.0 AND event_id IN (
+                SELECT e.id FROM events e 
+                JOIN leagues l ON e.league_id = l.id 
+                WHERE l.scoring_format = 'baseball'
+            )
+        ");
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('fix_baseball_corrupted_multipliers')")->execute();
+        echo "✓ Fixed baseball corrupted multipliers.\n";
+    } else {
+        echo "Baseball corrupted multipliers migration already applied.\n";
     }
 
     echo "\n✓ All migrations complete.\n";

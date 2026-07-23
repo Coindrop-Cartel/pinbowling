@@ -207,6 +207,7 @@ class ScoreService
         // Number of rounds (each round = top + bottom)
         $roundsCount = (int) (count($slots) / 2);
         $hasScores = false;
+        $isWalkoff = false;
 
         for ($round = 1; $round <= $roundsCount; $round++) {
             $topOrderNum    = ($round - 1) * 2 + 1;
@@ -230,6 +231,8 @@ class ScoreService
             $topTarget    = $machineMap[$topOrderNum]    ?? $defaultTarget;
             $bottomTarget = $machineMap[$bottomOrderNum] ?? $defaultTarget;
 
+            $topPlayed = isset($scoreMap[$player1Id][$topOrderNum]) || isset($scoreMap[$player2Id][$topOrderNum]);
+
             if ($topTarget) {
                 // Top of round: Player 2 (Away) is batter, Player 1 (Home) is pitcher
                 $runs = $this->calculateRunsForHalfRound($topTarget, $p2TopEntry, $p1TopEntry);
@@ -238,8 +241,13 @@ class ScoreService
 
             if ($bottomTarget) {
                 // Bottom of round: Player 1 (Home) is batter, Player 2 (Away) is pitcher
-                $runs = $this->calculateRunsForHalfRound($bottomTarget, $p1BottomEntry, $p2BottomEntry);
-                $player1Score += $runs;
+                $isLastRound = ($round === $roundsCount);
+                if ($isLastRound && $topPlayed && $player1Score > $player2Score) {
+                    $isWalkoff = true;
+                } else {
+                    $runs = $this->calculateRunsForHalfRound($bottomTarget, $p1BottomEntry, $p2BottomEntry);
+                    $player1Score += $runs;
+                }
             }
         }
 
@@ -248,14 +256,27 @@ class ScoreService
         for ($round = 1; $round <= $roundsCount; $round++) {
             $topOrderNum    = ($round - 1) * 2 + 1;
             $bottomOrderNum = ($round - 1) * 2 + 2;
-            if (
-                !isset($scoreMap[$player1Id][$topOrderNum]) ||
-                !isset($scoreMap[$player2Id][$topOrderNum]) ||
-                !isset($scoreMap[$player1Id][$bottomOrderNum]) ||
-                !isset($scoreMap[$player2Id][$bottomOrderNum])
-            ) {
-                $fullyPlayed = false;
-                break;
+
+            $isLastRound = ($round === $roundsCount);
+            if ($isLastRound && $isWalkoff) {
+                // For a walk-off bottom half-inning, we don't require player scores for bottomOrderNum
+                if (
+                    !isset($scoreMap[$player1Id][$topOrderNum]) ||
+                    !isset($scoreMap[$player2Id][$topOrderNum])
+                ) {
+                    $fullyPlayed = false;
+                    break;
+                }
+            } else {
+                if (
+                    !isset($scoreMap[$player1Id][$topOrderNum]) ||
+                    !isset($scoreMap[$player2Id][$topOrderNum]) ||
+                    !isset($scoreMap[$player1Id][$bottomOrderNum]) ||
+                    !isset($scoreMap[$player2Id][$bottomOrderNum])
+                ) {
+                    $fullyPlayed = false;
+                    break;
+                }
             }
         }
 
@@ -305,10 +326,20 @@ class ScoreService
         $val1 = (int) ($target['value1'] ?? 5000000);
         $val2 = (float) ($target['value2'] ?? 1.5);
 
-        // Build thresholds
+        // Build thresholds, using stored score1-10 columns if present to avoid overflow/recalculation mismatches
         $thresholds = [];
         for ($rank = 1; $rank <= 10; $rank++) {
-            $thresholds[$rank] = (int) round($val1 * pow($val2, $rank - 1));
+            $colName = 'score' . $rank;
+            if (isset($target[$colName]) && (int)$target[$colName] > 0) {
+                $thresholds[$rank] = (int)$target[$colName];
+            } else {
+                $threshold = $val1 * pow($val2, $rank - 1);
+                if ($threshold > PHP_INT_MAX || $threshold < 0) {
+                    $thresholds[$rank] = PHP_INT_MAX;
+                } else {
+                    $thresholds[$rank] = (int) round($threshold);
+                }
+            }
         }
 
         for ($i = 0; $i < 3; $i++) {

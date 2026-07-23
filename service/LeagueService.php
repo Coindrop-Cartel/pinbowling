@@ -272,6 +272,10 @@ class LeagueService {
         ?int $pointSpread = null,
         array $locationIds = []
     ): array {
+        if ($scoringFormat === 'baseball' && ($competitionFormat === 'group' || $competitionFormat === 'standard')) {
+            throw new \InvalidArgumentException('Baseball scoring format is only supported for head-to-head competitions.');
+        }
+
         $pdo = $this->db->getPdo();
         try {
             $pdo->beginTransaction();
@@ -327,6 +331,10 @@ class LeagueService {
         array $locationIds = [],
         ?string $status = null
     ): array {
+        if ($scoringFormat === 'baseball' && ($competitionFormat === 'group' || $competitionFormat === 'standard')) {
+            throw new \InvalidArgumentException('Baseball scoring format is only supported for head-to-head competitions.');
+        }
+
         $pdo = $this->db->getPdo();
         try {
             $pdo->beginTransaction();

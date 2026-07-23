@@ -25,11 +25,13 @@ export async function startPlayoffsFlow({ leagueId, allLeagues, loaderParent, on
   const league = allLeagues.find(l => l.id === leagueId);
   if (!league) return;
   
-  const maxQualifiers = league.players ? league.players.length : 0;
+  const isTeam = league.participationType === 'team';
+  const participants = isTeam ? (league.teams || []) : (league.players || []);
+  const maxQualifiers = participants.length;
   if (maxQualifiers < 2) {
     await showDialog({
       title: 'Cannot Start Playoffs',
-      message: 'You need at least 2 players in the roster to start the playoffs.'
+      message: `You need at least 2 ${isTeam ? 'teams' : 'players'} in the roster to start the playoffs.`
     });
     return;
   }
