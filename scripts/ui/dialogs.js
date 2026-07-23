@@ -297,6 +297,92 @@ export const showAuthDialog = () => {
   });
 };
 
+/**
+ * Displays a multi-select dialog with search, Select All / Clear All controls,
+ * and a scrollable checkbox list. Returns the selected values on confirm.
+ * @param {Object} options
+ * @param {string} options.title - Dialog title.
+ * @param {string} [options.message=''] - Optional message displayed above the list.
+ * @param {Array<{value: string|number, label: string}>} options.items - Items to display.
+ * @param {Array<string|number>} [options.selected=[]] - Currently selected values.
+ * @param {string} [options.searchPlaceholder='Search...'] - Placeholder for the search input.
+ * @returns {Promise<Array<string>|null>} Resolves with selected values array, or null on cancel.
+ */
+export async function showMultiSelectDialog({ title, message = '', items, selected = [], searchPlaceholder = 'Search...', showSelectAll = true }) {
+  const selectedSet = new Set(selected.map(String));
+
+  const customElement = document.createElement('div');
+  customElement.style.minWidth = '350px';
+  customElement.innerHTML = `
+    ${message ? `<p class="small-hint mb-10">${message}</p>` : ''}
+    <input type="text" class="modal-input" id="multi-select-search" placeholder="${searchPlaceholder}" style="width: 100%; margin-bottom: 10px; box-sizing: border-box;">
+    ${showSelectAll ? `<div style="margin-bottom: 8px; display: flex; gap: 8px;">
+      <button type="button" id="multi-select-all" class="btn-small">Select All</button>
+      <button type="button" id="multi-select-clear" class="btn-small">Clear All</button>
+    </div>` : ''}
+    <div id="multi-select-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 4px;">
+      ${items.map(item => {
+        const val = String(item.value);
+        return `<label class="checkbox-label multi-select-item" data-value="${val}" style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; padding: 4px 8px; margin: 0; border-radius: 3px; white-space: nowrap; overflow: hidden;">
+          <input type="checkbox" value="${val}" ${selectedSet.has(val) ? 'checked' : ''} style="width: auto; margin: 0; flex-shrink: 0;">
+          <span style="overflow: hidden; text-overflow: ellipsis;">${item.label}</span>
+        </label>`;
+      }).join('')}
+    </div>
+  `;
+
+  return showDialog({
+    title,
+    message: '',
+    confirmText: 'Done',
+    cancelValue: null,
+    customElement,
+    onReady: ({ card, confirmBtn, close }) => {
+      const searchInput = card.querySelector('#multi-select-search');
+      const list = card.querySelector('#multi-select-list');
+      const selectAllBtn = card.querySelector('#multi-select-all');
+      const clearAllBtn = card.querySelector('#multi-select-clear');
+      const items = list.querySelectorAll('.multi-select-item');
+
+      searchInput.addEventListener('input', () => {
+        const query = searchInput.value.toLowerCase();
+        items.forEach(item => {
+          const label = item.querySelector('span').textContent.toLowerCase();
+          item.style.display = label.includes(query) ? 'flex' : 'none';
+        });
+      });
+
+      if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', () => {
+          items.forEach(item => {
+            if (item.style.display !== 'none') {
+              item.querySelector('input[type="checkbox"]').checked = true;
+            }
+          });
+        });
+      }
+
+      if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', () => {
+          items.forEach(item => {
+            item.querySelector('input[type="checkbox"]').checked = false;
+          });
+        });
+      }
+
+      confirmBtn.onclick = () => {
+        const selectedValues = [];
+        list.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+          selectedValues.push(cb.value);
+        });
+        close(selectedValues);
+      };
+
+      setTimeout(() => searchInput.focus(), 50);
+    }
+  });
+}
+
 export async function showPlayerSelectionDialog(title, message, options, confirmText = 'Add Player') {
   const isTeam = confirmText.toLowerCase().includes('team');
   const searchPlaceholder = isTeam ? 'Search teams...' : 'Search players...';

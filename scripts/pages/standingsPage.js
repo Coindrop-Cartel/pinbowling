@@ -3,7 +3,7 @@ import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventI
 import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
-import { showDialog } from '@ui/dialogs.js';
+import { showMultiSelectDialog } from '@ui/dialogs.js';
 import { renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { filterLeaguesForUser } from '@services/auth.js';
 import { normalizeTargets, normalizeScores, groupScoresByPlayer } from '@services/normalizer.js';
@@ -84,59 +84,20 @@ export async function initStandingsPage() {
    * Shows a multi-select dialog to filter which players are visible.
    */
   async function openPlayerFilterDialog(players) {
-    const container = document.createElement('div');
-
-    // Inline controls for Select/Clear All (Doesn't close the modal)
-    const controls = document.createElement('div');
-    controls.className = 'modal-controls-inline';
-
-    const selectAllBtn = document.createElement('button');
-    selectAllBtn.textContent = 'Select All';
-    selectAllBtn.className = 'btn-standard secondary';
-    selectAllBtn.type = 'button';
-    selectAllBtn.onclick = () => {
-      container.querySelectorAll('input[type="checkbox"]').forEach(i => i.checked = true);
-    };
-
-    const clearAllBtn = document.createElement('button');
-    clearAllBtn.textContent = 'Clear All';
-    clearAllBtn.className = 'btn-standard secondary';
-    clearAllBtn.type = 'button';
-    clearAllBtn.onclick = () => {
-      container.querySelectorAll('input[type="checkbox"]').forEach(i => i.checked = false);
-    };
-
-    controls.append(selectAllBtn, clearAllBtn);
-    container.appendChild(controls);
-
-    const grid = document.createElement('div');
-    grid.className = 'player-filter-grid';
-    
-    players.sort((a,b) => a.playerName.localeCompare(b.playerName)).forEach(p => {
-        const label = document.createElement('label');
-      label.className = 'player-filter-label';
-      // Default to unselected. If no filter is active, we start with a clean slate 
-      // for the user to pick just the players they want.
-      const isChecked = selectedPlayerIds.includes(String(p.id));
-      label.innerHTML = `<input type="checkbox" value="${p.id}" ${isChecked ? 'checked' : ''} class="checkbox-lg">
-        <span class="ellipsis flex-1">${p.playerName}</span>`;
-      grid.appendChild(label);
-      });
-    container.appendChild(grid);
-
-    const result = await showDialog({
+    const result = await showMultiSelectDialog({
       title: 'Select Players to Show',
       message: 'Choose players for your scoreboard view. Applying with none selected will show everyone.',
-      confirmText: 'Apply Filter',
-      cancelText: 'Cancel',
-      customElement: container
+      items: players
+        .sort((a, b) => a.playerName.localeCompare(b.playerName))
+        .map(p => ({ value: String(p.id), label: p.playerName })),
+      selected: selectedPlayerIds,
+      searchPlaceholder: 'Search players...'
     });
 
-    if (result !== true) return; // Escape or Cancel
+    if (result === null) return; // Escape or Cancel
 
-    const checked = Array.from(container.querySelectorAll('input:checked')).map(i => i.value);
-    // Optimization: If everyone is checked, or if nothing is checked, we treat it as "Show Everyone"
-    selectedPlayerIds = checked.length === players.length ? [] : checked;
+    // Optimization: If everyone is selected, treat it as "Show Everyone"
+    selectedPlayerIds = result.length === players.length ? [] : result;
     refresh();
   }
 

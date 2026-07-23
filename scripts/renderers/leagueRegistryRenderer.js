@@ -14,15 +14,19 @@ import { escapeHTML } from '@scripts/utils.js';
  * @param {Object} league The league data object.
  * @param {Function} getParticipantMeta Function that returns participant metadata for a league.
  */
-export function updateLeagueHeaderStats(leagueId, league, getParticipantMeta) {
+export function updateLeagueHeaderStats(leagueId, league, getParticipantMeta, getLocationName) {
   const card = document.querySelector(`.league-registry-item[data-league-id="${leagueId}"]`);
   if (!card) return;
 
   const statsEl = card.querySelector('.league-header small');
   if (statsEl) {
     const participantMeta = getParticipantMeta(league);
+    const eventLabel = league.weeksInSeason ? 'Weeks' : 'Events';
+    const locationStr = (league.locationIds && league.locationIds.length > 0)
+      ? league.locationIds.map(id => getLocationName ? getLocationName(id) : id).join(', ')
+      : 'None';
 
-    statsEl.textContent = `Started: ${league.startDate || 'N/A'} | ${participantMeta.mode} | Events: ${league.events?.length || 0} | ${participantMeta.countLabel}: ${participantMeta.count} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''}`;
+    statsEl.innerHTML = `Started: ${league.startDate || 'N/A'} | ${participantMeta.mode} | ${eventLabel}: ${league.events?.length || 0} | ${participantMeta.countLabel}: ${participantMeta.count} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''} | Status: ${league.status || 'N/A'}<br>Format: ${league.scoringFormat || 'N/A'} | Locations: ${locationStr}`;
   }
 }
 

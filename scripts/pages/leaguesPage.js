@@ -54,6 +54,7 @@ export async function initLeaguesPage() {
   const createBtn = document.getElementById('create-league-btn');
   const leagueFormTitle = document.getElementById('league-form-title');
   let allPlayersCache = []; // Cache all players for selection dialogs
+  let allLocationsCache = []; // Cache all locations for location name lookup
 
   let allLeagues = [];
   let filterInstance = null;
@@ -74,6 +75,11 @@ export async function initLeaguesPage() {
     if (league?.participants === 'team') return { mode: 'Team', countLabel: 'Teams', count: league.teams?.length || 0, listLabel: 'Teams', emptyLabel: 'teams' };
     if (league?.participants === 'head2head') return { mode: 'Head-to-head', countLabel: 'Players', count: league.players?.length || 0, listLabel: 'Roster', emptyLabel: 'players' };
     return { mode: 'Individual', countLabel: 'Players', count: league?.players?.length || 0, listLabel: 'Roster', emptyLabel: 'players' };
+  };
+
+  const getLocationName = (id) => {
+    const loc = allLocationsCache.find(l => String(l.id) === String(id));
+    return loc ? loc.name : id;
   };
 
   const leagueFormController = createLeagueFormController({
@@ -123,7 +129,7 @@ export async function initLeaguesPage() {
           league.events.push({ ...payload, id: Number(eventId) });
         }
         renderEventsForLeagueLocal(Number(leagueId), league.events, league.name);
-        updateLeagueHeaderStats(Number(leagueId), league, getParticipantMeta);
+        updateLeagueHeaderStats(Number(leagueId), league, getParticipantMeta, getLocationName);
       }
       applyPreferredTheme(ScoringFormats.resolve(getCookie('pb_preferred_format')));
     }
@@ -159,6 +165,7 @@ export async function initLeaguesPage() {
     onUpdateSeason: updateSeasonFlow,
     onPrintSeasonResults: printSeasonResultsFlow,
     getParticipantMeta,
+    getLocationName,
     skipScroll: skipScrollOnNextRender
   });
 
@@ -224,7 +231,11 @@ export async function initLeaguesPage() {
 
       // Also refresh the global player cache for selection dialogs
       allPlayersCache = await PB_API.players.getAll();
-      
+
+      // Refresh the global locations cache for location name resolution
+      const locationsRaw = await PB_API.locations.getAll();
+      allLocationsCache = Array.isArray(locationsRaw) ? locationsRaw : [];
+
       filterInstance.setData(allLeagues);
       filterInstance.performFilter();
     } catch (err) {
@@ -258,7 +269,7 @@ export async function initLeaguesPage() {
             onRemoveTeam: (teamId, teamName) => removeTeamFromLeagueLocal(leagueId, teamId, teamName)
           });
         }
-        updateLeagueHeaderStats(leagueId, league, getParticipantMeta);
+        updateLeagueHeaderStats(leagueId, league, getParticipantMeta, getLocationName);
       }
     });
   }
@@ -274,7 +285,7 @@ export async function initLeaguesPage() {
             onRemoveTeam: (tId, tName) => removeTeamFromLeagueLocal(leagueId, tId, tName)
           });
         }
-        updateLeagueHeaderStats(leagueId, league, getParticipantMeta);
+        updateLeagueHeaderStats(leagueId, league, getParticipantMeta, getLocationName);
       }
     });
   }
@@ -292,7 +303,7 @@ export async function initLeaguesPage() {
             onRemovePlayer: (playerId, playerName) => removePlayerFromLeague(leagueId, playerId, playerName)
           });
         }
-        updateLeagueHeaderStats(leagueId, league, getParticipantMeta);
+        updateLeagueHeaderStats(leagueId, league, getParticipantMeta, getLocationName);
       }
     });
   }
@@ -320,7 +331,7 @@ export async function initLeaguesPage() {
             onRemovePlayer: (pId, pName) => removePlayerFromLeague(leagueId, pId, pName)
           });
         }
-        updateLeagueHeaderStats(leagueId, league, getParticipantMeta);
+        updateLeagueHeaderStats(leagueId, league, getParticipantMeta, getLocationName);
       }
     });
   }
@@ -349,7 +360,7 @@ export async function initLeaguesPage() {
               renderLeagueList(leaguesList, allLeagues, buildListCallbacks(allLeagues, leagueNameInput.value.trim().toLowerCase()));
               skipScrollOnNextRender = false;
           }
-          updateLeagueHeaderStats(leagueId, league, getParticipantMeta);
+          updateLeagueHeaderStats(leagueId, league, getParticipantMeta, getLocationName);
       }
     });
   }

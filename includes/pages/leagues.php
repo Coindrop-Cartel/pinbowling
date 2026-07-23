@@ -48,7 +48,7 @@
           <input id="league-weeks-in-season" data-testid="league-weeks-in-season-input" type="number" min="1" value="8" />
         </div>
         <div id="league-rounds-per-game-row" data-testid="league-rounds-per-game-row" class="form-row hidden">
-          <label for="league-rounds-per-game">Rounds per Game</label>
+          <label id="league-rounds-per-game-label" for="league-rounds-per-game">Rounds per Game</label>
           <select id="league-rounds-per-game" data-testid="league-rounds-per-game-select">
             <option value="2" selected>2 Rounds</option>
             <option value="4">4 Rounds</option>
@@ -57,9 +57,12 @@
           </select>
         </div>
         <div id="league-locations-row" data-testid="league-locations-row" class="form-row hidden">
-          <label>Assigned Locations</label>
-          <div id="league-locations-container" data-testid="league-locations-container" class="checkbox-group" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 8px;">
-            <!-- Location checkboxes will be populated dynamically -->
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <label style="margin: 0; white-space: nowrap;">Assigned Locations</label>
+            <button type="button" id="league-locations-btn" data-testid="league-locations-btn" class="btn-secondary btn-mgmt">Select Locations</button>
+          </div>
+          <div id="league-locations-container" data-testid="league-locations-container" style="border: 1px solid #ddd; border-radius: 4px; padding: 8px 12px; min-height: 36px;">
+            <span id="league-locations-summary" data-testid="league-locations-summary" style="color: #666;"></span>
           </div>
         </div>
         <div class="form-actions hidden" data-testid="league-form-actions">

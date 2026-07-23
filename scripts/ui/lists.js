@@ -3,6 +3,7 @@ import { escapeHTML, setActiveLeagueId, setActiveEventId, loadPage } from '@scri
 import { PB_API } from '@services/api.js';
 import { showDialog, showConfirm } from '@ui/dialogs.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
+import { updateLeagueHeaderStats } from '@scripts/renderers/leagueRegistryRenderer.js';
 
 /**
  * Render the event list for a specific league card.
@@ -159,6 +160,7 @@ export function renderLeagueList(container, filteredLeagues, {
   onUpdateSeason,
   onPrintSeasonResults,
   getParticipantMeta,
+  getLocationName,
   skipScroll
 }) {
   container.innerHTML = '';
@@ -283,9 +285,9 @@ export function renderLeagueList(container, filteredLeagues, {
     }
 
     const headerHtml = `
-      <div>
+      <div class="league-header">
         <h3 class="section-heading">${escapeHTML(league.name)}</h3>
-        <small>Started: ${escapeHTML(league.startDate) || 'N/A'} | ${participantMeta.mode} | Events/Weeks: ${isH2H ? (league.events?.length || league.weeksInSeason || 0) : (league.events?.length || 0)} | ${participantMeta.countLabel}: ${participantMeta.count} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''} | Status: ${escapeHTML(league.status || 'setup')}</small>
+        <small></small>
       </div>
     `;
 
@@ -329,6 +331,7 @@ export function renderLeagueList(container, filteredLeagues, {
     });
 
     row.dataset.leagueId = league.id;
+    updateLeagueHeaderStats(league.id, league, getParticipantMeta, getLocationName);
 
     // Action listeners
     if (isAuthorized) {

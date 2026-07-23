@@ -44,6 +44,12 @@ export function applyPreferredTheme(overrideFormat) {
     link.textContent = branding.playActionLabel;
   });
 
+  // Update league form "Rounds per Game" label to match format terminology (e.g. "Innings per Game")
+  const roundsLabel = document.getElementById('league-rounds-per-game-label');
+  if (roundsLabel) {
+    roundsLabel.textContent = branding.roundLabel + 's per Game';
+  }
+
   // Update homepage descriptive text
   const logicText = document.getElementById('scoring-logic-text');
   if (logicText) logicText.textContent = branding.scoringDescription;

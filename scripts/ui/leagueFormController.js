@@ -1,6 +1,7 @@
 import { SCORING_FORMATS } from '../core/engine.js';
 import { ScoringFormats } from '../services/scoringFormat.js';
-import { getCookie, escapeHTML } from '../utils.js';
+import { getCookie } from '../utils.js';
+import { showMultiSelectDialog, showAlert } from './dialogs.js';
 
 export function createLeagueFormController(elements, options) {
   const {
@@ -39,22 +40,66 @@ export function createLeagueFormController(elements, options) {
   const inningsRow = document.getElementById('league-rounds-per-game-row');
   const locationsRow = document.getElementById('league-locations-row');
   const locationsContainer = document.getElementById('league-locations-container');
+  const locationsBtn = document.getElementById('league-locations-btn');
+  const locationsSummary = document.getElementById('league-locations-summary');
   const actionsRow = createBtn?.closest('.form-actions');
 
   let editingLeagueId = null;
   let allLocations = [];
+  let selectedLocationIds = [];
+
+  const updateLocationsSummary = () => {
+    if (!locationsSummary) return;
+    if (selectedLocationIds.length === 0) {
+      locationsSummary.textContent = 'No locations selected';
+      return;
+    }
+    const names = selectedLocationIds.map(id => {
+      const loc = allLocations.find(l => String(l.id) === String(id));
+      return loc ? loc.name : null;
+    }).filter(Boolean);
+    if (names.length === selectedLocationIds.length) {
+      locationsSummary.innerHTML = names.map(name =>
+        `<span style="display: inline-block; background: #e0e0e0; border-radius: 3px; padding: 2px 8px; margin: 2px 4px 2px 0; font-size: 0.85rem;">${name}</span>`
+      ).join('');
+    } else {
+      locationsSummary.textContent = `${selectedLocationIds.length} location(s) selected`;
+    }
+  };
+
+  const openLocationsDialog = async () => {
+    if (allLocations.length === 0) {
+      try {
+        allLocations = await options.PB_API.locations.getAll();
+      } catch (err) {
+        console.error('[leagueFormController] Failed to load locations:', err);
+        showAlert('Failed to load locations.');
+        return;
+      }
+    }
+    const result = await showMultiSelectDialog({
+      title: 'Select Locations',
+      showSelectAll: false,
+      items: allLocations.map(loc => ({
+        value: String(loc.id),
+        label: loc.name + (loc.city ? ` (${loc.city})` : '')
+      })),
+      selected: selectedLocationIds
+    });
+    if (result === null) return;
+    selectedLocationIds = result;
+    updateLocationsSummary();
+  };
+
+  if (locationsBtn && !locationsBtn.dataset.listenersBound) {
+    locationsBtn.addEventListener('click', openLocationsDialog);
+    locationsBtn.dataset.listenersBound = 'true';
+  }
 
   const loadLocations = async () => {
     try {
       allLocations = await options.PB_API.locations.getAll();
-      if (locationsContainer) {
-        locationsContainer.innerHTML = allLocations.map(loc => `
-          <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; margin: 0;">
-            <input type="checkbox" name="league-locations" value="${loc.id}" data-testid="league-location-checkbox-${loc.id}" style="width: auto; margin: 0;" />
-            <span>${escapeHTML(loc.name)}${loc.city ? ` (${escapeHTML(loc.city)})` : ''}</span>
-          </label>
-        `).join('');
-      }
+      updateLocationsSummary();
     } catch (err) {
       console.error('[leagueFormController] Failed to load locations:', err);
     }
@@ -74,14 +119,26 @@ export function createLeagueFormController(elements, options) {
     }
   };
 
+  const updateFormatOptions = (isH2H) => {
+    if (!leagueFormatInput) return;
+    const currentValue = leagueFormatInput.value;
+    const allowed = isH2H
+      ? SCORING_FORMATS
+      : SCORING_FORMATS.filter(f => f.value !== ScoringFormats.BASEBALL);
+    leagueFormatInput.innerHTML = allowed.map(f =>
+      `<option value="${f.value}">${f.label}</option>`
+    ).join('');
+    if (!allowed.some(f => f.value === currentValue)) {
+      const preferred = ScoringFormats.resolve(getCookie('pb_preferred_format'));
+      leagueFormatInput.value = allowed.some(f => f.value === preferred) ? preferred : allowed[0].value;
+    }
+  };
+
   const handleParticipantsChange = () => {
     if (!leagueParticipantsInput) return;
     const isH2H = leagueParticipantsInput.value === 'head2head';
+    updateFormatOptions(isH2H);
     if (isH2H) {
-      if (leagueFormatInput) {
-        leagueFormatInput.value = ScoringFormats.BASEBALL;
-        leagueFormatInput.disabled = true;
-      }
       seasonScoringRow?.classList.add('hidden');
       dropLowestRow?.classList.add('hidden');
       weeklyPointsRow?.classList.add('hidden');
@@ -89,12 +146,6 @@ export function createLeagueFormController(elements, options) {
       weeksRow?.classList.remove('hidden');
       inningsRow?.classList.remove('hidden');
     } else {
-      if (leagueFormatInput) {
-        leagueFormatInput.disabled = false;
-        if (!editingLeagueId) {
-          leagueFormatInput.value = ScoringFormats.resolve(getCookie('pb_preferred_format'));
-        }
-      }
       if (dateRow && !dateRow.classList.contains('hidden')) {
         seasonScoringRow?.classList.remove('hidden');
         dropLowestRow?.classList.remove('hidden');
@@ -123,10 +174,8 @@ export function createLeagueFormController(elements, options) {
     locationsRow?.classList.add('hidden');
     actionsRow?.classList.add('hidden');
 
-    const checkboxes = locationsContainer?.querySelectorAll('input[name="league-locations"]');
-    if (checkboxes) {
-      checkboxes.forEach(cb => cb.checked = false);
-    }
+    selectedLocationIds = [];
+    updateLocationsSummary();
 
     if (leagueFormatInput) leagueFormatInput.disabled = false;
     if (leagueParticipantsInput) leagueParticipantsInput.disabled = false;
@@ -160,13 +209,8 @@ export function createLeagueFormController(elements, options) {
     locationsRow?.classList.remove('hidden');
     if (participantsRow) participantsRow.classList.remove('hidden');
 
-    const checkboxes = locationsContainer?.querySelectorAll('input[name="league-locations"]');
-    if (checkboxes) {
-      const assignedSet = new Set((league.locationIds || []).map(Number));
-      checkboxes.forEach(cb => {
-        cb.checked = assignedSet.has(Number(cb.value));
-      });
-    }
+    selectedLocationIds = (league.locationIds || []).map(String);
+    updateLocationsSummary();
 
     handleParticipantsChange();
     actionsRow?.classList.remove('hidden');
@@ -190,15 +234,14 @@ export function createLeagueFormController(elements, options) {
   }
 
   // Bind Listeners
-  if (leagueParticipantsInput) {
+  if (leagueParticipantsInput && !leagueParticipantsInput.dataset.listenersBound) {
     leagueParticipantsInput.addEventListener('change', handleParticipantsChange);
+    leagueParticipantsInput.dataset.listenersBound = 'true';
   }
 
   if (leagueFormatInput) {
-    const preferredFormat = ScoringFormats.resolve(getCookie('pb_preferred_format'));
-    leagueFormatInput.innerHTML = SCORING_FORMATS
-      .map(f => `<option value="${f.value}" ${f.value === preferredFormat ? 'selected' : ''}>${f.label}</option>`)
-      .join('');
+    const isH2H = leagueParticipantsInput?.value === 'head2head';
+    updateFormatOptions(isH2H);
     leagueFormatInput.onchange = () => {
       applyPreferredTheme(leagueFormatInput.value);
     };
@@ -239,6 +282,7 @@ export function createLeagueFormController(elements, options) {
         if (leagueDateInput && !leagueDateInput.value) {
           leagueDateInput.value = new Date().toISOString().split('T')[0];
         }
+        updateLocationsSummary();
       }
     };
     createToggle.classList.remove('hidden');
@@ -265,11 +309,14 @@ export function createLeagueFormController(elements, options) {
     createBtn.disabled = true;
     createBtn.textContent = 'Saving...';
 
-    const locationIds = [];
-    const checkedBoxes = locationsContainer?.querySelectorAll('input[name="league-locations"]:checked');
-    if (checkedBoxes) {
-      checkedBoxes.forEach(cb => locationIds.push(Number(cb.value)));
+    if (isH2H && weeksInSeason && selectedLocationIds.length === 0) {
+      showAlert('Please select at least one location for head-to-head seasons.');
+      createBtn.disabled = false;
+      createBtn.textContent = editingLeagueId ? 'Update League' : 'Save League';
+      return;
     }
+
+    const locationIds = selectedLocationIds.map(Number);
 
     try {
       const payload = {

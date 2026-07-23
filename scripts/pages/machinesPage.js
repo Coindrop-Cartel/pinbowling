@@ -53,6 +53,19 @@ export async function initMachinesPage() {
   if (baselineMedInput) applyScoreFormatting(baselineMedInput);
   if (baselineHardInput) applyScoreFormatting(baselineHardInput);
 
+  // Toggle Target Scores section expand/collapse
+  const baselineScoresToggle = document.getElementById('baseline-scores-toggle');
+  const baselineScoresBody = document.getElementById('baseline-scores-body');
+  const baselineScoresToggleIcon = document.getElementById('baseline-scores-toggle-icon');
+  if (baselineScoresToggle && baselineScoresBody) {
+    baselineScoresToggle.onclick = () => {
+      const isHidden = baselineScoresBody.classList.toggle('hidden');
+      if (baselineScoresToggleIcon) {
+        baselineScoresToggleIcon.textContent = isHidden ? '\u25B6' : '\u25BC';
+      }
+    };
+  }
+
   /**
    * Updates the labels, placeholders, and values for the baseline scores based on the selected format.
    * @param {string} fmt 
@@ -86,11 +99,14 @@ export async function initMachinesPage() {
   if (baselineFormatSelect) {
     baselineFormatSelect.addEventListener('change', (e) => {
       const oldFmt = ScoringFormats.resolve(baselineFormatSelect.dataset.prevFormat);
-      editingScores[oldFmt] = {
-        targetEasy: Number(baselineEasyInput.value.replace(/\D/g, '')) || 0,
-        targetMed: Number(baselineMedInput.value.replace(/\D/g, '')) || 0,
-        targetHard: Number(baselineHardInput.value.replace(/\D/g, '')) || 0,
-      };
+      const easy = Number(baselineEasyInput.value.replace(/\D/g, '')) || 0;
+      const med = Number(baselineMedInput.value.replace(/\D/g, '')) || 0;
+      const hard = Number(baselineHardInput.value.replace(/\D/g, '')) || 0;
+      if (easy || med || hard) {
+        editingScores[oldFmt] = { targetEasy: easy, targetMed: med, targetHard: hard };
+      } else {
+        delete editingScores[oldFmt];
+      }
 
       const newFmt = e.target.value;
       baselineFormatSelect.dataset.prevFormat = newFmt;
@@ -151,7 +167,15 @@ export async function initMachinesPage() {
 
   function toggleFormVisibility(hide) {
     metadataRow.classList.toggle('hidden', hide);
-    if (baselineScoresRow) baselineScoresRow.classList.toggle('hidden', hide);
+    if (baselineScoresRow) {
+      if (hide) {
+        baselineScoresRow.classList.add('hidden');
+        if (baselineScoresBody) baselineScoresBody.classList.add('hidden');
+        if (baselineScoresToggleIcon) baselineScoresToggleIcon.textContent = '\u25B6';
+      } else {
+        baselineScoresRow.classList.remove('hidden');
+      }
+    }
     actionsRow.classList.toggle('hidden', hide);
   }
 
@@ -335,18 +359,24 @@ export async function initMachinesPage() {
     // Save current baseline inputs to local cache first
     if (baselineFormatSelect) {
       const currentFmt = baselineFormatSelect.value;
-      editingScores[currentFmt] = {
-        targetEasy: Number(baselineEasyInput.value.replace(/\D/g, '')) || 0,
-        targetMed: Number(baselineMedInput.value.replace(/\D/g, '')) || 0,
-        targetHard: Number(baselineHardInput.value.replace(/\D/g, '')) || 0,
-      };
+      const easy = Number(baselineEasyInput.value.replace(/\D/g, '')) || 0;
+      const med = Number(baselineMedInput.value.replace(/\D/g, '')) || 0;
+      const hard = Number(baselineHardInput.value.replace(/\D/g, '')) || 0;
+      if (easy || med || hard) {
+        editingScores[currentFmt] = { targetEasy: easy, targetMed: med, targetHard: hard };
+      } else {
+        delete editingScores[currentFmt];
+      }
     }
+
+    // Only include scores with actual values
+    const hasScores = Object.keys(editingScores).length > 0;
 
     const payload = { 
       machineName: name,
       year: yearInput.value ? parseInt(yearInput.value, 10) : null,
       manufacturer: mfgInput.value.trim() || null,
-      scores: editingScores
+      scores: hasScores ? editingScores : {}
     };
 
     saveMachineButton.disabled = true;
