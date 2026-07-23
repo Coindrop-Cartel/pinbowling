@@ -122,6 +122,10 @@ export async function initLeaguesPage() {
     PB_API,
     applyPreferredTheme,
     escapeHTML,
+    getLeagueLocationIds: (leagueId) => {
+      const league = allLeagues.find(l => String(l.id) === String(leagueId));
+      return (league?.locationIds || []).map(String);
+    },
     onSaveSuccess: async (leagueId, eventId, payload) => {
       const league = allLeagues.find(l => String(l.id) === String(leagueId));
       if (league) {

@@ -26,15 +26,25 @@ export function createEventFormController(elements, options) {
     }
 
     const locationSelect = document.getElementById('event-location');
-    const locations = await PB_API.locations.getAll();
-    locationSelect.innerHTML = '<option value="">Select Location (Optional)</option>';
-    locations.forEach(loc => {
+    const allLocations = await PB_API.locations.getAll();
+    const leagueLocationIds = options.getLeagueLocationIds ? options.getLeagueLocationIds(leagueId) : [];
+    const filteredLocations = leagueLocationIds.length > 0
+      ? allLocations.filter(loc => leagueLocationIds.includes(String(loc.id)))
+      : allLocations;
+
+    locationSelect.innerHTML = '<option value="">Select Location</option>';
+    filteredLocations.forEach(loc => {
       const opt = document.createElement('option');
       opt.value = loc.id;
       opt.textContent = loc.name;
       if (event && event.locationId == loc.id) opt.selected = true;
       locationSelect.appendChild(opt);
     });
+    locationSelect.required = true;
+
+    if (filteredLocations.length === 1 && !event) {
+      locationSelect.value = filteredLocations[0].id;
+    }
 
     eventFormCard.scrollIntoView({ behavior: 'smooth' });
   }
@@ -63,12 +73,17 @@ export function createEventFormController(elements, options) {
     const locationValue = document.getElementById('event-location').value;
     const formatValue = document.getElementById('event-scoring-format')?.value;
 
+    if (!locationValue) {
+      alert('Please select a location for this event.');
+      return;
+    }
+
     const payload = {
       leagueId: leagueId,
       eventName: name,
       eventDate: date,
       scoringFormat: ScoringFormats.resolve(formatValue),
-      locationId: locationValue ? Number(locationValue) : null
+      locationId: Number(locationValue)
     };
 
     try {

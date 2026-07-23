@@ -449,7 +449,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
     isManagementAuthorized.mockResolvedValue(true);
     PB_API.leagues.getAll.mockResolvedValue([{ id: 1, name: 'L1', players: [], events: [] }]);
     PB_API.players.getAll.mockResolvedValue([]);
-    PB_API.locations.getAll.mockResolvedValue([]);
+    PB_API.locations.getAll.mockResolvedValue([{ id: 10, name: 'Main' }]);
     PB_API.events.create.mockResolvedValue({ id: 99 });
 
     await initLeaguesPage();
@@ -460,6 +460,12 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
     document.getElementById('event-name').value = 'New Event';
     document.getElementById('event-date').value = '2024-05-01';
+
+    // Wait for showEventForm to populate the location dropdown, then set the value
+    await vi.waitFor(() => {
+      expect(document.getElementById('event-location').options.length).toBeGreaterThan(0);
+    });
+    document.getElementById('event-location').value = '10';
     document.getElementById('event-form').dispatchEvent(new Event('submit'));
 
     await vi.waitFor(() => {
@@ -476,7 +482,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
     const mockLeague = { id: 1, name: 'L1', players: [], events: [{ id: 50, eventName: 'OldEvent', eventDate: '2024-01-01', scoringFormat: 'bowling' }] };
     PB_API.leagues.getAll.mockResolvedValue([mockLeague]);
     PB_API.players.getAll.mockResolvedValue([]);
-    PB_API.locations.getAll.mockResolvedValue([]);
+    PB_API.locations.getAll.mockResolvedValue([{ id: 10, name: 'Main' }]);
     PB_API.events.update.mockResolvedValue({ id: 50 });
 
     await initLeaguesPage();
@@ -486,6 +492,12 @@ describe('Leagues Page (leaguesPage.js)', () => {
     document.querySelector('.edit-event-btn').click();
 
     document.getElementById('event-name').value = 'Updated Event';
+
+    // Wait for showEventForm to populate the location dropdown, then set the value
+    await vi.waitFor(() => {
+      expect(document.getElementById('event-location').options.length).toBeGreaterThan(0);
+    });
+    document.getElementById('event-location').value = '10';
     document.getElementById('event-form').dispatchEvent(new Event('submit'));
 
     await vi.waitFor(() => {
