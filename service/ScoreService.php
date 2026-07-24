@@ -209,16 +209,23 @@ class ScoreService
                 }
 
                 $roundsCount = (int) (count($slots) / 2);
+                $isWalkoff = false;
                 $allPlayed = true;
                 for ($round = 1; $round <= $roundsCount; $round++) {
                     $topOrderNum    = ($round - 1) * 2 + 1;
                     $bottomOrderNum = ($round - 1) * 2 + 2;
-                    if (
-                        !isset($scoreMap[$player1Id][$topOrderNum]) ||
-                        !isset($scoreMap[$player2Id][$topOrderNum]) ||
-                        !isset($scoreMap[$player1Id][$bottomOrderNum]) ||
-                        !isset($scoreMap[$player2Id][$bottomOrderNum])
-                    ) {
+
+                    $isLastRound = ($round === $roundsCount);
+                    $topPlayed = isset($scoreMap[$player1Id][$topOrderNum]) && isset($scoreMap[$player2Id][$topOrderNum]);
+                    $bottomPlayed = isset($scoreMap[$player1Id][$bottomOrderNum]) && isset($scoreMap[$player2Id][$bottomOrderNum]);
+
+                    if ($isLastRound && $topPlayed && !$bottomPlayed && $player1Score > $player2Score) {
+                        // Walk-off: home was ahead after top of last round, bottom not played
+                        $isWalkoff = true;
+                        break;
+                    }
+
+                    if (!$topPlayed || !$bottomPlayed) {
                         $allPlayed = false;
                         break;
                     }
@@ -231,6 +238,9 @@ class ScoreService
                     } elseif ($player2Score > $player1Score) {
                         $winnerId = $player2Id;
                     }
+                } elseif ($isWalkoff) {
+                    $status = 'completed';
+                    $winnerId = $player1Id;
                 }
             }
 
