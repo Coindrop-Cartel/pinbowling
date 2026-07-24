@@ -198,8 +198,12 @@ function initializeDatabaseSchema($pdo) {
         `event_id` INT NOT NULL,
         `player1_id` INT NOT NULL,
         `player2_id` INT DEFAULT NULL,
+        `player3_id` INT DEFAULT NULL,
+        `player4_id` INT DEFAULT NULL,
         `player1_score` INT DEFAULT 0,
         `player2_score` INT DEFAULT 0,
+        `player3_score` INT DEFAULT 0,
+        `player4_score` INT DEFAULT 0,
         `winner_id` INT DEFAULT NULL,
         `status` ENUM('pending', 'completed') DEFAULT 'pending',
         `game_number` INT DEFAULT 1,
@@ -213,6 +217,7 @@ function initializeDatabaseSchema($pdo) {
         `event_matchup_id` INT DEFAULT NULL,
         `order_number` INT NOT NULL,
         `machine_id` INT NOT NULL,
+        `player_id` INT DEFAULT NULL,
         UNIQUE KEY `unique_matchup_round` (`event_matchup_id`, `order_number`),
         CONSTRAINT `fk_matchup_event_matchup` FOREIGN KEY (`event_matchup_id`) REFERENCES `event_matchups` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_matchup_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
@@ -346,12 +351,21 @@ function alignTableColumns($pdo) {
                 $pdo->exec("ALTER TABLE `matchups` ADD CONSTRAINT `fk_matchup_event_matchup` FOREIGN KEY (`event_matchup_id`) REFERENCES `event_matchups` (`id`) ON DELETE CASCADE");
             }
         }
+
+        $hasPlayerId = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'player_id'")->fetch();
+        if (!$hasPlayerId) {
+            $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `player_id` INT DEFAULT NULL AFTER `machine_id`");
+        }
     }
 
     // --- event_matchups ---
     $checkTable = $pdo->query("SHOW TABLES LIKE 'event_matchups'")->fetch();
     if ($checkTable) {
         $cols = [
+            'player3_id'    => "ALTER TABLE `event_matchups` ADD COLUMN `player3_id` INT DEFAULT NULL AFTER `player2_id`",
+            'player4_id'    => "ALTER TABLE `event_matchups` ADD COLUMN `player4_id` INT DEFAULT NULL AFTER `player3_id`",
+            'player3_score' => "ALTER TABLE `event_matchups` ADD COLUMN `player3_score` INT DEFAULT 0 AFTER `player2_score`",
+            'player4_score' => "ALTER TABLE `event_matchups` ADD COLUMN `player4_score` INT DEFAULT 0 AFTER `player3_score`",
             'round_name'  => "ALTER TABLE `event_matchups` ADD COLUMN `round_name` VARCHAR(50) DEFAULT NULL AFTER `game_number`",
             'series_id'   => "ALTER TABLE `event_matchups` ADD COLUMN `series_id` INT DEFAULT NULL AFTER `round_name`",
         ];

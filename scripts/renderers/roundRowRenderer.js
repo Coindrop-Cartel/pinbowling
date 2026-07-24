@@ -92,15 +92,28 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   const role = rowContext.role ?? '';
   const opponentName = rowContext.opponentName ?? '';
 
+  // For team baseball: check if this row belongs to the current player
+  const isTeamMode = engineContext?.isTeamMode;
+  const rowPlayerId = round.playerId ? Number(round.playerId) : null;
+  const currentPlayerId = engineContext?.getCurrentPlayerId ? Number(engineContext.getCurrentPlayerId()) : null;
+  const isCurrentPlayerRow = !isTeamMode || (rowPlayerId && currentPlayerId && rowPlayerId === currentPlayerId);
+
+  // For team baseball: show player name in the role display
+  const playerName = round.playerName || '';
   let roleHtml = '';
   if (hasMatchup) {
+    const playerLabel = isTeamMode && playerName ? ` (${escapeHTML(playerName)})` : '';
     roleHtml = `
       <div class="baseball-role-row">
-        <span class="role-label ${role === 'pitcher' ? 'pitcher' : 'batter'}">${role === 'pitcher' ? 'Pitcher' : 'Batter'}</span>
+        <span class="role-label ${role === 'pitcher' ? 'pitcher' : 'batter'}">${role === 'pitcher' ? 'Pitcher' : 'Batter'}${playerLabel}</span>
         <span class="meta-muted">vs ${escapeHTML(opponentName)}</span>
       </div>
     `;
   }
+
+  // For team baseball: lock rows that don't belong to the current player
+  const isRowLocked = isTeamMode && !isCurrentPlayerRow;
+  const effectiveAccessDenied = isAccessDenied || isRowLocked;
 
   const roundTitle = displayRoundLabel ? `${escapeHTML(displayRoundLabel)} ${displayRoundNumber}` : `${displayRoundNumber}`;
 
@@ -117,11 +130,11 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
     </div>
     <div class="round-actions">
       ${hasMatchup && !isPitcher ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label pitcher-label">Pitcher:</span></div>` : ''}
-      <div class="round-inputs-container ${isAccessDenied ? 'round-inputs-disabled' : ''}">${hasMatchup ? `<span class="input-role-label">${isPitcher ? 'Pitcher:' : 'Batter:'}</span>` : ''}</div>
+      <div class="round-inputs-container ${effectiveAccessDenied ? 'round-inputs-disabled' : ''}">${hasMatchup ? `<span class="input-role-label">${isPitcher ? 'Pitcher:' : 'Batter:'}</span>` : ''}</div>
       ${hasMatchup && isPitcher ? `<div class="opponent-inputs-container round-inputs-disabled"><span class="input-role-label batter-label">Batter:</span></div>` : ''}
-      <button class="save-round-button btn-mgmt" ${isAccessDenied ? 'hidden' : ''} disabled>Save</button>
+      <button class="save-round-button btn-mgmt" ${effectiveAccessDenied ? 'hidden' : ''} disabled>Save</button>
     </div>
-    ${isAccessDenied ? `
+    ${effectiveAccessDenied ? `
       <div class="round-status-bar">
         <span class="round-msg">${escapeHTML(msg)}</span>
       </div>

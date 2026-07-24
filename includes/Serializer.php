@@ -223,7 +223,7 @@ class Serializer {
             'members' => array_map(function($m) {
                 return [
                     'id' => (int)$m['id'],
-                    'playerName' => $m['player_name']
+                    'playerName' => $m['player_name'] ?? $m['playerName'] ?? null
                 ];
             }, $row['members'] ?? [])
         ];
@@ -238,7 +238,9 @@ class Serializer {
             'eventMatchupId' => (isset($row['event_matchup_id']) && $row['event_matchup_id'] !== null) ? (int)$row['event_matchup_id'] : null,
             'orderNumber' => (int)$row['order_number'],
             'machineId' => (int)$row['machine_id'],
-            'machineName' => $row['machine_name'] ?? null
+            'machineName' => $row['machine_name'] ?? null,
+            'playerId' => (isset($row['player_id']) && $row['player_id'] !== null) ? (int)$row['player_id'] : null,
+            'playerName' => $row['player_name'] ?? null
         ];
     }
 
@@ -252,10 +254,16 @@ class Serializer {
             'leagueId' => isset($row['league_id']) ? (int)$row['league_id'] : null,
             'player1Id' => (int)$row['player1_id'],
             'player2Id' => (isset($row['player2_id']) && $row['player2_id'] !== null) ? (int)$row['player2_id'] : null,
+            'player3Id' => (isset($row['player3_id']) && $row['player3_id'] !== null) ? (int)$row['player3_id'] : null,
+            'player4Id' => (isset($row['player4_id']) && $row['player4_id'] !== null) ? (int)$row['player4_id'] : null,
             'player1Name' => $row['player1_name'] ?? null,
             'player2Name' => $row['player2_name'] ?? null,
+            'player3Name' => $row['player3_name'] ?? null,
+            'player4Name' => $row['player4_name'] ?? null,
             'player1Score' => (int)($row['player1_score'] ?? 0),
             'player2Score' => (int)($row['player2_score'] ?? 0),
+            'player3Score' => (int)($row['player3_score'] ?? 0),
+            'player4Score' => (int)($row['player4_score'] ?? 0),
             'winnerId' => (isset($row['winner_id']) && $row['winner_id'] !== null) ? (int)$row['winner_id'] : null,
             'status' => $row['status'] ?? 'pending',
             'gameNumber' => (int)($row['game_number'] ?? 1),

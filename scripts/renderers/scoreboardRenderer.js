@@ -53,11 +53,20 @@ export function renderStandardScoreboard(calcResult, domRefs) {
  */
 export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs, engine) {
   const { resultsPanel, resultsBody, totalScore, resultsEmpty } = domRefs;
-  const { allEventScores, eventMatchups, allPlayersCache, getCurrentPlayerId, normalizeScores, groupScoresByPlayer } = context;
+  const { allEventScores, eventMatchups, allPlayersCache, getCurrentPlayerId, normalizeScores, groupScoresByPlayer, isTeamMode } = context;
 
   if (!eventMatchups || eventMatchups.length === 0) {
-    // Fall back to standard scoreboard rendering if no matchups exist
     renderStandardScoreboard(calcResult, domRefs);
+    return;
+  }
+
+  const resultsTable = resultsPanel.querySelector('table.data-table');
+  if (resultsTable) resultsTable.classList.add('hidden');
+  const existingGrid = resultsPanel.querySelector('.scoreboard-grid');
+  if (existingGrid) existingGrid.remove();
+
+  if (isTeamMode && calcResult.teamTotals) {
+    _renderTeamScoreboard(calcResult, machines, context, domRefs, engine);
     return;
   }
 
@@ -72,11 +81,7 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
   const opponentId = isCurrentPlayer1 ? p2Id : p1Id;
   const opponentIds = opponentId ? [opponentId] : [];
 
-  console.log('[renderHead2HeadScoreboard] currentPlayerId:', currentPlayerId, 'p1Id:', p1Id, 'p2Id:', p2Id, 'opponentId:', opponentId);
-  console.log('[renderHead2HeadScoreboard] allEntries:', allEntries);
-
   const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
-  console.log('[renderHead2HeadScoreboard] scoresByPlayer:', scoresByPlayer);
 
   const playerResults = [
     { id: currentPlayerId, name: allPlayersCache.find(p => p.id === currentPlayerId)?.playerName || `You`, scoreMap: engine.buildPlayerScoreMap(currentPlayerId, scoresByPlayer[currentPlayerId] || [], scoresByPlayer, eventMatchups) },
@@ -86,7 +91,6 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
       scoreMap: engine.buildPlayerScoreMap(oppId, scoresByPlayer[oppId] || [], scoresByPlayer, eventMatchups)
     }))
   ];
-  console.log('[renderHead2HeadScoreboard] playerResults:', playerResults);
 
   // Sort: Away (playerOrder 2) always first, Home (playerOrder 1) second.
   playerResults.sort((a, b) => {
@@ -104,7 +108,6 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
     const pTurnResults = engine.calculateTurnResults(machines, pResult.scoreMap);
     const turnResults = Array.isArray(pTurnResults) ? pTurnResults : (pTurnResults.turnResults || []);
     playerEngineResults[playerIdNum] = turnResults;
-    console.log('[renderHead2HeadScoreboard] player ' + playerIdNum + ' scoreMap:', pResult.scoreMap, 'turnResults:', turnResults);
 
     let currentTotal = 0;
     for (let i = 0; i < turnResults.length; i++) {
@@ -132,12 +135,6 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
     }
     playerTotalScores[playerIdNum] = currentTotal;
   });
-
-  const resultsTable = resultsPanel.querySelector('table.data-table');
-  if (resultsTable) resultsTable.classList.add('hidden');
-
-  const existingGrid = resultsPanel.querySelector('.scoreboard-grid');
-  if (existingGrid) existingGrid.remove();
 
   const roundGroups = [];
   const totalRounds = Math.ceil(machines.length / 2);
@@ -186,6 +183,134 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
   const awayName = awayResult ? escapeHTML(awayResult.name) : 'Away';
   const homeName = homeResult ? escapeHTML(homeResult.name) : 'Home';
   totalScore.innerHTML = `<span class="away-label">Away:</span> ${awayName} ${awayTotal} &nbsp; <span class="home-label">Home:</span> ${homeName} ${homeTotal}`;
+
+  resultsEmpty.classList.add('hidden');
+  resultsPanel.classList.remove('hidden');
+}
+
+/**
+ * Renders a team baseball scoreboard showing team totals and per-player breakdown.
+ * @private
+ */
+function _renderTeamScoreboard(calcResult, machines, context, domRefs, engine) {
+  const { resultsPanel, resultsBody, totalScore, resultsEmpty } = domRefs;
+  const { eventMatchups, allPlayersCache, allEventScores, normalizeScores, groupScoresByPlayer } = context;
+  const { turnResults, teamTotals } = calcResult;
+
+  const wrapper = eventMatchups[0];
+  const homeTeamId = Number(wrapper.player1Id ?? wrapper.player1_id);
+  const awayTeamId = Number(wrapper.player2Id ?? wrapper.player2_id);
+  const homeTeamName = wrapper.player1Name ?? wrapper.player1_name ?? 'Home';
+  const awayTeamName = wrapper.player2Name ?? wrapper.player2_name ?? 'Away';
+
+  // Group turn results by half-inning (machine)
+  const machineGroups = [];
+  const seenMachines = new Set();
+  machines.forEach(m => {
+    const machineId = Number(m.machineId ?? m.id);
+    if (!seenMachines.has(machineId)) {
+      seenMachines.add(machineId);
+      machineGroups.push({
+        machineId,
+        machineName: m.machineName,
+        isTop: m.isTop,
+        entries: turnResults.filter(tr => {
+          const mach = machines.find(mac => Number(mac.orderNumber ?? mac.order_number) === Number(tr.orderNumber));
+          return mach && Number(mach.machineId ?? mach.id) === machineId;
+        })
+      });
+    }
+  });
+
+  // Group by inning (pairs of half-innings)
+  const innings = [];
+  for (let i = 0; i < machineGroups.length; i += 2) {
+    const topGroup = machineGroups[i];
+    const bottomGroup = machineGroups[i + 1];
+    innings.push({
+      inningNumber: Math.floor(i / 2) + 1,
+      top: topGroup,
+      bottom: bottomGroup
+    });
+  }
+
+  let scoreboardHTML = '<div class="scoreboard-grid">';
+
+  // Header row
+  scoreboardHTML += '<div class="scoreboard-row header"><span class="player-col">Team</span>';
+  innings.forEach(inn => {
+    scoreboardHTML += `<span class="round-header" style="min-width: 80px;">Inning ${inn.inningNumber}</span>`;
+  });
+  scoreboardHTML += '<span class="total-header">TOTAL</span></div>';
+
+  // Away team row
+  scoreboardHTML += '<div class="scoreboard-row player-row">';
+  scoreboardHTML += `<span class="player-name"><span class="home-away-label">Away:</span> ${escapeHTML(awayTeamName)}</span>`;
+  innings.forEach(inn => {
+    const topRuns = inn.top?.entries.reduce((sum, e) => sum + (e.played ? e.score : 0), 0) ?? '-';
+    scoreboardHTML += `<span class="round-score">${topRuns === 0 && !inn.top?.entries.some(e => e.played) ? '-' : topRuns}</span>`;
+  });
+  scoreboardHTML += `<span class="total-score">${teamTotals.away}</span></div>`;
+
+  // Home team row
+  scoreboardHTML += '<div class="scoreboard-row player-row">';
+  scoreboardHTML += `<span class="player-name"><span class="home-away-label">Home:</span> ${escapeHTML(homeTeamName)}</span>`;
+  innings.forEach(inn => {
+    const bottomRuns = inn.bottom?.entries.reduce((sum, e) => sum + (e.played ? e.score : 0), 0) ?? '-';
+    scoreboardHTML += `<span class="round-score">${bottomRuns === 0 && !inn.bottom?.entries.some(e => e.played) ? '-' : bottomRuns}</span>`;
+  });
+  scoreboardHTML += `<span class="total-score">${teamTotals.home}</span></div>`;
+
+  scoreboardHTML += '</div>';
+
+  // Player breakdown
+  scoreboardHTML += '<div class="scoreboard-grid" style="margin-top: 12px;">';
+  scoreboardHTML += '<div class="scoreboard-row header"><span class="player-col">Player Breakdown</span><span class="total-header">Runs</span></div>';
+
+  const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
+  const teamMembers = {};
+  teamMembers[awayTeamId] = { name: awayTeamName, members: [] };
+  teamMembers[homeTeamId] = { name: homeTeamName, members: [] };
+
+  // Find team members from the enriched machine entries
+  machines.forEach(m => {
+    if (m.playerId && m.teamId) {
+      const existing = teamMembers[m.teamId]?.members.find(mb => mb.id === m.playerId);
+      if (!existing) {
+        const playerObj = allPlayersCache.find(p => p.id === m.playerId);
+        teamMembers[m.teamId]?.members.push({
+          id: m.playerId,
+          name: playerObj?.playerName || `Player ${m.playerId}`,
+          isTop: m.isTop
+        });
+      }
+    }
+  });
+
+  [awayTeamId, homeTeamId].forEach(teamId => {
+    const team = teamMembers[teamId];
+    if (!team) return;
+    team.members.forEach(member => {
+      // Sum this player's runs from turn results
+      const memberRuns = turnResults
+        .filter(tr => {
+          const mach = machines.find(mac => Number(mac.orderNumber ?? mac.order_number) === Number(tr.orderNumber));
+          return mach && Number(mach.playerId) === member.id && tr.played;
+        })
+        .reduce((sum, tr) => sum + tr.score, 0);
+
+      scoreboardHTML += '<div class="scoreboard-row player-row">';
+      scoreboardHTML += `<span class="player-name" style="padding-left: 20px;">${escapeHTML(member.name)}</span>`;
+      scoreboardHTML += `<span class="total-score">${memberRuns}</span></div>`;
+    });
+  });
+
+  scoreboardHTML += '</div>';
+
+  resultsBody.innerHTML = '';
+  resultsPanel.insertAdjacentHTML('beforeend', scoreboardHTML);
+
+  totalScore.innerHTML = `<span class="away-label">Away:</span> ${escapeHTML(awayTeamName)} ${teamTotals.away} &nbsp; <span class="home-label">Home:</span> ${escapeHTML(homeTeamName)} ${teamTotals.home}`;
 
   resultsEmpty.classList.add('hidden');
   resultsPanel.classList.remove('hidden');

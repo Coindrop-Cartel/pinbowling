@@ -23,7 +23,7 @@ export const SCORING_FORMATS = ScoringFormats.ALL.map(value => {
  * @param {string|null} [format=null] - The format key ('bowling', 'golf', or 'baseball').
  * @returns {ScoringEngine} An instance of a class extending ScoringEngine.
  */
-export function getScoringEngine(format = null) {
+export function getScoringEngine(format = null, options = {}) {
   const match = document.cookie.match(new RegExp('(^| )pb_preferred_format=([^;]+)'));
   const preferred = match ? match[2] : null;
   const activeFormat = ScoringFormats.resolve(format || preferred);
@@ -33,11 +33,11 @@ export function getScoringEngine(format = null) {
 
   switch (activeFormat) {
     case ScoringFormats.GOLF:
-      return new GolfEngine(settings.golf);
+      return new GolfEngine(settings.golf, options);
     case ScoringFormats.BASEBALL:
-      return new BaseballEngine(settings.baseball);
+      return new BaseballEngine(settings.baseball, options);
     case ScoringFormats.BOWLING:
     default:
-      return new BowlingEngine(settings.bowling);
+      return new BowlingEngine(settings.bowling, options);
   }
 }

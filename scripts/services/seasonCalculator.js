@@ -131,10 +131,31 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
   const isTeamLeague = league?.participationType === 'team';
   const isH2H = league?.competitionFormat === 'head_to_head' || league?.competitionFormat === 'head2head' || !!engine.getMatchupDescription(1);
 
-  const assignmentStrategy = getPlayerAssignmentStrategy(league?.participationType);
-  const competitionStrategy = getCompetitionFormatStrategy(isH2H ? 'head_to_head' : (league?.competitionFormat || 'group'));
+  // Use engine's strategies if available, otherwise fall back to standalone strategies
+  const assignmentStrategy = engine.calculateEntityEventScore
+    ? null  // engine delegates internally
+    : getPlayerAssignmentStrategy(league?.participationType);
+  const competitionStrategy = engine.getCompetitionStrategy
+    ? null  // engine delegates internally
+    : getCompetitionFormatStrategy(isH2H ? 'head_to_head' : (league?.competitionFormat || 'group'));
 
-  // Options for team calculations (e.g. drop lowest player score per event if configured)
+  // Helper to calculate entity score (engine method or standalone strategy)
+  const calcEntityScore = (entity, eventTargets, playerScores, opts) => {
+    if (engine.calculateEntityEventScore) {
+      return engine.calculateEntityEventScore(entity, eventTargets, playerScores, opts);
+    }
+    return assignmentStrategy.calculateEntityEventScore(entity, eventTargets, playerScores, engine, opts);
+  };
+
+  // Helper to get competition strategy
+  const getCompetition = () => {
+    if (engine.getCompetitionStrategy) {
+      return engine.getCompetitionStrategy();
+    }
+    return competitionStrategy;
+  };
+
+  // Options for entity-level calculations (e.g. drop lowest player score per event for teams)
   const assignmentOptions = {
     dropLowestPlayer: league?.dropLowestPlayer || league?.dropLowestPlayerScores || 0,
     matchupsByEvent
@@ -157,8 +178,8 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
 
       const targetEntities = isTeamLeague ? (league.teams || []) : players;
       targetEntities.forEach(entity => {
-        const { total, hasData } = assignmentStrategy.calculateEntityEventScore(
-          entity, eventTargets, scoresByEventAndPlayer[event.id] || {}, engine, assignmentOptions
+        const { total, hasData } = calcEntityScore(
+          entity, eventTargets, scoresByEventAndPlayer[event.id] || {}, assignmentOptions
         );
         if (hasData) scoreEntities.push({ id: entity.id, total });
       });
@@ -204,8 +225,8 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
         scoreValue = pts;
         hasData = pts > 0;
       } else {
-        const result = assignmentStrategy.calculateEntityEventScore(
-          entity, eventTargets, scoresByEventAndPlayer[event.id] || {}, engine, assignmentOptions
+        const result = calcEntityScore(
+          entity, eventTargets, scoresByEventAndPlayer[event.id] || {}, assignmentOptions
         );
         scoreValue = result.total;
         hasData = result.hasData;
@@ -278,9 +299,10 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
     };
   });
 
-  // Calculate H2H records if applicable using competition strategy
-  const head2headRecords = competitionStrategy.calculateMatchupRecords
-    ? competitionStrategy.calculateMatchupRecords(entitiesToMap, events, matchupsByEvent, entityEventTotals, engine)
+  // Calculate H2H records via the competition strategy (engine-delegated or standalone)
+  const compStrategy = getCompetition();
+  const head2headRecords = compStrategy.calculateMatchupRecords
+    ? compStrategy.calculateMatchupRecords(entitiesToMap, events, matchupsByEvent, entityEventTotals, engine)
     : null;
 
   if (head2headRecords) {
@@ -293,8 +315,10 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
     });
   }
 
-  // Sort standings via competition strategy
-  const sortedRows = competitionStrategy.sortStandings(rows, engine, { seasonScoring: league?.seasonScoring });
+  // Sort standings via engine (which delegates to competition strategy, or use standalone)
+  const sortedRows = engine.sortStandings
+    ? engine.sortStandings(rows, { seasonScoring: league?.seasonScoring })
+    : compStrategy.sortStandings(rows, engine, { seasonScoring: league?.seasonScoring });
 
   return { rows: sortedRows, isTeamLeague, head2headRecords };
 }

@@ -169,14 +169,23 @@ class ScoreService
         $player1Id = (int) $matchup['player1_id'];
         $player2Id = (int) $matchup['player2_id'];
 
-        if (!$player1Id || !$player2Id) {
-            return; // BYE week or incomplete matchup
-        }
-
         // Fetch detailed matchup slots (machine config, player roles)
         $stmt = $pdo->prepare('SELECT * FROM matchups WHERE event_matchup_id = ? ORDER BY order_number ASC');
         $stmt->execute([$eventMatchupId]);
         $slots = $stmt->fetchAll();
+
+        // Detect team baseball: slots have player_id set (batting rotation)
+        $isTeamMode = !empty($slots) && isset($slots[0]['player_id']) && $slots[0]['player_id'] !== null;
+
+        if ($isTeamMode) {
+            $this->updateTeamMatchupTotals($pdo, $matchup, $slots, $eventMatchupId);
+            return;
+        }
+
+        // Individual mode: requires both player IDs
+        if (!$player1Id || !$player2Id) {
+            return; // BYE week or incomplete matchup
+        }
 
         // Fetch all scores submitted for this matchup
         $scores = $this->getMatchupScores($eventMatchupId);
@@ -300,6 +309,84 @@ class ScoreService
              WHERE id = ?'
         );
         $stmt->execute([$player1Score, $player2Score, $winnerId, $status, $eventMatchupId]);
+
+        if ($status === 'completed') {
+            $this->playoffService->handlePlayoffAdvancement($eventMatchupId);
+        }
+    }
+
+    /**
+     * Team baseball half-inning totals calculator.
+     *
+     * Each event_matchup represents one half-inning. Matchup rows have player_id
+     * (the batter). Scores are keyed by player_id. Pitcher scores are 0 (not entered).
+     */
+    private function updateTeamMatchupTotals(PDO $pdo, array $matchup, array $slots, int $eventMatchupId): void
+    {
+        $scores = $this->getMatchupScores($eventMatchupId);
+        $scoreMap = [];
+        foreach ($scores as $s) {
+            $scoreMap[(int) $s['player_id']][(int) $s['order_number']] = $s;
+        }
+
+        // Fetch target scores for this event
+        $stmt = $pdo->prepare(
+            'SELECT ts.*, m.machine_name
+             FROM target_scores ts
+             JOIN machines m ON ts.machine_id = m.id
+             WHERE ts.event_id = ?'
+        );
+        $stmt->execute([$matchup['event_id']]);
+        $machines = $stmt->fetchAll();
+        $machineMap = [];
+        foreach ($machines as $mac) {
+            $machineMap[(int) $mac['order_number']] = $mac;
+        }
+
+        $totalRuns = 0;
+        $hasScores = false;
+        $defaultTarget = ['value1' => 5000000, 'value2' => 1.5];
+
+        foreach ($slots as $slot) {
+            $orderNum = (int) $slot['order_number'];
+            $batterId = (int) $slot['player_id'];
+            $batterEntry = $scoreMap[$batterId][$orderNum] ?? null;
+
+            if ($batterEntry) {
+                $hasScores = true;
+                $target = $machineMap[$orderNum] ?? $defaultTarget;
+                $emptyPitcher = ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
+                $totalRuns += $this->calculateRunsForHalfRound($target, $batterEntry, $emptyPitcher);
+            }
+        }
+
+        $status = 'pending';
+        $winnerId = null;
+
+        if ($hasScores) {
+            // Check if all slots have scores
+            $allPlayed = true;
+            foreach ($slots as $slot) {
+                $orderNum = (int) $slot['order_number'];
+                $batterId = (int) $slot['player_id'];
+                if (!isset($scoreMap[$batterId][$orderNum])) {
+                    $allPlayed = false;
+                    break;
+                }
+            }
+            if ($allPlayed) {
+                $status = 'completed';
+            }
+        }
+
+        // Store total runs in player1_score (batting team's runs for this half-inning)
+        // winner_id: set to player1_id (home team) if completed, null if pending
+        $stmt = $pdo->prepare(
+            'UPDATE event_matchups
+             SET player1_score = ?, winner_id = ?, status = ?
+             WHERE id = ?'
+        );
+        $stmt->execute([$totalRuns, $winnerId, $status, $eventMatchupId]);
 
         if ($status === 'completed') {
             $this->playoffService->handlePlayoffAdvancement($eventMatchupId);

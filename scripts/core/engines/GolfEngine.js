@@ -204,17 +204,19 @@ export class GolfEngine extends ScoringEngine {
   compareScores(a, b) { return a - b; } // Low score wins
 
   /**
-   * Sorts standings by par-relative diff, then by raw total as tiebreak.
+   * Sorts standings by par-relative diff first (sport-specific),
+   * then delegates to the CompetitionFormatStrategy for group/H2H tiebreaking.
    */
-  sortStandings(rows, _options = {}) {
-    return [...rows].sort((a, b) => {
+  sortStandings(rows, options = {}) {
+    const preSorted = [...rows].sort((a, b) => {
       if (a.hasScores !== b.hasScores) return a.hasScores ? -1 : 1;
       if (a.parDiff !== undefined && b.parDiff !== undefined) {
         const d = a.parDiff - b.parDiff;
         if (d !== 0) return d;
       }
-      return this.compareScores(a.total, b.total);
+      return 0; // defer remaining tiebreaking to strategy
     });
+    return this.getCompetitionStrategy().sortStandings(preSorted, this, options);
   }
 
   /**

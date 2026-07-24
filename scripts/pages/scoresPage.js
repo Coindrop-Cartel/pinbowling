@@ -7,6 +7,7 @@ import { ScoringFormats } from '@services/scoringFormat.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { showDialog } from '@ui/dialogs.js';
 import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
+import { enrichTeamMatchupEntries } from '@services/matchupBuilder.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { printBlankScoreSheet, printScoreSheet } from '@ui/printing.js';
 import { buildRoundRow } from '../renderers/roundRowRenderer.js';
@@ -462,7 +463,9 @@ export async function initScoresPage() {
       getCurrentPlayerId,
       normalizeScores,
       groupScoresByPlayer,
-      escapeHTML
+      escapeHTML,
+      activeLeague,
+      isTeamMode: !!(eventMatchups?.[0]?.entries?.[0]?.teamId || eventMatchups?.[0]?.entries?.[0]?.team_id)
     };
   }
 
@@ -481,10 +484,18 @@ export async function initScoresPage() {
    */
   function renderCurrentResults() {
     const scoreMap = getScoreMapFromInputs();
-    const calcResult = Engine.calculateTurnResults(machines, scoreMap);
+    const engineContext = getEngineContext();
+    const isTeamMode = engineContext.isTeamMode;
+
+    let calcResult;
+    if (isTeamMode) {
+      calcResult = Engine.calculateTeamTurnResults(machines, scoreMap, engineContext);
+    } else {
+      calcResult = Engine.calculateTurnResults(machines, scoreMap);
+    }
 
     if (activeFormat === ScoringFormats.BASEBALL) {
-      renderHead2HeadScoreboard(calcResult, machines, getEngineContext(), {
+      renderHead2HeadScoreboard(calcResult, machines, engineContext, {
         resultsPanel,
         resultsBody,
         totalScore,
@@ -628,6 +639,47 @@ export async function initScoresPage() {
           values
         };
       });
+    }
+
+    // Enrich team matchup entries with player info
+    const isTeamMode = league?.participationType === 'team' && activeEventMatchupId && eventMatchups.length > 0;
+    if (isTeamMode) {
+      const matchupWrapper = eventMatchups[0];
+      const awayTeam = league.teams?.find(t => String(t.id) === String(matchupWrapper.player2Id ?? matchupWrapper.player2_id));
+      const homeTeam = league.teams?.find(t => String(t.id) === String(matchupWrapper.player1Id ?? matchupWrapper.player1_id));
+      if (awayTeam && homeTeam) {
+        const awayMembers = awayTeam.members || [];
+        const homeMembers = homeTeam.members || [];
+        const rawEntries = matchupWrapper.entries || [];
+        machinesNormalized = enrichTeamMatchupEntries(rawEntries, matchupWrapper, awayMembers, homeMembers).map((entry, i) => {
+          const sequentialOrderNumber = i + 1;
+          const tgt = eventTargets.find(t => t.orderNumber === sequentialOrderNumber);
+          const value1 = tgt ? tgt.value1 : 5000000;
+          const value2 = tgt ? tgt.value2 : 1.5;
+          let values = tgt ? tgt.values : null;
+          if (!values || Object.values(values).every(v => Number(v) === 0)) {
+            values = Engine.buildRoundValues(value1, value2);
+          }
+          return {
+            id: entry.id,
+            eventId: entry.eventId,
+            orderNumber: sequentialOrderNumber,
+            machineId: entry.machineId,
+            machineName: entry.machineName,
+            value1,
+            value2,
+            values,
+            playerId: entry.playerId,
+            playerName: entry.playerName,
+            opponentId: entry.opponentId,
+            opponentName: entry.opponentName,
+            teamId: entry.teamId,
+            isTop: entry.isTop,
+            slotIndex: entry.slotIndex,
+            playerOrder: entry.playerOrder,
+          };
+        });
+      }
     }
 
     activeLeague = league;

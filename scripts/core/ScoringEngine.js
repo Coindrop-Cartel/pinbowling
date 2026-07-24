@@ -1,14 +1,56 @@
 import { escapeHTML } from '../utils.js';
+import { getPlayerAssignmentStrategy } from './PlayerAssignmentStrategy.js';
+import { getCompetitionFormatStrategy } from './CompetitionFormatStrategy.js';
 
 /**
  * Base class for all scoring logic in the PinBowling application.
+ * Delegates entity-level scoring to a PlayerAssignmentStrategy and
+ * standings sorting to a CompetitionFormatStrategy.
  */
 export class ScoringEngine {
   /**
    * @param {Object} config UI and Terminology configuration from config.php
+   * @param {Object} [options] Strategy configuration.
+   * @param {string} [options.participationType='individual'] - 'individual' or 'team'.
+   * @param {string} [options.competitionFormat='group'] - 'group', 'head_to_head', or 'head2head'.
    */
-  constructor(config = {}) {
+  constructor(config = {}, options = {}) {
     this.config = config;
+    this._assignmentStrategy = getPlayerAssignmentStrategy(options.participationType || 'individual');
+    this._competitionStrategy = getCompetitionFormatStrategy(options.competitionFormat || 'group');
+  }
+
+  /**
+   * Returns the active PlayerAssignmentStrategy.
+   * @returns {BaseAssignmentStrategy}
+   */
+  getAssignmentStrategy() {
+    return this._assignmentStrategy;
+  }
+
+  /**
+   * Returns the active CompetitionFormatStrategy.
+   * @returns {BaseCompetitionStrategy}
+   */
+  getCompetitionStrategy() {
+    return this._competitionStrategy;
+  }
+
+  /**
+   * Calculates an entity's (player or team) total score for an event.
+   * Delegates to the PlayerAssignmentStrategy which handles the
+   * individual-vs-team aggregation logic.
+   *
+   * @param {Object} entity - Player or Team object.
+   * @param {Array} eventTargets - Machine targets for the event.
+   * @param {Object} scoresByPlayer - Map of playerId -> score rows array.
+   * @param {Object} [options] - Additional strategy options (e.g. dropLowestPlayer).
+   * @returns {{ total: number, memberTotals: Array, droppedMemberIds: Array, hasData: boolean }}
+   */
+  calculateEntityEventScore(entity, eventTargets, scoresByPlayer, options = {}) {
+    return this._assignmentStrategy.calculateEntityEventScore(
+      entity, eventTargets, scoresByPlayer, this, options
+    );
   }
 
   /**
@@ -132,18 +174,16 @@ export class ScoringEngine {
   compareScores(a, b) { return b - a; }
 
   /**
-   * Sorts standings rows for display. Players with no scores go to the bottom.
-   * Format-specific engines override this to add their own tiebreaking rules.
+   * Sorts standings rows for display. Delegates to the CompetitionFormatStrategy
+   * which applies group or head-to-head tiebreaking rules.
+   * Format-specific engines can override this to add their own tiebreaking rules.
    *
    * @param {Array} rows - Player result rows ({ hasScores, total, ... })
-   * @param {Object} [_options] - Engine-specific sort options
+   * @param {Object} [options] - Sort options (e.g. seasonScoring).
    * @returns {Array} Sorted copy of rows
    */
-  sortStandings(rows, _options = {}) {
-    return [...rows].sort((a, b) => {
-      if (a.hasScores !== b.hasScores) return a.hasScores ? -1 : 1;
-      return this.compareScores(a.total, b.total);
-    });
+  sortStandings(rows, options = {}) {
+    return this._competitionStrategy.sortStandings(rows, this, options);
   }
 
   /**

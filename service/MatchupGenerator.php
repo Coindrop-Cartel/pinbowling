@@ -50,13 +50,15 @@ class MatchupGenerator {
      * @param int   $rounds           Number of rounds per game.
      * @param int   $matchupsPerRound Number of matchup slots per round.
      * @param array $allMachineIds    Full pool of machine IDs to draw from.
+     * @param array $playerIds        Optional array of player IDs to assign to slots (for team baseball).
      */
     public static function createMatchupSlots(
         PDO $pdo,
         int $eventMatchupId,
         int $rounds,
         int $matchupsPerRound,
-        array $allMachineIds
+        array $allMachineIds,
+        array $playerIds = []
     ): void {
         $totalSlots = $rounds * $matchupsPerRound;
         $machineSlots = self::selectMachines($allMachineIds, $totalSlots);
@@ -67,8 +69,8 @@ class MatchupGenerator {
         $eventId = (int)$stmt->fetchColumn();
 
         $stmt = $pdo->prepare(
-            'INSERT INTO matchups (event_matchup_id, order_number, machine_id)
-             VALUES (?, ?, ?)'
+            'INSERT INTO matchups (event_matchup_id, order_number, machine_id, player_id)
+             VALUES (?, ?, ?, ?)'
         );
 
         $tsStmt = $pdo->prepare(
@@ -90,7 +92,8 @@ class MatchupGenerator {
 
         foreach ($machineSlots as $i => $machineId) {
             $orderNum = $i + 1;
-            $stmt->execute([$eventMatchupId, $orderNum, $machineId]);
+            $playerId = !empty($playerIds) ? ($playerIds[$i % count($playerIds)] ?? null) : null;
+            $stmt->execute([$eventMatchupId, $orderNum, $machineId, $playerId]);
 
             if ($eventId) {
                 $targetScores = self::getBaseballTargetScoreForMachine($pdo, $machineId);

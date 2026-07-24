@@ -12,11 +12,16 @@ class LocationService {
             COALESCE(NULLIF(lms.target_easy, 0), ms.target_easy, 0) AS target_easy,
             COALESCE(NULLIF(lms.target_med, 0), ms.target_med, 0) AS target_med,
             COALESCE(NULLIF(lms.target_hard, 0), ms.target_hard, 0) AS target_hard,
-            COALESCE(lms.format, ms.format, 'bowling') AS format
+            f.format AS format
      FROM location_machines lm 
      JOIN machines m ON lm.machine_id = m.id 
-     LEFT JOIN location_machine_scores lms ON lms.location_machine_id = lm.id
-     LEFT JOIN machine_scores ms ON ms.machine_id = lm.machine_id AND ms.format = COALESCE(lms.format, 'bowling')";
+     CROSS JOIN (
+         SELECT DISTINCT format FROM machine_scores
+         UNION
+         SELECT DISTINCT format FROM location_machine_scores
+     ) f
+     LEFT JOIN location_machine_scores lms ON lms.location_machine_id = lm.id AND lms.format = f.format
+     LEFT JOIN machine_scores ms ON ms.machine_id = lm.machine_id AND ms.format = f.format";
 
     public function __construct(DatabaseService $db) {
         $this->db = $db;

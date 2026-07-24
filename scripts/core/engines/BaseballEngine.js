@@ -1,7 +1,7 @@
 import { ScoringEngine } from '../ScoringEngine.js';
 import { formatNumber, escapeHTML } from '../../utils.js';
 import { buildBaseballScoreMapForPlayer } from '../../services/normalizer.js';
-import { buildRoundRobinMatchups, resolveMatchupRole } from '../../services/matchupBuilder.js';
+import { buildRoundRobinMatchups, resolveMatchupRole, buildTeamRoundRobinMatchups, resolveTeamMatchupRole } from '../../services/matchupBuilder.js';
 
 /**
  * Implementation of Baseball-style scoring logic (PinBaseball).
@@ -274,6 +274,172 @@ export class BaseballEngine extends ScoringEngine {
     };
   }
 
+  /**
+   * Calculates team baseball results. Each half-inning has multiple matchups
+   * on the same machine. Runs accumulate across matchups within each half-inning.
+   *
+   * @param {Array} machines The machine entries (matchup slots).
+   * @param {Object} scoreMap Map of orderNumber to ball scores from the current player.
+   * @param {Object} context Additional context including allEventScores, eventMatchups, etc.
+   * @returns {{ turnResults: Array, total: number, totalDisplay: string, teamTotals: Object }}
+   */
+  calculateTeamTurnResults(machines, scoreMap, context = {}) {
+    const { allEventScores, eventMatchups, allPlayersCache, normalizeScores, groupScoresByPlayer } = context;
+
+    // Group matchups by machine (half-inning)
+    const machineGroups = [];
+    const seenMachines = new Set();
+    machines.forEach(m => {
+      const machineId = Number(m.machineId ?? m.id);
+      if (!seenMachines.has(machineId)) {
+        seenMachines.add(machineId);
+        machineGroups.push({
+          machineId,
+          machine: m,
+          entries: machines.filter(em => Number(em.machineId ?? em.id) === machineId)
+        });
+      }
+    });
+
+    const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
+    let awayScore = 0;
+    let homeScore = 0;
+    const roundPlayStatus = [];
+    const teamTotals = { away: 0, home: 0 };
+
+    // Pre-calculate runs for each half-inning group
+    const halfInningDetails = machineGroups.map((group, groupIdx) => {
+      const isTop = groupIdx % 2 === 0;
+      let halfInningRuns = 0;
+      let halfInningPlayed = false;
+
+      // Check walk-off: if this is the last bottom half-inning and home is already ahead
+      const isLastHalfInning = groupIdx === machineGroups.length - 1;
+      if (!isTop && isLastHalfInning && roundPlayStatus[machineGroups.length - 2]) {
+        if (homeScore > awayScore) {
+          // Walk-off: skip this half-inning
+          return {
+            groupIdx,
+            group,
+            isTop,
+            runs: 0,
+            played: false,
+            isWalkOff: true,
+            entryResults: group.entries.map(entry => ({
+              orderNumber: entry.orderNumber,
+              machineName: entry.machineName,
+              isBatter: false,
+              played: false,
+              score: 0,
+              mark: '-',
+            }))
+          };
+        }
+      }
+
+      let runsAccumulated = 0;
+      const entryResults = group.entries.map(entry => {
+        const orderStr = String(entry.orderNumber);
+        const playerEntry = scoreMap?.[orderStr] || { ball1: 0, ball2: 0, ball3: 0 };
+
+        // Find opponent scores for this entry
+        const entryPlayerId = Number(entry.playerId ?? entry.player_id ?? 0);
+        const entryOpponentId = Number(entry.opponentId ?? 0);
+        const opponentScores = scoresByPlayer[entryOpponentId] || scoresByPlayer[String(entryOpponentId)] || [];
+        const opponentRow = opponentScores.find(s => Number(s.orderNumber ?? s.order_number) === entry.orderNumber);
+        const opponentEntry = opponentRow
+          ? { ball1: Number(opponentRow.ball1), ball2: Number(opponentRow.ball2), ball3: Number(opponentRow.ball3) }
+          : { ball1: 0, ball2: 0, ball3: 0 };
+
+        // Determine if this entry's player is batter or pitcher
+        // For team baseball: in top half, the entry's team is batting; in bottom half, pitching
+        const entryTeamId = Number(entry.teamId ?? entry.team_id ?? 0);
+        const isBatter = isTop
+          ? entryTeamId === Number(eventMatchups?.[0]?.player2Id ?? eventMatchups?.[0]?.player2_id ?? 0)
+          : entryTeamId === Number(eventMatchups?.[0]?.playerId ?? eventMatchups?.[0]?.player_id ?? 0);
+
+        const turn = this.getInningData(entry, isBatter ? playerEntry : opponentEntry, isBatter ? opponentEntry : playerEntry, isBatter, true);
+
+        if (turn.played) {
+          halfInningPlayed = true;
+          halfInningRuns += turn.score;
+        }
+
+        return {
+          orderNumber: entry.orderNumber,
+          machineName: entry.machineName,
+          isBatter,
+          played: turn.played,
+          score: turn.score,
+          mark: turn.mark,
+        };
+      });
+
+      // Accumulate to team totals
+      if (isTop) {
+        awayScore += halfInningRuns;
+        teamTotals.away += halfInningRuns;
+      } else {
+        homeScore += halfInningRuns;
+        teamTotals.home += halfInningRuns;
+      }
+
+      roundPlayStatus[groupIdx] = halfInningPlayed;
+
+      return {
+        groupIdx,
+        group,
+        isTop,
+        runs: halfInningRuns,
+        played: halfInningPlayed,
+        isWalkOff: false,
+        entryResults
+      };
+    });
+
+    // Build final turn results with running totals
+    let runningTotal = 0;
+    const results = [];
+    halfInningDetails.forEach(hd => {
+      hd.entryResults.forEach((er, entryIdx) => {
+        if (hd.isWalkOff) {
+          results.push({
+            ...er,
+            played: false,
+            score: 0,
+            mark: '-',
+            isWalkOff: true,
+            displayMark: '-',
+            displayRoundTotal: '',
+            displayRunningTotal: this.formatTotalScore(runningTotal)
+          });
+        } else if (er.played) {
+          runningTotal += er.score;
+          results.push({
+            ...er,
+            displayMark: this.formatMark(er),
+            displayRoundTotal: er.isBatter ? `+${er.score}` : '0',
+            displayRunningTotal: this.formatTotalScore(runningTotal)
+          });
+        } else {
+          results.push({
+            ...er,
+            displayMark: '-',
+            displayRoundTotal: '',
+            displayRunningTotal: '-'
+          });
+        }
+      });
+    });
+
+    return {
+      turnResults: results,
+      total: runningTotal,
+      totalDisplay: this.formatTotalScore(runningTotal),
+      teamTotals
+    };
+  }
+
   formatMark(turn, scoreOverride = null) {
     if (!turn.played) return turn.mark || '-';
     if (!turn.isBatter) return turn.mark || 'P';
@@ -341,6 +507,17 @@ export class BaseballEngine extends ScoringEngine {
    * @returns {{ description: string, details: Array<{ label: string, value: string }> }}
    */
   getMatchupDescription(roundCount) {
+    // Check if team mode is available from the last context
+    const isTeam = this._lastContext?.isTeamMode;
+    if (isTeam) {
+      return {
+        description: `Two teams compete head-to-head across ${roundCount} innings. Each inning has 4 matchups (2 per half-inning). Team members rotate as pitcher and batter.`,
+        details: [
+          { label: 'Format', value: 'Team Head-to-Head (4 matchups per inning)' },
+          { label: 'Innings', value: String(roundCount) },
+        ]
+      };
+    }
     return {
       description: `Exactly 2 players compete head-to-head across ${roundCount} innings. Roles alternate each inning (Pitcher/Batter) and each inning has 2 machines (Top and Bottom).`,
       details: [
@@ -424,9 +601,44 @@ export class BaseballEngine extends ScoringEngine {
     const { allEventScores, eventMatchups, getCurrentPlayerId, normalizeScores, groupScoresByPlayer } = context;
     const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
     const selectedPlayerId = getCurrentPlayerId();
-    const opponentMap = this.buildPlayerScoreMap(selectedPlayerId, scoresByPlayer[selectedPlayerId] || [], scoresByPlayer, eventMatchups);
-    scoreMap.opponent = opponentMap.opponent || {};
-    scoreMap.isPlayer1 = opponentMap.isPlayer1;
+
+    // Check if this is a team matchup
+    const entries = eventMatchups?.[0]?.entries || [];
+    const isTeamMode = entries.length > 0 && (entries[0].teamId !== undefined || entries[0].team_id !== undefined);
+
+    if (isTeamMode) {
+      // For team mode: build opponent map from the specific matchup entries
+      // that correspond to the current player's opponents
+      const opponentMap = {};
+      entries.forEach(entry => {
+        const entryPlayerId = Number(entry.playerId ?? entry.player_id ?? 0);
+        const entryOpponentId = Number(entry.opponentId ?? 0);
+        const orderStr = String(entry.orderNumber ?? entry.order_number);
+
+        if (entryPlayerId === Number(selectedPlayerId)) {
+          // This entry belongs to the current player - find opponent scores
+          const opponentScores = scoresByPlayer[entryOpponentId] || scoresByPlayer[String(entryOpponentId)] || [];
+          const opponentRow = opponentScores.find(s => Number(s.orderNumber ?? s.order_number) === Number(entry.orderNumber ?? entry.order_number));
+          if (opponentRow) {
+            opponentMap[orderStr] = {
+              ball1: Number(opponentRow.ball1),
+              ball2: Number(opponentRow.ball2),
+              ball3: Number(opponentRow.ball3)
+            };
+          }
+        }
+      });
+
+      scoreMap.opponent = opponentMap;
+      scoreMap.isPlayer1 = true; // Team mode doesn't use this flag
+      scoreMap.isTeamMode = true;
+      return scoreMap;
+    }
+
+    // Individual mode: existing logic
+    const opponentMap2 = this.buildPlayerScoreMap(selectedPlayerId, scoresByPlayer[selectedPlayerId] || [], scoresByPlayer, eventMatchups);
+    scoreMap.opponent = opponentMap2.opponent || {};
+    scoreMap.isPlayer1 = opponentMap2.isPlayer1;
     return scoreMap;
   }
 
@@ -451,16 +663,30 @@ export class BaseballEngine extends ScoringEngine {
    * @returns {{matchup: Object|null, isPitcher: boolean, opponentName: string, displayRoundNumber: string, roleHtml: string}}
    */
   getRoundRowContext(round, context) {
-    const { eventMatchups, getCurrentPlayerId } = context;
+    const { eventMatchups, getCurrentPlayerId, allPlayersCache, activeLeague } = context;
     const currentPlayerId = Number(getCurrentPlayerId());
-    const { matchup, isPitcher, opponentName, displayRoundNumber, role } = resolveMatchupRole(
-      currentPlayerId,
-      round.machineId,
-      eventMatchups
-    );
-    // When no matchup is found, the helper returns an empty string for
-    // `displayRoundNumber`.  The UI and tests expect the round number to be
-    // displayed in that case, so fall back to the round's order number.
+    
+    // Check if this is a team matchup by looking at the matchup entries
+    const entries = eventMatchups?.[0]?.entries || [];
+    const isTeamMode = entries.length > 0 && (entries[0].teamId !== undefined || entries[0].team_id !== undefined);
+
+    let result;
+    if (isTeamMode) {
+      result = resolveTeamMatchupRole(
+        currentPlayerId,
+        round.orderNumber,
+        eventMatchups,
+        { allPlayersCache, activeLeague }
+      );
+    } else {
+      result = resolveMatchupRole(
+        currentPlayerId,
+        round.machineId,
+        eventMatchups
+      );
+    }
+
+    const { matchup, isPitcher, opponentName, displayRoundNumber, role } = result;
     const roundNumber = round.orderNumber ?? 1;
     const finalDisplayRoundNumber = matchup ? displayRoundNumber : roundNumber;
     return {

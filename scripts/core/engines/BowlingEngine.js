@@ -7,6 +7,16 @@ import { formatNumber } from '../../utils.js';
  */
 export class BowlingEngine extends ScoringEngine {
   /**
+   * @param {Object} config UI and Terminology configuration from config.php
+   * @param {Object} [options] Strategy configuration.
+   * @param {string} [options.participationType='individual'] - 'individual' or 'team'.
+   * @param {string} [options.competitionFormat='group'] - 'group', 'head_to_head', or 'head2head'.
+   */
+  constructor(config = {}, options = {}) {
+    super(config, options);
+  }
+
+  /**
    * Converts a raw pinball score into a 0-10 pin count based on machine-specific thresholds.
    * Uses a descending search to find the highest threshold reached.
    * 
