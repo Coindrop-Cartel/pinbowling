@@ -180,6 +180,8 @@ classDiagram
     ScoringEngine <|-- BaseballEngine
 ```
 
+> **Score flow (Baseball):** `BaseballEngine.calculateTurnResults()` returns `homeScore`/`awayScore` — the pre-computed matchup totals. The client sends these with each score save via `POST /api/score`, and `ScoreService` stores them directly in `event_matchups.player1_score/player2_score`. This makes the JS engine the single source of truth for run calculation; the server-side `calculateRunsForHalfRound()` is only a fallback for non-JS clients.
+
 ### State Management
 
 Minimal state via `localStorage`:

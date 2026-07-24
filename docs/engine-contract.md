@@ -9,7 +9,7 @@ and for any interactions with the browser.
 
 | Method | Purpose | Input | Output | Notes |
 |--------|---------|------|-------|------|
-| `calculateTurnResults(machines, scoreMap)` | Compute the results for a single turn. | `machines: Machine[]`, `scoreMap: Record<string, number>` | `{ turnResults: TurnResult[], total: number, totalDisplay: string }` | `turnResults` contains per‑machine data used by the UI.  `total` is the numeric total for the turn.  `totalDisplay` is a formatted string for display.
+| `calculateTurnResults(machines, scoreMap)` | Compute the results for a single turn. | `machines: Machine[]`, `scoreMap: Record<string, number>` | `{ turnResults: TurnResult[], total: number, totalDisplay: string, homeScore?: number, awayScore?: number }` | `turnResults` contains per‑machine data used by the UI.  `total` is the numeric total for the turn.  `totalDisplay` is a formatted string for display.  `homeScore`/`awayScore` are returned by `BaseballEngine` for head-to-head matchup totals (player1=Home, player2=Away). |
 | `buildRoundValues(target, base, multiplier, scalingType)` | Build the per‑machine values for a round. | `target: number`, `base: number`, `multiplier: number`, `scalingType: 'linear' | 'exponential'` | `Record<string, number>` mapping machine IDs to the value for that round.
 | `getRunCount()` | Return the number of runs required to win a turn. | – | `number` |
 | `getPinCount()` | Return the number of pins required to win a turn. | – | `number` |
@@ -69,6 +69,8 @@ export class BowlingEngine {
   // ...other methods as per the contract
 }
 ```
+
+> **Note:** `BaseballEngine` extends this contract by also returning `homeScore` and `awayScore` — the pre-computed matchup totals for the head-to-head game. The client sends these values to the server on each score save so that `event_matchups.player1_score/player2_score` matches the JS engine's display (single source of truth).
 
 ## Usage in the UI
 
