@@ -54,9 +54,9 @@ A lightweight custom container (`includes/Container.php`) manages all service in
 | `PlayerService` | Player CRUD, role management, profile updates |
 | `LeagueService` | League/event CRUD, roster management, season config |
 | `EventService` | Individual event creation and lookup |
-| `SeasonService` | Season start/update logic, round-robin scheduling |
+| `SeasonService` | Season start/update logic, round-robin scheduling, team batting rotation |
 | `PlayoffService` | Postseason bracket creation and series advancement |
-| `MatchupGenerator` | Shared helper for creating inning/matchup slots (static) |
+| `MatchupGenerator` | Shared helper for creating inning/matchup slots with optional batting rotation (static) |
 | `LocationService` | Venue management, machine-to-location mapping |
 | `MachineService` | Master machine registry, target score thresholds |
 | `ScoreService` | Score recording and retrieval |

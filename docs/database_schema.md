@@ -8,20 +8,26 @@
 ## Design Principles
 
 1. **Format-agnostic storage.** Tables use neutral column names
-   (`player1_id`, `player2_id`, `player1_score`, `player2_score`,
-   `order_number`, `value1`, `value2`). No format-specific terminology lives in
-   the schema. Each scoring engine is responsible for translating these columns
-   into format vocabulary:
-   - **Baseball** — `player1` = Home, `player2` = Away;
+   (`player1_id`, `player2_id`, `player3_id`, `player4_id`,
+   `player1_score`, `player2_score`, `order_number`, `value1`, `value2`).
+   No format-specific terminology lives in the schema. Each scoring engine
+   is responsible for translating these columns into format vocabulary:
+   - **Baseball (team)** — `player1` = Home team, `player2` = Away team;
+     `player1_score`/`player2_score` = Home Runs / Away Runs;
+     `round_name` = half-inning label ("Top N" / "Bottom N");
+     `matchups.player_id` = batter assigned by rotation.
+   - **Baseball (individual)** — `player1` = Home, `player2` = Away;
      `player1_score`/`player2_score` = Home Runs / Away Runs;
      `order_number` on `matchups` = half-inning slot (Top/Bottom of inning N).
    - **Bowling / Golf** — `player1`/`player2` are unused (individual formats);
      `order_number` on `scores`/`target_scores` = frame number / hole number.
 2. **Two participation models.**
-   - `leagues.participants = 'individual' | 'team'` — everyone plays everyone
-     (Bowling, Golf). Roster via `league_players` or `league_teams`.
-   - `leagues.participants = 'head2head'` — paired play (Baseball). Pairings
-     tracked through `event_matchups` + `matchups`.
+   - `leagues.participation_type = 'individual'` — everyone plays everyone
+     (Bowling, Golf). Roster via `league_players`.
+   - `leagues.participation_type = 'team'` — teams compete (Team Baseball).
+     Roster via `league_teams` → `team_members`.
+   - `leagues.participants = 'head2head'` — paired play (Individual Baseball).
+     Pairings tracked through `event_matchups` + `matchups`.
 3. **Two league lifecycles.**
    - `leagues.type = 'session'` — a one-off single-event session (Quick Play).
    - `leagues.type = 'standard'` — a multi-event league spanning weeks/season.
@@ -87,7 +93,7 @@ erDiagram
 | `id` | int PK auto | |
 | `name` | varchar(255) | League or session name |
 | `type` | enum(`standard`,`session`) | `session` = Quick Play one-off; `standard` = multi-week |
-| `participants` | enum(`individual`,`team`,`head2head`) | `head2head` for Baseball |
+| `participants` | enum(`individual`,`team`,`head2head`) | `head2head` for Individual Baseball; `team` for Team Baseball |
 | `start_date` | date | |
 | `scoring_format` | varchar(50) | `bowling` / `golf` / `baseball` |
 | `season_scoring` | enum(`cumulative`,`weekly`) | Season aggregation strategy |
@@ -95,7 +101,7 @@ erDiagram
 | `weekly_points` | int (nullable) | Season config (standard leagues) |
 | `point_spread` | int (nullable) | Season config (standard leagues) |
 | `rounds_per_game` | int (nullable) | Number of rounds in a game. Bowling = 10 (full), sessions often 3/6/10. Golf = 9 or 18. Baseball = innings. For a `standard` league, may be `NULL` if rounds are driven by `target_scores` row count instead. |
-| `matchups_per_round` | int (nullable) | **Head2head only.** Number of paired matchups within a round. Baseball = 2 (top/bottom). `NULL` for individual formats (bowling/golf). Total `matchups` rows for a head2head game = `rounds_per_game * matchups_per_round`. |
+| `matchups_per_round` | int (nullable) | **Head2head only.** Number of paired matchups within a round. Individual Baseball = 2 (top/bottom). Team Baseball = team size (batters per half-inning). `NULL` for individual formats (bowling/golf). Total `matchups` rows for a head2head game = `rounds_per_game * matchups_per_round`. |
 | `weeks_in_season` | int (nullable) | Number of weeks/events in a standard season |
 | `status` | enum(`setup`,`active`,`completed`) | |
 | `playoff_series_length` | int (nullable) | Number of games per playoff series |
@@ -139,17 +145,33 @@ table entirely.
 |---|---|---|
 | `id` | int PK auto | |
 | `event_id` | int FK→`events.id` | |
-| `player1_id` | int FK→`players.id` | **Engine-translated**: Home (baseball) |
-| `player2_id` | int FK→`players.id` (nullable) | **Engine-translated**: Away (baseball) |
+| `player1_id` | int FK→`players.id` | **Engine-translated**: Home team (team) or Home player (individual) |
+| `player2_id` | int FK→`players.id` (nullable) | **Engine-translated**: Away team (team) or Away player (individual) |
 | `player1_score` | int default 0 | **Engine-translated**: Home Runs |
 | `player2_score` | int default 0 | **Engine-translated**: Away Runs |
+| `player3_id` | int FK→`players.id` (nullable) | Reserved for future use (generic column) |
+| `player4_id` | int FK→`players.id` (nullable) | Reserved for future use (generic column) |
+| `player3_score` | int default 0 | Reserved for future use |
+| `player4_score` | int default 0 | Reserved for future use |
 | `winner_id` | int FK→`players.id` (nullable) | Resolved when `status='completed'` |
 | `status` | enum(`pending`,`completed`) | |
 | `game_number` | int default 1 | For multi-game series within one event |
+| `round_name` | varchar(50) (nullable) | Team baseball only. Half-inning label, e.g. `"Top 1"`, `"Bottom 2"`. Individual mode: NULL. |
 
 **Relationships:** belongs to `events`; has many `matchups` (the half-inning
 slots); references `players` three times (player1, player2, winner).
 
+> **Team baseball model:** Each `event_matchups` row represents one half-inning.
+> `player1_id` = home team, `player2_id` = away team. The `round_name` field
+> stores the half-inning label (e.g. "Top 1"). A 2-inning team game has 4
+> `event_matchups` rows (Top 1, Bottom 1, Top 2, Bottom 2), each with N
+> `matchups` rows (one per batter in the batting rotation).
+>
+> **Individual baseball model:** Each `event_matchups` row represents one
+> head-to-head pairing between two players. `player1_id` = home player,
+> `player2_id` = away player. `round_name` is NULL. A 2-inning game has 1
+> `event_matchups` row with 4 `matchups` rows (Top 1, Bottom 1, Top 2, Bottom 2).
+>
 > The engine layer is responsible for mapping `player1`/`player2` to
 > Home/Away and `player1_score`/`player2_score` to Home/Away Runs. The DB
 > stores only neutral `player1`/`player2` semantics.
@@ -167,14 +189,19 @@ One row per half-inning per game. For an N-inning baseball game there are
 | `event_matchup_id` | int FK→`event_matchups.id` (nullable) | Grouping parent |
 | `order_number` | int | Sequential slot index (1-based). Engine maps to Top/Bottom of inning N |
 | `machine_id` | int FK→`machines.id` | The machine played for this half-inning |
+| `player_id` | int FK→`players.id` (nullable) | Team baseball only. The batter assigned to this slot by the batting rotation. Individual mode: NULL. |
 
 **Unique key:** `unique_matchup_round` (`event_matchup_id`, `order_number`) — drives `ON DUPLICATE KEY UPDATE` in matchup saves.
 
 **Relationships:** belongs to `event_matchups`; references `machines`.
 
 > `order_number` semantics by format:
-> - **Baseball**: half-inning slot. `Math.ceil(order/2)` = inning number;
->   odd = Top, even = Bottom.
+> - **Baseball (individual)**: half-inning slot. `Math.ceil(order/2)` = inning number;
+>   odd = Top, even = Bottom. Player assignment derived from
+>   `event_matchups.player1_id`/`player2_id` + `order_number` parity.
+> - **Baseball (team)**: batter slot within a half-inning. `player_id` stores the
+>   batter assigned by the batting rotation. The pitcher is determined at game
+>   time by the opposing team.
 > - (Unused by Bowling/Golf — those formats use `scores.order_number` and
 >   `target_scores.order_number` directly.)
 
@@ -368,6 +395,8 @@ This traces how a Quick Play session materializes rows across these tables.
 Refer to `scripts/pages/playPage.js` (`generatePreview`) and
 `scripts/services/sessionFinalizer.js` (`finalizeSession`).
 
+### Individual Baseball
+
 1. **`leagues`** — `finalizeSession` calls `PB_API.leagues.create` with
    `type:'session'`, `scoring_format:'baseball'`, `participants:'head2head'`,
    `rounds_per_game: generatedFrames.length / 2` (the inning count) and
@@ -380,27 +409,43 @@ Refer to `scripts/pages/playPage.js` (`generatePreview`) and
    roster < 2.
 5. **`event_matchups`** — Created by `api/matchup.php` POST handler when the
    first matchup payload arrives (resolves player1=home, player2=away).
+   **One row** per head-to-head pairing.
 6. **`matchups`** — `BaseballEngine.generateMatchupPayload` →
    `buildRoundRobinMatchups(players, inningCount, machines)` produces
    `inningCount × 2` rows (one per half-inning slot), each pointing at the
    `event_matchup_id` and a `machine_id`. For 2 innings → **4 rows**.
 
+### Team Baseball
+
+For team leagues (`leagues.participation_type = 'team'`), the model differs:
+
+1. **`leagues`** — Created with `participation_type:'team'`, `rounds_per_game`
+   must be a multiple of `team_size` (validated at creation).
+2. **`events`** — One event per week.
+3. **`target_scores`** — Same as individual: one row per half-inning slot.
+4. **`event_matchups`** — **One row per half-inning** (not per pairing). A
+   2-inning team game with 3 members per team creates **4 rows**
+   (Top 1, Bottom 1, Top 2, Bottom 2). Each row has:
+   - `player1_id` = home team, `player2_id` = away team
+   - `round_name` = `"Top N"` or `"Bottom N"`
+5. **`matchups`** — Each event_matchup has N matchup rows (one per batter in
+   the batting rotation). Each row has `player_id` set to the batter assigned
+   by the rotation. The pitcher is determined at game time.
+
 ### Expected row counts for a 2-inning baseball session
 
-| Table | Rows | Why |
-|---|---|---|
-| `leagues` | 1 | The session league |
-| `events` | 1 | Single event for the session |
-| `target_scores` | 4 | 2 innings × 2 half-innings |
-| `event_matchups` | 1 | One head-to-head pairing (2 players) |
-| `matchups` | 4 | 2 innings × 2 (Top + Bottom) |
-| `league_players` | 2 | Home + Away |
+| Table | Individual | Team (3 members) | Why |
+|---|---|---|---|
+| `leagues` | 1 | 1 | The session/standard league |
+| `events` | 1 | 4 (one per week) | Individual = session; Team = standard |
+| `target_scores` | 4 | 4 per event | 2 innings × 2 half-innings |
+| `event_matchups` | 1 | 4 per event | Individual = 1 pairing; Team = 1 per half-inning |
+| `matchups` | 4 | 12 per event | Individual = 4 slots; Team = 4 half-innings × 3 batters |
+| `league_players` or `league_teams` | 2 | 2 teams | Home + Away |
 
-If you observe only 2 `matchups` rows for a 2-inning game, the discrepancy is
-in the payload generation path (`buildRoundRobinMatchups` in
-`scripts/services/matchupBuilder.js`) or the `inningCount` argument passed to
-it (`generatedFrames.length / engine.getMachinesPerRound()` in
-`sessionFinalizer.js`), not in the schema itself.
+If you observe unexpected row counts, check the payload generation path
+(`buildRoundRobinMatchups` in `scripts/services/matchupBuilder.js` for individual,
+or `SeasonService::startSeason` for team) or the `inningCount` argument.
 
 ---
 
@@ -408,20 +453,22 @@ it (`generatedFrames.length / engine.getMachinesPerRound()` in
 
 How engines interpret the generic columns:
 
-| Generic Column | Bowling | Golf | Baseball |
-|---|---|---|---|
-| `leagues.participants` | `individual` | `individual` | `head2head` |
-| `leagues.rounds_per_game` | Frames per game (10 full; sessions often 3/6/10) | Holes per game (9 or 18) | Innings per game |
-| `leagues.matchups_per_round` | — | — | Sides per inning (2) |
-| `event_matchups.player1_id` | — | — | Home |
-| `event_matchups.player2_id` | — | — | Away |
-| `event_matchups.player1_score` | — | — | Home Runs |
-| `event_matchups.player2_score` | — | — | Away Runs |
-| `matchups.order_number` | — | — | Half-inning slot (1-based; odd=Top, even=Bottom) |
-| `scores.order_number` | Frame # | Hole # | Half-inning slot |
-| `target_scores.value1` | Strike score (10-pin threshold) | Target Score (anchored at par) | Run baseline |
-| `target_scores.value2` | 1-pin baseline score | Par value per hole (3/4/5) | Exponential multiplier |
-| `target_scores.score1..10` | Pin thresholds (1-pin → strike) | Stroke thresholds (1 stroke → 10 strokes) | Run thresholds (1R..10R) |
+| Generic Column | Bowling | Golf | Baseball (Individual) | Baseball (Team) |
+|---|---|---|---|---|
+| `leagues.participation_type` | `individual` | `individual` | `individual` (via `head2head`) | `team` |
+| `leagues.rounds_per_game` | Frames per game (10 full; sessions often 3/6/10) | Holes per game (9 or 18) | Innings per game | Innings per game (must be multiple of team size) |
+| `leagues.matchups_per_round` | — | — | Sides per inning (2) | Batters per half-inning (team size) |
+| `event_matchups.player1_id` | — | — | Home player | Home team |
+| `event_matchups.player2_id` | — | — | Away player | Away team |
+| `event_matchups.player1_score` | — | — | Home Runs | Home Runs |
+| `event_matchups.player2_score` | — | — | Away Runs | Away Runs |
+| `event_matchups.round_name` | — | — | NULL | `"Top N"` / `"Bottom N"` |
+| `matchups.order_number` | — | — | Half-inning slot (1-based; odd=Top, even=Bottom) | Batter slot within half-inning |
+| `matchups.player_id` | — | — | NULL (derived from event_matchups) | Batter assigned by rotation |
+| `scores.order_number` | Frame # | Hole # | Half-inning slot | Batter slot within half-inning |
+| `target_scores.value1` | Strike score (10-pin threshold) | Target Score (anchored at par) | Run baseline | Run baseline |
+| `target_scores.value2` | 1-pin baseline score | Par value per hole (3/4/5) | Exponential multiplier | Exponential multiplier |
+| `target_scores.score1..10` | Pin thresholds (1-pin → strike) | Stroke thresholds (1 stroke → 10 strokes) | Run thresholds (1R..10R) | Run thresholds (1R..10R) |
 
 ---
 
@@ -431,14 +478,15 @@ How engines interpret the generic columns:
   events have no rows here; their scores join directly to `events`.
 - `scores.event_matchup_id` is nullable for the same reason — individual
   formats leave it NULL.
-- `matchups` has no `player_id`/`player_order` or `event_id` columns in the
-  current schema; player assignment for each half-inning is derived from the
-  parent `event_matchups.player1_id`/`player2_id` plus the `order_number`
-  parity (odd = Top = player1 pitches, even = Bottom = player2 pitches). The JS
-  `buildRoundRobinMatchups` emits `playerOrder` in the payload, but the PHP
-  `MatchupService::saveMatchups` only persists `event_matchup_id`,
-  `order_number`, and `machine_id` — player resolution happens at read time
-  via `resolveInningRole` (`scripts/services/matchupBuilder.js`).
+- `matchups.player_id` is set for team baseball (the batter assigned by the
+  batting rotation) and NULL for individual baseball (player assignment is
+  derived from the parent `event_matchups.player1_id`/`player2_id` plus the
+  `order_number` parity).
+- `event_matchups.round_name` is set for team baseball (half-inning label like
+  "Top 1") and NULL for individual baseball.
+- `event_matchups.player3_id`/`player4_id` are reserved generic columns
+  following the same neutral naming convention as `player1_id`/`player2_id`.
+  Different formats can interpret them differently in the future.
 - Game sizing for head2head formats is the product of
   `leagues.rounds_per_game` and `leagues.matchups_per_round`. The schema
   stores these as two independent columns (rather than a single

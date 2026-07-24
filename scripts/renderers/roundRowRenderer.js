@@ -103,10 +103,11 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   let roleHtml = '';
   if (hasMatchup) {
     const playerLabel = isTeamMode && playerName ? ` (${escapeHTML(playerName)})` : '';
+    const opponentHtml = opponentName ? `<span class="meta-muted">vs ${escapeHTML(opponentName)}</span>` : '';
     roleHtml = `
       <div class="baseball-role-row">
         <span class="role-label ${role === 'pitcher' ? 'pitcher' : 'batter'}">${role === 'pitcher' ? 'Pitcher' : 'Batter'}${playerLabel}</span>
-        <span class="meta-muted">vs ${escapeHTML(opponentName)}</span>
+        ${opponentHtml}
       </div>
     `;
   }

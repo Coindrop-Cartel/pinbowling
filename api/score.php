@@ -89,7 +89,9 @@ class ScoreController extends ApiController {
                     $this->input['ball1'] ?? null,
                     $this->input['ball2'] ?? null,
                     $this->input['ball3'] ?? null,
-                    isset($this->input['eventMatchupId']) ? (int) $this->input['eventMatchupId'] : null
+                    isset($this->input['eventMatchupId']) ? (int) $this->input['eventMatchupId'] : null,
+                    isset($this->input['player1Score']) ? (int) $this->input['player1Score'] : null,
+                    isset($this->input['player2Score']) ? (int) $this->input['player2Score'] : null
                 );
 
                 $this->sendJson(['success' => true]);

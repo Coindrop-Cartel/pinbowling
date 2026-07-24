@@ -62,6 +62,7 @@ vi.mock('@services/auth.js', () => ({
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
     calculateTurnResults: vi.fn(() => ({ turnResults: [], total: 0 })),
+    calculateTeamTurnResults: vi.fn(() => ({ turnResults: [], total: 0, teamTotals: { home: 0, away: 0 } })),
     getRoundLabel: () => 'Frame',
     getPrimaryTargetLabel: () => 'Strike',
     getRoundRowContext: () => ({}),

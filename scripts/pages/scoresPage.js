@@ -100,6 +100,7 @@ export async function initScoresPage() {
   let activeFormat = ScoringFormats.DEFAULT;
   let eventMatchups = [];
   let allEventScores = [];
+  let lastCalcResult = null;
   let activeEvent = null;
   let summaryTitle = '';
 
@@ -288,6 +289,10 @@ export async function initScoresPage() {
         getCurrentPlayerId,
         saveScoreCallback: async (scoreData) => {
           const activeEventMatchupId = getActiveEventMatchupId();
+          const isTeamMode = activeLeague?.participationType === 'team';
+          const totals = !isTeamMode && lastCalcResult
+            ? { home: lastCalcResult.homeScore, away: lastCalcResult.awayScore }
+            : null;
           await PB_API.scores.save({
             playerId: scoreData.playerId,
             orderNumber: scoreData.orderNumber,
@@ -297,7 +302,9 @@ export async function initScoresPage() {
             ball1: scoreData.ball1,
             ball2: scoreData.ball2,
             ball3: scoreData.ball3,
-            eventMatchupId: activeEventMatchupId ? Number(activeEventMatchupId) : null
+            eventMatchupId: activeEventMatchupId ? Number(activeEventMatchupId) : null,
+            player1Score: totals?.home ?? null,
+            player2Score: totals?.away ?? null
           });
         },
         refreshCallback: async () => {
@@ -465,7 +472,8 @@ export async function initScoresPage() {
       groupScoresByPlayer,
       escapeHTML,
       activeLeague,
-      isTeamMode: !!(eventMatchups?.[0]?.entries?.[0]?.teamId || eventMatchups?.[0]?.entries?.[0]?.team_id)
+      isTeamMode: activeLeague?.participationType === 'team',
+      enrichedEntries: machines,
     };
   }
 
@@ -493,6 +501,7 @@ export async function initScoresPage() {
     } else {
       calcResult = Engine.calculateTurnResults(machines, scoreMap);
     }
+    lastCalcResult = calcResult;
 
     if (activeFormat === ScoringFormats.BASEBALL) {
       renderHead2HeadScoreboard(calcResult, machines, engineContext, {
@@ -587,8 +596,16 @@ export async function initScoresPage() {
     // then fetch it generically — no format-specific branching required.
     const requiredData = Engine.getRequiredEventData(eventId, PB_API);
     if (activeEventMatchupId) {
-      requiredData.eventMatchups = PB_API.matchups.get(null, Number(activeEventMatchupId)).then(m => [m]);
-      requiredData.allEventScores = PB_API.scores.get(null, null, null, Number(activeEventMatchupId));
+      // Team mode: fetch ALL event_matchups for the event (multiple half-innings)
+      // Individual mode: fetch only the specific matchup by ID
+      const isTeamModeLeague = league?.participationType === 'team';
+      if (isTeamModeLeague) {
+        requiredData.eventMatchups = PB_API.matchups.get(eventId).catch(() => []);
+        requiredData.allEventScores = PB_API.scores.get(null, Number(eventId)).catch(() => []);
+      } else {
+        requiredData.eventMatchups = PB_API.matchups.get(null, Number(activeEventMatchupId)).then(m => [m]);
+        requiredData.allEventScores = PB_API.scores.get(null, null, null, Number(activeEventMatchupId));
+      }
     }
     const requiredKeys = Object.keys(requiredData);
     const requiredValues = await Promise.all(Object.values(requiredData));
@@ -612,46 +629,25 @@ export async function initScoresPage() {
       return m;
     });
     if (activeEventMatchupId && eventMatchups.length > 0) {
-      const matchupDetails = eventMatchups[0];
-      // IMPORTANT: Each entry's orderNumber is the round number (1, 2, …) and is
-      // shared by BOTH matchups within the same round (e.g., top and bottom).
-      // If we used it directly, both entries would get the same orderNumber,
-      // causing score saves/lookups to collide. Instead we derive a strict
-      // sequential position (1, 2, 3, 4, …) from the entry's index in the
-      // entries array, which matches how event target scores are numbered.
-      machinesNormalized = (matchupDetails.entries || []).map((entry, i) => {
-        const sequentialOrderNumber = i + 1;
-        const tgt = eventTargets.find(t => t.orderNumber === sequentialOrderNumber);
-        const value1 = tgt ? tgt.value1 : 5000000;
-        const value2 = tgt ? tgt.value2 : 1.5;
-        let values = tgt ? tgt.values : null;
-        if (!values || Object.values(values).every(v => Number(v) === 0)) {
-          values = Engine.buildRoundValues(value1, value2);
-        }
-        return {
-          id: entry.id,
-          eventId: entry.eventId,
-          orderNumber: sequentialOrderNumber,
-          machineId: entry.machineId,
-          machineName: entry.machineName,
-          value1,
-          value2,
-          values
-        };
-      });
-    }
+      const isTeamModeLeague = league?.participationType === 'team';
 
-    // Enrich team matchup entries with player info
-    const isTeamMode = league?.participationType === 'team' && activeEventMatchupId && eventMatchups.length > 0;
-    if (isTeamMode) {
-      const matchupWrapper = eventMatchups[0];
-      const awayTeam = league.teams?.find(t => String(t.id) === String(matchupWrapper.player2Id ?? matchupWrapper.player2_id));
-      const homeTeam = league.teams?.find(t => String(t.id) === String(matchupWrapper.player1Id ?? matchupWrapper.player1_id));
-      if (awayTeam && homeTeam) {
-        const awayMembers = awayTeam.members || [];
-        const homeMembers = homeTeam.members || [];
-        const rawEntries = matchupWrapper.entries || [];
-        machinesNormalized = enrichTeamMatchupEntries(rawEntries, matchupWrapper, awayMembers, homeMembers).map((entry, i) => {
+      if (isTeamModeLeague) {
+        // Team mode: flatten ALL event_matchups entries (one per half-inning)
+        let flatIdx = 0;
+        const enrichedEntries = [];
+        for (const em of eventMatchups) {
+          const rawEntries = em.entries || [];
+          const roundName = em.roundName ?? em.round_name ?? '';
+          const awayTeam = league.teams?.find(t => String(t.id) === String(em.player2Id ?? em.player2_id));
+          const homeTeam = league.teams?.find(t => String(t.id) === String(em.player1Id ?? em.player1_id));
+          if (awayTeam && homeTeam) {
+            const enriched = enrichTeamMatchupEntries(rawEntries, em, awayTeam.members || [], homeTeam.members || [], roundName);
+            enrichedEntries.push(...enriched);
+          } else {
+            enrichedEntries.push(...rawEntries);
+          }
+        }
+        machinesNormalized = enrichedEntries.map((entry, i) => {
           const sequentialOrderNumber = i + 1;
           const tgt = eventTargets.find(t => t.orderNumber === sequentialOrderNumber);
           const value1 = tgt ? tgt.value1 : 5000000;
@@ -671,12 +667,34 @@ export async function initScoresPage() {
             values,
             playerId: entry.playerId,
             playerName: entry.playerName,
-            opponentId: entry.opponentId,
-            opponentName: entry.opponentName,
             teamId: entry.teamId,
             isTop: entry.isTop,
             slotIndex: entry.slotIndex,
             playerOrder: entry.playerOrder,
+            opponentPlayerId: entry.opponentPlayerId,
+          };
+        });
+      } else {
+        // Individual mode: use first matchup's entries
+        const matchupDetails = eventMatchups[0];
+        machinesNormalized = (matchupDetails.entries || []).map((entry, i) => {
+          const sequentialOrderNumber = i + 1;
+          const tgt = eventTargets.find(t => t.orderNumber === sequentialOrderNumber);
+          const value1 = tgt ? tgt.value1 : 5000000;
+          const value2 = tgt ? tgt.value2 : 1.5;
+          let values = tgt ? tgt.values : null;
+          if (!values || Object.values(values).every(v => Number(v) === 0)) {
+            values = Engine.buildRoundValues(value1, value2);
+          }
+          return {
+            id: entry.id,
+            eventId: entry.eventId,
+            orderNumber: sequentialOrderNumber,
+            machineId: entry.machineId,
+            machineName: entry.machineName,
+            value1,
+            value2,
+            values
           };
         });
       }

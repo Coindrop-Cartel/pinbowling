@@ -111,11 +111,42 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup) {
  * @private
  */
 function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup) {
-  matchupsList.innerHTML = matchups.map(m => {
+  // Group matchups by (player1Id, player2Id) pair.
+  // Team baseball has multiple event_matchups per pair (one per half-inning);
+  // individual baseball has exactly one per pair.
+  const grouped = {};
+  const groupedOrder = [];
+  matchups.forEach(m => {
+    const key = `${m.player1Id ?? 'null'}-${m.player2Id ?? 'null'}`;
+    if (!grouped[key]) {
+      grouped[key] = [];
+      groupedOrder.push(key);
+    }
+    grouped[key].push(m);
+  });
+
+  matchupsList.innerHTML = groupedOrder.map(key => {
+    const pair = grouped[key];
+    const m = pair[0]; // Use first matchup for names, id, status
     const isBye = m.player2Id === null;
-    const winnerHome = m.status === 'completed' && m.winnerId === m.player1Id;
-    const winnerAway = m.status === 'completed' && m.winnerId === m.player2Id;
-    
+
+    // Aggregate scores across all half-innings in the group
+    let totalP1Score = 0;
+    let totalP2Score = 0;
+    let allCompleted = true;
+    let anyCompleted = false;
+    pair.forEach(g => {
+      totalP1Score += Number(g.player1Score ?? 0);
+      totalP2Score += Number(g.player2Score ?? 0);
+      if (g.status === 'completed') anyCompleted = true;
+      else allCompleted = false;
+    });
+
+    const winnerHome = allCompleted && anyCompleted && totalP1Score > totalP2Score;
+    const winnerAway = allCompleted && anyCompleted && totalP2Score > totalP1Score;
+    const isCompleted = allCompleted && anyCompleted;
+    const displayStatus = isCompleted ? 'completed' : 'pending';
+
     return `
       <li class="list-item-row" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
         <div class="matchup-players" style="font-weight: 500;">
@@ -125,9 +156,9 @@ function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup) {
           <span class="meta-muted" style="margin-left: 8px;">(Home)</span>
         </div>
         <div class="matchup-score-badge" style="display: flex; align-items: center; gap: 12px;">
-          ${m.status === 'completed' ? `
+          ${isCompleted ? `
             <span class="badge completed font-bold" style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px;">
-              ${m.player2Score} - ${m.player1Score}
+              ${totalP2Score} - ${totalP1Score}
             </span>
           ` : `
             <span class="badge pending" style="background: #fff3e0; color: #e65100; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;">
@@ -138,7 +169,7 @@ function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup) {
           <div class="matchup-actions" style="display: flex; gap: 8px;">
             ${!isBye ? `
               <button class="play-matchup-btn primary btn-row btn-small" data-matchup-id="${m.id}" data-event-id="${m.eventId}">
-                ${m.status === 'completed' ? 'View/Edit' : 'Play'}
+                ${isCompleted ? 'View/Edit' : 'Play'}
               </button>
             ` : ''}
           </div>

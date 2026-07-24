@@ -130,11 +130,13 @@ class SeasonService {
                     }
                     
                     if ($home !== null) {
-                        // Alternate home/away weekly to be fair
-                        if ($round % 2 === 0) {
-                            $pairings[] = ['home' => $home, 'away' => $away];
-                        } else {
+                        // Alternate home/away weekly to be fair.
+                        // On odd rounds, swap — but only if away is not a BYE null,
+                        // otherwise keep original order so homePlayer is never null.
+                        if ($round % 2 !== 0 && $away !== null) {
                             $pairings[] = ['home' => $away, 'away' => $home];
+                        } else {
+                            $pairings[] = ['home' => $home, 'away' => $away];
                         }
                     }
                 }
@@ -421,7 +423,12 @@ class SeasonService {
                         if ($round % 2 === 0) {
                             $pairings[] = ['home' => $home, 'away' => $away];
                         } else {
-                            $pairings[] = ['home' => $away, 'away' => $home];
+                            if ($away !== null) {
+                                $pairings[] = ['home' => $away, 'away' => $home];
+                            } else {
+                                // BYE on odd round: keep original order to avoid null home
+                                $pairings[] = ['home' => $home, 'away' => $away];
+                            }
                         }
                     }
                 }
@@ -472,28 +479,79 @@ class SeasonService {
                         );
                         $stmt->execute([$eventId, $homePlayer['id']]);
                     } else {
-                        // Normal pending matchup
-                        $stmt = $pdo->prepare(
-                            "INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number)
-                             VALUES (?, ?, ?, 'pending', 1)"
-                        );
-                        $stmt->execute([$eventId, $homePlayer['id'], $awayPlayer['id']]);
-                        $eventMatchupId = (int)$pdo->lastInsertId();
- 
                         // Determine the machine pool for this matchup
                         $matchupMachineIds = $allMachineIds;
                         if (!empty($assignedLocationIds)) {
-                            // Pick a random location from the assigned locations
                             $chosenLocId = (int)$assignedLocationIds[array_rand($assignedLocationIds)];
                             if (!empty($machinesByLocation[$chosenLocId])) {
                                 $matchupMachineIds = $machinesByLocation[$chosenLocId];
                             }
                         }
 
-                        MatchupGenerator::createMatchupSlots(
-                            $pdo, $eventMatchupId,
-                            $rounds, $matchupsPerRound, $matchupMachineIds
-                        );
+                        if ($isTeam) {
+                            // Team baseball: 1 event_matchup per half-inning
+                            $homeTeamMembers = $this->getTeamMembers($pdo, $homePlayer['id']);
+                            $awayTeamMembers = $this->getTeamMembers($pdo, $awayPlayer['id']);
+                            $homeTeamSize = count($homeTeamMembers);
+                            $awayTeamSize = count($awayTeamMembers);
+
+                            for ($inning = 1; $inning <= $rounds; $inning++) {
+                                // Top half: Away team bats, Home team pitches
+                                $topMatchupStmt = $pdo->prepare(
+                                    'INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number, round_name)
+                                     VALUES (?, ?, ?, \'pending\', ?, ?)'
+                                );
+                                $topMatchupStmt->execute([$eventId, $homePlayer['id'], $awayPlayer['id'], $inning, "Top $inning"]);
+                                $topMatchupId = (int)$pdo->lastInsertId();
+
+                                $halfInningNum = ($inning - 1) * 2;
+                                $startIdx = $halfInningNum % max($awayTeamSize, 1);
+                                $awayBatters = [];
+                                for ($b = 0; $b < $matchupsPerRound; $b++) {
+                                    $idx = ($startIdx + $b) % $awayTeamSize;
+                                    $awayBatters[] = $awayTeamMembers[$idx]['id'];
+                                }
+                                $topMachines = MatchupGenerator::selectMachines($matchupMachineIds, $matchupsPerRound);
+                                MatchupGenerator::createMatchupSlots(
+                                    $pdo, $topMatchupId,
+                                    1, $matchupsPerRound, $topMachines, $awayBatters
+                                );
+
+                                // Bottom half: Home team bats, Away team pitches
+                                $bottomMatchupStmt = $pdo->prepare(
+                                    'INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number, round_name)
+                                     VALUES (?, ?, ?, \'pending\', ?, ?)'
+                                );
+                                $bottomMatchupStmt->execute([$eventId, $homePlayer['id'], $awayPlayer['id'], $inning, "Bottom $inning"]);
+                                $bottomMatchupId = (int)$pdo->lastInsertId();
+
+                                $halfInningNum = ($inning - 1) * 2 + 1;
+                                $startIdx = $halfInningNum % max($homeTeamSize, 1);
+                                $homeBatters = [];
+                                for ($b = 0; $b < $matchupsPerRound; $b++) {
+                                    $idx = ($startIdx + $b) % $homeTeamSize;
+                                    $homeBatters[] = $homeTeamMembers[$idx]['id'];
+                                }
+                                $bottomMachines = MatchupGenerator::selectMachines($matchupMachineIds, $matchupsPerRound);
+                                MatchupGenerator::createMatchupSlots(
+                                    $pdo, $bottomMatchupId,
+                                    1, $matchupsPerRound, $bottomMachines, $homeBatters
+                                );
+                            }
+                        } else {
+                            // Individual baseball: existing logic
+                            $stmt = $pdo->prepare(
+                                "INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number)
+                                 VALUES (?, ?, ?, 'pending', 1)"
+                            );
+                            $stmt->execute([$eventId, $homePlayer['id'], $awayPlayer['id']]);
+                            $eventMatchupId = (int)$pdo->lastInsertId();
+
+                            MatchupGenerator::createMatchupSlots(
+                                $pdo, $eventMatchupId,
+                                $rounds, $matchupsPerRound, $matchupMachineIds
+                            );
+                        }
                     }
                 }
             }

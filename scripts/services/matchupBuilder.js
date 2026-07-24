@@ -303,6 +303,7 @@ export function enrichTeamMatchupEntries(entries, matchupWrapper, awayTeamMember
   const enriched = entries.map((entry, idx) => {
     const batterId = Number(entry.playerId ?? entry.player_id ?? 0);
     const batterMember = memberMap[batterId] || battingMembers[idx] || battingMembers[0];
+    const pitcherMember = pitchingMembers[idx] || pitchingMembers[0];
 
     return {
       ...entry,
@@ -313,6 +314,7 @@ export function enrichTeamMatchupEntries(entries, matchupWrapper, awayTeamMember
       slotIndex: idx,
       playerOrder: idx + 1,
       opponentTeamId: pitchingTeamId,
+      opponentPlayerId: pitcherMember?.id ?? 0,
     };
   });
 

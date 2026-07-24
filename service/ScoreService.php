@@ -99,6 +99,8 @@ class ScoreService
      * @param int|null $ball2
      * @param int|null $ball3
      * @param int|null $eventMatchupId
+     * @param int|null $player1Score Pre-computed matchup total for player1 (Home). When provided, skips server-side recalculation.
+     * @param int|null $player2Score Pre-computed matchup total for player2 (Away). When provided, skips server-side recalculation.
      * @return bool
      */
     public function saveScore(
@@ -109,7 +111,9 @@ class ScoreService
         ?int $ball1 = null,
         ?int $ball2 = null,
         ?int $ball3 = null,
-        ?int $eventMatchupId = null
+        ?int $eventMatchupId = null,
+        ?int $player1Score = null,
+        ?int $player2Score = null
     ): bool {
         $pdo = $this->db->getPdo();
 
@@ -144,7 +148,7 @@ class ScoreService
 
         // If eventMatchupId is set, check if we need to auto-calculate the total/winner of the matchup
         if ($eventMatchupId !== null) {
-            $this->updateMatchupTotals($eventMatchupId);
+            $this->updateMatchupTotals($eventMatchupId, $player1Score, $player2Score);
         }
 
         return true;
@@ -153,9 +157,15 @@ class ScoreService
     /**
      * Re-calculate runs and winner for a matchup once scores are updated.
      *
+     * When pre-computed totals are provided (from the JS scoring engine), they are used
+     * directly instead of re-calculating server-side. This eliminates the dual-implementation
+     * risk between JS and PHP run calculations.
+     *
      * @param int $eventMatchupId
+     * @param int|null $player1Score Pre-computed total for player1 (Home)
+     * @param int|null $player2Score Pre-computed total for player2 (Away)
      */
-    private function updateMatchupTotals(int $eventMatchupId): void
+    private function updateMatchupTotals(int $eventMatchupId, ?int $player1Score = null, ?int $player2Score = null): void
     {
         $pdo = $this->db->getPdo();
 
@@ -182,7 +192,62 @@ class ScoreService
             return;
         }
 
-        // Individual mode: requires both player IDs
+        // Use pre-computed totals when provided (single source of truth from JS engine)
+        if ($player1Score !== null && $player2Score !== null) {
+            $hasScores = ($player1Score > 0 || $player2Score > 0);
+
+            // Determine status: check if all scores have been entered
+            $status = 'pending';
+            $winnerId = null;
+
+            if ($hasScores) {
+                // Fetch scores to check if all slots are filled
+                $scores = $this->getMatchupScores($eventMatchupId);
+                $scoreMap = [];
+                foreach ($scores as $s) {
+                    $scoreMap[(int) $s['player_id']][(int) $s['order_number']] = $s;
+                }
+
+                $roundsCount = (int) (count($slots) / 2);
+                $allPlayed = true;
+                for ($round = 1; $round <= $roundsCount; $round++) {
+                    $topOrderNum    = ($round - 1) * 2 + 1;
+                    $bottomOrderNum = ($round - 1) * 2 + 2;
+                    if (
+                        !isset($scoreMap[$player1Id][$topOrderNum]) ||
+                        !isset($scoreMap[$player2Id][$topOrderNum]) ||
+                        !isset($scoreMap[$player1Id][$bottomOrderNum]) ||
+                        !isset($scoreMap[$player2Id][$bottomOrderNum])
+                    ) {
+                        $allPlayed = false;
+                        break;
+                    }
+                }
+
+                if ($allPlayed) {
+                    $status = 'completed';
+                    if ($player1Score > $player2Score) {
+                        $winnerId = $player1Id;
+                    } elseif ($player2Score > $player1Score) {
+                        $winnerId = $player2Id;
+                    }
+                }
+            }
+
+            $stmt = $pdo->prepare(
+                'UPDATE event_matchups 
+                 SET player1_score = ?, player2_score = ?, winner_id = ?, status = ? 
+                 WHERE id = ?'
+            );
+            $stmt->execute([$player1Score, $player2Score, $winnerId, $status, $eventMatchupId]);
+
+            if ($status === 'completed') {
+                $this->playoffService->handlePlayoffAdvancement($eventMatchupId);
+            }
+            return;
+        }
+
+        // Fallback: server-side calculation when no pre-computed totals provided
         if (!$player1Id || !$player2Id) {
             return; // BYE week or incomplete matchup
         }
@@ -320,8 +385,11 @@ class ScoreService
      *
      * Each event_matchup represents one half-inning. Matchup rows have player_id
      * (the batter). Scores are keyed by player_id. Pitcher scores are 0 (not entered).
+     *
+     * Rounds per game = number of innings. Matchups per round = at-bats per half-inning.
+     * All at-bats in a half-inning share the same machine and target scores.
      */
-    private function updateTeamMatchupTotals(PDO $pdo, array $matchup, array $slots, int $eventMatchupId): void
+    private function updateTeamMatchupTotals($pdo, array $matchup, array $slots, int $eventMatchupId): void
     {
         $scores = $this->getMatchupScores($eventMatchupId);
         $scoreMap = [];
@@ -329,7 +397,8 @@ class ScoreService
             $scoreMap[(int) $s['player_id']][(int) $s['order_number']] = $s;
         }
 
-        // Fetch target scores for this event
+        // Fetch target scores for this event, keyed by machine_id since
+        // all matchups in a half-inning share the same machine/target.
         $stmt = $pdo->prepare(
             'SELECT ts.*, m.machine_name
              FROM target_scores ts
@@ -338,9 +407,13 @@ class ScoreService
         );
         $stmt->execute([$matchup['event_id']]);
         $machines = $stmt->fetchAll();
-        $machineMap = [];
+        $targetByMachine = [];
         foreach ($machines as $mac) {
-            $machineMap[(int) $mac['order_number']] = $mac;
+            $machineId = (int) $mac['machine_id'];
+            // Keep first target per machine (all matchups on same machine share targets)
+            if (!isset($targetByMachine[$machineId])) {
+                $targetByMachine[$machineId] = $mac;
+            }
         }
 
         $totalRuns = 0;
@@ -350,11 +423,12 @@ class ScoreService
         foreach ($slots as $slot) {
             $orderNum = (int) $slot['order_number'];
             $batterId = (int) $slot['player_id'];
+            $machineId = (int) $slot['machine_id'];
             $batterEntry = $scoreMap[$batterId][$orderNum] ?? null;
 
             if ($batterEntry) {
                 $hasScores = true;
-                $target = $machineMap[$orderNum] ?? $defaultTarget;
+                $target = $targetByMachine[$machineId] ?? $defaultTarget;
                 $emptyPitcher = ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
                 $totalRuns += $this->calculateRunsForHalfRound($target, $batterEntry, $emptyPitcher);
             }

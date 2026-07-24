@@ -270,7 +270,9 @@ export class BaseballEngine extends ScoringEngine {
     return {
       turnResults: results,
       total: runningTotal,
-      totalDisplay: this.formatTotalScore(runningTotal)
+      totalDisplay: this.formatTotalScore(runningTotal),
+      homeScore,
+      awayScore
     };
   }
 
@@ -342,10 +344,11 @@ export class BaseballEngine extends ScoringEngine {
         const orderStr = String(entry.orderNumber);
         const playerEntry = scoreMap?.[orderStr] || { ball1: 0, ball2: 0, ball3: 0 };
 
-        // Find opponent scores for this entry
-        const entryPlayerId = Number(entry.playerId ?? entry.player_id ?? 0);
-        const entryOpponentId = Number(entry.opponentId ?? 0);
-        const opponentScores = scoresByPlayer[entryOpponentId] || scoresByPlayer[String(entryOpponentId)] || [];
+        // Find opponent (pitcher) scores for this entry
+        const opponentPlayerId = Number(entry.opponentPlayerId ?? 0);
+        const opponentScores = opponentPlayerId
+          ? (scoresByPlayer[opponentPlayerId] || scoresByPlayer[String(opponentPlayerId)] || [])
+          : [];
         const opponentRow = opponentScores.find(s => Number(s.orderNumber ?? s.order_number) === entry.orderNumber);
         const opponentEntry = opponentRow
           ? { ball1: Number(opponentRow.ball1), ball2: Number(opponentRow.ball2), ball3: Number(opponentRow.ball3) }
@@ -356,7 +359,7 @@ export class BaseballEngine extends ScoringEngine {
         const entryTeamId = Number(entry.teamId ?? entry.team_id ?? 0);
         const isBatter = isTop
           ? entryTeamId === Number(eventMatchups?.[0]?.player2Id ?? eventMatchups?.[0]?.player2_id ?? 0)
-          : entryTeamId === Number(eventMatchups?.[0]?.playerId ?? eventMatchups?.[0]?.player_id ?? 0);
+          : entryTeamId === Number(eventMatchups?.[0]?.player1Id ?? eventMatchups?.[0]?.player1_id ?? 0);
 
         const turn = this.getInningData(entry, isBatter ? playerEntry : opponentEntry, isBatter ? opponentEntry : playerEntry, isBatter, true);
 
@@ -598,39 +601,39 @@ export class BaseballEngine extends ScoringEngine {
    * @returns {Object} The enriched score map with opponent data.
    */
   enrichScoreMap(scoreMap, context) {
-    const { allEventScores, eventMatchups, getCurrentPlayerId, normalizeScores, groupScoresByPlayer } = context;
+    const { allEventScores, eventMatchups, getCurrentPlayerId, normalizeScores, groupScoresByPlayer, activeLeague, enrichedEntries } = context;
     const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
     const selectedPlayerId = getCurrentPlayerId();
 
-    // Check if this is a team matchup
-    const entries = eventMatchups?.[0]?.entries || [];
-    const isTeamMode = entries.length > 0 && (entries[0].teamId !== undefined || entries[0].team_id !== undefined);
+    const isTeamMode = activeLeague?.participationType === 'team';
 
     if (isTeamMode) {
-      // For team mode: build opponent map from the specific matchup entries
-      // that correspond to the current player's opponents
-      const opponentMap = {};
-      entries.forEach(entry => {
-        const entryPlayerId = Number(entry.playerId ?? entry.player_id ?? 0);
-        const entryOpponentId = Number(entry.opponentId ?? 0);
-        const orderStr = String(entry.orderNumber ?? entry.order_number);
+      // Team mode: use enriched entries (have opponentPlayerId) for opponent lookup
+      const allEntries = enrichedEntries || (eventMatchups || []).flatMap(em => em.entries || []);
 
-        if (entryPlayerId === Number(selectedPlayerId)) {
-          // This entry belongs to the current player - find opponent scores
-          const opponentScores = scoresByPlayer[entryOpponentId] || scoresByPlayer[String(entryOpponentId)] || [];
-          const opponentRow = opponentScores.find(s => Number(s.orderNumber ?? s.order_number) === Number(entry.orderNumber ?? entry.order_number));
-          if (opponentRow) {
-            opponentMap[orderStr] = {
-              ball1: Number(opponentRow.ball1),
-              ball2: Number(opponentRow.ball2),
-              ball3: Number(opponentRow.ball3)
-            };
-          }
+      // Build opponent map: for each entry, look up the pitcher's scores by opponentPlayerId
+      const opponentMap = {};
+      allEntries.forEach(entry => {
+        const entryPlayerId = Number(entry.playerId ?? entry.player_id ?? 0);
+        if (entryPlayerId !== Number(selectedPlayerId)) return;
+
+        const opponentPlayerId = Number(entry.opponentPlayerId ?? 0);
+        if (!opponentPlayerId) return;
+
+        const orderStr = String(entry.orderNumber ?? entry.order_number);
+        const opponentScores = scoresByPlayer[opponentPlayerId] || scoresByPlayer[String(opponentPlayerId)] || [];
+        const opponentRow = opponentScores.find(s => Number(s.orderNumber ?? s.order_number) === Number(entry.orderNumber ?? entry.order_number));
+        if (opponentRow) {
+          opponentMap[orderStr] = {
+            ball1: Number(opponentRow.ball1),
+            ball2: Number(opponentRow.ball2),
+            ball3: Number(opponentRow.ball3)
+          };
         }
       });
 
       scoreMap.opponent = opponentMap;
-      scoreMap.isPlayer1 = true; // Team mode doesn't use this flag
+      scoreMap.isPlayer1 = true;
       scoreMap.isTeamMode = true;
       return scoreMap;
     }
@@ -666,9 +669,7 @@ export class BaseballEngine extends ScoringEngine {
     const { eventMatchups, getCurrentPlayerId, allPlayersCache, activeLeague } = context;
     const currentPlayerId = Number(getCurrentPlayerId());
     
-    // Check if this is a team matchup by looking at the matchup entries
-    const entries = eventMatchups?.[0]?.entries || [];
-    const isTeamMode = entries.length > 0 && (entries[0].teamId !== undefined || entries[0].team_id !== undefined);
+    const isTeamMode = activeLeague?.participationType === 'team';
 
     let result;
     if (isTeamMode) {
