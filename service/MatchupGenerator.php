@@ -58,19 +58,31 @@ class MatchupGenerator {
         int $rounds,
         int $matchupsPerRound,
         array $allMachineIds,
-        array $playerIds = []
+        array $playerIds = [],
+        array $player1Ids = [],
+        array $player2Ids = []
     ): void {
         $totalSlots = $rounds * $matchupsPerRound;
         $machineSlots = self::selectMachines($allMachineIds, $totalSlots);
 
-        // Fetch event_id from event_matchups
-        $stmt = $pdo->prepare('SELECT event_id FROM event_matchups WHERE id = ?');
+        // Fetch event_id, location_id, and scoring_format from event_matchups
+        $stmt = $pdo->prepare(
+            'SELECT e.id as event_id, e.location_id, e.scoring_format as event_format, l.scoring_format as league_format
+             FROM event_matchups em
+             JOIN events e ON em.event_id = e.id
+             LEFT JOIN leagues l ON e.league_id = l.id
+             WHERE em.id = ?'
+        );
         $stmt->execute([$eventMatchupId]);
-        $eventId = (int)$stmt->fetchColumn();
+        $eventRow = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $eventId = (int)($eventRow['event_id'] ?? 0);
+        $eventLocationId = !empty($eventRow['location_id']) ? (int)$eventRow['location_id'] : null;
+        $format = !empty($eventRow['event_format']) ? $eventRow['event_format'] : (!empty($eventRow['league_format']) ? $eventRow['league_format'] : 'baseball');
 
         $stmt = $pdo->prepare(
-            'INSERT INTO matchups (event_matchup_id, order_number, machine_id, player_id)
-             VALUES (?, ?, ?, ?)'
+            'INSERT INTO matchups (event_matchup_id, order_number, machine_id, player1_id, player2_id)
+             VALUES (?, ?, ?, ?, ?)'
         );
 
         $tsStmt = $pdo->prepare(
@@ -93,10 +105,12 @@ class MatchupGenerator {
         foreach ($machineSlots as $i => $machineId) {
             $orderNum = $i + 1;
             $playerId = !empty($playerIds) ? ($playerIds[$i % count($playerIds)] ?? null) : null;
-            $stmt->execute([$eventMatchupId, $orderNum, $machineId, $playerId]);
+            $p1Id = !empty($player1Ids) ? ($player1Ids[$i % count($player1Ids)] ?? null) : $playerId;
+            $p2Id = !empty($player2Ids) ? ($player2Ids[$i % count($player2Ids)] ?? null) : null;
+            $stmt->execute([$eventMatchupId, $orderNum, $machineId, $p1Id, $p2Id]);
 
             if ($eventId) {
-                $targetScores = self::getBaseballTargetScoreForMachine($pdo, $machineId);
+                $targetScores = TargetResolver::resolveTarget($pdo, $machineId, $format, 'medium', $eventLocationId);
                 $value1 = $targetScores['value1'] ?? 5000000;
                 $value2 = $targetScores['value2'] ?? 1.5;
 
@@ -113,46 +127,6 @@ class MatchupGenerator {
                 ]);
             }
         }
-    }
-
-    /**
-     * Helper to retrieve machine-specific target scores for baseball or default to 5,000,000 / 1.5.
-     */
-    private static function getBaseballTargetScoreForMachine(PDO $pdo, int $machineId): array {
-        // 1. Check location_machine_scores
-        $stmt = $pdo->prepare(
-            'SELECT lms.target_easy, lms.target_med
-             FROM location_machine_scores lms
-             JOIN location_machines lm ON lms.location_machine_id = lm.id
-             WHERE lm.machine_id = ? AND lms.format = \'baseball\'
-             LIMIT 1'
-        );
-        $stmt->execute([$machineId]);
-        $row = $stmt->fetch();
-        if ($row && !empty($row['target_easy'])) {
-            return [
-                'value1' => (int)$row['target_easy'],
-                'value2' => 1.5
-            ];
-        }
-
-        // 2. Check machine_scores
-        $stmt = $pdo->prepare(
-            'SELECT target_easy, target_med
-             FROM machine_scores
-             WHERE machine_id = ? AND format = \'baseball\'
-             LIMIT 1'
-        );
-        $stmt->execute([$machineId]);
-        $row = $stmt->fetch();
-        if ($row && !empty($row['target_easy'])) {
-            return [
-                'value1' => (int)$row['target_easy'],
-                'value2' => 1.5
-            ];
-        }
-
-        return ['value1' => 5000000, 'value2' => 1.5];
     }
 }
 

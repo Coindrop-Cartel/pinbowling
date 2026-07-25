@@ -21,11 +21,13 @@ class MatchupService {
     public function getEventMatchups(int $eventId): array {
         $stmt = $this->db->query(
             'SELECT m.*, mac.machine_name, em.event_id,
-                    p.player_name as player_name
+                    p1.player_name as player1_name,
+                    p2.player_name as player2_name
              FROM matchups m
              JOIN event_matchups em ON m.event_matchup_id = em.id
              JOIN machines mac ON m.machine_id = mac.id
-             LEFT JOIN players p ON m.player_id = p.id
+             LEFT JOIN players p1 ON m.player1_id = p1.id
+             LEFT JOIN players p2 ON m.player2_id = p2.id
              WHERE em.event_id = ?
              ORDER BY m.order_number ASC, m.id ASC',
             [$eventId]
@@ -42,10 +44,12 @@ class MatchupService {
     public function getMatchupEntries(int $eventMatchupId): array {
         $stmt = $this->db->query(
             'SELECT m.*, mac.machine_name,
-                    p.player_name as player_name
+                    p1.player_name as player1_name,
+                    p2.player_name as player2_name
              FROM matchups m
              JOIN machines mac ON m.machine_id = mac.id
-             LEFT JOIN players p ON m.player_id = p.id
+             LEFT JOIN players p1 ON m.player1_id = p1.id
+             LEFT JOIN players p2 ON m.player2_id = p2.id
              WHERE m.event_matchup_id = ?
              ORDER BY m.order_number ASC, m.id ASC',
             [$eventMatchupId]
@@ -67,9 +71,11 @@ class MatchupService {
                     COALESCE(p2.player_name, t2.name) as player2_name,
                     COALESCE(p3.player_name, t3.name) as player3_name,
                     COALESCE(p4.player_name, t4.name) as player4_name,
-                    w.player_name as winner_name
+                    w.player_name as winner_name,
+                    loc.name as location_name
              FROM event_matchups em
              JOIN events e ON em.event_id = e.id
+             LEFT JOIN locations loc ON COALESCE(em.location_id, e.location_id, (SELECT ll.location_id FROM league_locations ll WHERE ll.league_id = e.league_id LIMIT 1)) = loc.id
              LEFT JOIN players p1 ON em.player1_id = p1.id
              LEFT JOIN players p2 ON em.player2_id = p2.id
              LEFT JOIN players p3 ON em.player3_id = p3.id
@@ -94,10 +100,12 @@ class MatchupService {
     public function getMatchup(int $matchupId) {
         $stmt = $this->db->query(
             'SELECT m.*, mac.machine_name,
-                    p.player_name as player_name
+                    p1.player_name as player1_name,
+                    p2.player_name as player2_name
              FROM matchups m
              JOIN machines mac ON m.machine_id = mac.id
-             LEFT JOIN players p ON m.player_id = p.id
+             LEFT JOIN players p1 ON m.player1_id = p1.id
+             LEFT JOIN players p2 ON m.player2_id = p2.id
              WHERE m.id = ?',
             [$matchupId]
         );
@@ -108,7 +116,7 @@ class MatchupService {
      * Save or update multiple matchups.
      *
      * Each matchup row represents a machine assigned to a half-inning slot:
-     *   eventMatchupId, orderNumber, machineId.
+     *   eventMatchupId, orderNumber, machineId, player1Id, player2Id.
      * The unique key (event_matchup_id, order_number) drives the upsert.
      *
      * @param array $matchups Array of matchup data
@@ -121,17 +129,20 @@ class MatchupService {
             $pdo->beginTransaction();
 
             $stmt = $pdo->prepare(
-                'INSERT INTO matchups (event_matchup_id, order_number, machine_id, player_id)
-                 VALUES (?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), player_id = VALUES(player_id)'
+                'INSERT INTO matchups (event_matchup_id, order_number, machine_id, player1_id, player2_id)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), player1_id = VALUES(player1_id), player2_id = VALUES(player2_id)'
             );
 
             foreach ($matchups as $m) {
+                $p1 = $m['player1Id'] ?? $m['player1_id'] ?? $m['playerId'] ?? $m['player_id'] ?? null;
+                $p2 = $m['player2Id'] ?? $m['player2_id'] ?? null;
                 $stmt->execute([
-                    $m['eventMatchupId'] ?? null,
-                    $m['orderNumber'] ?? 0,
-                    $m['machineId'] ?? 0,
-                    $m['playerId'] ?? null
+                    $m['eventMatchupId'] ?? $m['event_matchup_id'] ?? null,
+                    $m['orderNumber'] ?? $m['order_number'] ?? 0,
+                    $m['machineId'] ?? $m['machine_id'] ?? 0,
+                    $p1,
+                    $p2
                 ]);
             }
 

@@ -29,7 +29,7 @@ export function renderMatchupSchedule(matchupsList, event, { onPlayMatchup }) {
   if (isPlayoffs) {
     _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup);
   } else {
-    _renderRegularSchedule(matchupsList, matchups, onPlayMatchup);
+    _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, event);
   }
 
   // Bind play/view buttons
@@ -110,71 +110,89 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup) {
  * Renders the regular season matchup schedule.
  * @private
  */
-function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup) {
-  // Group matchups by (player1Id, player2Id) pair.
-  // Team baseball has multiple event_matchups per pair (one per half-inning);
-  // individual baseball has exactly one per pair.
-  const grouped = {};
-  const groupedOrder = [];
+function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, event = null) {
+  // Group matchups by location, then by (player1Id, player2Id) pair.
+  const locationGroups = {};
+  const locationOrder = [];
+
   matchups.forEach(m => {
-    const key = `${m.player1Id ?? 'null'}-${m.player2Id ?? 'null'}`;
-    if (!grouped[key]) {
-      grouped[key] = [];
-      groupedOrder.push(key);
+    const locName = m.locationName || m.location_name || event?.locationName || event?.location_name || 'Location Not Specified';
+    if (!locationGroups[locName]) {
+      locationGroups[locName] = { grouped: {}, groupedOrder: [] };
+      locationOrder.push(locName);
     }
-    grouped[key].push(m);
+    const locGroup = locationGroups[locName];
+    const key = `${m.player1Id ?? 'null'}-${m.player2Id ?? 'null'}`;
+    if (!locGroup.grouped[key]) {
+      locGroup.grouped[key] = [];
+      locGroup.groupedOrder.push(key);
+    }
+    locGroup.grouped[key].push(m);
   });
 
-  matchupsList.innerHTML = groupedOrder.map(key => {
-    const pair = grouped[key];
-    const m = pair[0]; // Use first matchup for names, id, status
-    const isBye = m.player2Id === null;
+  matchupsList.innerHTML = locationOrder.map(locName => {
+    const { grouped, groupedOrder } = locationGroups[locName];
+    const matchupsHtml = groupedOrder.map(key => {
+      const pair = grouped[key];
+      const m = pair[0]; // Use first matchup for names, id, status
+      const isBye = m.player2Id === null;
 
-    // Aggregate scores across all half-innings in the group
-    let totalP1Score = 0;
-    let totalP2Score = 0;
-    let allCompleted = true;
-    let anyCompleted = false;
-    pair.forEach(g => {
-      totalP1Score += Number(g.player1Score ?? 0);
-      totalP2Score += Number(g.player2Score ?? 0);
-      if (g.status === 'completed') anyCompleted = true;
-      else allCompleted = false;
-    });
+      // Aggregate scores across all half-innings in the group
+      let totalP1Score = 0;
+      let totalP2Score = 0;
+      let allCompleted = true;
+      let anyCompleted = false;
+      pair.forEach(g => {
+        totalP1Score += Number(g.player1Score ?? 0);
+        totalP2Score += Number(g.player2Score ?? 0);
+        if (g.status === 'completed') anyCompleted = true;
+        else allCompleted = false;
+      });
 
-    const winnerHome = allCompleted && anyCompleted && totalP1Score > totalP2Score;
-    const winnerAway = allCompleted && anyCompleted && totalP2Score > totalP1Score;
-    const isCompleted = allCompleted && anyCompleted;
-    const displayStatus = isCompleted ? 'completed' : 'pending';
+      const winnerHome = allCompleted && anyCompleted && totalP1Score > totalP2Score;
+      const winnerAway = allCompleted && anyCompleted && totalP2Score > totalP1Score;
+      const isCompleted = allCompleted && anyCompleted;
+
+      return `
+        <li class="list-item-row" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
+          <div class="matchup-players" style="font-weight: 500;">
+            <span class="${winnerAway ? 'font-bold' : ''}" style="${winnerAway ? 'color: #2e7d32;' : ''}">${escapeHTML(m.player2Name || 'BYE')}</span> 
+            <span class="meta-muted" style="margin: 0 8px;">(Away) vs</span> 
+            <span class="${winnerHome ? 'font-bold' : ''}" style="${winnerHome ? 'color: #2e7d32;' : ''}">${escapeHTML(m.player1Name)}</span>
+            <span class="meta-muted" style="margin-left: 8px;">(Home)</span>
+          </div>
+          <div class="matchup-score-badge" style="display: flex; align-items: center; gap: 12px;">
+            ${isCompleted ? `
+              <span class="badge completed font-bold" style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px;">
+                ${totalP2Score} - ${totalP1Score}
+              </span>
+            ` : `
+              <span class="badge pending" style="background: #fff3e0; color: #e65100; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;">
+                Pending
+              </span>
+            `}
+            
+            <div class="matchup-actions" style="display: flex; gap: 8px;">
+              ${!isBye ? `
+                <button class="play-matchup-btn primary btn-row btn-small" data-matchup-id="${m.id}" data-event-id="${m.eventId}">
+                  ${isCompleted ? 'View/Edit' : 'Play'}
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        </li>
+      `;
+    }).join('');
 
     return `
-      <li class="list-item-row" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
-        <div class="matchup-players" style="font-weight: 500;">
-          <span class="${winnerAway ? 'font-bold' : ''}" style="${winnerAway ? 'color: #2e7d32;' : ''}">${escapeHTML(m.player2Name || 'BYE')}</span> 
-          <span class="meta-muted" style="margin: 0 8px;">(Away) vs</span> 
-          <span class="${winnerHome ? 'font-bold' : ''}" style="${winnerHome ? 'color: #2e7d32;' : ''}">${escapeHTML(m.player1Name)}</span>
-          <span class="meta-muted" style="margin-left: 8px;">(Home)</span>
-        </div>
-        <div class="matchup-score-badge" style="display: flex; align-items: center; gap: 12px;">
-          ${isCompleted ? `
-            <span class="badge completed font-bold" style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px;">
-              ${totalP2Score} - ${totalP1Score}
-            </span>
-          ` : `
-            <span class="badge pending" style="background: #fff3e0; color: #e65100; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;">
-              Pending
-            </span>
-          `}
-          
-          <div class="matchup-actions" style="display: flex; gap: 8px;">
-            ${!isBye ? `
-              <button class="play-matchup-btn primary btn-row btn-small" data-matchup-id="${m.id}" data-event-id="${m.eventId}">
-                ${isCompleted ? 'View/Edit' : 'Play'}
-              </button>
-            ` : ''}
-          </div>
-        </div>
-      </li>
+      <div class="location-matchup-group mb-15">
+        <h4 style="margin: 0 0 8px 0; color: #212121; font-size: 1.05em; font-weight: 600; border-bottom: 2px solid #e0e0e0; padding-bottom: 4px;">
+          ${escapeHTML(locName)}
+        </h4>
+        <ul class="matchup-group-list" style="list-style: none; padding: 0; margin: 0;">
+          ${matchupsHtml}
+        </ul>
+      </div>
     `;
   }).join('');
 }

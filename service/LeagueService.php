@@ -114,11 +114,12 @@ class LeagueService {
 
         // Fetch players
         $stmt = $pdo->prepare(
-            'SELECT p.id, p.player_name, p.ifpa_id, u.id as user_id 
+            'SELECT DISTINCT p.id, p.player_name, p.ifpa_id, u.id as user_id 
              FROM players p 
-             JOIN league_players lp ON p.id = lp.player_id 
+             JOIN team_members tm ON p.id = tm.player_id
+             JOIN league_teams lt ON tm.team_id = lt.team_id
              LEFT JOIN users u ON p.id = u.player_id 
-             WHERE lp.league_id = ? 
+             WHERE lt.league_id = ? 
              ORDER BY p.player_name ASC'
         );
         $stmt->execute([$leagueId]);
@@ -161,10 +162,16 @@ class LeagueService {
         $pdo = $this->db->getPdo();
 
         $sql = 'SELECT * FROM leagues';
-        if ($type) $sql .= ' WHERE type = ?';
+        $params = [];
+        if ($type === 'standard' || $type === 'league') {
+            $sql .= ' WHERE (type != \'session\' OR type IS NULL)';
+        } elseif ($type && $type !== 'all') {
+            $sql .= ' WHERE type = ?';
+            $params[] = $type;
+        }
         $sql .= ' ORDER BY start_date DESC';
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($type ? [$type] : []);
+        $stmt->execute($params);
         $leagues = $stmt->fetchAll();
 
         $emStmt = $pdo->query(
@@ -173,8 +180,11 @@ class LeagueService {
                     COALESCE(p2.player_name, t2.name) as player2_name,
                     COALESCE(p3.player_name, t3.name) as player3_name,
                     COALESCE(p4.player_name, t4.name) as player4_name,
-                    w.player_name as winner_name
+                    w.player_name as winner_name,
+                    loc.name as location_name
              FROM event_matchups em
+             JOIN events e ON em.event_id = e.id
+             LEFT JOIN locations loc ON COALESCE(em.location_id, e.location_id, (SELECT ll.location_id FROM league_locations ll WHERE ll.league_id = e.league_id LIMIT 1)) = loc.id
              LEFT JOIN players p1 ON em.player1_id = p1.id
              LEFT JOIN players p2 ON em.player2_id = p2.id
              LEFT JOIN players p3 ON em.player3_id = p3.id
@@ -199,9 +209,10 @@ class LeagueService {
         }
 
         $lpStmt = $pdo->query(
-            'SELECT lp.league_id, p.id, p.player_name, p.ifpa_id, u.id as user_id
+            'SELECT DISTINCT lt.league_id, p.id, p.player_name, p.ifpa_id, u.id as user_id
              FROM players p
-             JOIN league_players lp ON p.id = lp.player_id
+             JOIN team_members tm ON p.id = tm.player_id
+             JOIN league_teams lt ON tm.team_id = lt.team_id
              LEFT JOIN users u ON p.id = u.player_id
              ORDER BY p.player_name ASC'
         );
@@ -286,7 +297,8 @@ class LeagueService {
         ?int $matchupsPerRound = null,
         ?int $weeklyPoints = null,
         ?int $pointSpread = null,
-        array $locationIds = []
+        array $locationIds = [],
+        int $dropLowestPlayerScores = 0
     ): array {
         if ($scoringFormat === 'baseball' && ($competitionFormat === 'group' || $competitionFormat === 'standard')) {
             throw new \InvalidArgumentException('Baseball scoring format is only supported for head-to-head competitions.');
@@ -296,10 +308,10 @@ class LeagueService {
         try {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare(
-                'INSERT INTO leagues (name, start_date, type, competition_format, participation_type, scoring_format, season_scoring, drop_lowest_weeks, weeks_in_season, rounds_per_game, matchups_per_round, weekly_points, point_spread)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO leagues (name, start_date, type, competition_format, participation_type, scoring_format, season_scoring, drop_lowest_weeks, drop_lowest_player_scores, weeks_in_season, rounds_per_game, matchups_per_round, weekly_points, point_spread)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
-            $stmt->execute([$name, $startDate, $type, $competitionFormat, $participationType, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread]);
+            $stmt->execute([$name, $startDate, $type, $competitionFormat, $participationType, $scoringFormat, $seasonScoring, $dropLowestWeeks, $dropLowestPlayerScores, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread]);
             $leagueId = (int)$pdo->lastInsertId();
             
             $this->syncLeagueLocations($pdo, $leagueId, $locationIds);
@@ -345,7 +357,8 @@ class LeagueService {
         ?int $weeklyPoints = null,
         ?int $pointSpread = null,
         array $locationIds = [],
-        ?string $status = null
+        ?string $status = null,
+        int $dropLowestPlayerScores = 0
     ): array {
         if ($scoringFormat === 'baseball' && ($competitionFormat === 'group' || $competitionFormat === 'standard')) {
             throw new \InvalidArgumentException('Baseball scoring format is only supported for head-to-head competitions.');
@@ -355,8 +368,8 @@ class LeagueService {
         try {
             $pdo->beginTransaction();
 
-            $updateFields = 'SET name = ?, start_date = ?, competition_format = ?, participation_type = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ?, weeks_in_season = ?, rounds_per_game = ?, matchups_per_round = ?, weekly_points = ?, point_spread = ?';
-            $updateParams = [$name, $startDate, $competitionFormat, $participationType, $scoringFormat, $seasonScoring, $dropLowestWeeks, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread];
+            $updateFields = 'SET name = ?, start_date = ?, competition_format = ?, participation_type = ?, scoring_format = ?, season_scoring = ?, drop_lowest_weeks = ?, drop_lowest_player_scores = ?, weeks_in_season = ?, rounds_per_game = ?, matchups_per_round = ?, weekly_points = ?, point_spread = ?';
+            $updateParams = [$name, $startDate, $competitionFormat, $participationType, $scoringFormat, $seasonScoring, $dropLowestWeeks, $dropLowestPlayerScores, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread];
 
             if ($status !== null) {
                 $updateFields .= ', status = ?';
@@ -368,6 +381,14 @@ class LeagueService {
             $stmt->execute($updateParams);
             
             $this->syncLeagueLocations($pdo, $leagueId, $locationIds);
+            
+            // If the league is currently active, automatically update unplayed season weeks
+            // to reflect updated locations, roster, or settings
+            $checkStatusStmt = $pdo->prepare('SELECT status FROM leagues WHERE id = ?');
+            $checkStatusStmt->execute([$leagueId]);
+            if ($checkStatusStmt->fetchColumn() === 'active') {
+                $this->seasonService->updateSeason($leagueId);
+            }
             
             $pdo->commit();
             return $this->getLeague($leagueId);
@@ -443,7 +464,6 @@ class LeagueService {
             }
 
             // Clean up league associations
-            $pdo->prepare("DELETE FROM league_players WHERE league_id = ?")->execute([$leagueId]);
             $pdo->prepare("DELETE FROM league_teams WHERE league_id = ?")->execute([$leagueId]);
             $pdo->prepare("DELETE FROM league_staff WHERE league_id = ?")->execute([$leagueId]);
 

@@ -10,7 +10,7 @@ class ScoreService
     private DatabaseService $db;
     private PlayoffService $playoffService;
 
-    private const SCORE_COLUMNS = 's.id, s.player_id, s.event_id, s.event_matchup_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name';
+    private const SCORE_COLUMNS = 's.id, s.player_id, s.team_id, s.event_id, s.event_matchup_id, s.order_number, s.machine_id, s.ball1, s.ball1_player_id, s.ball2, s.ball2_player_id, s.ball3, s.ball3_player_id, m.machine_name';
 
     public function __construct(DatabaseService $db, PlayoffService $playoffService)
     {
@@ -105,15 +105,19 @@ class ScoreService
      */
     public function saveScore(
         int $eventId,
-        int $playerId,
-        int $machineId,
-        int $orderNumber,
+        ?int $playerId = null,
+        int $machineId = 0,
+        int $orderNumber = 0,
         ?int $ball1 = null,
         ?int $ball2 = null,
         ?int $ball3 = null,
         ?int $eventMatchupId = null,
         ?int $player1Score = null,
-        ?int $player2Score = null
+        ?int $player2Score = null,
+        ?int $teamId = null,
+        ?int $ball1PlayerId = null,
+        ?int $ball2PlayerId = null,
+        ?int $ball3PlayerId = null
     ): bool {
         $pdo = $this->db->getPdo();
 
@@ -125,28 +129,93 @@ class ScoreService
             throw new \Exception('Event not found.');
         }
 
-        // 2. Check if player is a member of the league roster (directly or via team)
-        $stmt = $pdo->prepare(
-            'SELECT 1 FROM league_players WHERE league_id = ? AND player_id = ?
-             UNION
-             SELECT 1 FROM league_teams lt 
-             JOIN team_members tm ON lt.team_id = tm.team_id 
-             WHERE lt.league_id = ? AND tm.player_id = ?'
-        );
-        $stmt->execute([$leagueId, $playerId, $leagueId, $playerId]);
-        if (!$stmt->fetchColumn()) {
-            throw new \Exception('Player is not registered in this league.');
+        // 2. Check roster registration if playerId is provided
+        if ($playerId) {
+            $stmt = $pdo->prepare(
+                'SELECT 1 FROM league_teams lt 
+                 JOIN team_members tm ON lt.team_id = tm.team_id 
+                 WHERE lt.league_id = ? AND tm.player_id = ?'
+            );
+            $stmt->execute([$leagueId, $playerId]);
+            if (!$stmt->fetchColumn()) {
+                throw new \Exception('Player is not registered in this league.');
+            }
         }
 
         $stmt = $pdo->prepare(
-            'INSERT INTO scores (event_id, event_matchup_id, player_id, machine_id, order_number, ball1, ball2, ball3)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE ball1 = VALUES(ball1), ball2 = VALUES(ball2), ball3 = VALUES(ball3)'
+            'INSERT INTO scores (event_id, event_matchup_id, player_id, team_id, machine_id, order_number, ball1, ball1_player_id, ball2, ball2_player_id, ball3, ball3_player_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE ball1 = VALUES(ball1), ball1_player_id = VALUES(ball1_player_id), ball2 = VALUES(ball2), ball2_player_id = VALUES(ball2_player_id), ball3 = VALUES(ball3), ball3_player_id = VALUES(ball3_player_id)'
         );
 
-        $stmt->execute([$eventId, $eventMatchupId, $playerId, $machineId, $orderNumber, $ball1, $ball2, $ball3]);
+        $stmt->execute([$eventId, $eventMatchupId, $playerId, $teamId, $machineId, $orderNumber, $ball1, $ball1PlayerId, $ball2, $ball2PlayerId, $ball3, $ball3PlayerId]);
 
-        // If eventMatchupId is set, check if we need to auto-calculate the total/winner of the matchup
+        if ($eventMatchupId !== null) {
+            $this->updateMatchupTotals($eventMatchupId, $player1Score, $player2Score);
+        }
+
+        return true;
+    }
+
+    /**
+     * Save or update a team-level score (team baseball H2H and similar formats where
+     * the entire team shares one score sheet per round rather than each player
+     * recording their own score).
+     *
+     * @param int $eventId
+     * @param int $teamId
+     * @param int $machineId
+     * @param int $orderNumber
+     * @param int|null $ball1
+     * @param int|null $ball2
+     * @param int|null $ball3
+     * @param int|null $eventMatchupId
+     * @param int|null $player1Score Pre-computed matchup total for player1 (Home).
+     * @param int|null $player2Score Pre-computed matchup total for player2 (Away).
+     * @return bool
+     */
+    public function saveTeamScore(
+        int $eventId,
+        int $teamId,
+        int $machineId,
+        int $orderNumber,
+        ?int $ball1 = null,
+        ?int $ball2 = null,
+        ?int $ball3 = null,
+        ?int $eventMatchupId = null,
+        ?int $player1Score = null,
+        ?int $player2Score = null,
+        ?int $ball1PlayerId = null,
+        ?int $ball2PlayerId = null,
+        ?int $ball3PlayerId = null
+    ): bool {
+        $pdo = $this->db->getPdo();
+
+        // 1. Verify the event exists
+        $stmt = $pdo->prepare('SELECT league_id FROM events WHERE id = ?');
+        $stmt->execute([$eventId]);
+        $leagueId = $stmt->fetchColumn();
+        if (!$leagueId) {
+            throw new \Exception('Event not found.');
+        }
+
+        // 2. Verify the team belongs to the league
+        $stmt = $pdo->prepare(
+            'SELECT 1 FROM league_teams WHERE league_id = ? AND team_id = ?'
+        );
+        $stmt->execute([$leagueId, $teamId]);
+        if (!$stmt->fetchColumn()) {
+            throw new \Exception('Team is not registered in this league.');
+        }
+
+        $stmt = $pdo->prepare(
+            'INSERT INTO scores (event_id, event_matchup_id, team_id, machine_id, order_number, ball1, ball1_player_id, ball2, ball2_player_id, ball3, ball3_player_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE ball1 = VALUES(ball1), ball1_player_id = VALUES(ball1_player_id), ball2 = VALUES(ball2), ball2_player_id = VALUES(ball2_player_id), ball3 = VALUES(ball3), ball3_player_id = VALUES(ball3_player_id)'
+        );
+
+        $stmt->execute([$eventId, $eventMatchupId, $teamId, $machineId, $orderNumber, $ball1, $ball1PlayerId, $ball2, $ball2PlayerId, $ball3, $ball3PlayerId]);
+
         if ($eventMatchupId !== null) {
             $this->updateMatchupTotals($eventMatchupId, $player1Score, $player2Score);
         }
@@ -205,7 +274,8 @@ class ScoreService
                 $scores = $this->getMatchupScores($eventMatchupId);
                 $scoreMap = [];
                 foreach ($scores as $s) {
-                    $scoreMap[(int) $s['player_id']][(int) $s['order_number']] = $s;
+                    $idKey = (int) (($s['team_id'] ?? 0) ?: ($s['player_id'] ?? 0));
+                    $scoreMap[$idKey][(int) $s['order_number']] = $s;
                 }
 
                 $roundsCount = (int) (count($slots) / 2);
@@ -315,7 +385,7 @@ class ScoreService
             $topTarget    = $machineMap[$topOrderNum]    ?? $defaultTarget;
             $bottomTarget = $machineMap[$bottomOrderNum] ?? $defaultTarget;
 
-            $topPlayed = isset($scoreMap[$player1Id][$topOrderNum]) || isset($scoreMap[$player2Id][$topOrderNum]);
+            $topPlayed = isset($scoreMap[$player1Id][$topOrderNum]) && isset($scoreMap[$player2Id][$topOrderNum]);
 
             if ($topTarget) {
                 // Top of round: Player 2 (Away) is batter, Player 1 (Home) is pitcher
@@ -404,7 +474,8 @@ class ScoreService
         $scores = $this->getMatchupScores($eventMatchupId);
         $scoreMap = [];
         foreach ($scores as $s) {
-            $scoreMap[(int) $s['player_id']][(int) $s['order_number']] = $s;
+            $idKey = (int) (($s['team_id'] ?? 0) ?: ($s['player_id'] ?? 0));
+            $scoreMap[$idKey][(int) $s['order_number']] = $s;
         }
 
         // Fetch target scores for this event, keyed by machine_id since

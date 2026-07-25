@@ -228,6 +228,57 @@ export class BowlingEngine extends ScoringEngine {
   }
 
   /**
+   * Calculates team totals across all team members for a full game in Bowling,
+   * applying drop_lowest_player_scores logic (dropping worst/lowest total game scores per player).
+   *
+   * @param {Array<Object>} machines Target definitions for the event.
+   * @param {Object<number|string, Object>} scoreMapByPlayer Dictionary of player scoreMaps keyed by playerId.
+   * @param {Array<Object>} members List of team member objects.
+   * @param {number} dropLowestCount Number of lowest member game totals to drop per game.
+   * @returns {Object}
+   */
+  calculateTeamTurnResults(machines, scoreMapByPlayer = {}, members = [], dropLowestCount = 0) {
+    const memberResults = {};
+    const memberGameTotals = [];
+
+    members.forEach(member => {
+      const pScores = scoreMapByPlayer[member.id] || {};
+      const res = this.calculateTurnResults(machines, pScores);
+      memberResults[member.id] = res;
+      memberGameTotals.push({
+        playerId: member.id,
+        playerName: member.playerName || member.name,
+        total: res.total,
+        totalDisplay: res.totalDisplay,
+        hasScores: res.turnResults.some(t => t.played)
+      });
+    });
+
+    // In Bowling, higher score is better -> sort descending (highest to lowest total)
+    // Worst game scores are at the bottom of the array
+    memberGameTotals.sort((a, b) => b.total - a.total);
+
+    let effectiveMemberTotals = memberGameTotals;
+    let droppedMemberTotals = [];
+
+    if (dropLowestCount > 0 && memberGameTotals.length > dropLowestCount) {
+      effectiveMemberTotals = memberGameTotals.slice(0, memberGameTotals.length - dropLowestCount);
+      droppedMemberTotals = memberGameTotals.slice(memberGameTotals.length - dropLowestCount);
+    }
+
+    const teamGameTotal = effectiveMemberTotals.reduce((sum, m) => sum + m.total, 0);
+
+    return {
+      memberResults,
+      memberGameTotals,
+      effectiveMemberTotals,
+      droppedMemberTotals,
+      total: teamGameTotal,
+      totalDisplay: formatNumber(teamGameTotal)
+    };
+  }
+
+  /**
    * Look-ahead helper for standard bowling math.
    * 
    * @param {number} roundIndex The current frame index.

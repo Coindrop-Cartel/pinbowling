@@ -44,58 +44,106 @@ class ScoreController extends ApiController {
                 break;
 
             case 'POST':
-                if (empty($this->input['eventId']) || empty($this->input['playerId']) || empty($this->input['machineId']) || !isset($this->input['orderNumber'])) {
-                    $this->sendError('eventId, playerId, machineId, and orderNumber are required', 400);
+                $hasTeamId = !empty($this->input['teamId']);
+                $hasPlayerId = !empty($this->input['playerId']);
+
+                if (empty($this->input['eventId']) || (!$hasTeamId && !$hasPlayerId) || empty($this->input['machineId']) || !isset($this->input['orderNumber'])) {
+                    $this->sendError('eventId, machineId, orderNumber, and either teamId or playerId are required', 400);
                 }
 
-                $playerService = $this->container->get(\App\Service\PlayerService::class);
-                $targetPlayer = $playerService->getPlayer((int)$this->input['playerId']);
-                if (!$targetPlayer) {
-                    $this->sendError('Player not found.', 404);
-                }
+                if ($hasTeamId) {
+                    // ── Team-level score save ─────────────────────────────────────
+                    $currentUser = \App\Service\AuthService::getCurrentUser();
+                    $isTD = $currentUser && in_array($currentUser['role'] ?? '', ['admin', 'td']);
 
-                $isTargetUnregistered = ($targetPlayer['user_id'] === null);
+                    if (!$currentUser) {
+                        $this->sendError('Unauthorized: Login required to record team scores.', 401);
+                    }
 
-                $apiSecret = \Configuration::getInstance()->getApiSecret();
-                $providedSecret = getHeader('X-PB-Secret');
-                $hasSecret = ($providedSecret && $providedSecret === $apiSecret);
-                $currentUser = \App\Service\AuthService::getCurrentUser();
-
-                if ($hasSecret) {
-                    // System/Admin override
-                } else if ($currentUser) {
-                    $role = $currentUser['role'] ?? 'player';
-                    if ($role === 'admin' || $role === 'td') {
-                        // TD and Admins can score anyone
-                    } else {
-                        // Logged-in player can score themselves or unregistered players
-                        $isSelf = ((int)$targetPlayer['id'] === (int)$currentUser['player_id']);
-                        if (!$isSelf && !$isTargetUnregistered) {
-                            $this->sendError('Unauthorized: Players can only score themselves or unregistered players.', 401);
+                    if (!$isTD) {
+                        // Verify the current user is a member of the selected team
+                        $pdo = $this->container->get(\App\Service\DatabaseService::class)->getPdo();
+                        $stmt = $pdo->prepare(
+                            'SELECT 1 FROM team_members tm
+                             WHERE tm.team_id = ? AND tm.player_id = ?'
+                        );
+                        $stmt->execute([(int)$this->input['teamId'], (int)$currentUser['player_id']]);
+                        if (!$stmt->fetchColumn()) {
+                            $this->sendError('Unauthorized: You are not a member of this team.', 401);
                         }
                     }
-                } else {
-                    // Guest user (not logged in) can only score unregistered players
-                    if (!$isTargetUnregistered) {
-                        $this->sendError('Unauthorized: Guests can only score unregistered players.', 401);
-                    }
-                }
 
-                $this->scoreService->saveScore(
-                    (int) $this->input['eventId'],
-                    (int) $this->input['playerId'],
-                    (int) $this->input['machineId'],
-                    (int) $this->input['orderNumber'],
-                    $this->input['ball1'] ?? null,
-                    $this->input['ball2'] ?? null,
-                    $this->input['ball3'] ?? null,
-                    isset($this->input['eventMatchupId']) ? (int) $this->input['eventMatchupId'] : null,
-                    isset($this->input['player1Score']) ? (int) $this->input['player1Score'] : null,
-                    isset($this->input['player2Score']) ? (int) $this->input['player2Score'] : null
-                );
+                    $this->scoreService->saveTeamScore(
+                        (int) $this->input['eventId'],
+                        (int) $this->input['teamId'],
+                        (int) $this->input['machineId'],
+                        (int) $this->input['orderNumber'],
+                        $this->input['ball1'] ?? null,
+                        $this->input['ball2'] ?? null,
+                        $this->input['ball3'] ?? null,
+                        isset($this->input['eventMatchupId']) ? (int) $this->input['eventMatchupId'] : null,
+                        isset($this->input['player1Score']) ? (int) $this->input['player1Score'] : null,
+                        isset($this->input['player2Score']) ? (int) $this->input['player2Score'] : null,
+                        isset($this->input['ball1PlayerId']) ? (int) $this->input['ball1PlayerId'] : null,
+                        isset($this->input['ball2PlayerId']) ? (int) $this->input['ball2PlayerId'] : null,
+                        isset($this->input['ball3PlayerId']) ? (int) $this->input['ball3PlayerId'] : null
+                    );
+                } else {
+                    // ── Individual player score save ──────────────────────────────
+                    $playerService = $this->container->get(\App\Service\PlayerService::class);
+                    $targetPlayer = $playerService->getPlayer((int)$this->input['playerId']);
+                    if (!$targetPlayer) {
+                        $this->sendError('Player not found.', 404);
+                    }
+
+                    $isTargetUnregistered = ($targetPlayer['user_id'] === null);
+
+                    $apiSecret = \Configuration::getInstance()->getApiSecret();
+                    $providedSecret = getHeader('X-PB-Secret');
+                    $hasSecret = ($providedSecret && $providedSecret === $apiSecret);
+                    $currentUser = \App\Service\AuthService::getCurrentUser();
+
+                    if ($hasSecret) {
+                        // System/Admin override
+                    } else if ($currentUser) {
+                        $role = $currentUser['role'] ?? 'player';
+                        if ($role === 'admin' || $role === 'td') {
+                            // TD and Admins can score anyone
+                        } else {
+                            // Logged-in player can score themselves or unregistered players
+                            $isSelf = ((int)$targetPlayer['id'] === (int)$currentUser['player_id']);
+                            if (!$isSelf && !$isTargetUnregistered) {
+                                $this->sendError('Unauthorized: Players can only score themselves or unregistered players.', 401);
+                            }
+                        }
+                    } else {
+                        // Guest user (not logged in) can only score unregistered players
+                        if (!$isTargetUnregistered) {
+                            $this->sendError('Unauthorized: Guests can only score unregistered players.', 401);
+                        }
+                    }
+
+                    $this->scoreService->saveScore(
+                        (int) $this->input['eventId'],
+                        (int) $this->input['playerId'],
+                        (int) $this->input['machineId'],
+                        (int) $this->input['orderNumber'],
+                        $this->input['ball1'] ?? null,
+                        $this->input['ball2'] ?? null,
+                        $this->input['ball3'] ?? null,
+                        isset($this->input['eventMatchupId']) ? (int) $this->input['eventMatchupId'] : null,
+                        isset($this->input['player1Score']) ? (int) $this->input['player1Score'] : null,
+                        isset($this->input['player2Score']) ? (int) $this->input['player2Score'] : null,
+                        isset($this->input['teamId']) ? (int) $this->input['teamId'] : null,
+                        isset($this->input['ball1PlayerId']) ? (int) $this->input['ball1PlayerId'] : null,
+                        isset($this->input['ball2PlayerId']) ? (int) $this->input['ball2PlayerId'] : null,
+                        isset($this->input['ball3PlayerId']) ? (int) $this->input['ball3PlayerId'] : null
+                    );
+                }
 
                 $this->sendJson(['success' => true]);
                 break;
+
 
             case 'DELETE':
                 $eventId = isset($_GET['eventId']) ? (int) $_GET['eventId'] : 0;

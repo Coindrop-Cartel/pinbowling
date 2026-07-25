@@ -320,7 +320,12 @@ export async function initPlayPage() {
     const value2Defaults = engine.generateValue2Defaults(frameCount);
 
       generatedFrames = selected.map((m, index) => {
-        const baseScore = getTargetScoreForDifficulty(m, difficulty, currentSessionFormat);
+        const easyTarget = getTargetScoreForDifficulty(m, 'easy', currentSessionFormat);
+        const medTarget = getTargetScoreForDifficulty(m, 'med', currentSessionFormat);
+        const hardTarget = getTargetScoreForDifficulty(m, 'hard', currentSessionFormat);
+        const targets = { easy: easyTarget, med: medTarget, hard: hardTarget };
+
+        const baseScore = targets[difficulty] || medTarget;
         let { value1, value2 } = engine.getInitialValues(baseScore);
 
         // Apply default value2 for formats that support it (e.g., golf pars)
@@ -329,13 +334,9 @@ export async function initPlayPage() {
         }
 
         return {
-            machineId: Number(m.machineId),
+            machineId: Number(m.machineId || m.id),
             machineName: m.machineName,
-            targets: {
-                easy: m.targetEasy || 1000000,
-                med: m.targetMed || 2000000,
-                hard: m.targetHard || 3000000
-            },
+            targets,
             value1,
             value2,
             scaling: globalScaling,
@@ -430,7 +431,16 @@ export async function initPlayPage() {
         machines: currentLocMachines,
         onUpdate: () => {},
         onSelectMachine: (f, match) => {
-          f.targets = { easy: match.targetEasy, med: match.targetMed, hard: match.targetHard };
+          f.targets = {
+            easy: getTargetScoreForDifficulty(match, 'easy', currentSessionFormat),
+            med: getTargetScoreForDifficulty(match, 'med', currentSessionFormat),
+            hard: getTargetScoreForDifficulty(match, 'hard', currentSessionFormat)
+          };
+          const baseScore = f.targets.med;
+          const { value1, value2 } = engine.getInitialValues(baseScore);
+          f.value1 = value1;
+          f.value2 = value2;
+          f.values = engine.buildRoundValues(f.value1, f.value2, f.scaling || 'curved');
         },
         afterSelectMachine: () => renderPreview(),
         afterQFill: () => renderPreview(),

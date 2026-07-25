@@ -106,8 +106,16 @@ export function wireTargetRow(row, frame, options) {
         const { value1, value2 } = engine.getInitialValues(val);
         frame.value1 = value1;
         frame.value2 = value2;
-        if (s10) s10.value = formatNumber(frame.value1);
-        if (s1) s1.value = formatNumber(frame.value2);
+        if (s10) {
+          const v1 = formatNumber(frame.value1);
+          s10.value = v1;
+          s10.setAttribute('value', v1);
+        }
+        if (s1) {
+          const v2 = formatNumber(frame.value2);
+          s1.value = v2;
+          s1.setAttribute('value', v2);
+        }
         updateValues();
         if (options.afterQFill) {
           options.afterQFill(frame);

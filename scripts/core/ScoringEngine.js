@@ -403,7 +403,7 @@ export class ScoringEngine {
    * @param {Object} context Format-specific context data (same keys as enrichScoreMap).
    * @returns {Object} Format-specific row context. May include:
    *   - {Object|null} matchup The matchup for this round (if applicable).
-   *   - {boolean} isPitcher Whether the current player is the pitcher.
+   *   - {boolean} isPlayer1 Whether the current player is player1 in the matchup.
    *   - {string} opponentName Name of the opponent.
    *   - {string} displayRoundNumber How to label this round (e.g. "Top of Inning 1").
    *   - {string} roleHtml Additional HTML for the role indicator.

@@ -1,5 +1,6 @@
 import { escapeHTML } from '@scripts/utils.js';
 import { flattenMatchupEntries } from '@services/normalizer.js';
+import { resolvePlayersForMatchupParticipant } from '@services/playerSelector.js';
 
 /**
  * Renders the standard table scoreboard for formats like Bowling and Golf.
@@ -53,7 +54,7 @@ export function renderStandardScoreboard(calcResult, domRefs) {
  */
 export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs, engine) {
   const { resultsPanel, resultsBody, totalScore, resultsEmpty } = domRefs;
-  const { allEventScores, eventMatchups, allPlayersCache, getCurrentPlayerId, normalizeScores, groupScoresByPlayer, isTeamMode } = context;
+  const { allEventScores, eventMatchups, allPlayersCache, getCurrentPlayerId, normalizeScores, groupScoresByPlayer, isTeamMode, activeLeague } = context;
 
   if (!eventMatchups || eventMatchups.length === 0) {
     renderStandardScoreboard(calcResult, domRefs);
@@ -71,25 +72,42 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
   }
 
   const currentPlayerId = Number(getCurrentPlayerId());
-  const allEntries = flattenMatchupEntries(eventMatchups);
 
-  // Player IDs come from the wrapper object, not individual entries
+  // Player / Team IDs come from the wrapper object
   const wrapper = eventMatchups[0];
   const p1Id = Number(wrapper.player1Id ?? wrapper.player1_id);
   const p2Id = Number(wrapper.player2Id ?? wrapper.player2_id);
-  const isCurrentPlayer1 = currentPlayerId === p1Id;
-  const opponentId = isCurrentPlayer1 ? p2Id : p1Id;
-  const opponentIds = opponentId ? [opponentId] : [];
+
+  const leagues = activeLeague ? [activeLeague] : [];
+  const p1Players = resolvePlayersForMatchupParticipant(p1Id, wrapper.player1Name ?? wrapper.player1_name, allPlayersCache, leagues);
+  const p2Players = resolvePlayersForMatchupParticipant(p2Id, wrapper.player2Name ?? wrapper.player2_name, allPlayersCache, leagues);
+
+  const p1Player = p1Players[0];
+  const p2Player = p2Players[0];
+
+  const p1ActualId = Number(p1Player?.id ?? p1Id);
+  const p2ActualId = Number(p2Player?.id ?? p2Id);
+
+  const isCurrentPlayer1 = currentPlayerId === p1ActualId || currentPlayerId === p1Id;
+  const activePlayerObj = isCurrentPlayer1 ? p1Player : p2Player;
+  const oppPlayerObj = isCurrentPlayer1 ? p2Player : p1Player;
+
+  const activeId = Number(activePlayerObj?.id ?? currentPlayerId);
+  const oppId = Number(oppPlayerObj?.id ?? (isCurrentPlayer1 ? p2Id : p1Id));
 
   const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
 
   const playerResults = [
-    { id: currentPlayerId, name: allPlayersCache.find(p => p.id === currentPlayerId)?.playerName || `You`, scoreMap: engine.buildPlayerScoreMap(currentPlayerId, scoresByPlayer[currentPlayerId] || [], scoresByPlayer, eventMatchups) },
-    ...opponentIds.map(oppId => ({
+    {
+      id: activeId,
+      name: activePlayerObj?.playerName || (isCurrentPlayer1 ? (wrapper.player1Name || 'You') : (wrapper.player2Name || 'You')),
+      scoreMap: engine.buildPlayerScoreMap(activeId, scoresByPlayer[activeId] || [], scoresByPlayer, eventMatchups)
+    },
+    {
       id: oppId,
-      name: allPlayersCache.find(p => p.id === oppId)?.playerName || `Opponent ${oppId}`,
+      name: oppPlayerObj?.playerName || (isCurrentPlayer1 ? (wrapper.player2Name || 'Opponent') : (wrapper.player1Name || 'Opponent')),
       scoreMap: engine.buildPlayerScoreMap(oppId, scoresByPlayer[oppId] || [], scoresByPlayer, eventMatchups)
-    }))
+    }
   ];
 
   // Sort: Away (playerOrder 2) always first, Home (playerOrder 1) second.
@@ -260,50 +278,6 @@ function _renderTeamScoreboard(calcResult, machines, context, domRefs, engine) {
     scoreboardHTML += `<span class="round-score">${bottomRuns === 0 && !inn.bottom?.entries.some(e => e.played) ? '-' : bottomRuns}</span>`;
   });
   scoreboardHTML += `<span class="total-score">${teamTotals.home}</span></div>`;
-
-  scoreboardHTML += '</div>';
-
-  // Player breakdown
-  scoreboardHTML += '<div class="scoreboard-grid" style="margin-top: 12px;">';
-  scoreboardHTML += '<div class="scoreboard-row header"><span class="player-col">Player Breakdown</span><span class="total-header">Runs</span></div>';
-
-  const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
-  const teamMembers = {};
-  teamMembers[awayTeamId] = { name: awayTeamName, members: [] };
-  teamMembers[homeTeamId] = { name: homeTeamName, members: [] };
-
-  // Find team members from the enriched machine entries
-  machines.forEach(m => {
-    if (m.playerId && m.teamId) {
-      const existing = teamMembers[m.teamId]?.members.find(mb => mb.id === m.playerId);
-      if (!existing) {
-        const playerObj = allPlayersCache.find(p => p.id === m.playerId);
-        teamMembers[m.teamId]?.members.push({
-          id: m.playerId,
-          name: playerObj?.playerName || `Player ${m.playerId}`,
-          isTop: m.isTop
-        });
-      }
-    }
-  });
-
-  [awayTeamId, homeTeamId].forEach(teamId => {
-    const team = teamMembers[teamId];
-    if (!team) return;
-    team.members.forEach(member => {
-      // Sum this player's runs from turn results
-      const memberRuns = turnResults
-        .filter(tr => {
-          const mach = machines.find(mac => Number(mac.orderNumber ?? mac.order_number) === Number(tr.orderNumber));
-          return mach && Number(mach.playerId) === member.id && tr.played;
-        })
-        .reduce((sum, tr) => sum + tr.score, 0);
-
-      scoreboardHTML += '<div class="scoreboard-row player-row">';
-      scoreboardHTML += `<span class="player-name" style="padding-left: 20px;">${escapeHTML(member.name)}</span>`;
-      scoreboardHTML += `<span class="total-score">${memberRuns}</span></div>`;
-    });
-  });
 
   scoreboardHTML += '</div>';
 

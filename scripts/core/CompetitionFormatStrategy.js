@@ -27,10 +27,12 @@ export class BaseCompetitionStrategy {
 export class GroupCompetitionStrategy extends BaseCompetitionStrategy {
   sortStandings(rows, engine, options = {}) {
     return [...rows].sort((a, b) => {
+      const scoreA = a.totalSeasonPoints ?? a.total ?? 0;
+      const scoreB = b.totalSeasonPoints ?? b.total ?? 0;
       if (options.seasonScoring === 'weekly') {
-        return b.totalSeasonPoints - a.totalSeasonPoints;
+        return scoreB - scoreA;
       }
-      return engine.compareScores(a.totalSeasonPoints, b.totalSeasonPoints);
+      return engine.compareScores(scoreA, scoreB);
     });
   }
 }
@@ -167,10 +169,12 @@ export class HeadToHeadCompetitionStrategy extends BaseCompetitionStrategy {
         if (totalRunsDiff !== 0) return totalRunsDiff;
       }
 
+      const scoreA = a.totalSeasonPoints ?? a.total ?? 0;
+      const scoreB = b.totalSeasonPoints ?? b.total ?? 0;
       if (options.seasonScoring === 'weekly') {
-        return b.totalSeasonPoints - a.totalSeasonPoints;
+        return scoreB - scoreA;
       }
-      return engine.compareScores(a.totalSeasonPoints, b.totalSeasonPoints);
+      return engine.compareScores(scoreA, scoreB);
     });
   }
 }

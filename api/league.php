@@ -35,8 +35,9 @@ class LeagueController extends ApiController {
             'participationType' => $this->input['participationType'] ?? 'individual',
             'scoringFormat' => $this->input['scoringFormat'] ?? 'bowling',
             'seasonScoring' => $this->input['seasonScoring'] ?? 'weekly',
-            'dropLowestWeeks' => (int)($this->input['dropLowestWeeks'] ?? 0),
-            'weeksInSeason' => isset($this->input['weeksInSeason']) ? (int)$this->input['weeksInSeason'] : null,
+            'dropLowestWeeks' => isset($this->input['dropLowestWeeks']) ? (int)$this->input['dropLowestWeeks'] : 0,
+            'dropLowestPlayerScores' => isset($this->input['dropLowestPlayerScores']) ? (int)$this->input['dropLowestPlayerScores'] : 0,
+            'weeksInSeason' => isset($this->input['weeksInSeason']) && $this->input['weeksInSeason'] !== '' ? (int)$this->input['weeksInSeason'] : null,
             'roundsPerGame' => isset($this->input['roundsPerGame']) && $this->input['roundsPerGame'] !== '' ? (int)$this->input['roundsPerGame'] : null,
             'matchupsPerRound' => isset($this->input['matchupsPerRound']) && $this->input['matchupsPerRound'] !== '' ? (int)$this->input['matchupsPerRound'] : null,
             'weeklyPoints' => isset($this->input['weeklyPoints']) && $this->input['weeklyPoints'] !== '' ? (int)$this->input['weeklyPoints'] : null,
@@ -172,7 +173,8 @@ class LeagueController extends ApiController {
                         $p['matchupsPerRound'],
                         $p['weeklyPoints'],
                         $p['pointSpread'],
-                        $p['locationIds']
+                        $p['locationIds'],
+                        $p['dropLowestPlayerScores']
                     );
                     if (!$league) $this->sendError('League created but could not be retrieved.', 500);
                     $this->sendJson(Serializer::league($league));
@@ -221,7 +223,8 @@ class LeagueController extends ApiController {
                         $p['weeklyPoints'],
                         $p['pointSpread'],
                         $p['locationIds'],
-                        $p['status']
+                        $p['status'],
+                        $p['dropLowestPlayerScores']
                     );
                     if (!$league) $this->sendError('Resource updated but could not be retrieved.', 500);
                     $this->sendJson(Serializer::league($league));

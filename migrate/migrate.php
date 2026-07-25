@@ -70,10 +70,12 @@ function initializeDatabaseSchema($pdo) {
         `type` ENUM('standard', 'session') DEFAULT 'standard',
         `competition_format` ENUM('group', 'head2head') DEFAULT 'group',
         `participation_type` ENUM('individual', 'team') DEFAULT 'individual',
+        `team_size` INT DEFAULT 1,
         `start_date` DATE DEFAULT NULL,
         `scoring_format` VARCHAR(50) DEFAULT 'bowling',
         `season_scoring` ENUM('cumulative', 'weekly') DEFAULT 'weekly',
         `drop_lowest_weeks` INT DEFAULT 0,
+        `drop_lowest_player_scores` INT DEFAULT 0,
         `weekly_points` INT DEFAULT NULL,
         `point_spread` INT DEFAULT NULL,
         `rounds_per_game` INT DEFAULT NULL,
@@ -88,6 +90,7 @@ function initializeDatabaseSchema($pdo) {
         `name` VARCHAR(255) NOT NULL,
         `city` VARCHAR(255) DEFAULT NULL,
         `state` VARCHAR(255) DEFAULT NULL,
+        `is_individual_wrapper` TINYINT(1) DEFAULT 0,
         UNIQUE KEY `unique_team_location` (`name`, `city`, `state`),
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
@@ -143,12 +146,16 @@ function initializeDatabaseSchema($pdo) {
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `event_id` INT NOT NULL,
         `event_matchup_id` INT DEFAULT NULL,
-        `player_id` INT NOT NULL,
+        `player_id` INT NULL DEFAULT NULL,
+        `team_id` INT NULL DEFAULT NULL,
         `order_number` INT NOT NULL,
         `machine_id` INT NOT NULL,
         `ball1` BIGINT DEFAULT 0,
+        `ball1_player_id` INT NULL DEFAULT NULL,
         `ball2` BIGINT DEFAULT 0,
+        `ball2_player_id` INT NULL DEFAULT NULL,
         `ball3` BIGINT DEFAULT 0,
+        `ball3_player_id` INT NULL DEFAULT NULL,
         `match_key` VARCHAR(100) GENERATED ALWAYS AS (
             IF(`event_matchup_id` IS NULL,
                CONCAT('evt_', `event_id`, '_rnd_', `order_number`),
@@ -156,18 +163,15 @@ function initializeDatabaseSchema($pdo) {
             )
         ) STORED,
         UNIQUE KEY `unique_scores_key` (`player_id`, `match_key`),
+        UNIQUE KEY `uq_score_team` (`event_matchup_id`, `team_id`, `order_number`),
         CONSTRAINT `fk_scores_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_scores_team` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_scores_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_scores_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE,
-        CONSTRAINT `fk_score_event_matchup` FOREIGN KEY (`event_matchup_id`) REFERENCES `event_matchups` (`id`) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
-    $pdo->exec("CREATE TABLE IF NOT EXISTS `league_players` (
-        `league_id` INT NOT NULL,
-        `player_id` INT NOT NULL,
-        PRIMARY KEY (`league_id`, `player_id`),
-        CONSTRAINT `fk_lp_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE,
-        CONSTRAINT `fk_lp_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
+        CONSTRAINT `fk_score_event_matchup` FOREIGN KEY (`event_matchup_id`) REFERENCES `event_matchups` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_scores_b1_player` FOREIGN KEY (`ball1_player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL,
+        CONSTRAINT `fk_scores_b2_player` FOREIGN KEY (`ball2_player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL,
+        CONSTRAINT `fk_scores_b3_player` FOREIGN KEY (`ball3_player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `target_scores` (
@@ -196,6 +200,7 @@ function initializeDatabaseSchema($pdo) {
     $pdo->exec("CREATE TABLE IF NOT EXISTS `event_matchups` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `event_id` INT NOT NULL,
+        `location_id` INT DEFAULT NULL,
         `player1_id` INT NOT NULL,
         `player2_id` INT DEFAULT NULL,
         `player3_id` INT DEFAULT NULL,
@@ -209,7 +214,8 @@ function initializeDatabaseSchema($pdo) {
         `game_number` INT DEFAULT 1,
         `round_name` VARCHAR(50) DEFAULT NULL,
         `series_id` INT DEFAULT NULL,
-        CONSTRAINT `fk_em_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE
+        CONSTRAINT `fk_em_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_em_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `matchups` (
@@ -217,7 +223,8 @@ function initializeDatabaseSchema($pdo) {
         `event_matchup_id` INT DEFAULT NULL,
         `order_number` INT NOT NULL,
         `machine_id` INT NOT NULL,
-        `player_id` INT DEFAULT NULL,
+        `player1_id` INT DEFAULT NULL,
+        `player2_id` INT DEFAULT NULL,
         UNIQUE KEY `unique_matchup_round` (`event_matchup_id`, `order_number`),
         CONSTRAINT `fk_matchup_event_matchup` FOREIGN KEY (`event_matchup_id`) REFERENCES `event_matchups` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_matchup_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
@@ -265,8 +272,14 @@ function initializeDatabaseSchema($pdo) {
 /**
  * Adds columns that may be missing from tables created by older schema versions.
  * Safe to run on fresh installs (SHOW COLUMNS will find everything already present).
+ *
+ * FK checks are temporarily disabled so that ALTER TABLE operations on partially-
+ * migrated databases do not fail when re-validating existing FK constraints that
+ * may reference tables or columns created in a different order.
  */
 function alignTableColumns($pdo) {
+    $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+
     // --- leagues ---
     $checkTable = $pdo->query("SHOW TABLES LIKE 'leagues'")->fetch();
     if ($checkTable) {
@@ -274,7 +287,10 @@ function alignTableColumns($pdo) {
             'type'                     => "ALTER TABLE `leagues` ADD COLUMN `type` ENUM('standard', 'session') DEFAULT 'standard' AFTER `name`",
             'competition_format'       => "ALTER TABLE `leagues` ADD COLUMN `competition_format` ENUM('group', 'head2head') DEFAULT 'group' AFTER `type`",
             'participation_type'       => "ALTER TABLE `leagues` ADD COLUMN `participation_type` ENUM('individual', 'team') DEFAULT 'individual' AFTER `competition_format`",
-            'weekly_points'            => "ALTER TABLE `leagues` ADD COLUMN `weekly_points` INT DEFAULT NULL AFTER `drop_lowest_weeks`",
+            'team_size'                => "ALTER TABLE `leagues` ADD COLUMN `team_size` INT DEFAULT 1 AFTER `participation_type`",
+            'drop_lowest_weeks'        => "ALTER TABLE `leagues` ADD COLUMN `drop_lowest_weeks` INT DEFAULT 0",
+            'drop_lowest_player_scores' => "ALTER TABLE `leagues` ADD COLUMN `drop_lowest_player_scores` INT DEFAULT 0 AFTER `drop_lowest_weeks`",
+            'weekly_points'            => "ALTER TABLE `leagues` ADD COLUMN `weekly_points` INT DEFAULT NULL AFTER `drop_lowest_player_scores`",
             'point_spread'             => "ALTER TABLE `leagues` ADD COLUMN `point_spread` INT DEFAULT NULL AFTER `weekly_points`",
             'rounds_per_game'          => "ALTER TABLE `leagues` ADD COLUMN `rounds_per_game` INT DEFAULT NULL AFTER `point_spread`",
             'matchups_per_round'       => "ALTER TABLE `leagues` ADD COLUMN `matchups_per_round` INT DEFAULT NULL AFTER `rounds_per_game`",
@@ -290,6 +306,31 @@ function alignTableColumns($pdo) {
         }
     }
 
+    // --- teams ---
+    $checkTable = $pdo->query("SHOW TABLES LIKE 'teams'")->fetch();
+    if ($checkTable) {
+        $hasWrapperCol = $pdo->query("SHOW COLUMNS FROM `teams` LIKE 'is_individual_wrapper'")->fetch();
+        if (!$hasWrapperCol) {
+            $pdo->exec("ALTER TABLE `teams` ADD COLUMN `is_individual_wrapper` TINYINT(1) DEFAULT 0");
+        }
+        // Retroactively flag existing 1-person wrapper teams
+        $pdo->exec("
+            UPDATE `teams` t
+            JOIN `team_members` tm ON t.id = tm.team_id
+            JOIN `players` p ON tm.player_id = p.id
+            SET t.is_individual_wrapper = 1
+            WHERE t.name = p.player_name
+              AND t.id IN (
+                SELECT sub.team_id FROM (
+                  SELECT tm2.team_id
+                  FROM `team_members` tm2
+                  GROUP BY tm2.team_id
+                  HAVING COUNT(tm2.player_id) = 1
+                ) sub
+              )
+        ");
+    }
+
     // --- users ---
     $checkTable = $pdo->query("SHOW TABLES LIKE 'users'")->fetch();
     if ($checkTable) {
@@ -302,6 +343,22 @@ function alignTableColumns($pdo) {
             $exists = $pdo->query("SHOW COLUMNS FROM `users` LIKE '$col'")->fetch();
             if (!$exists) {
                 $pdo->exec($sql);
+            }
+        }
+    }
+
+    // --- event_matchups ---
+    $checkTable = $pdo->query("SHOW TABLES LIKE 'event_matchups'")->fetch();
+    if ($checkTable) {
+        $hasLocId = $pdo->query("SHOW COLUMNS FROM `event_matchups` LIKE 'location_id'")->fetch();
+        if (!$hasLocId) {
+            $pdo->exec("ALTER TABLE `event_matchups` ADD COLUMN `location_id` INT DEFAULT NULL AFTER `event_id`");
+            $fkExists = $pdo->query(
+                "SELECT 1 FROM information_schema.KEY_COLUMN_USAGE
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'event_matchups' AND CONSTRAINT_NAME = 'fk_em_location'"
+            )->fetch();
+            if (!$fkExists) {
+                $pdo->exec("ALTER TABLE `event_matchups` ADD CONSTRAINT `fk_em_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL");
             }
         }
     }
@@ -335,6 +392,42 @@ function alignTableColumns($pdo) {
         if (!$hasScoresKey) {
             $pdo->exec("ALTER TABLE `scores` ADD UNIQUE KEY `unique_scores_key` (`player_id`, `match_key`)");
         }
+
+        // team_id support: make player_id nullable and add team_id column + unique key
+        $playerIdCol = $pdo->query("SHOW COLUMNS FROM `scores` LIKE 'player_id'")->fetch();
+        if ($playerIdCol && strpos(strtoupper($playerIdCol['Null'] ?? ''), 'NO') !== false) {
+            // Make player_id nullable so team-level rows can omit it
+            $pdo->exec("ALTER TABLE `scores` MODIFY COLUMN `player_id` INT NULL DEFAULT NULL");
+        }
+
+        $hasTeamId = $pdo->query("SHOW COLUMNS FROM `scores` LIKE 'team_id'")->fetch();
+        if (!$hasTeamId) {
+            $pdo->exec("ALTER TABLE `scores` ADD COLUMN `team_id` INT NULL DEFAULT NULL AFTER `player_id`");
+            $fkExists = $pdo->query(
+                "SELECT 1 FROM information_schema.KEY_COLUMN_USAGE
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'scores' AND CONSTRAINT_NAME = 'fk_scores_team'"
+            )->fetch();
+            if (!$fkExists) {
+                $pdo->exec("ALTER TABLE `scores` ADD CONSTRAINT `fk_scores_team` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE");
+            }
+        }
+
+        $hasTeamKey = $pdo->query("SHOW INDEX FROM `scores` WHERE Key_name = 'uq_score_team'")->fetch();
+        if (!$hasTeamKey) {
+            $pdo->exec("ALTER TABLE `scores` ADD UNIQUE KEY `uq_score_team` (`event_matchup_id`, `team_id`, `order_number`)");
+        }
+
+        $ballCols = [
+            'ball1_player_id' => "ALTER TABLE `scores` ADD COLUMN `ball1_player_id` INT NULL DEFAULT NULL AFTER `ball1`",
+            'ball2_player_id' => "ALTER TABLE `scores` ADD COLUMN `ball2_player_id` INT NULL DEFAULT NULL AFTER `ball2`",
+            'ball3_player_id' => "ALTER TABLE `scores` ADD COLUMN `ball3_player_id` INT NULL DEFAULT NULL AFTER `ball3`",
+        ];
+        foreach ($ballCols as $col => $sql) {
+            $exists = $pdo->query("SHOW COLUMNS FROM `scores` LIKE '$col'")->fetch();
+            if (!$exists) {
+                $pdo->exec($sql);
+            }
+        }
     }
 
     // --- matchups ---
@@ -353,8 +446,18 @@ function alignTableColumns($pdo) {
         }
 
         $hasPlayerId = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'player_id'")->fetch();
-        if (!$hasPlayerId) {
-            $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `player_id` INT DEFAULT NULL AFTER `machine_id`");
+        if ($hasPlayerId) {
+            $pdo->exec("ALTER TABLE `matchups` DROP COLUMN `player_id`");
+        }
+
+        $hasP1Id = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'player1_id'")->fetch();
+        if (!$hasP1Id) {
+            $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `player1_id` INT DEFAULT NULL AFTER `machine_id`");
+        }
+
+        $hasP2Id = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'player2_id'")->fetch();
+        if (!$hasP2Id) {
+            $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `player2_id` INT DEFAULT NULL AFTER `player1_id`");
         }
     }
 
@@ -430,6 +533,8 @@ function alignTableColumns($pdo) {
             CONSTRAINT `fk_ll_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     }
+
+    $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
 }
 
 echo "=== PinBowling Database Migration ===\n\n";
@@ -574,6 +679,93 @@ try {
         echo "✓ Fixed baseball corrupted multipliers.\n";
     } else {
         echo "Baseball corrupted multipliers migration already applied.\n";
+    }
+
+    // -----------------------------------------------------------------------
+    // Migration 6: migrate_league_players_to_universal_teams
+    // -----------------------------------------------------------------------
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'migrate_league_players_to_universal_teams'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $hasLeaguePlayers = $pdo->query("SHOW TABLES LIKE 'league_players'")->fetch();
+        if ($hasLeaguePlayers) {
+            // Step 1: Create a 1-player team for each player in league_players if they don't already have one
+            $pdo->exec("
+                INSERT INTO teams (name)
+                SELECT DISTINCT p.player_name
+                FROM league_players lp
+                JOIN players p ON lp.player_id = p.id
+                LEFT JOIN (
+                    SELECT tm.player_id, t.id
+                    FROM team_members tm
+                    JOIN teams t ON tm.team_id = t.id
+                    GROUP BY tm.player_id, t.id
+                    HAVING COUNT(*) = 1
+                ) existing_solo ON lp.player_id = existing_solo.player_id
+                WHERE existing_solo.id IS NULL
+            ");
+
+            // Step 2: Link player to their 1-player team in team_members
+            $pdo->exec("
+                INSERT IGNORE INTO team_members (team_id, player_id)
+                SELECT DISTINCT t.id, lp.player_id
+                FROM league_players lp
+                JOIN players p ON lp.player_id = p.id
+                JOIN teams t ON t.name = p.player_name
+            ");
+
+            // Step 3: Link the team to the league in league_teams
+            $pdo->exec("
+                INSERT IGNORE INTO league_teams (league_id, team_id)
+                SELECT DISTINCT lp.league_id, tm.team_id
+                FROM league_players lp
+                JOIN team_members tm ON lp.player_id = tm.player_id
+            ");
+
+            // Step 4: Safely drop legacy league_players table
+            $pdo->exec("DROP TABLE IF EXISTS `league_players`");
+        } else {
+            // Fallback: If league_players was already dropped, reconstruct league_teams from scores table!
+            $pdo->exec("
+                INSERT INTO teams (name)
+                SELECT DISTINCT p.player_name
+                FROM scores s
+                JOIN events e ON s.event_id = e.id
+                JOIN players p ON s.player_id = p.id
+                LEFT JOIN (
+                    SELECT tm.player_id, t.id
+                    FROM team_members tm
+                    JOIN teams t ON tm.team_id = t.id
+                    GROUP BY tm.player_id, t.id
+                    HAVING COUNT(*) = 1
+                ) existing_solo ON s.player_id = existing_solo.player_id
+                WHERE e.league_id IS NOT NULL AND existing_solo.id IS NULL
+            ");
+
+            $pdo->exec("
+                INSERT IGNORE INTO team_members (team_id, player_id)
+                SELECT DISTINCT t.id, s.player_id
+                FROM scores s
+                JOIN events e ON s.event_id = e.id
+                JOIN players p ON s.player_id = p.id
+                JOIN teams t ON t.name = p.player_name
+                WHERE e.league_id IS NOT NULL
+            ");
+
+            $pdo->exec("
+                INSERT IGNORE INTO league_teams (league_id, team_id)
+                SELECT DISTINCT e.league_id, tm.team_id
+                FROM scores s
+                JOIN events e ON s.event_id = e.id
+                JOIN team_members tm ON s.player_id = tm.player_id
+                WHERE e.league_id IS NOT NULL
+            ");
+        }
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('migrate_league_players_to_universal_teams')")->execute();
+        echo "✓ Migrated legacy league_players into universal teams (league_teams/team_members).\n";
+    } else {
+        echo "League players migration already applied.\n";
     }
 
     echo "\n✓ All migrations complete.\n";

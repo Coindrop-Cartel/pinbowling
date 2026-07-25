@@ -128,7 +128,10 @@ export async function initStandingsPage() {
     ]);
     const league = leagues.find(l => String(l.id) === String(leagueId));
     const format = ScoringFormats.resolve(league?.scoringFormat);
-    const engine = getScoringEngine(format);
+    const engine = getScoringEngine(format, {
+      participationType: league?.participationType,
+      competitionFormat: league?.competitionFormat
+    });
     const isTeamLeague = league?.participationType === 'team';
 
     applyPreferredTheme(format);
@@ -221,7 +224,10 @@ export async function initStandingsPage() {
     
     // Priority: Event Format > League Format > Default
     const format = ScoringFormats.resolve(event?.scoringFormat || league?.scoringFormat);
-    Engine = getScoringEngine(format);
+    Engine = getScoringEngine(format, {
+      participationType: league?.participationType,
+      competitionFormat: league?.competitionFormat
+    });
     applyPreferredTheme(format);
 
     // Set up selector UI references if they don't exist

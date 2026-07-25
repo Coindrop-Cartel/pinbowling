@@ -189,6 +189,7 @@ The version from `package.json` is the single source of truth — it's read by `
 
 See the [`docs/`](docs/) directory for detailed documentation:
 
+- **[Team Reorganization](docs/team_reorganization.md)** — Universal Team Model architecture, 1-on-1 matchup design, and migration plan
 - **[Architecture](docs/architecture.md)** — System design, data flow, and component overview
 - **[Database Schema](docs/database_schema.md)** — Full table reference, relationships, format matrix
 - **[Deployment](docs/deployment.md)** — Server setup, synchronization, cache-busting

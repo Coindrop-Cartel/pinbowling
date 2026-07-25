@@ -105,6 +105,16 @@ class PlayerService {
         if ($playerName !== null) {
             $fields[] = "player_name = ?";
             $params[] = $playerName;
+
+            // Sync the 1-person wrapper team name if one exists for this player
+            $pdo = $this->db->getPdo();
+            $stmtWrapper = $pdo->prepare("
+                UPDATE teams t
+                JOIN team_members tm ON t.id = tm.team_id
+                SET t.name = ?
+                WHERE tm.player_id = ? AND t.is_individual_wrapper = 1
+            ");
+            $stmtWrapper->execute([$playerName, $playerId]);
         }
         if ($ifpaId !== null) {
             $fields[] = "ifpa_id = ?";
@@ -146,10 +156,6 @@ class PlayerService {
 
             // Delete scores for this player across all events
             $stmt = $pdo->prepare("DELETE FROM scores WHERE player_id = ?");
-            $stmt->execute([$playerId]);
-
-            // Remove from league rosters
-            $stmt = $pdo->prepare("DELETE FROM league_players WHERE player_id = ?");
             $stmt->execute([$playerId]);
 
             // Finally delete the player record
@@ -326,20 +332,7 @@ class PlayerService {
             $stmt = $pdo->prepare("UPDATE scores SET player_id = ? WHERE player_id = ?");
             $stmt->execute([$playerAId, $playerBId]);
 
-            // 3. Merge League Players
-            // Delete duplicate league player rows for player B
-            $stmt = $pdo->prepare("
-                DELETE lp_b FROM league_players lp_b
-                INNER JOIN league_players lp_a ON lp_b.league_id = lp_a.league_id
-                WHERE lp_b.player_id = ? AND lp_a.player_id = ?
-            ");
-            $stmt->execute([$playerBId, $playerAId]);
-
-            // Update remaining league player rows to player A
-            $stmt = $pdo->prepare("UPDATE league_players SET player_id = ? WHERE player_id = ?");
-            $stmt->execute([$playerAId, $playerBId]);
-
-            // 4. Merge Team Members
+            // 3. Merge Team Members
             // Delete duplicate team member rows for player B
             $stmt = $pdo->prepare("
                 DELETE tm_b FROM team_members tm_b

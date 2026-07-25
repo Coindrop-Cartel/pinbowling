@@ -8,6 +8,7 @@
  */
 
 import { flattenMatchupEntries } from './normalizer.js';
+import { resolvePlayersForMatchupParticipant } from './playerSelector.js';
 
 /**
  * Build team round-robin matchup entries for team baseball.
@@ -34,50 +35,47 @@ export function buildTeamRoundRobinMatchups(matchupWrapper, awayTeamMembers, hom
   let orderNumber = 1;
 
   for (let inning = 0; inning < inningCount; inning++) {
-    const topMachine = machines[inning * 2] || machines[0];
-    const bottomMachine = machines[inning * 2 + 1] || machines[1] || topMachine;
+    // Each half-inning uses exactly 1 machine.
+    // Batter rotation (Ball 1 → Batter 1, Ball 2 → Batter 2, Ball 3 → Batter 1 …)
+    // is handled at scoring time by the batting order — not by creating separate rows per batter.
+    const topMachine = machines[inning] || machines[inning % machines.length] || machines[0];
+    const bottomMachine = machines[(inningCount + inning) % machines.length] || machines[0];
     const topMachineId = topMachine.machineId || topMachine.id;
     const bottomMachineId = bottomMachine.machineId || bottomMachine.id;
 
-    // Top half: Away team bats, Home team pitches
-    for (let slot = 0; slot < awayTeamMembers.length; slot++) {
-      const batterMember = awayTeamMembers[slot];
-      const pitcherMember = homeTeamMembers[slot] || homeTeamMembers[0];
-      matchups.push({
-        orderNumber,
-        playerId: batterMember.id,
-        playerOrder: slot + 1,
-        machineId: topMachineId,
-        teamId: Number(matchupWrapper.player2Id ?? matchupWrapper.player2_id),
-        isTop: true,
-        slotIndex: slot,
-        playerName: batterMember.playerName,
-        opponentName: pitcherMember.playerName,
-        opponentId: pitcherMember.id,
-        opponentTeamId: Number(matchupWrapper.player1Id ?? matchupWrapper.player1_id),
-      });
-      orderNumber++;
-    }
+    // Top half: Away team bats, Home team pitches — 1 matchup row for the whole half-inning
+    matchups.push({
+      orderNumber,
+      playerId: awayTeamMembers[0].id,   // lead-off batter (Ball 1)
+      player1Id: Number(matchupWrapper.player1Id ?? matchupWrapper.player1_id),  // home (pitching team)
+      player2Id: Number(matchupWrapper.player2Id ?? matchupWrapper.player2_id),  // away (batting team)
+      playerOrder: 1,
+      machineId: topMachineId,
+      teamId: Number(matchupWrapper.player2Id ?? matchupWrapper.player2_id),
+      isTop: true,
+      inning: inning + 1,
+      roundName: `Top ${inning + 1}`,
+      playerName: awayTeamMembers[0].playerName,
+      opponentTeamId: Number(matchupWrapper.player1Id ?? matchupWrapper.player1_id),
+    });
+    orderNumber++;
 
-    // Bottom half: Home team bats, Away team pitches
-    for (let slot = 0; slot < homeTeamMembers.length; slot++) {
-      const batterMember = homeTeamMembers[slot];
-      const pitcherMember = awayTeamMembers[slot] || awayTeamMembers[0];
-      matchups.push({
-        orderNumber,
-        playerId: batterMember.id,
-        playerOrder: slot + 1,
-        machineId: bottomMachineId,
-        teamId: Number(matchupWrapper.player1Id ?? matchupWrapper.player1_id),
-        isTop: false,
-        slotIndex: slot,
-        playerName: batterMember.playerName,
-        opponentName: pitcherMember.playerName,
-        opponentId: pitcherMember.id,
-        opponentTeamId: Number(matchupWrapper.player2Id ?? matchupWrapper.player2_id),
-      });
-      orderNumber++;
-    }
+    // Bottom half: Home team bats, Away team pitches — 1 matchup row for the whole half-inning
+    matchups.push({
+      orderNumber,
+      playerId: homeTeamMembers[0].id,   // lead-off batter (Ball 1)
+      player1Id: Number(matchupWrapper.player1Id ?? matchupWrapper.player1_id),  // home (batting team)
+      player2Id: Number(matchupWrapper.player2Id ?? matchupWrapper.player2_id),  // away (pitching team)
+      playerOrder: 1,
+      machineId: bottomMachineId,
+      teamId: Number(matchupWrapper.player1Id ?? matchupWrapper.player1_id),
+      isTop: false,
+      inning: inning + 1,
+      roundName: `Bottom ${inning + 1}`,
+      playerName: homeTeamMembers[0].playerName,
+      opponentTeamId: Number(matchupWrapper.player2Id ?? matchupWrapper.player2_id),
+    });
+    orderNumber++;
   }
 
   return matchups;
@@ -93,23 +91,22 @@ export function buildTeamRoundRobinMatchups(matchupWrapper, awayTeamMembers, hom
  * @param {number|string} orderNumber The matchup entry's order number.
  * @param {Array} eventMatchups The event matchup wrappers.
  * @param {Object} [teamContext] Optional team context {allPlayersCache, activeLeague}.
- * @returns {{ matchup: object|null, isPitcher: boolean, opponentName: string, displayRoundNumber: string, role: 'pitcher'|'batter' }}
+ * @returns {{ matchup: object|null, isPlayer1: boolean, isTop: boolean, opponentName: string, displayRoundNumber: string }}
  */
 export function resolveTeamMatchupRole(playerId, orderNumber, eventMatchups, teamContext) {
   const entries = flattenMatchupEntries(eventMatchups);
   if (!entries || entries.length === 0) {
-    return { matchup: null, isPitcher: true, opponentName: '', displayRoundNumber: '', role: 'pitcher' };
+    return { matchup: null, isPlayer1: true, isTop: true, opponentName: '', displayRoundNumber: '' };
   }
 
   const targetEntry = entries.find(m =>
     Number(m.orderNumber ?? m.order_number) === Number(orderNumber)
-  );
+  ) || entries[Number(orderNumber) - 1] || null;
 
   if (!targetEntry) {
-    return { matchup: null, isPitcher: true, opponentName: '', displayRoundNumber: '', role: 'pitcher' };
+    return { matchup: null, isPlayer1: true, isTop: true, opponentName: '', displayRoundNumber: '' };
   }
 
-  // Get round info from the event_matchup wrapper (has roundName like "Top 1")
   const targetMatchup = eventMatchups.find(em => {
     const emId = Number(em.id ?? em.eventMatchupId ?? em.event_matchup_id);
     const entryEmId = Number(targetEntry.eventMatchupId ?? targetEntry.event_matchup_id);
@@ -117,20 +114,16 @@ export function resolveTeamMatchupRole(playerId, orderNumber, eventMatchups, tea
   }) || eventMatchups[0];
 
   const roundName = targetMatchup?.roundName ?? targetMatchup?.round_name ?? '';
-  const isTop = roundName.toLowerCase().startsWith('top');
-  const displayRoundNumber = roundName || (isTop ? 'Top' : 'Bottom');
+  let isTop = roundName ? roundName.toLowerCase().startsWith('top') : (Number(orderNumber) % 2 !== 0);
+  const inningNumber = Math.ceil(Number(orderNumber) / 2);
+  const displayRoundNumber = roundName || `${isTop ? 'Top' : 'Bottom'} ${inningNumber}`;
 
-  // Check if the current player is the batter (entry's player_id matches)
-  const entryPlayerId = Number(targetEntry.playerId ?? targetEntry.player_id ?? 0);
-  const isBatter = entryPlayerId === Number(playerId);
-
-  // Player is batter if their ID matches, otherwise they're on the pitching team
-  const isPitcher = !isBatter;
+  const homeTeamId = Number(targetMatchup?.player1Id ?? targetMatchup?.player1_id ?? 0);
+  const selectedTeamId = Number(playerId);
+  const isPlayer1 = selectedTeamId === homeTeamId;
   const opponentName = '';
 
-  const role = isPitcher ? 'pitcher' : 'batter';
-
-  return { matchup: targetEntry, isPitcher, opponentName, displayRoundNumber, role };
+  return { matchup: targetEntry, isPlayer1, isTop, opponentName, displayRoundNumber };
 }
 
 /**
@@ -162,18 +155,22 @@ export function buildRoundRobinMatchups(players, inningCount, machines) {
 
     // Each half-inning gets a unique order_number (1, 2, 3, 4, …) so that
     // two rows per inning don't collide on the (event_matchup_id, order_number) UNIQUE key.
-    // Home player (player_order 1) on the top machine
+    // Home player (player_order 1) pitches on top machine, away player (player_order 2) bats
     matchups.push({
       orderNumber: inning * 2 + 1,
       playerId: pairing.player1Id,
+      player1Id: pairing.player1Id,
+      player2Id: pairing.player2Id,
       playerOrder: 1,
       machineId: topMachine.machineId || topMachine.id,
     });
 
-    // Away player (player_order 2) on the bottom machine
+    // Away player (player_order 2) pitches on bottom machine, home player (player_order 1) bats
     matchups.push({
       orderNumber: inning * 2 + 2,
       playerId: pairing.player2Id,
+      player1Id: pairing.player2Id,
+      player2Id: pairing.player1Id,
       playerOrder: 2,
       machineId: bottomMachine.machineId || bottomMachine.id,
     });
@@ -188,12 +185,12 @@ export function buildRoundRobinMatchups(players, inningCount, machines) {
  * @param {number|string} playerId
  * @param {number|string} machineId
  * @param {Array} eventMatchups
- * @returns {{ matchup: object|null, isPitcher: boolean, opponentName: string, displayRoundNumber: string, role: 'pitcher'|'batter' }}
+ * @returns {{ matchup: object|null, isPlayer1: boolean, isTop: boolean, opponentName: string, displayRoundNumber: string }}
  */
-export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups) {
+export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups, teamContext = {}) {
   const entries = flattenMatchupEntries(eventMatchups);
   if (!eventMatchups || eventMatchups.length === 0 || !entries || entries.length === 0) {
-    return { matchup: null, isPitcher: true, opponentName: '', displayRoundNumber: '', role: 'pitcher' };
+    return { matchup: null, isPlayer1: true, isTop: true, opponentName: '', displayRoundNumber: '' };
   }
 
   const targetMatchup = eventMatchups[0];
@@ -205,7 +202,7 @@ export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups) {
   );
 
   if (!item) {
-    return { matchup: null, isPitcher: true, opponentName: '', displayRoundNumber: '', role: 'pitcher' };
+    return { matchup: null, isPlayer1: true, isTop: true, opponentName: '', displayRoundNumber: '' };
   }
 
   const p1Id = targetMatchup.player1Id ?? targetMatchup.player1_id;
@@ -215,11 +212,20 @@ export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups) {
   let isPlayer2 = false;
   let opponentName = '';
 
-  if (p1Id !== undefined && p2Id !== undefined) {
-    isPlayer1 = Number(playerId) === Number(p1Id);
-    isPlayer2 = Number(playerId) === Number(p2Id);
-    const p1Name = targetMatchup.player1Name ?? targetMatchup.player1_name ?? 'Home';
-    const p2Name = targetMatchup.player2Name ?? targetMatchup.player2_name ?? 'Away';
+  const { allPlayersCache = [], activeLeague } = teamContext;
+  const leagues = activeLeague ? [activeLeague] : [];
+
+  const p1Players = resolvePlayersForMatchupParticipant(p1Id, targetMatchup.player1Name ?? targetMatchup.player1_name, allPlayersCache, leagues);
+  const p2Players = resolvePlayersForMatchupParticipant(p2Id, targetMatchup.player2Name ?? targetMatchup.player2_name, allPlayersCache, leagues);
+
+  const isInP1 = p1Players.some(p => String(p.id) === String(playerId)) || String(playerId) === String(p1Id);
+  const isInP2 = p2Players.some(p => String(p.id) === String(playerId)) || String(playerId) === String(p2Id);
+
+  if (isInP1 || isInP2) {
+    isPlayer1 = isInP1;
+    isPlayer2 = isInP2;
+    const p1Name = p1Players[0]?.playerName || targetMatchup.player1Name || targetMatchup.player1_name || 'Home';
+    const p2Name = p2Players[0]?.playerName || targetMatchup.player2Name || targetMatchup.player2_name || 'Away';
     opponentName = isPlayer1 ? p2Name : (isPlayer2 ? p1Name : '');
   } else {
     const orderNum = Number(item.orderNumber ?? item.order_number);
@@ -242,27 +248,19 @@ export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups) {
 
   if (item.playerOrder !== undefined || item.player_order !== undefined) {
     inningNumber = orderNumber;
-    const topSlot = entries.find(m => Number(m.orderNumber ?? m.order_number) === orderNumber && Number(m.playerOrder ?? m.player_order) === 1);
-    isTop = topSlot ? (Number(topSlot.machineId ?? topSlot.machine_id) === Number(roundIdentifier)) : true;
+    const pOrder = Number(item.playerOrder ?? item.player_order);
+    isTop = (pOrder === 1);
   } else {
     inningNumber = Math.ceil(orderNumber / 2);
     isTop = (orderNumber % 2 !== 0);
   }
 
-  let isPitcher = false;
-  if (isPlayer1) {
-    isPitcher = isTop;
-  } else if (isPlayer2) {
-    isPitcher = !isTop;
-  } else {
-    isPitcher = isTop;
-  }
-
   const displayRoundNumber = `${isTop ? 'Top' : 'Bottom'} of ${inningNumber}`;
-  const role = isPitcher ? 'pitcher' : 'batter';
 
-  return { matchup: item, isPitcher, opponentName, displayRoundNumber, role };
+  return { matchup: item, isPlayer1, isTop, opponentName, displayRoundNumber };
 }
+
+
 
 /**
  * Enrich server-created matchup entries with player info for team baseball.
@@ -311,6 +309,7 @@ export function enrichTeamMatchupEntries(entries, matchupWrapper, awayTeamMember
       playerName: entry.playerName ?? entry.player_name ?? batterMember?.playerName ?? batterMember?.player_name ?? '',
       teamId: battingTeamId,
       isTop,
+      roundName: roundName || '',
       slotIndex: idx,
       playerOrder: idx + 1,
       opponentTeamId: pitchingTeamId,
@@ -319,4 +318,58 @@ export function enrichTeamMatchupEntries(entries, matchupWrapper, awayTeamMember
   });
 
   return enriched;
+}
+
+/**
+ * Validates that role assignments are equally distributed across team members.
+ *
+ * @param {Array<{id: number, playerName: string}>} members Team members.
+ * @param {Object<string|number, number>} roleAssignments Map of `{ [machineOrder/round]: playerId }`.
+ * @returns {{ valid: boolean, counts: Object<number, number>, minCount: number, maxCount: number, message: string }}
+ */
+export function validateRoleWorkload(members = [], roleAssignments = {}, roleName = 'Pitching') {
+  if (!members || members.length === 0) {
+    return { valid: true, counts: {}, minCount: 0, maxCount: 0, message: '' };
+  }
+
+  const counts = {};
+  members.forEach(m => { counts[Number(m.id)] = 0; });
+
+  const assignedValues = Object.values(roleAssignments).map(v => Number(v)).filter(v => Boolean(v));
+  assignedValues.forEach(pId => {
+    if (counts[pId] !== undefined) {
+      counts[pId]++;
+    }
+  });
+
+  const countList = Object.values(counts);
+  const minCount = countList.length > 0 ? Math.min(...countList) : 0;
+  const maxCount = countList.length > 0 ? Math.max(...countList) : 0;
+  const diff = maxCount - minCount;
+
+  const valid = diff <= 1;
+  let message = '';
+  if (!valid) {
+    message = `${roleName} workload is uneven! Max assigned: ${maxCount}, Min assigned: ${minCount}. Please balance assignments across team members.`;
+  }
+
+  return { valid, counts, minCount, maxCount, message };
+}
+
+/** Alias for validateRoleWorkload */
+export const validatePitcherWorkload = validateRoleWorkload;
+
+/**
+ * Resolves the player for a specific ball index from a team's rotation sequence.
+ *
+ * @param {Array<{id: number, playerName: string}>} rotationSequence Ordered list of team players.
+ * @param {number} ballIndex 0-indexed ball number (0 = Ball 1, 1 = Ball 2, etc.).
+ * @returns {{ id: number, playerName: string }} Player object for the given ball.
+ */
+export function resolvePlayerForBall(rotationSequence = [], ballIndex = 0) {
+  if (!rotationSequence || rotationSequence.length === 0) {
+    return { id: 0, playerName: 'Unassigned Player' };
+  }
+  const idx = Math.abs(ballIndex) % rotationSequence.length;
+  return rotationSequence[idx];
 }

@@ -417,3 +417,196 @@ export async function showPlayerSelectionDialog(title, message, options, confirm
     }
   });
 }
+
+/**
+ * Displays a modal dialog for setting a team's batting order.
+ *
+ * @param {Object} options
+ * @param {Object} options.team Team object { id, name }.
+ * @param {Array<{id: number, playerName: string}>} options.members Team members list.
+ * @param {Array<{id: number, playerName: string}>} [options.currentOrder] Initial order.
+ * @returns {Promise<Array<{id: number, playerName: string}>|null>}
+ */
+export async function showBattingOrderDialog({ team, members = [], currentOrder = [] }) {
+  const memberIdSet = new Set((members || []).map(m => String(m.id)));
+  const validCurrentOrder = (currentOrder || []).filter(o => memberIdSet.has(String(o.id)));
+
+  let orderList = validCurrentOrder.length > 0
+    ? [...validCurrentOrder]
+    : [...members];
+
+  // Ensure any missing members are included at the end
+  members.forEach(m => {
+    if (!orderList.some(o => String(o.id) === String(m.id))) {
+      orderList.push(m);
+    }
+  });
+
+  const customElement = document.createElement('div');
+  customElement.className = 'batting-order-modal mt-15';
+
+  const renderList = () => {
+    customElement.innerHTML = `
+      <p class="small-hint mb-10">Arrange the batting order sequence (1st, 2nd, 3rd, etc.):</p>
+      <ul class="list-group no-bullets" style="padding: 0; margin: 0;">
+        ${orderList.map((m, idx) => `
+          <li class="flex-between align-center p-10 mb-8" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px;">
+            <div>
+              <strong style="color: #2196f3; margin-right: 8px;">#${idx + 1}</strong>
+              <span>${m.playerName || m.name || `Player ${m.id}`}</span>
+            </div>
+            <div class="flex gap-4">
+              <button type="button" class="btn-row secondary move-up-btn" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''}>▲</button>
+              <button type="button" class="btn-row secondary move-down-btn" data-idx="${idx}" ${idx === orderList.length - 1 ? 'disabled' : ''}>▼</button>
+            </div>
+          </li>
+        `).join('')}
+      </ul>
+    `;
+
+    customElement.querySelectorAll('.move-up-btn').forEach(btn => {
+      btn.onclick = () => {
+        const i = Number(btn.dataset.idx);
+        if (i > 0) {
+          const temp = orderList[i];
+          orderList[i] = orderList[i - 1];
+          orderList[i - 1] = temp;
+          renderList();
+        }
+      };
+    });
+
+    customElement.querySelectorAll('.move-down-btn').forEach(btn => {
+      btn.onclick = () => {
+        const i = Number(btn.dataset.idx);
+        if (i < orderList.length - 1) {
+          const temp = orderList[i];
+          orderList[i] = orderList[i + 1];
+          orderList[i + 1] = temp;
+          renderList();
+        }
+      };
+    });
+  };
+
+  renderList();
+
+  return showDialog({
+    title: `Set Batting Order — ${team?.name || 'Team'}`,
+    message: '',
+    confirmText: 'Save Batting Order',
+    cancelValue: null,
+    customElement,
+    resolveValue: () => orderList
+  });
+}
+
+/**
+ * Displays a modal dialog for assigning defensive/specialist roles for each machine/round.
+ * Includes equal workload validation.
+ *
+ * @param {Object} options
+ * @param {Object} options.team Team object.
+ * @param {Array<{id: number, playerName: string}>} options.members Team members.
+ * @param {Array<{orderNumber: number, label: string, machineName: string}>} options.machines List of round/segment slots.
+ * @param {Object<string|number, number>} [options.currentAssignments] Map of `{ [orderNumber]: playerId }`.
+ * @param {string} [options.roleName] Role label (e.g. "Pitcher", "Defender", "Player"). Default: "Pitcher".
+ * @param {string} [options.actionLabel] Action label (e.g. "defending", "playing"). Default: "defending".
+ * @returns {Promise<Object<string|number, number>|null>}
+ */
+export async function showRoleAssignmentDialog({
+  team,
+  members = [],
+  machines = [],
+  currentAssignments = {},
+  roleName = 'Pitcher',
+  actionLabel = 'defending'
+}) {
+  const assignments = { ...currentAssignments };
+
+  // Default unassigned machines to member rotation
+  machines.forEach((mac, idx) => {
+    if (!assignments[mac.orderNumber] && members.length > 0) {
+      assignments[mac.orderNumber] = members[idx % members.length].id;
+    }
+  });
+
+  const customElement = document.createElement('div');
+  customElement.className = 'role-assignment-modal mt-15';
+
+  let confirmButtonEl = null;
+
+  const updateValidation = (card) => {
+    const counts = {};
+    members.forEach(m => { counts[Number(m.id)] = 0; });
+    Object.values(assignments).forEach(pId => {
+      const idNum = Number(pId);
+      if (counts[idNum] !== undefined) counts[idNum]++;
+    });
+
+    const countList = Object.values(counts);
+    const minCount = countList.length > 0 ? Math.min(...countList) : 0;
+    const maxCount = countList.length > 0 ? Math.max(...countList) : 0;
+    const isBalanced = (maxCount - minCount) <= 1;
+
+    const workloadBadge = card.querySelector('#workload-status');
+    if (workloadBadge) {
+      const summaryText = members.map(m => `${m.playerName || `Player ${m.id}`}: ${counts[Number(m.id)] || 0}`).join(' | ');
+      workloadBadge.innerHTML = `
+        <div style="padding: 10px; border-radius: 6px; background: ${isBalanced ? '#e8f5e9' : '#ffebee'}; border: 1px solid ${isBalanced ? '#a5d6a7' : '#ef9a9a'}; margin-bottom: 12px;">
+          <strong style="color: ${isBalanced ? '#2e7d32' : '#c62828'};">
+            ${isBalanced ? '✓ Workload Balanced' : `⚠️ Uneven ${roleName} Workload! Everyone on the team should play an equal amount.`}
+          </strong>
+          <div style="font-size: 0.85em; color: #555; margin-top: 4px;">${summaryText}</div>
+        </div>
+      `;
+    }
+
+    if (confirmButtonEl) {
+      confirmButtonEl.disabled = !isBalanced;
+    }
+  };
+
+  customElement.innerHTML = `
+    <div id="workload-status"></div>
+    <p class="small-hint mb-10">Assign a ${roleName.toLowerCase()} for each machine where ${team?.name || 'your team'} is ${actionLabel}:</p>
+    <div class="role-rows flex-col gap-10">
+      ${machines.map(mac => `
+        <div class="form-row flex-between align-center p-10" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px;">
+          <div>
+            <strong>${mac.label || `Round ${mac.orderNumber}`}</strong>
+            <div style="font-size: 0.85em; color: #666;">Machine: ${mac.machineName || 'Unknown'}</div>
+          </div>
+          <select class="role-select modal-input" data-order="${mac.orderNumber}" style="width: auto; min-width: 160px;">
+            ${members.map(m => `<option value="${m.id}" ${String(assignments[mac.orderNumber]) === String(m.id) ? 'selected' : ''}>${m.playerName || m.name}</option>`).join('')}
+          </select>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  return showDialog({
+    title: `Assign ${roleName}s — ${team?.name || 'Team'}`,
+    message: '',
+    confirmText: `Save ${roleName}s`,
+    cancelValue: null,
+    customElement,
+    resolveValue: () => assignments,
+    onReady: ({ card, confirmBtn }) => {
+      confirmButtonEl = confirmBtn;
+      card.querySelectorAll('.role-select').forEach(sel => {
+        sel.addEventListener('change', (e) => {
+          const orderNum = e.target.dataset.order;
+          assignments[orderNum] = Number(e.target.value);
+          updateValidation(card);
+        });
+      });
+      updateValidation(card);
+    }
+  });
+}
+
+/** Legacy alias for showRoleAssignmentDialog */
+export async function showPitcherAssignmentDialog(options) {
+  return showRoleAssignmentDialog({ ...options, roleName: 'Pitcher', actionLabel: 'defending' });
+}

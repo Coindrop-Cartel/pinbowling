@@ -133,17 +133,14 @@ export function createLeagueFormController(elements, options) {
     const allowed = isH2H
       ? SCORING_FORMATS
       : SCORING_FORMATS.filter(f => f.value !== ScoringFormats.BASEBALL);
-    console.log('[FormatDropdown] rebuild: isH2H=%s, currentValue=%s, allowed=%o', isH2H, currentValue, allowed.map(f => f.value));
     leagueFormatInput.innerHTML = allowed.map(f =>
       `<option value="${f.value}">${f.label}</option>`
     ).join('');
     if (allowed.some(f => f.value === currentValue)) {
       leagueFormatInput.value = currentValue;
-      console.log('[FormatDropdown] restored currentValue:', currentValue);
     } else {
       const preferred = ScoringFormats.resolve(getCookie('pb_preferred_format'));
       leagueFormatInput.value = allowed.some(f => f.value === preferred) ? preferred : allowed[0].value;
-      console.log('[FormatDropdown] currentValue not in allowed, fell back to:', leagueFormatInput.value, '(preferred:', preferred, ')');
     }
   };
 

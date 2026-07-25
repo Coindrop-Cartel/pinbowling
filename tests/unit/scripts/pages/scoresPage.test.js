@@ -325,6 +325,7 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
 
   it('should resolve and render player selection for team participant leagues', async () => {
     Utils.getCurrentPlayerId.mockReturnValue('20');
+    PB_API.auth.me.mockResolvedValue({ id: 1, player_id: 20 });
     PB_API.players.getAll.mockResolvedValue([
       { id: 20, playerName: 'Alice' },
       { id: 30, playerName: 'Bob' }

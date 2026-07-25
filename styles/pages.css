@@ -48,11 +48,42 @@
   border-radius: 3px;
 }
 
-.round-inputs-container {
+.round-inputs-container,
+.opponent-inputs-container {
   display: flex;
-  gap: 0.5rem;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-start;
   flex-basis: 100%;
+}
+
+.role-section-header {
+  width: 100%;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  color: var(--pb-black, #222);
+}
+
+.role-section-header .role-title {
+  font-weight: 700;
+}
+
+.ball-input-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex: 1;
+  min-width: 100px;
+}
+
+.ball-player-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--pb-black, #222);
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .round-actions {
@@ -66,13 +97,6 @@
 .round-inputs-disabled {
   opacity: 0.5;
   pointer-events: none;
-}
-
-.opponent-inputs-container {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  flex-basis: 100%;
 }
 
 .save-round-button {
@@ -521,16 +545,15 @@
     margin-bottom: 10px;
   }
 
-  .round-inputs-container {
-    flex-direction: column;
-    width: 100%;
-    gap: 10px;
-  }
-
+  .round-inputs-container,
   .opponent-inputs-container {
     flex-direction: column;
     width: 100%;
-    gap: 10px;
+    gap: 12px;
+  }
+
+  .ball-input-group {
+    width: 100%;
   }
 
   .ball-input-wrapper {

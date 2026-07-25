@@ -139,7 +139,11 @@ vi.mock('@ui/branding.js', () => uiMocks);
 vi.mock('@services/sessionGenerator.js', () => ({
   generateSessionName: vi.fn((raw, loc, date, time) => raw || `${loc} ${date} ${time}`),
   selectRandomMachines: vi.fn((machines, count) => machines.slice(0, count)),
-  getTargetScoreForDifficulty: vi.fn((m, diff) => m.targetMed || 1000),
+  getTargetScoreForDifficulty: vi.fn((m, diff) => {
+    if (diff === 'easy') return m?.targetEasy || 500;
+    if (diff === 'hard') return m?.targetHard || 2000;
+    return m?.targetMed || 1000;
+  }),
 }));
 
 import { initPlayPage } from '@scripts/pages/playPage.js';
@@ -670,7 +674,9 @@ describe('Play Page (playPage.js)', () => {
       });
 
       // Simulate expansion to show qfill and scaling buttons
-      const onHeaderClick = uiMocks.createExpandableRow.mock.calls[0][1].onHeaderClick;
+      const previewCalls = uiMocks.createExpandableRow.mock.calls.filter(c => c[1]?.className === 'frame-preview-item');
+      const lastPreviewCall = previewCalls[previewCalls.length - 1];
+      const onHeaderClick = lastPreviewCall[1].onHeaderClick;
       onHeaderClick();
 
       // Locate qfill button (e.g. Easy)

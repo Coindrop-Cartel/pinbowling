@@ -27,7 +27,7 @@ class CleanupService {
 
         // Identify session leagues that have passed the retention threshold
         $stmt = $this->db->query(
-            "SELECT id FROM leagues WHERE type = 'session' AND start_date < ?",
+            "SELECT id FROM leagues WHERE type = 'session' AND (start_date IS NULL OR start_date <= ?)",
             [$cutoffDate]
         );
         $results = $stmt->fetchAll(\PDO::FETCH_COLUMN);
@@ -37,7 +37,8 @@ class CleanupService {
             return [
                 'success' => true,
                 'message' => "No session leagues older than $retentionDays days were found.",
-                'deletedCount' => 0
+                'deletedCount' => 0,
+                'leagues_cleaned' => 0
             ];
         }
 
@@ -69,15 +70,11 @@ class CleanupService {
             $sql = "DELETE FROM events WHERE league_id IN ($idPlaceholders)";
             $pdo->prepare($sql)->execute($leagueIds);
 
-            // 4. Remove player-to-league roster mappings
-            $sql = "DELETE FROM league_players WHERE league_id IN ($idPlaceholders)";
-            $pdo->prepare($sql)->execute($leagueIds);
-
-            // 5. Remove league team associations
+            // 6. Remove league team associations
             $sql = "DELETE FROM league_teams WHERE league_id IN ($idPlaceholders)";
             $pdo->prepare($sql)->execute($leagueIds);
 
-            // 6. Finally, delete the leagues
+            // 7. Finally, delete the leagues
             $sql = "DELETE FROM leagues WHERE id IN ($idPlaceholders)";
             $pdo->prepare($sql)->execute($leagueIds);
 
@@ -87,7 +84,8 @@ class CleanupService {
             return [
                 'success' => true,
                 'message' => count($leagueIds) . " session league(s) older than $retentionDays days have been deleted.",
-                'deletedCount' => count($leagueIds)
+                'deletedCount' => count($leagueIds),
+                'leagues_cleaned' => count($leagueIds)
             ];
         } catch (\PDOException $e) {
             $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -130,10 +128,6 @@ class CleanupService {
             }
 
             $idPlaceholders = implode(',', array_fill(0, count($playerIds), '?'));
-
-            // Delete player league memberships
-            $sql = "DELETE FROM league_players WHERE player_id IN ($idPlaceholders)";
-            $pdo->prepare($sql)->execute($playerIds);
 
             // Delete player team memberships
             $sql = "DELETE FROM team_members WHERE player_id IN ($idPlaceholders)";

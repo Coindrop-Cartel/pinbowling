@@ -85,10 +85,12 @@ class Serializer {
             'type' => $row['type'] ?? 'standard',
             'competitionFormat' => $row['competition_format'] ?? 'group',
             'participationType' => $row['participation_type'] ?? 'individual',
+            'teamSize' => isset($row['team_size']) ? (int)$row['team_size'] : 1,
             'startDate' => $row['start_date'] ?? null,
             'scoringFormat' => $row['scoring_format'] ?? 'bowling',
             'seasonScoring' => $row['season_scoring'] ?? 'weekly',
             'dropLowestWeeks' => (int)($row['drop_lowest_weeks'] ?? 0),
+            'dropLowestPlayerScores' => (int)($row['drop_lowest_player_scores'] ?? 0),
             'weeklyPoints' => isset($row['weekly_points']) ? (int)$row['weekly_points'] : null,
             'pointSpread' => isset($row['point_spread']) ? (int)$row['point_spread'] : null,
             'weeksInSeason' => isset($row['weeks_in_season']) && $row['weeks_in_season'] !== null ? (int)$row['weeks_in_season'] : null,
@@ -125,15 +127,19 @@ class Serializer {
     public static function score($row) {
         return [
             'id' => (int)$row['id'],
-            'playerId' => (int)$row['player_id'],
+            'playerId' => (isset($row['player_id']) && $row['player_id'] !== null) ? (int)$row['player_id'] : null,
+            'teamId' => (isset($row['team_id']) && $row['team_id'] !== null) ? (int)$row['team_id'] : null,
             'eventId' => (int)($row['event_id'] ?? 0),
             'eventMatchupId' => (isset($row['event_matchup_id']) && $row['event_matchup_id'] !== null) ? (int)$row['event_matchup_id'] : null,
             'orderNumber' => (int)$row['order_number'],
             'machineId' => (int)$row['machine_id'],
             'machineName' => $row['machine_name'] ?? null,
             'ball1' => (int)$row['ball1'],
+            'ball1PlayerId' => (isset($row['ball1_player_id']) && $row['ball1_player_id'] !== null) ? (int)$row['ball1_player_id'] : null,
             'ball2' => (int)$row['ball2'],
+            'ball2PlayerId' => (isset($row['ball2_player_id']) && $row['ball2_player_id'] !== null) ? (int)$row['ball2_player_id'] : null,
             'ball3' => (int)$row['ball3'],
+            'ball3PlayerId' => (isset($row['ball3_player_id']) && $row['ball3_player_id'] !== null) ? (int)$row['ball3_player_id'] : null,
             'status' => $row['status'] ?? 'approved'
         ];
     }
@@ -239,7 +245,9 @@ class Serializer {
             'orderNumber' => (int)$row['order_number'],
             'machineId' => (int)$row['machine_id'],
             'machineName' => $row['machine_name'] ?? null,
-            'playerId' => (isset($row['player_id']) && $row['player_id'] !== null) ? (int)$row['player_id'] : null,
+            'player1Id' => (isset($row['player1_id']) && $row['player1_id'] !== null) ? (int)$row['player1_id'] : null,
+            'player2Id' => (isset($row['player2_id']) && $row['player2_id'] !== null) ? (int)$row['player2_id'] : null,
+            'playerId' => (isset($row['player2_id']) && $row['player2_id'] !== null) ? (int)$row['player2_id'] : ((isset($row['player1_id']) && $row['player1_id'] !== null) ? (int)$row['player1_id'] : null),
             'playerName' => $row['player_name'] ?? null
         ];
     }

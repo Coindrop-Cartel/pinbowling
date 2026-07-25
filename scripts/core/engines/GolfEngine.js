@@ -199,6 +199,57 @@ export class GolfEngine extends ScoringEngine {
   }
 
   /**
+   * Calculates team totals across all team members for a full game in Golf,
+   * applying drop_lowest_player_scores logic (dropping worst/highest total game stroke scores per player).
+   *
+   * @param {Array<Object>} machines Target definitions for the event.
+   * @param {Object<number|string, Object>} scoreMapByPlayer Dictionary of player scoreMaps keyed by playerId.
+   * @param {Array<Object>} members List of team member objects.
+   * @param {number} dropLowestCount Number of lowest member game totals to drop per game.
+   * @returns {Object}
+   */
+  calculateTeamTurnResults(machines, scoreMapByPlayer = {}, members = [], dropLowestCount = 0) {
+    const memberResults = {};
+    const memberGameTotals = [];
+
+    members.forEach(member => {
+      const pScores = scoreMapByPlayer[member.id] || {};
+      const res = this.calculateTurnResults(machines, pScores);
+      memberResults[member.id] = res;
+      memberGameTotals.push({
+        playerId: member.id,
+        playerName: member.playerName || member.name,
+        total: res.total,
+        totalDisplay: res.totalDisplay,
+        hasScores: res.turnResults.some(t => t.played)
+      });
+    });
+
+    // In Golf, lower score is better -> sort ascending (lowest to highest total)
+    // Worst game score is the highest total stroke count
+    memberGameTotals.sort((a, b) => a.total - b.total);
+
+    let effectiveMemberTotals = memberGameTotals;
+    let droppedMemberTotals = [];
+
+    if (dropLowestCount > 0 && memberGameTotals.length > dropLowestCount) {
+      effectiveMemberTotals = memberGameTotals.slice(0, memberGameTotals.length - dropLowestCount);
+      droppedMemberTotals = memberGameTotals.slice(memberGameTotals.length - dropLowestCount);
+    }
+
+    const teamGameTotal = effectiveMemberTotals.reduce((sum, m) => sum + m.total, 0);
+
+    return {
+      memberResults,
+      memberGameTotals,
+      effectiveMemberTotals,
+      droppedMemberTotals,
+      total: teamGameTotal,
+      totalDisplay: this.formatTotalScore(teamGameTotal, machines)
+    };
+  }
+
+  /**
    * Comparator for player standings. Low score wins in Golf.
    */
   compareScores(a, b) { return a - b; } // Low score wins

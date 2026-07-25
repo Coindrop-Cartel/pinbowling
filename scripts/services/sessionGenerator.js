@@ -2,6 +2,10 @@
  * Small helpers for Quick-Play session generation.
  */
 
+import { getTargetScoreForDifficulty as resolveTarget, FORMAT_DEFAULTS } from './targetResolver.js';
+
+export { FORMAT_DEFAULTS };
+
 /**
  * Build a session name from optional custom name, location, date, and time.
  * @param {string} rawName - Optional custom event name (may be empty string)
@@ -34,21 +38,18 @@ export function selectRandomMachines(machines, count) {
 
 /**
  * Look up the target score for a machine at a given difficulty level.
- * Difficulty is mapped to a machine property key (e.g. 'easy' → 'targetEasy').
- * @param {Object} machine - Machine object with targetEasy/targetMed/targetHard properties
- * @param {string} difficulty - Difficulty level ('easy', 'med', or 'hard')
- * @param {string} [format='bowling'] - The format to lookup targets for
- * @returns {number} Target score for the difficulty, or 1000000 (5000000 for baseball) as fallback
+ * 
+ * Delegates to {@link module:services/targetResolver.resolveTarget}.
+ * Supports signature variants `(machine, difficulty, format)` and `(machine, format, difficulty)`.
+ *
+ * @param {Object} machine - Machine object with score targets
+ * @param {string} [param2='med'] - Difficulty level or scoring format
+ * @param {string} [param3='bowling'] - Scoring format or difficulty level
+ * @returns {number} Resolved target score
  */
-export function getTargetScoreForDifficulty(machine, difficulty, format = 'bowling') {
-    const key = 'target' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-    if (machine.scores && machine.scores[format] && machine.scores[format][key]) {
-        return machine.scores[format][key];
-    }
-    if ((!machine.format || machine.format === format) && machine[key]) {
-        return machine[key];
-    }
-    return (format === 'baseball' ? 5000000 : 1000000);
+export function getTargetScoreForDifficulty(machine, param2 = 'med', param3 = 'bowling') {
+    const isParam2Format = ['bowling', 'golf', 'baseball'].includes(String(param2).toLowerCase());
+    const format = isParam2Format ? param2 : param3;
+    const difficulty = isParam2Format ? param3 : param2;
+    return resolveTarget(machine, format, difficulty);
 }
-
-

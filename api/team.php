@@ -21,7 +21,8 @@ class TeamController extends ApiController {
     protected function handle(): void {
         switch ($this->method) {
             case 'GET':
-                $teams = $this->teamService->getAllTeams();
+                $includeWrappers = isset($_GET['includeWrappers']) && $_GET['includeWrappers'] === 'true';
+                $teams = $this->teamService->getAllTeams($includeWrappers);
                 $this->sendJson(array_map([Serializer::class, 'team'], $teams));
                 break;
 

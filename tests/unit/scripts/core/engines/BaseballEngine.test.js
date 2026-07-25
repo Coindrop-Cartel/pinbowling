@@ -505,10 +505,10 @@ describe('BaseballEngine', () => {
     const matchups = engine.generateMatchupPayload(players, 2, machines);
     // 2 innings × 2 players = 4 rows
     expect(matchups).toHaveLength(4);
-    expect(matchups[0]).toEqual({ orderNumber: 1, playerId: 10, playerOrder: 1, machineId: 101 });
-    expect(matchups[1]).toEqual({ orderNumber: 2, playerId: 20, playerOrder: 2, machineId: 102 });
-    expect(matchups[2]).toEqual({ orderNumber: 3, playerId: 10, playerOrder: 1, machineId: 103 });
-    expect(matchups[3]).toEqual({ orderNumber: 4, playerId: 20, playerOrder: 2, machineId: 104 });
+    expect(matchups[0]).toEqual({ orderNumber: 1, playerId: 10, player1Id: 10, player2Id: 20, playerOrder: 1, machineId: 101 });
+    expect(matchups[1]).toEqual({ orderNumber: 2, playerId: 20, player1Id: 20, player2Id: 10, playerOrder: 2, machineId: 102 });
+    expect(matchups[2]).toEqual({ orderNumber: 3, playerId: 10, player1Id: 10, player2Id: 20, playerOrder: 1, machineId: 103 });
+    expect(matchups[3]).toEqual({ orderNumber: 4, playerId: 20, player1Id: 20, player2Id: 10, playerOrder: 2, machineId: 104 });
   });
 
   test('generateMatchupPayload - round-robin cycles pairings for 3 players', () => {
@@ -650,6 +650,7 @@ describe('BaseballEngine', () => {
     const result = engine.getRoundRowContext(round, context);
     // Current player 2 is away (playerOrder 2). Viewing the Top machine (player 1's).
     // Away bats on Top → current player is the Batter.
+    expect(result.isPlayer1).toBe(false);
     expect(result.isPitcher).toBe(false);
     expect(result.opponentName).toBe('Kyle');
     expect(result.displayRoundNumber).toContain('Top of 1');
@@ -674,6 +675,7 @@ describe('BaseballEngine', () => {
     const result = engine.getRoundRowContext(round, context);
     // Current player 2 is away (playerOrder 2). Viewing the Bottom machine (their own).
     // Away pitches on Bottom → current player is the Pitcher.
+    expect(result.isPlayer1).toBe(false);
     expect(result.isPitcher).toBe(true);
     expect(result.role).toBe('pitcher');
   });
@@ -696,10 +698,68 @@ describe('BaseballEngine', () => {
     const result = engine.getRoundRowContext(round, context);
     // Current player 1 is home (playerOrder 1). Viewing the Top machine (their own).
     // Home pitches on Top → current player is the Pitcher.
+    expect(result.isPlayer1).toBe(true);
     expect(result.isPitcher).toBe(true);
     expect(result.opponentName).toBe('Brian');
     expect(result.displayRoundNumber).toContain('Top of 1');
     expect(result.role).toBe('pitcher');
+  });
+
+  test('calculateTurnResults - preserves bottom of last inning scores and dynamically includes them if earlier inning edit causes home to trail', () => {
+    const machines = [
+      { orderNumber: 1, machineName: 'M1', values: { 1: 1000, 2: 2000 } }, // Top 1 (Away)
+      { orderNumber: 2, machineName: 'M2', values: { 1: 1000, 2: 2000 } }, // Bot 1 (Home)
+      { orderNumber: 3, machineName: 'M3', values: { 1: 1000, 2: 2000 } }, // Top 2 (Away)
+      { orderNumber: 4, machineName: 'M4', values: { 1: 1000, 2: 2000 } }, // Bot 2 (Home)
+    ];
+
+    // Initial state:
+    // Top 1: Away 0 runs
+    // Bot 1: Home 2 runs (2000)
+    // Top 2: Away 0 runs (played ball1: 100 -> 0 runs)
+    // Bot 2: Home 2000 (2 runs entered)
+    // Entering Bot 2, Home is ALREADY leading 2-0 after Top 2 is played!
+    const scoreMapInitial = {
+      isPlayer1: true,
+      '1': { ball1: 0, ball2: 0, ball3: 0 },
+      '2': { ball1: 2000, ball2: 0, ball3: 0 },
+      '3': { ball1: 0, ball2: 0, ball3: 0 },
+      '4': { ball1: 2000, ball2: 0, ball3: 0 },
+      opponent: {
+        '1': { ball1: 0, ball2: 0, ball3: 0 },
+        '2': { ball1: 0, ball2: 0, ball3: 0 },
+        '3': { ball1: 100, ball2: 0, ball3: 0 },
+        '4': { ball1: 0, ball2: 0, ball3: 0 }
+      }
+    };
+
+    const initialResult = engine.calculateTurnResults(machines, scoreMapInitial);
+    // Home was leading 2-0 before Bot 2; Bot 2 is walk-off (0 added to total, but score preserved)
+    expect(initialResult.turnResults[3].isWalkOff).toBe(true);
+    expect(initialResult.turnResults[3].played).toBe(true);
+    expect(initialResult.turnResults[3].displayMark).toBe('2R');
+
+    // Away edits Top 1 to score 4000 (2 runs for Away) -> Away total is now 2, Home before Bot 2 was 2
+    // Away edits Top 2 to score 2000 (1 run for Away) -> Away total is now 3, Home before Bot 2 is 2 (Home is trailing 2-3!)
+    const scoreMapEdited = {
+      isPlayer1: true,
+      '1': { ball1: 0, ball2: 0, ball3: 0 },
+      '2': { ball1: 2000, ball2: 0, ball3: 0 },
+      '3': { ball1: 0, ball2: 0, ball3: 0 },
+      '4': { ball1: 2000, ball2: 0, ball3: 0 },
+      opponent: {
+        '1': { ball1: 4000, ball2: 0, ball3: 0 }, // Away scores 2 runs in Top 1!
+        '2': { ball1: 0, ball2: 0, ball3: 0 },
+        '3': { ball1: 2000, ball2: 0, ball3: 0 }, // Away scores 1 run in Top 2! (Away total = 3)
+        '4': { ball1: 0, ball2: 0, ball3: 0 }
+      }
+    };
+
+    const editedResult = engine.calculateTurnResults(machines, scoreMapEdited);
+    // Away is now 3 runs. Home (2 runs before Bot 2) is trailing! Home's Bot 2 score (2 runs) is now NEEDED so isWalkOff is undefined and runs are counted!
+    expect(editedResult.turnResults[3].isWalkOff).toBeUndefined();
+    expect(editedResult.turnResults[3].score).toBe(2);
+    expect(editedResult.turnResults[3].displayRunningTotal).toBe('4 R');
   });
 
   test('getRoundRowContext - home player is batter when viewing away bottom machine', () => {
@@ -720,6 +780,7 @@ describe('BaseballEngine', () => {
     const result = engine.getRoundRowContext(round, context);
     // Current player 1 is home (playerOrder 1). Viewing the Bottom machine (away's).
     // Home bats on Bottom → current player is the Batter.
+    expect(result.isPlayer1).toBe(true);
     expect(result.isPitcher).toBe(false);
     expect(result.opponentName).toBe('Brian');
     expect(result.displayRoundNumber).toContain('Bottom of 1');
@@ -731,6 +792,7 @@ describe('BaseballEngine', () => {
     const round = { machineId: 999, orderNumber: 1 };
     const result = engine.getRoundRowContext(round, context);
     expect(result.matchup).toBeNull();
+    expect(result.isPlayer1).toBe(true);
     expect(result.isPitcher).toBe(true);
     expect(result.opponentName).toBe('');
     expect(result.role).toBe('pitcher');
@@ -935,9 +997,9 @@ describe('BaseballEngine', () => {
     // Verify insertion fallback (no total-score div)
     expect(domRefs.resultsPanel.insertAdjacentHTML).toHaveBeenCalledWith('beforeend', expect.stringContaining('scoreboard-grid'));
 
-    // Check rendered total score (Away defaults to string 'Away' because it's missing, Home defaults to 'You')
-    expect(domRefs.totalScore.innerHTML).toContain('Away 0');
-    expect(domRefs.totalScore.innerHTML).toContain('You 5');
+    // Check rendered total score (Away defaults to 'Opponent' with mocked score 5, Home resolves to 'Player One' with 0)
+    expect(domRefs.totalScore.innerHTML).toContain('Opponent 5');
+    expect(domRefs.totalScore.innerHTML).toContain('Player One 0');
 
     calculateTurnResultsSpy.mockRestore();
   });
@@ -995,8 +1057,8 @@ describe('BaseballEngine', () => {
 
     renderHead2HeadScoreboard(calcResult, machines, context, domRefs, engine);
 
-    // Away defaults to 'You' (because current player is player 2), Home defaults to 'Home' (because it's missing)
-    expect(domRefs.totalScore.innerHTML).toContain('You 7');
+    // Away resolves to 'Player Two' (from wrapper.player2Name), Home defaults to 'Home' (because it's missing)
+    expect(domRefs.totalScore.innerHTML).toContain('Player Two 7');
     expect(domRefs.totalScore.innerHTML).toContain('Home 0');
 
     calculateTurnResultsSpy.mockRestore();

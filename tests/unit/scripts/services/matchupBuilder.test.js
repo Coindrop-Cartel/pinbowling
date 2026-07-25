@@ -5,6 +5,8 @@ import {
   buildTeamRoundRobinMatchups,
   resolveTeamMatchupRole,
   enrichTeamMatchupEntries,
+  validatePitcherWorkload,
+  resolvePlayerForBall,
 } from '@services/matchupBuilder.js';
 
 // ── Shared Fixtures ──────────────────────────────────────────────────
@@ -78,11 +80,10 @@ describe('resolveMatchupRole', () => {
   test('returns default when no matchups', () => {
     const result = resolveMatchupRole(1, 10, []);
     expect(result.matchup).toBeNull();
-    expect(result.isPitcher).toBe(true);
-    expect(result.role).toBe('pitcher');
+    expect(result.isPlayer1).toBe(true);
   });
 
-  test('resolves Player 1 as pitcher on top machine', () => {
+  test('resolves Player 1 identity on top machine', () => {
     const eventMatchups = [{
       player1Id: 1, player1Name: 'Alice',
       player2Id: 2, player2Name: 'Bob',
@@ -92,12 +93,11 @@ describe('resolveMatchupRole', () => {
       ]
     }];
     const result = resolveMatchupRole(1, 10, eventMatchups);
-    expect(result.isPitcher).toBe(true);
+    expect(result.isPlayer1).toBe(true);
     expect(result.opponentName).toBe('Bob');
-    expect(result.role).toBe('pitcher');
   });
 
-  test('resolves Player 2 as batter on bottom machine', () => {
+  test('resolves Player 2 identity on bottom machine', () => {
     const eventMatchups = [{
       player1Id: 1, player1Name: 'Alice',
       player2Id: 2, player2Name: 'Bob',
@@ -107,9 +107,8 @@ describe('resolveMatchupRole', () => {
       ]
     }];
     const result = resolveMatchupRole(2, 11, eventMatchups);
-    expect(result.isPitcher).toBe(false);
+    expect(result.isPlayer1).toBe(false);
     expect(result.opponentName).toBe('Alice');
-    expect(result.role).toBe('batter');
   });
 
   test('returns empty when no matching entry found', () => {
@@ -135,72 +134,69 @@ describe('buildTeamRoundRobinMatchups', () => {
     expect(buildTeamRoundRobinMatchups(makeMatchupWrapper(), awayMembers, homeMembers, 0, [makeMachine(1)])).toEqual([]);
   });
 
-  test('generates 4 entries per inning (2 per half-inning)', () => {
+  test('generates 2 matchups per inning (1 per half-inning)', () => {
     const wrapper = makeMatchupWrapper();
     const machines = [makeMachine(10), makeMachine(11)];
     const result = buildTeamRoundRobinMatchups(wrapper, awayMembers, homeMembers, 1, machines);
-    expect(result).toHaveLength(4);
+    // 1 inning × 2 halves = 2 total (NOT one row per team member)
+    expect(result).toHaveLength(2);
   });
 
   test('generates correct total for multiple innings', () => {
     const wrapper = makeMatchupWrapper();
     const machines = [makeMachine(10), makeMachine(11), makeMachine(12), makeMachine(13)];
     const result = buildTeamRoundRobinMatchups(wrapper, awayMembers, homeMembers, 2, machines);
-    expect(result).toHaveLength(8);
+    // 2 innings × 2 halves = 4 total
+    expect(result).toHaveLength(4);
   });
 
-  test('top half entries use the same machine', () => {
+  test('top half uses 1 machine for the whole half-inning', () => {
     const wrapper = makeMatchupWrapper();
     const machines = [makeMachine(10), makeMachine(11)];
     const result = buildTeamRoundRobinMatchups(wrapper, awayMembers, homeMembers, 1, machines);
     const topEntries = result.filter(e => e.isTop);
-    expect(topEntries).toHaveLength(2);
+    // Exactly 1 matchup row for Top — batter rotation handled at scoring time
+    expect(topEntries).toHaveLength(1);
     expect(topEntries[0].machineId).toBe(10);
-    expect(topEntries[1].machineId).toBe(10);
   });
 
-  test('bottom half entries use the same machine', () => {
+  test('bottom half uses 1 machine for the whole half-inning', () => {
     const wrapper = makeMatchupWrapper();
     const machines = [makeMachine(10), makeMachine(11)];
     const result = buildTeamRoundRobinMatchups(wrapper, awayMembers, homeMembers, 1, machines);
     const bottomEntries = result.filter(e => !e.isTop);
-    expect(bottomEntries).toHaveLength(2);
+    // Exactly 1 matchup row for Bottom — batter rotation handled at scoring time
+    expect(bottomEntries).toHaveLength(1);
     expect(bottomEntries[0].machineId).toBe(11);
-    expect(bottomEntries[1].machineId).toBe(11);
   });
 
-  test('top half: away team members are batters, home team members are pitchers', () => {
+  test('top half: lead-off away batter and team IDs are set', () => {
     const wrapper = makeMatchupWrapper();
     const machines = [makeMachine(10), makeMachine(11)];
     const result = buildTeamRoundRobinMatchups(wrapper, awayMembers, homeMembers, 1, machines);
-    const topEntries = result.filter(e => e.isTop);
+    const top = result.find(e => e.isTop);
 
-    expect(topEntries[0].playerId).toBe(1); // Alice (away) batter
-    expect(topEntries[0].opponentId).toBe(3); // Charlie (home) pitcher
-    expect(topEntries[0].playerName).toBe('Alice');
-    expect(topEntries[0].opponentName).toBe('Charlie');
-
-    expect(topEntries[1].playerId).toBe(2); // Bob (away) batter
-    expect(topEntries[1].opponentId).toBe(4); // Dave (home) pitcher
-    expect(topEntries[1].playerName).toBe('Bob');
-    expect(topEntries[1].opponentName).toBe('Dave');
+    // Lead-off batter is away[0] = Alice; batter rotation continues at scoring time
+    expect(top.playerId).toBe(1); // Alice (away lead-off)
+    expect(top.playerName).toBe('Alice');
+    // Team IDs reference the team objects, not individual players
+    expect(top.teamId).toBe(awayTeam.id);
+    expect(top.opponentTeamId).toBe(homeTeam.id);
+    expect(top.player1Id).toBe(homeTeam.id); // home = pitching team
+    expect(top.player2Id).toBe(awayTeam.id); // away = batting team
   });
 
-  test('bottom half: home team members are batters, away team members are pitchers', () => {
+  test('bottom half: lead-off home batter and team IDs are set', () => {
     const wrapper = makeMatchupWrapper();
     const machines = [makeMachine(10), makeMachine(11)];
     const result = buildTeamRoundRobinMatchups(wrapper, awayMembers, homeMembers, 1, machines);
-    const bottomEntries = result.filter(e => !e.isTop);
+    const bottom = result.find(e => !e.isTop);
 
-    expect(bottomEntries[0].playerId).toBe(3); // Charlie (home) batter
-    expect(bottomEntries[0].opponentId).toBe(1); // Alice (away) pitcher
-    expect(bottomEntries[0].playerName).toBe('Charlie');
-    expect(bottomEntries[0].opponentName).toBe('Alice');
-
-    expect(bottomEntries[1].playerId).toBe(4); // Dave (home) batter
-    expect(bottomEntries[1].opponentId).toBe(2); // Bob (away) pitcher
-    expect(bottomEntries[1].playerName).toBe('Dave');
-    expect(bottomEntries[1].opponentName).toBe('Bob');
+    // Lead-off batter is home[0] = Charlie
+    expect(bottom.playerId).toBe(3); // Charlie (home lead-off)
+    expect(bottom.playerName).toBe('Charlie');
+    expect(bottom.teamId).toBe(homeTeam.id);
+    expect(bottom.opponentTeamId).toBe(awayTeam.id);
   });
 
   test('team IDs are set correctly', () => {
@@ -208,41 +204,29 @@ describe('buildTeamRoundRobinMatchups', () => {
     const machines = [makeMachine(10), makeMachine(11)];
     const result = buildTeamRoundRobinMatchups(wrapper, awayMembers, homeMembers, 1, machines);
 
-    // Top half: away team bats
+    // result[0] = Top (away bats), result[1] = Bottom (home bats)
     expect(result[0].teamId).toBe(awayTeam.id);
     expect(result[0].opponentTeamId).toBe(homeTeam.id);
-    // Bottom half: home team bats
-    expect(result[2].teamId).toBe(homeTeam.id);
-    expect(result[2].opponentTeamId).toBe(awayTeam.id);
+    expect(result[1].teamId).toBe(homeTeam.id);
+    expect(result[1].opponentTeamId).toBe(awayTeam.id);
   });
 
   test('orderNumbers are sequential starting from 1', () => {
     const wrapper = makeMatchupWrapper();
     const machines = [makeMachine(10), makeMachine(11)];
     const result = buildTeamRoundRobinMatchups(wrapper, awayMembers, homeMembers, 1, machines);
-    expect(result.map(e => e.orderNumber)).toEqual([1, 2, 3, 4]);
+    // 1 inning = 2 rows (Top 1, Bottom 1)
+    expect(result.map(e => e.orderNumber)).toEqual([1, 2]);
   });
 
-  test('handles uneven team sizes (3 vs 2)', () => {
+  test('roundName is set on each half-inning', () => {
     const wrapper = makeMatchupWrapper();
-    const bigAway = [makePlayer(1, 'Alice'), makePlayer(2, 'Bob'), makePlayer(5, 'Eve')];
-    const machines = [makeMachine(10), makeMachine(11)];
-    const result = buildTeamRoundRobinMatchups(wrapper, bigAway, homeMembers, 1, machines);
-    // 3 away members -> 3 top entries; 2 home members -> 2 bottom entries
-    expect(result).toHaveLength(5);
-    expect(result.filter(e => e.isTop)).toHaveLength(3);
-    expect(result.filter(e => !e.isTop)).toHaveLength(2);
-  });
-
-  test('falls back to first member when slot exceeds team size', () => {
-    const wrapper = makeMatchupWrapper();
-    const smallAway = [makePlayer(1, 'Alice')];
-    const machines = [makeMachine(10), makeMachine(11)];
-    const result = buildTeamRoundRobinMatchups(wrapper, smallAway, homeMembers, 1, machines);
-    const topEntries = result.filter(e => e.isTop);
-    // Only 1 away member -> 1 top entry, opponent should be home member 0 (Charlie)
-    expect(topEntries).toHaveLength(1);
-    expect(topEntries[0].opponentId).toBe(3);
+    const machines = [makeMachine(10), makeMachine(11), makeMachine(12), makeMachine(13)];
+    const result = buildTeamRoundRobinMatchups(wrapper, awayMembers, homeMembers, 2, machines);
+    expect(result[0].roundName).toBe('Top 1');
+    expect(result[1].roundName).toBe('Bottom 1');
+    expect(result[2].roundName).toBe('Top 2');
+    expect(result[3].roundName).toBe('Bottom 2');
   });
 
   test('uses snake_case field names from matchupWrapper', () => {
@@ -260,8 +244,7 @@ describe('resolveTeamMatchupRole', () => {
   test('returns default when no entries', () => {
     const result = resolveTeamMatchupRole(1, 1, []);
     expect(result.matchup).toBeNull();
-    expect(result.isPitcher).toBe(true);
-    expect(result.role).toBe('pitcher');
+    expect(result.isPlayer1).toBe(true);
   });
 
   test('returns default when orderNumber not found', () => {
@@ -274,7 +257,7 @@ describe('resolveTeamMatchupRole', () => {
     expect(result.matchup).toBeNull();
   });
 
-  test('resolves batter role when playerId matches entry', () => {
+  test('resolves away team as player2', () => {
     const eventMatchups = [{
       id: 1,
       player1Id: homeTeam.id,
@@ -288,14 +271,13 @@ describe('resolveTeamMatchupRole', () => {
       ]
     }];
 
-    const result = resolveTeamMatchupRole(1, 1, eventMatchups);
-    expect(result.isPitcher).toBe(false);
-    expect(result.role).toBe('batter');
+    const result = resolveTeamMatchupRole(awayTeam.id, 1, eventMatchups);
+    expect(result.isPlayer1).toBe(false);
     expect(result.opponentName).toBe('');
     expect(result.displayRoundNumber).toBe('Top 1');
   });
 
-  test('resolves pitcher role when player is not the batter', () => {
+  test('resolves home team as player1', () => {
     const eventMatchups = [{
       id: 1,
       player1Id: homeTeam.id,
@@ -306,10 +288,8 @@ describe('resolveTeamMatchupRole', () => {
       ]
     }];
 
-    // Player 3 (Charlie) is not the batter in entry 1
-    const result = resolveTeamMatchupRole(3, 1, eventMatchups);
-    expect(result.isPitcher).toBe(true);
-    expect(result.role).toBe('pitcher');
+    const result = resolveTeamMatchupRole(homeTeam.id, 1, eventMatchups);
+    expect(result.isPlayer1).toBe(true);
     expect(result.opponentName).toBe('');
   });
 
@@ -357,13 +337,16 @@ describe('resolveTeamMatchupRole', () => {
       },
     ];
 
-    const result1 = resolveTeamMatchupRole(1, 1, eventMatchups);
+    // Top 1: away team bats
+    const result1 = resolveTeamMatchupRole(awayTeam.id, 1, eventMatchups);
     expect(result1.displayRoundNumber).toBe('Top 1');
 
-    const result3 = resolveTeamMatchupRole(3, 3, eventMatchups);
+    // Bottom 1: home team bats
+    const result3 = resolveTeamMatchupRole(homeTeam.id, 3, eventMatchups);
     expect(result3.displayRoundNumber).toBe('Bottom 1');
 
-    const result5 = resolveTeamMatchupRole(1, 5, eventMatchups);
+    // Top 2: away team bats
+    const result5 = resolveTeamMatchupRole(awayTeam.id, 5, eventMatchups);
     expect(result5.displayRoundNumber).toBe('Top 2');
   });
 });
@@ -457,5 +440,28 @@ describe('enrichTeamMatchupEntries', () => {
     const wrapper = makeMatchupWrapper();
     const result = enrichTeamMatchupEntries(serverEntries, wrapper, awayMembers, homeMembers);
     expect(result[0].isTop).toBe(true);
+  });
+});
+
+describe('validatePitcherWorkload & resolvePlayerForBall', () => {
+  const members = [{ id: 1, playerName: 'Kyle' }, { id: 2, playerName: 'Steve' }];
+
+  test('validatePitcherWorkload identifies balanced assignments', () => {
+    const res = validatePitcherWorkload(members, { 1: 1, 2: 2 });
+    expect(res.valid).toBe(true);
+    expect(res.maxCount).toBe(1);
+    expect(res.minCount).toBe(1);
+  });
+
+  test('validatePitcherWorkload flags uneven assignments', () => {
+    const res = validatePitcherWorkload(members, { 1: 1, 2: 1, 3: 1 });
+    expect(res.valid).toBe(false);
+    expect(res.message).toContain('Pitching workload is uneven');
+  });
+
+  test('resolvePlayerForBall cycles through batting order', () => {
+    expect(resolvePlayerForBall(members, 0).playerName).toBe('Kyle');
+    expect(resolvePlayerForBall(members, 1).playerName).toBe('Steve');
+    expect(resolvePlayerForBall(members, 2).playerName).toBe('Kyle');
   });
 });

@@ -235,7 +235,8 @@ export async function initManagementPage() {
         return;
       }
       const result = await PB_API.system.runCleanup(days);
-      showAlert(`Cleanup successful! Removed ${result.leagues_cleaned || 0} session leagues older than ${days} days.`, 'Success');
+      const cleaned = result.deletedCount ?? result.leagues_cleaned ?? 0;
+      showAlert(`Cleanup successful! Removed ${cleaned} session league(s) older than ${days} days.`, 'Success');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       showAlert('Cleanup failed: ' + message, 'Error');

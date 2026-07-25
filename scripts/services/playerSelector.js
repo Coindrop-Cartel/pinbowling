@@ -1,6 +1,86 @@
 import { filterPlayersForUser } from './auth.js';
 
 /**
+ * Helper to resolve participant IDs (player or team ID) to actual player objects.
+ */
+export function resolvePlayersForMatchupParticipant(participantId, participantName, allPlayers = [], allLeaguesCache = []) {
+  if (!participantId) return [];
+  const pIdStr = String(participantId);
+
+  // 1. Direct match in allPlayers
+  const directPlayer = allPlayers.find(p => String(p.id) === pIdStr);
+  if (directPlayer) return [directPlayer];
+
+  // 2. Check team members across all leagues
+  for (const league of allLeaguesCache) {
+    const team = (league?.teams || []).find(t => String(t.id) === pIdStr);
+    if (team?.members?.length) {
+      return team.members;
+    }
+  }
+
+  // 3. Fallback to name match in allPlayers
+  if (participantName) {
+    const nameMatch = allPlayers.find(p => p.playerName?.toLowerCase() === participantName.toLowerCase());
+    if (nameMatch) return [nameMatch];
+  }
+
+  // 4. Return fallback object
+  return [{ id: participantId, playerName: participantName || `Participant ${participantId}` }];
+}
+
+/**
+ * Gets the list of selectable teams for team mode matchup scoring context.
+ *
+ * @param {Object} params - Selection parameters { activeMatchupId, eventMatchups, allLeaguesCache, leagueId }.
+ * @returns {Array<{ id: number, name: string, members: Array, roleLabel?: string }>} List of selectable team objects.
+ */
+export function getSelectableTeams(params) {
+  const { activeMatchupId, eventMatchups = [], allLeaguesCache = [], leagueId } = params;
+  const league = allLeaguesCache.find(l => String(l.id) === String(leagueId));
+
+  if (!league || league.participationType !== 'team') return [];
+
+  if (activeMatchupId && eventMatchups.length > 0) {
+    const matchup = eventMatchups[0];
+    const awayId = String(matchup.player2Id ?? matchup.player2_id ?? '');
+    const homeId = String(matchup.player1Id ?? matchup.player1_id ?? '');
+
+    const awayTeam = (league.teams || []).find(t => String(t.id) === awayId);
+    const homeTeam = (league.teams || []).find(t => String(t.id) === homeId);
+
+    const selectable = [];
+    if (awayTeam) selectable.push({ ...awayTeam, roleLabel: 'Away' });
+    if (homeTeam) selectable.push({ ...homeTeam, roleLabel: 'Home' });
+    return selectable;
+  }
+
+  return league.teams || [];
+}
+
+/**
+ * Helper to check if a player ID is a participant (directly or via team membership) in a matchup.
+ */
+export function isPlayerInMatchup(playerId, matchup, allLeaguesCache = []) {
+  if (!matchup || !playerId) return false;
+  const p1Id = String(matchup.player1Id ?? matchup.player1_id ?? '');
+  const p2Id = String(matchup.player2Id ?? matchup.player2_id ?? '');
+  const curId = String(playerId);
+
+  if (p1Id === curId || p2Id === curId) return true;
+
+  // Check team membership
+  for (const league of allLeaguesCache) {
+    const t1 = (league?.teams || []).find(t => String(t.id) === p1Id);
+    if (t1?.members?.some(m => String(m.id) === curId)) return true;
+    const t2 = (league?.teams || []).find(t => String(t.id) === p2Id);
+    if (t2?.members?.some(m => String(m.id) === curId)) return true;
+  }
+
+  return false;
+}
+
+/**
  * Gets the list of selectable players for the scores page dropdown.
  *
  * @param {Object} params - Selection parameters.
@@ -8,11 +88,11 @@ import { filterPlayersForUser } from './auth.js';
  */
 export function getSelectablePlayers(params) {
   const {
-    allPlayers,
+    allPlayers = [],
     leagueId,
-    allLeaguesCache,
+    allLeaguesCache = [],
     activeMatchupId,
-    eventMatchups,
+    eventMatchups = [],
     currentUser,
     currentPlayerId
   } = params;
@@ -24,12 +104,20 @@ export function getSelectablePlayers(params) {
     const matchup = eventMatchups[0];
     if (matchup) {
       if (matchup.player2Id) {
-        const awayPlayer = allPlayers.find(p => String(p.id) === String(matchup.player2Id));
-        selectablePlayers.push(awayPlayer || { id: matchup.player2Id, playerName: matchup.player2Name });
+        const awayPlayers = resolvePlayersForMatchupParticipant(matchup.player2Id, matchup.player2Name, allPlayers, allLeaguesCache);
+        awayPlayers.forEach(p => {
+          if (!selectablePlayers.some(sp => String(sp.id) === String(p.id))) {
+            selectablePlayers.push(p);
+          }
+        });
       }
       if (matchup.player1Id) {
-        const homePlayer = allPlayers.find(p => String(p.id) === String(matchup.player1Id));
-        selectablePlayers.push(homePlayer || { id: matchup.player1Id, playerName: matchup.player1Name });
+        const homePlayers = resolvePlayersForMatchupParticipant(matchup.player1Id, matchup.player1Name, allPlayers, allLeaguesCache);
+        homePlayers.forEach(p => {
+          if (!selectablePlayers.some(sp => String(sp.id) === String(p.id))) {
+            selectablePlayers.push(p);
+          }
+        });
       }
     }
   } else if (leagueId) {
@@ -69,20 +157,18 @@ export function getAutoSelectedPlayerId(params) {
   const {
     activePlayerId,
     currentUser,
-    allPlayersCache,
+    allPlayersCache = [],
     activeMatchupId,
-    eventMatchups,
-    selectablePlayers
+    eventMatchups = [],
+    selectablePlayers = [],
+    allLeaguesCache = []
   } = params;
 
   if (activePlayerId) return activePlayerId;
 
   if (currentUser?.player_id) {
     const isInRoster = allPlayersCache.some(p => String(p.id) === String(currentUser.player_id));
-    const isMatchupParticipant = activeMatchupId && eventMatchups[0] && (
-      String(eventMatchups[0].player1Id) === String(currentUser.player_id) ||
-      String(eventMatchups[0].player2Id) === String(currentUser.player_id)
-    );
+    const isMatchupParticipant = activeMatchupId && eventMatchups[0] && isPlayerInMatchup(currentUser.player_id, eventMatchups[0], allLeaguesCache);
     if (isInRoster && (!activeMatchupId || isMatchupParticipant)) {
       return String(currentUser.player_id);
     }
@@ -96,6 +182,36 @@ export function getAutoSelectedPlayerId(params) {
 }
 
 /**
+ * Returns the team ID that the current user belongs to for a team-mode matchup.
+ * Returns null if the user is not a member of any participating team.
+ *
+ * @param {Object} params
+ * @param {Object} params.currentUser
+ * @param {Array}  params.selectableTeams  Teams in the matchup (from getSelectableTeams).
+ * @param {string|null} params.activeTeamId  Currently selected team ID (if any).
+ * @returns {string|null}
+ */
+export function getAutoSelectedTeamId({ currentUser, selectableTeams = [], activeTeamId = null }) {
+  if (activeTeamId) {
+    // Verify the stored ID is still a valid team in this matchup
+    if (selectableTeams.some(t => String(t.id) === String(activeTeamId))) {
+      return String(activeTeamId);
+    }
+  }
+
+  if (!currentUser?.player_id) return null;
+
+  // Find which team in the matchup the current user is a member of
+  const userTeam = selectableTeams.find(t =>
+    (t.members || []).some(m => String(m.id) === String(currentUser.player_id))
+  );
+
+  return userTeam ? String(userTeam.id) : null;
+}
+
+
+
+/**
  * Determines if the current view is in spectator mode and if the selected player is editable.
  *
  * @param {Object} params - Spectator parameters.
@@ -105,17 +221,15 @@ export function getSpectatorStatus(params) {
   const {
     activePlayerId,
     activeMatchupId,
-    eventMatchups,
+    eventMatchups = [],
     currentUser,
-    allPlayersCache,
+    allPlayersCache = [],
+    allLeaguesCache = [],
     isTD
   } = params;
 
   const matchup = eventMatchups[0];
-  const isParticipant = matchup && currentUser && (
-    String(matchup.player1Id) === String(currentUser.player_id) ||
-    String(matchup.player2Id) === String(currentUser.player_id)
-  );
+  const isParticipant = matchup && currentUser && isPlayerInMatchup(currentUser.player_id, matchup, allLeaguesCache);
 
   const isSpectator = !!(activeMatchupId && !isParticipant);
 
