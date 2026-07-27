@@ -27,7 +27,8 @@ pinbowling/
 │   ├── machine.php         # Master machine registry and target scores
 │   ├── score.php           # Score entry and retrieval
 │   ├── team.php            # Team management and league assignment
-│   ├── matchup.php         # Head-to-head matchup management (Baseball)
+│   ├── matchup.php         # Individual head-to-head matchup management (Baseball)
+│   ├── team-matchup.php    # Team head-to-head matchup management (Baseball)
 │   └── cleanup.php         # Session/data cleanup operations
 ├── includes/               # Core PHP infrastructure
 │   ├── Http/               # PSR-7 inspired Request/Response objects
@@ -52,6 +53,7 @@ pinbowling/
 │   ├── ScoreService.php
 │   ├── TeamService.php
 │   ├── MatchupService.php
+│   ├── TeamMatchupService.php
 │   ├── CleanupService.php
 │   ├── DatabaseService.php
 │   └── SettingsService.php
@@ -189,12 +191,11 @@ The version from `package.json` is the single source of truth — it's read by `
 
 See the [`docs/`](docs/) directory for detailed documentation:
 
-- **[Team Reorganization](docs/team_reorganization.md)** — Universal Team Model architecture, 1-on-1 matchup design, and migration plan
 - **[Architecture](docs/architecture.md)** — System design, data flow, and component overview
 - **[Database Schema](docs/database_schema.md)** — Full table reference, relationships, format matrix
+- **[Engine Contract](docs/engine-contract.md)** — Scoring engine public API specification
 - **[Deployment](docs/deployment.md)** — Server setup, synchronization, cache-busting
 - **[Local Setup](docs/local_setup.md)** — New developer environment guide
-- **[Engine Contract](docs/engine-contract.md)** — Scoring engine public API specification
 - **[UI Testing Plan](docs/ui_testing_documentation.md)** — E2E and visual regression strategy
 
 ## License

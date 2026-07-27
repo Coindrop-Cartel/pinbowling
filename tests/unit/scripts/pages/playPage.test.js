@@ -20,6 +20,7 @@ vi.mock('@services/api.js', () => ({
       getMachines: apiMock.getMachines,
     },
     events: { create: vi.fn() },
+    sessions: { getAll: vi.fn().mockResolvedValue([]), addPlayer: vi.fn(), create: vi.fn(), get: vi.fn() },
     machines: { saveTarget: vi.fn() },
     matchups: { save: vi.fn() },
     auth: {
@@ -197,11 +198,14 @@ describe('Play Page (playPage.js)', () => {
     vi.restoreAllMocks();
   });
 
-  it('should load and render existing session leagues', async () => {
-    PB_API.leagues.getAll.mockResolvedValue([{ 
-      id: 1, type: 'session', scoringFormat: 'bowling', events: [{ id: 101, eventName: 'Nightly', eventDate: new Date().toISOString().split('T')[0], scoringFormat: 'bowling' }] 
+  it('should load and render existing sessions', async () => {
+    const today = new Date().toISOString().split('T')[0];
+    PB_API.sessions.getAll.mockResolvedValue([{ 
+      id: 1, name: 'Nightly Session', scoringFormat: 'bowling', players: [],
+      events: [{ id: 101, eventName: 'Nightly', eventDate: today, scoringFormat: 'bowling', locationId: null, sessionId: 1 }] 
     }]);
     PB_API.locations.getAll.mockResolvedValue([]);
+    PB_API.players.getAll.mockResolvedValue([]);
 
     await initPlayPage();
 
@@ -215,7 +219,8 @@ describe('Play Page (playPage.js)', () => {
       { machineId: 11, machineName: 'M2', targetMed: 2000 }
     ]};
     PB_API.locations.getAll.mockResolvedValue([mockLocation]);
-    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.sessions.getAll.mockResolvedValue([]);
+    PB_API.players.getAll.mockResolvedValue([]);
     
     await initPlayPage();
     
@@ -229,11 +234,11 @@ describe('Play Page (playPage.js)', () => {
     expect(document.getElementById('qp-frames-list').children.length).toBe(3);
   });
 
-  it('should create league, event, and targets on finalize', async () => {
+  it('should create session and targets on finalize', async () => {
     PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1' }] }]);
-    PB_API.leagues.getAll.mockResolvedValue([]);
-    PB_API.leagues.create.mockResolvedValue({ id: 50 });
-    PB_API.events.create.mockResolvedValue({ id: 500 });
+    PB_API.sessions.getAll.mockResolvedValue([]);
+    PB_API.sessions.create.mockResolvedValue({ id: 50, events: [{ id: 500 }] });
+    PB_API.auth.me.mockResolvedValue(null);
 
     await initPlayPage();
     document.getElementById('qp-location').value = '1';
@@ -241,12 +246,12 @@ describe('Play Page (playPage.js)', () => {
 
     await document.getElementById('finalize-qp-btn').onclick();
 
-    expect(PB_API.leagues.create).toHaveBeenCalled();
+    expect(PB_API.sessions.create).toHaveBeenCalled();
     expect(PB_API.machines.saveTarget).toHaveBeenCalled();
   });
 
   it('should update round options when format changes', async () => {
-    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.sessions.getAll.mockResolvedValue([]);
     PB_API.locations.getAll.mockResolvedValue([]);
 
     await initPlayPage();
@@ -261,7 +266,7 @@ describe('Play Page (playPage.js)', () => {
   });
 
   it('should show create toggle and hide generator options initially', async () => {
-    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.sessions.getAll.mockResolvedValue([]);
     PB_API.locations.getAll.mockResolvedValue([]);
 
     await initPlayPage();
@@ -276,7 +281,7 @@ describe('Play Page (playPage.js)', () => {
   });
 
   it('should toggle generator options on create button click', async () => {
-    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.sessions.getAll.mockResolvedValue([]);
     PB_API.locations.getAll.mockResolvedValue([]);
 
     await initPlayPage();
@@ -300,7 +305,7 @@ describe('Play Page (playPage.js)', () => {
 
   it('should hide create toggle when user lacks CREATE_SESSION permission', async () => {
     can.mockResolvedValue(false);
-    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.sessions.getAll.mockResolvedValue([]);
     PB_API.locations.getAll.mockResolvedValue([]);
 
     await initPlayPage();
@@ -310,7 +315,7 @@ describe('Play Page (playPage.js)', () => {
   });
 
   it('should show change setup button and toggle setup fields', async () => {
-    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.sessions.getAll.mockResolvedValue([]);
     PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1', targetMed: 1000 }] }]);
 
     await initPlayPage();
@@ -334,11 +339,12 @@ describe('Play Page (playPage.js)', () => {
 
   it('should filter sessions by name', async () => {
     const today = new Date().toISOString().split('T')[0];
-    PB_API.leagues.getAll.mockResolvedValue([
-      { id: 1, type: 'session', scoringFormat: 'bowling', events: [{ id: 101, eventName: 'Monday Night', eventDate: today, scoringFormat: 'bowling' }] },
-      { id: 2, type: 'session', scoringFormat: 'bowling', events: [{ id: 102, eventName: 'Tuesday Fun', eventDate: today, scoringFormat: 'bowling' }] }
+    PB_API.sessions.getAll.mockResolvedValue([
+      { id: 1, name: 'Monday Night', scoringFormat: 'bowling', players: [], events: [{ id: 101, eventName: 'Monday Night', eventDate: today, scoringFormat: 'bowling', sessionId: 1 }] },
+      { id: 2, name: 'Tuesday Fun', scoringFormat: 'bowling', players: [], events: [{ id: 102, eventName: 'Tuesday Fun', eventDate: today, scoringFormat: 'bowling', sessionId: 2 }] }
     ]);
     PB_API.locations.getAll.mockResolvedValue([]);
+    PB_API.players.getAll.mockResolvedValue([]);
 
     await initPlayPage();
 
@@ -352,7 +358,7 @@ describe('Play Page (playPage.js)', () => {
   });
 
   it('should show no sessions notice when no matching sessions', async () => {
-    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.sessions.getAll.mockResolvedValue([]);
     PB_API.locations.getAll.mockResolvedValue([]);
 
     await initPlayPage();
@@ -362,7 +368,7 @@ describe('Play Page (playPage.js)', () => {
   });
 
   it('should alert when location has no machines during preview generation', async () => {
-    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.sessions.getAll.mockResolvedValue([]);
     PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'Empty Location', machines: [] }]);
 
     await initPlayPage();
@@ -375,12 +381,13 @@ describe('Play Page (playPage.js)', () => {
 
   it('should auto-join player on Play button click when user has player_id', async () => {
     const today = new Date().toISOString().split('T')[0];
-    PB_API.leagues.getAll.mockResolvedValue([{
-      id: 1, type: 'session', scoringFormat: 'bowling',
-      events: [{ id: 101, eventName: 'Session', eventDate: today, scoringFormat: 'bowling', leagueId: 1 }],
+    PB_API.sessions.getAll.mockResolvedValue([{
+      id: 1, name: 'Session', scoringFormat: 'bowling',
+      events: [{ id: 101, eventName: 'Session', eventDate: today, scoringFormat: 'bowling', sessionId: 1 }],
       players: [{ id: 5, playerName: 'Current Player' }]
     }]);
     PB_API.locations.getAll.mockResolvedValue([]);
+    PB_API.players.getAll.mockResolvedValue([]);
     PB_API.auth.me.mockResolvedValue({ player_id: 5 });
 
     await initPlayPage();
@@ -393,21 +400,22 @@ describe('Play Page (playPage.js)', () => {
       expect(loadPage).toHaveBeenCalledWith(expect.stringContaining('scores'));
     });
     // Player 5 is already in roster, so addPlayer should NOT be called
-    expect(PB_API.leagues.addPlayer).not.toHaveBeenCalled();
+    expect(PB_API.sessions.addPlayer).not.toHaveBeenCalled();
   });
 
   it('should show player selection dialog for guest users on Play click', async () => {
     const today = new Date().toISOString().split('T')[0];
-    PB_API.leagues.getAll.mockResolvedValue([{
-      id: 1, type: 'session', scoringFormat: 'bowling',
-      events: [{ id: 101, eventName: 'Session', eventDate: today, scoringFormat: 'bowling', leagueId: 1 }],
+    PB_API.sessions.getAll.mockResolvedValue([{
+      id: 1, name: 'Session', scoringFormat: 'bowling',
+      events: [{ id: 101, eventName: 'Session', eventDate: today, scoringFormat: 'bowling', sessionId: 1 }],
       players: []
     }]);
     PB_API.locations.getAll.mockResolvedValue([]);
+    PB_API.players.getAll.mockResolvedValue([]);
     PB_API.auth.me.mockResolvedValue(null);
     PB_API.players.getAll.mockResolvedValue([{ id: 10, playerName: 'Guest1' }]);
     showPlayerSelectionDialog.mockResolvedValue('10');
-    PB_API.leagues.addPlayer.mockResolvedValue({}); // Return empty object (no .error)
+    PB_API.sessions.addPlayer.mockResolvedValue({}); // Return empty object (no .error)
 
     await initPlayPage();
 
@@ -417,19 +425,20 @@ describe('Play Page (playPage.js)', () => {
 
     await vi.waitFor(() => {
       expect(showPlayerSelectionDialog).toHaveBeenCalled();
-      expect(PB_API.leagues.addPlayer).toHaveBeenCalledWith(1, 10);
+      expect(PB_API.sessions.addPlayer).toHaveBeenCalledWith(1, 10);
       expect(loadPage).toHaveBeenCalledWith(expect.stringContaining('scores'));
     });
   });
 
   it('should navigate to standings on Scoreboard button click', async () => {
     const today = new Date().toISOString().split('T')[0];
-    PB_API.leagues.getAll.mockResolvedValue([{
-      id: 1, type: 'session', scoringFormat: 'bowling',
-      events: [{ id: 101, eventName: 'Session', eventDate: today, scoringFormat: 'bowling', leagueId: 1 }],
+    PB_API.sessions.getAll.mockResolvedValue([{
+      id: 1, name: 'Session', scoringFormat: 'bowling',
+      events: [{ id: 101, eventName: 'Session', eventDate: today, scoringFormat: 'bowling', sessionId: 1 }],
       players: []
     }]);
     PB_API.locations.getAll.mockResolvedValue([]);
+    PB_API.players.getAll.mockResolvedValue([]);
 
     await initPlayPage();
 
@@ -442,8 +451,9 @@ describe('Play Page (playPage.js)', () => {
 
   it('should alert on finalize error', async () => {
     PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1', targetMed: 1000 }] }]);
-    PB_API.leagues.getAll.mockResolvedValue([]);
-    PB_API.leagues.create.mockRejectedValue(new Error('Server error'));
+    PB_API.sessions.getAll.mockResolvedValue([]);
+    PB_API.sessions.create.mockRejectedValue(new Error('Server error'));
+    PB_API.auth.me.mockResolvedValue(null);
 
     await initPlayPage();
     document.getElementById('qp-location').value = '1';
@@ -459,9 +469,8 @@ describe('Play Page (playPage.js)', () => {
 
   it('should auto-join current user on finalize when player_id exists', async () => {
     PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1', targetMed: 1000 }] }]);
-    PB_API.leagues.getAll.mockResolvedValue([]);
-    PB_API.leagues.create.mockResolvedValue({ id: 50 });
-    PB_API.events.create.mockResolvedValue({ id: 500 });
+    PB_API.sessions.getAll.mockResolvedValue([]);
+    PB_API.sessions.create.mockResolvedValue({ id: 50, events: [{ id: 500 }] });
     PB_API.auth.me.mockResolvedValue({ player_id: 42 });
 
     await initPlayPage();
@@ -471,12 +480,12 @@ describe('Play Page (playPage.js)', () => {
     const finalizeBtn = document.getElementById('finalize-qp-btn');
     await finalizeBtn.onclick();
 
-    expect(PB_API.leagues.addPlayer).toHaveBeenCalledWith(50, 42);
+    expect(PB_API.sessions.addPlayer).toHaveBeenCalledWith(50, 42);
     expect(loadPage).toHaveBeenCalledWith(expect.stringContaining('playerId=42'));
   });
 
   it('should populate location dropdown from API', async () => {
-    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.sessions.getAll.mockResolvedValue([]);
     PB_API.locations.getAll.mockResolvedValue([
       { id: 1, name: 'Main Alley', city: 'NYC' },
       { id: 2, name: 'Side Lane', city: 'LA' }
@@ -491,7 +500,7 @@ describe('Play Page (playPage.js)', () => {
   });
 
   it('should populate format dropdown from SCORING_FORMATS', async () => {
-    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.sessions.getAll.mockResolvedValue([]);
     PB_API.locations.getAll.mockResolvedValue([]);
 
     await initPlayPage();
@@ -504,11 +513,12 @@ describe('Play Page (playPage.js)', () => {
 
   it('should filter sessions by location', async () => {
     const today = new Date().toISOString().split('T')[0];
-    PB_API.leagues.getAll.mockResolvedValue([
-      { id: 1, type: 'session', scoringFormat: 'bowling', events: [{ id: 101, eventName: 'S1', eventDate: today, scoringFormat: 'bowling', locationId: 1 }] },
-      { id: 2, type: 'session', scoringFormat: 'bowling', events: [{ id: 102, eventName: 'S2', eventDate: today, scoringFormat: 'bowling', locationId: 2 }] }
+    PB_API.sessions.getAll.mockResolvedValue([
+      { id: 1, name: 'S1', scoringFormat: 'bowling', players: [], events: [{ id: 101, eventName: 'S1', eventDate: today, scoringFormat: 'bowling', locationId: 1, sessionId: 1 }] },
+      { id: 2, name: 'S2', scoringFormat: 'bowling', players: [], events: [{ id: 102, eventName: 'S2', eventDate: today, scoringFormat: 'bowling', locationId: 2, sessionId: 2 }] }
     ]);
     PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'L1' }, { id: 2, name: 'L2' }]);
+    PB_API.players.getAll.mockResolvedValue([]);
 
     await initPlayPage();
 
@@ -523,14 +533,15 @@ describe('Play Page (playPage.js)', () => {
 
   it('should handle Unauthorized error on Play button click', async () => {
     const today = new Date().toISOString().split('T')[0];
-    PB_API.leagues.getAll.mockResolvedValue([{
-      id: 1, type: 'session', scoringFormat: 'bowling',
-      events: [{ id: 101, eventName: 'Session', eventDate: today, scoringFormat: 'bowling', leagueId: 1 }],
+    PB_API.sessions.getAll.mockResolvedValue([{
+      id: 1, name: 'Session', scoringFormat: 'bowling',
+      events: [{ id: 101, eventName: 'Session', eventDate: today, scoringFormat: 'bowling', sessionId: 1 }],
       players: []
     }]);
     PB_API.locations.getAll.mockResolvedValue([]);
+    PB_API.players.getAll.mockResolvedValue([]);
     PB_API.auth.me.mockResolvedValue({ player_id: 5 });
-    PB_API.leagues.addPlayer.mockRejectedValue(new Error('Unauthorized'));
+    PB_API.sessions.addPlayer.mockRejectedValue(new Error('Unauthorized'));
 
     await initPlayPage();
 
@@ -550,7 +561,7 @@ describe('Play Page (playPage.js)', () => {
   });
 
   it('should hide preview section when canceling create flow', async () => {
-    PB_API.leagues.getAll.mockResolvedValue([]);
+    PB_API.sessions.getAll.mockResolvedValue([]);
     PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1', targetMed: 1000 }] }]);
 
     await initPlayPage();
@@ -568,10 +579,11 @@ describe('Play Page (playPage.js)', () => {
     expect(document.getElementById('qp-preview-section').classList.contains('hidden')).toBe(true);
   });
 
-  it('should throw error when league creation returns no id on finalize', async () => {
+  it('should throw error when session creation returns no id on finalize', async () => {
     PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1', targetMed: 1000 }] }]);
-    PB_API.leagues.getAll.mockResolvedValue([]);
-    PB_API.leagues.create.mockResolvedValue({}); // No id
+    PB_API.sessions.getAll.mockResolvedValue([]);
+    PB_API.sessions.create.mockResolvedValue({}); // No id
+    PB_API.auth.me.mockResolvedValue(null);
 
     await initPlayPage();
     document.getElementById('qp-location').value = '1';
@@ -583,11 +595,11 @@ describe('Play Page (playPage.js)', () => {
     expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Failed to create session'));
   });
 
-  it('should throw error when event creation returns no id on finalize', async () => {
+  it('should throw error when session has no event on finalize', async () => {
     PB_API.locations.getAll.mockResolvedValue([{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1', targetMed: 1000 }] }]);
-    PB_API.leagues.getAll.mockResolvedValue([]);
-    PB_API.leagues.create.mockResolvedValue({ id: 50 });
-    PB_API.events.create.mockResolvedValue({}); // No id
+    PB_API.sessions.getAll.mockResolvedValue([]);
+    PB_API.sessions.create.mockResolvedValue({ id: 50, events: [] }); // No event
+    PB_API.auth.me.mockResolvedValue(null);
 
     await initPlayPage();
     document.getElementById('qp-location').value = '1';
@@ -596,7 +608,7 @@ describe('Play Page (playPage.js)', () => {
     const finalizeBtn = document.getElementById('finalize-qp-btn');
     await finalizeBtn.onclick();
 
-    expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Failed to create event'));
+    expect(showAlert).toHaveBeenCalledWith(expect.stringContaining('Failed to create session'));
   });
 
   describe('Additional playPage Coverage', () => {
@@ -699,12 +711,12 @@ describe('Play Page (playPage.js)', () => {
     it('should prompt for opponent and save matchups in baseball head-to-head format on finalize', async () => {
       apiMock.locations = [{ id: 1, name: 'L1', machines: [{ machineId: 10, machineName: 'M1', targetEasy: 100, targetMed: 200, targetHard: 300 }] }];
       PB_API.locations.getAll.mockResolvedValue(apiMock.locations);
-      PB_API.leagues.create.mockResolvedValue({ id: 99 });
-      PB_API.events.create.mockResolvedValue({ id: 101 });
+      PB_API.sessions.create.mockResolvedValue({ id: 99, events: [{ id: 101 }], players: [{ id: 1, playerName: 'Kyle' }] });
+      PB_API.sessions.get.mockResolvedValue({ id: 99, players: [{ id: 1, playerName: 'Kyle' }] });
       PB_API.auth.me.mockResolvedValue({ player_id: 1 });
-      PB_API.leagues.addPlayer.mockResolvedValue({ success: true });
-      PB_API.leagues.get.mockResolvedValue({ players: [{ id: 1, playerName: 'Kyle' }] });
+      PB_API.sessions.addPlayer.mockResolvedValue({ success: true });
       PB_API.players.getAll.mockResolvedValue([{ id: 1, playerName: 'Kyle' }, { id: 2, playerName: 'Brian' }]);
+      PB_API.sessions.getAll.mockResolvedValue([]);
 
       // Enable baseball format
       engineMock.getMatchupDescription.mockReturnValue({
@@ -741,7 +753,7 @@ describe('Play Page (playPage.js)', () => {
       await finalizeBtn.onclick();
 
       expect(uiMocks.showPlayerSelectionDialog).toHaveBeenCalled();
-      expect(PB_API.leagues.addPlayer).toHaveBeenCalledWith(99, 2);
+      expect(PB_API.sessions.addPlayer).toHaveBeenCalledWith(99, 2);
       expect(PB_API.matchups.save).toHaveBeenCalled();
     });
   });

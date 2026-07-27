@@ -20,10 +20,10 @@ const awayMembers = [makePlayer(1, 'Alice'), makePlayer(2, 'Bob')];
 const homeMembers = [makePlayer(3, 'Charlie'), makePlayer(4, 'Dave')];
 
 const makeMatchupWrapper = () => ({
-  player1Id: homeTeam.id,
-  player1Name: homeTeam.name,
-  player2Id: awayTeam.id,
-  player2Name: awayTeam.name,
+  team1Id: homeTeam.id,
+  team1Name: homeTeam.name,
+  team2Id: awayTeam.id,
+  team2Name: awayTeam.name,
 });
 
 // ── buildRoundRobinMatchups ───────────────────────────────────────────
@@ -229,8 +229,8 @@ describe('buildTeamRoundRobinMatchups', () => {
     expect(result[3].roundName).toBe('Bottom 2');
   });
 
-  test('uses snake_case field names from matchupWrapper', () => {
-    const wrapper = { player1_id: homeTeam.id, player1_name: homeTeam.name, player2_id: awayTeam.id, player2_name: awayTeam.name };
+  test('uses team IDs from matchupWrapper', () => {
+    const wrapper = { team1Id: homeTeam.id, team2Id: awayTeam.id };
     const machines = [makeMachine(10), makeMachine(11)];
     const result = buildTeamRoundRobinMatchups(wrapper, awayMembers, homeMembers, 1, machines);
     expect(result[0].teamId).toBe(awayTeam.id);
@@ -249,8 +249,8 @@ describe('resolveTeamMatchupRole', () => {
 
   test('returns default when orderNumber not found', () => {
     const eventMatchups = [{
-      player1Id: homeTeam.id,
-      player2Id: awayTeam.id,
+      team1Id: homeTeam.id,
+      team2Id: awayTeam.id,
       entries: [{ orderNumber: 1, machineId: 10, playerId: 1, teamId: awayTeam.id, isTop: true }]
     }];
     const result = resolveTeamMatchupRole(1, 999, eventMatchups);
@@ -260,8 +260,8 @@ describe('resolveTeamMatchupRole', () => {
   test('resolves away team as player2', () => {
     const eventMatchups = [{
       id: 1,
-      player1Id: homeTeam.id,
-      player2Id: awayTeam.id,
+      team1Id: homeTeam.id,
+      team2Id: awayTeam.id,
       roundName: 'Top 1',
       entries: [
         { orderNumber: 1, machineId: 10, playerId: 1, teamId: awayTeam.id, playerName: 'Alice' },
@@ -280,8 +280,8 @@ describe('resolveTeamMatchupRole', () => {
   test('resolves home team as player1', () => {
     const eventMatchups = [{
       id: 1,
-      player1Id: homeTeam.id,
-      player2Id: awayTeam.id,
+      team1Id: homeTeam.id,
+      team2Id: awayTeam.id,
       roundName: 'Top 1',
       entries: [
         { orderNumber: 1, machineId: 10, playerId: 1, teamId: awayTeam.id, playerName: 'Alice' },
@@ -354,12 +354,21 @@ describe('resolveTeamMatchupRole', () => {
 // ── enrichTeamMatchupEntries ─────────────────────────────────────────
 
 describe('enrichTeamMatchupEntries', () => {
-  // Server entries now include player_id/player_name (batter assigned by rotation)
+  // Server entries now include team1_id/team2_id (pitcher/batter).
+  // Top half: home(200) pitches, away(100) bats
   const serverEntries = [
-    { order_number: 1, machine_id: 10, player_id: 1, player_name: 'Alice' },
-    { order_number: 2, machine_id: 10, player_id: 2, player_name: 'Bob' },
-    { order_number: 3, machine_id: 11, player_id: 3, player_name: 'Charlie' },
-    { order_number: 4, machine_id: 11, player_id: 4, player_name: 'Dave' },
+    { order_number: 1, machine_id: 10, player_id: 1, player_name: 'Alice', team1_id: 200, team2_id: 100 },
+    { order_number: 2, machine_id: 10, player_id: 2, player_name: 'Bob', team1_id: 200, team2_id: 100 },
+    { order_number: 3, machine_id: 11, player_id: 3, player_name: 'Charlie', team1_id: 200, team2_id: 100 },
+    { order_number: 4, machine_id: 11, player_id: 4, player_name: 'Dave', team1_id: 200, team2_id: 100 },
+  ];
+
+  // Bottom half: away(100) pitches, home(200) bats
+  const bottomServerEntries = [
+    { order_number: 1, machine_id: 10, player_id: 3, player_name: 'Charlie', team1_id: 100, team2_id: 200 },
+    { order_number: 2, machine_id: 10, player_id: 4, player_name: 'Dave', team1_id: 100, team2_id: 200 },
+    { order_number: 3, machine_id: 11, player_id: 3, player_name: 'Charlie', team1_id: 100, team2_id: 200 },
+    { order_number: 4, machine_id: 11, player_id: 4, player_name: 'Dave', team1_id: 100, team2_id: 200 },
   ];
 
   test('returns original entries when entries are empty', () => {
@@ -390,13 +399,7 @@ describe('enrichTeamMatchupEntries', () => {
 
   test('bottom half: all entries have home team id and isTop=false', () => {
     const wrapper = makeMatchupWrapper();
-    const bottomEntries = [
-      { order_number: 1, machine_id: 10, player_id: 3, player_name: 'Charlie' },
-      { order_number: 2, machine_id: 10, player_id: 4, player_name: 'Dave' },
-      { order_number: 3, machine_id: 11, player_id: 3, player_name: 'Charlie' },
-      { order_number: 4, machine_id: 11, player_id: 4, player_name: 'Dave' },
-    ];
-    const result = enrichTeamMatchupEntries(bottomEntries, wrapper, awayMembers, homeMembers, 'Bottom 1');
+    const result = enrichTeamMatchupEntries(bottomServerEntries, wrapper, awayMembers, homeMembers, 'Bottom 1');
     const bottom = result.filter(e => !e.isTop);
     expect(bottom).toHaveLength(4);
     expect(bottom[0].playerId).toBe(3); // Charlie
@@ -408,8 +411,8 @@ describe('enrichTeamMatchupEntries', () => {
   test('preserves original entry properties', () => {
     const wrapper = makeMatchupWrapper();
     const entriesWithExtras = [
-      { order_number: 1, machine_id: 10, player_id: 1, player_name: 'Alice', id: 42, event_matchup_id: 5 },
-      { order_number: 2, machine_id: 10, player_id: 2, player_name: 'Bob', id: 43, event_matchup_id: 5 },
+      { order_number: 1, machine_id: 10, player_id: 1, player_name: 'Alice', id: 42, event_matchup_id: 5, team1_id: 200, team2_id: 100 },
+      { order_number: 2, machine_id: 10, player_id: 2, player_name: 'Bob', id: 43, event_matchup_id: 5, team1_id: 200, team2_id: 100 },
     ];
     const result = enrichTeamMatchupEntries(entriesWithExtras, wrapper, awayMembers, homeMembers, 'Top 1');
     expect(result[0].id).toBe(42);
@@ -436,9 +439,10 @@ describe('enrichTeamMatchupEntries', () => {
     expect(result[3].playerOrder).toBe(4);
   });
 
-  test('defaults isTop to true when roundName is not provided', () => {
+  test('defaults isTop from team1_id when roundName is not provided', () => {
     const wrapper = makeMatchupWrapper();
     const result = enrichTeamMatchupEntries(serverEntries, wrapper, awayMembers, homeMembers);
+    // team1_id=200 (home) → home pitching = top
     expect(result[0].isTop).toBe(true);
   });
 });

@@ -2,7 +2,7 @@ import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 import { FormatBranding } from '@services/scoringFormatBranding.js';
 import { formatNumber, escapeHTML, renderThresholdGrid } from '@scripts/utils.js';
-import { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer, buildScoreMapFromRows, buildBaseballScoreMapForPlayer, groupScoresByPlayer } from '@services/normalizer.js';
+import { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer, buildScoreMapFromRows, groupScoresByPlayer } from '@services/normalizer.js';
 import { calculateSeasonSummary } from '@services/seasonCalculator.js';
 
 /**
@@ -354,7 +354,7 @@ export function printSeasonResults(league, players, events, locations, allLeague
   if (!printWindow) return alert('Please allow popups to print.');
 
   const format = ScoringFormats.resolve(league.scoringFormat);
-  const isBaseball = format === ScoringFormats.BASEBALL;
+  const hasH2H = typeof engine?.hasHead2HeadScoring === 'function' ? engine.hasHead2HeadScoring() : false;
   const isTeamLeague = league.participationType === 'team';
   
   const normalizedTargets = normalizeTargets(allLeagueTargets);
@@ -368,9 +368,8 @@ export function printSeasonResults(league, players, events, locations, allLeague
   });
 
   const getScoreMapForPlayer = (eventId, playerId, scores) => {
-    if (!isBaseball) return buildScoreMapFromRows(scores);
     const scoresByPlayer = groupScoresByPlayer(Object.values(scoresByEventAndPlayer[eventId] || {}).flat());
-    return buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchupsByEvent[eventId] || []);
+    return engine.buildPlayerScoreMap(playerId, scores, scoresByPlayer, matchupsByEvent[eventId] || []);
   };
 
   const generatePlayerResultsHtml = (event, playerId, playerObj, eventMachines, scoresByEventAndPlayer, matchupsByEvent, engine) => {
@@ -392,7 +391,7 @@ export function printSeasonResults(league, players, events, locations, allLeague
       </div>
     `;
 
-    if (isBaseball) {
+    if (hasH2H) {
       const matchups = matchupsByEvent[event.id] || [];
       const matchup = matchups.find(m => Number(m.awayPlayerId) === playerId || Number(m.homePlayerId) === playerId);
       if (!matchup) return '';
@@ -408,8 +407,8 @@ export function printSeasonResults(league, players, events, locations, allLeague
         [homeId]: homeScores
       };
       
-      const p1Map = buildBaseballScoreMapForPlayer(awayId, scoresByPlayerForEvent, [matchup]);
-      const p2Map = buildBaseballScoreMapForPlayer(homeId, scoresByPlayerForEvent, [matchup]);
+      const p1Map = engine.buildPlayerScoreMap(awayId, awayScores, scoresByPlayerForEvent, [matchup]);
+      const p2Map = engine.buildPlayerScoreMap(homeId, homeScores, scoresByPlayerForEvent, [matchup]);
       
       const { turnResults: p1Turns } = engine.calculateTurnResults(eventMachines, p1Map);
       const { turnResults: p2Turns } = engine.calculateTurnResults(eventMachines, p2Map);
@@ -622,15 +621,16 @@ export function printSeasonResults(league, players, events, locations, allLeague
 
     // Weekly scoreboard
     let weekScoreboardContent = '';
-    if (isBaseball) {
+    if (hasH2H) {
+      const scoreUnitLabel = engine.getThresholdPrefix ? engine.getThresholdPrefix() : 'Score';
       weekScoreboardContent = `
         <table class="data-table">
           <thead>
             <tr>
               <th>Away Player</th>
-              <th>Runs</th>
+              <th>${escapeHTML(scoreUnitLabel)}</th>
               <th>Home Player</th>
-              <th>Runs</th>
+              <th>${escapeHTML(scoreUnitLabel)}</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -708,7 +708,7 @@ export function printSeasonResults(league, players, events, locations, allLeague
 
   const playerLabel = isTeamLeague ? 'Team' : 'Player';
   let seasonScoreboardHtml = '';
-  if (isBaseball && !isTeamLeague) {
+  if (hasH2H && !isTeamLeague) {
     seasonScoreboardHtml = `
       <table class="data-table">
         <thead>

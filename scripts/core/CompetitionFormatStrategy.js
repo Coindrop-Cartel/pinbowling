@@ -26,13 +26,18 @@ export class BaseCompetitionStrategy {
 
 export class GroupCompetitionStrategy extends BaseCompetitionStrategy {
   sortStandings(rows, engine, options = {}) {
+    if (options.seasonScoring === 'weekly') {
+      return [...rows].sort((a, b) => (b.totalSeasonPoints ?? 0) - (a.totalSeasonPoints ?? 0));
+    }
+    if (engine.handlesSortCompletely()) {
+      return rows;
+    }
     return [...rows].sort((a, b) => {
-      const scoreA = a.totalSeasonPoints ?? a.total ?? 0;
-      const scoreB = b.totalSeasonPoints ?? b.total ?? 0;
-      if (options.seasonScoring === 'weekly') {
-        return scoreB - scoreA;
-      }
-      return engine.compareScores(scoreA, scoreB);
+      if (a.hasScores !== b.hasScores) return a.hasScores ? -1 : 1;
+      return engine.compareScores(
+        a.totalSeasonPoints ?? a.total ?? 0,
+        b.totalSeasonPoints ?? b.total ?? 0
+      );
     });
   }
 }
@@ -49,7 +54,7 @@ export class HeadToHeadCompetitionStrategy extends BaseCompetitionStrategy {
    * @param {Object} engine - Active ScoringEngine instance.
    * @returns {Object<number, {wins: number, losses: number, ties: number, winRate: number, scoreDiff: number, runDiff: number, totalScore: number, totalRuns: number, headToHead: Object}>}
    */
-  calculateMatchupRecords(entities, events, matchupsByEvent, entityEventTotals, engine) {
+  calculateMatchupRecords(entities, events, matchupsByEvent, entityEventTotals, engine, options = {}) {
     const records = {};
     entities.forEach(entity => {
       records[entity.id] = {
@@ -67,17 +72,26 @@ export class HeadToHeadCompetitionStrategy extends BaseCompetitionStrategy {
 
     events.forEach(event => {
       const matchups = matchupsByEvent[event.id] || [];
+      const isTeamMode = options?.participationType === 'team' || (matchups.length > 0 && matchups[0].team1Id !== null && matchups[0].team1Id !== undefined);
       matchups.forEach(m => {
         if (m.status !== 'completed') return;
 
-        const e1Id = Number(m.player1Id ?? m.player1_id ?? m.team1Id ?? m.team1_id ?? m.awayPlayerId ?? m.away_player_id);
-        const e2Id = Number(m.player2Id ?? m.player2_id ?? m.team2Id ?? m.team2_id ?? m.homePlayerId ?? m.home_player_id);
+        const e1Id = isTeamMode
+          ? Number(m.team1Id)
+          : Number(m.player1Id);
+        const e2Id = isTeamMode
+          ? Number(m.team2Id)
+          : Number(m.player2Id);
 
         if (!e1Id || !e2Id) return; // Bye week
 
-        // Read direct matchup scores first (runs or points)
-        const r1 = Number(m.player1Score ?? m.player1_score ?? m.awayRuns ?? m.away_runs ?? entityEventTotals?.[event.id]?.[e1Id] ?? 0);
-        const r2 = Number(m.player2Score ?? m.player2_score ?? m.homeRuns ?? m.home_runs ?? entityEventTotals?.[event.id]?.[e2Id] ?? 0);
+        // Read direct matchup scores
+        const r1 = isTeamMode
+          ? Number(m.team1Score ?? 0)
+          : Number(m.player1Score ?? 0);
+        const r2 = isTeamMode
+          ? Number(m.team2Score ?? 0)
+          : Number(m.player2Score ?? 0);
 
         if (records[e1Id]) {
           records[e1Id].totalScore += r1;
@@ -169,6 +183,7 @@ export class HeadToHeadCompetitionStrategy extends BaseCompetitionStrategy {
         if (totalRunsDiff !== 0) return totalRunsDiff;
       }
 
+      if (a.hasScores !== b.hasScores) return a.hasScores ? -1 : 1;
       const scoreA = a.totalSeasonPoints ?? a.total ?? 0;
       const scoreB = b.totalSeasonPoints ?? b.total ?? 0;
       if (options.seasonScoring === 'weekly') {

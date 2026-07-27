@@ -1,7 +1,6 @@
 import { formatNumber, applyScoreFormatting, renderThresholdGrid, escapeHTML } from '../utils.js';
 import { showAlert } from '../ui/dialogs.js';
 import { getScoreAccessLevel } from '../services/auth.js';
-import { resolvePlayerForBall } from '../services/matchupBuilder.js';
 
 /**
  * Helper to create a formatted numeric input for pinball scores.
@@ -44,11 +43,11 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   const turnValues = scoreMap?.[String(round.orderNumber)] || null;
   const opponentScores = scoreMap?.opponent?.[String(round.orderNumber)] || null;
   let isTargetInRoster = false;
+  const isSession = activeLeague?.isSession === true;
   if (activeLeague) {
     if (targetPlayer?.isTeam) {
-      // Team object passed — the team is always registered in the league
       isTargetInRoster = true;
-    } else if (activeLeague.type === 'session') {
+    } else if (isSession) {
       isTargetInRoster = true;
     } else if (activeLeague.participationType === 'team') {
       isTargetInRoster = (activeLeague.teams || []).some(t => (t.members || []).some(m => String(m.id) === String(targetPlayer?.id)));
@@ -59,13 +58,12 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
     isTargetInRoster = true;
   }
 
-  const { access: accessLevel, reason: msg, lockedBalls = {} } = await getScoreAccessLevel(currentUser, targetPlayer, turnValues, activeLeague?.type, isTargetInRoster);
+  const { access: accessLevel, reason: msg, lockedBalls = {} } = await getScoreAccessLevel(currentUser, targetPlayer, turnValues, isSession, isTargetInRoster);
   const isAccessDenied = accessLevel === 'denied';
 
   row.className = 'round-row';
   row.dataset.orderNumber = round.orderNumber;
 
-  // Retrieve data from engine instead of raw HTML
   const summaryData = engine.getRowSummaryData(round);
   let summaryHtml = '';
   if (summaryData) {
@@ -76,7 +74,6 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
     summaryHtml += `</div>`;
   }
 
-  // Bonus targets rendering
   let bonusHtml = '';
   const bonusTargets = engine.getBonusTargets(round);
   if (isLastRound && bonusTargets && bonusTargets.t1) {
@@ -91,131 +88,53 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   const rowContext = engine.getRoundRowContext(round, engineContext);
   const displayRoundNumber = rowContext.displayRoundNumber ?? round.orderNumber;
   const displayRoundLabel = rowContext.displayRoundLabel !== undefined ? rowContext.displayRoundLabel : engine.getRoundLabel();
-  const isPitcher = rowContext.isPitcher ?? false;
-  const hasMatchup = !!rowContext.matchup;
-  const role = rowContext.role ?? '';
-  const opponentName = rowContext.opponentName ?? '';
+  const sections = rowContext.sections || [];
+  const hasMatchup = sections.length > 0;
 
-  // Compute display names and team IDs for role labels
-  const matchupW = engineContext?.eventMatchups?.[0] || {};
-  const homeTeamId = Number(matchupW.player1Id ?? matchupW.player1_id ?? 0);
-  const awayTeamId = Number(matchupW.player2Id ?? matchupW.player2_id ?? 0);
-  const homeTeamName = matchupW.player1Name || matchupW.player1_name || '';
-  const awayTeamName = matchupW.player2Name || matchupW.player2_name || '';
-
-  const defendingTeamId = hasMatchup ? (round.isTop ? homeTeamId : awayTeamId) : 0;
-  const battingTeamId = hasMatchup ? (round.isTop ? awayTeamId : homeTeamId) : 0;
-
-  // Access control: team members can enter any scores for their selected team (batter or pitcher).
-  // Admins and TDs can enter any scores for any selected team regardless of membership.
-  const isTDOrAdmin = engineContext?.isTDOrAdmin ?? false;
+  const isTDOrAdmin = (engineContext?.isTDOrAdmin || currentUser?.role === 'admin' || currentUser?.role === 'td') ?? false;
   const isTeamMode = engineContext?.isTeamMode;
-  const rowPlayerId = round.playerId ? Number(round.playerId) : null;
-  const currentPlayerId = engineContext?.getCurrentPlayerId ? Number(engineContext.getCurrentPlayerId()) : null;
   const activeMembers = engineContext?.activeTeamMembers || [];
   const isTeamMember = isTeamMode && currentUser && activeMembers.some(m => String(m.id) === String(currentUser.player_id));
-  const canEditSelectedTeam = isTDOrAdmin || isTeamMember || !isTeamMode;
 
-  const isCurrentPlayerRow = !isTeamMode ? (rowPlayerId && currentPlayerId && rowPlayerId === currentPlayerId) : canEditSelectedTeam;
-  const effectiveAccessDenied = isAccessDenied || !isCurrentPlayerRow;
-  const opponentAccessDenied = isAccessDenied || !isTDOrAdmin;
+  let effectiveAccessDenied = false;
+  const opponentAccessDenied = true;
+  let statusMsg = msg;
 
-  const activeLeagueTeams = engineContext?.activeLeague?.teams || [];
-  const defendingTeam = activeLeagueTeams.find(t => Number(t.id) === defendingTeamId);
-  const defendingMembers = defendingTeam?.members || [];
-
-  const defendingTeamIdStr = String(defendingTeamId);
-  const pitcherAssignments = engineContext?.pitcherAssignmentsByTeam?.[defendingTeamIdStr] ||
-    (defendingTeamId === Number(engineContext?.getCurrentPlayerId?.()) ? engineContext?.pitcherAssignments : {}) || {};
-  const explicitPitcherId = pitcherAssignments[round.orderNumber];
-
-  let defendingPitcherObj = null;
-  if (explicitPitcherId) {
-    defendingPitcherObj = defendingMembers.find(m => String(m.id) === String(explicitPitcherId));
-  }
-  if (!defendingPitcherObj && defendingMembers.length > 0) {
-    const allRounds = engineContext?.enrichedEntries || [];
-    let priorDefendingRounds = 0;
-    for (const m of allRounds) {
-      if (m.orderNumber >= round.orderNumber) break;
-      const mDefendingId = m.isTop ? homeTeamId : awayTeamId;
-      if (mDefendingId === defendingTeamId) priorDefendingRounds++;
-    }
-    defendingPitcherObj = resolvePlayerForBall(defendingMembers, priorDefendingRounds);
-  }
-
-  const pitcherPlayerName = defendingPitcherObj?.playerName || defendingPitcherObj?.name || (round.isTop ? homeTeamName : awayTeamName);
-
-  let pitcherDisplayName = '';
-  let batterDisplayName = '';
-
-  if (hasMatchup) {
-    if (isTeamMode) {
-      pitcherDisplayName = pitcherPlayerName;
-      batterDisplayName = round.isTop ? awayTeamName : homeTeamName;
-    } else {
-      const currentId = Number(engineContext?.getCurrentPlayerId?.());
-      const currentName = (engineContext?.allPlayersCache || []).find(p => String(p.id) === String(currentId))?.playerName || '';
-      if (role === 'pitcher') {
-        pitcherDisplayName = currentName;
-        batterDisplayName = opponentName;
-      } else {
-        batterDisplayName = currentName;
-        pitcherDisplayName = opponentName;
-      }
-    }
-  }
-
-  let roleHtml = '';
-  if (hasMatchup) {
-    const roleIsPitcher = role === 'pitcher';
-    const displayName = roleIsPitcher ? pitcherDisplayName : batterDisplayName;
-    const roleLabel = roleIsPitcher ? 'Pitcher' : 'Batter';
-    const displayHtml = displayName ? `: ${escapeHTML(displayName)}` : '';
-    roleHtml = `
-      <div class="baseball-role-row">
-        <span class="role-label ${roleIsPitcher ? 'pitcher' : 'batter'}">${roleLabel}${displayHtml}</span>
-      </div>
-    `;
-  }
-
-  // Compute per-ball player names for team mode
-  const playerPerBall = [];
-  const ballPlayers = [];
-  if (hasMatchup && isTeamMode && round.isTop !== undefined) {
-    const battingTeamIdStr = String(battingTeamId);
-    let teamBattingOrder = engineContext?.battingOrdersByTeam?.[battingTeamIdStr];
-    if (!teamBattingOrder || teamBattingOrder.length === 0) {
-      if (battingTeamId === Number(engineContext?.getCurrentPlayerId?.()) && engineContext?.battingOrder?.length) {
-        teamBattingOrder = engineContext.battingOrder;
-      } else {
-        const battingTeam = activeLeagueTeams.find(t => Number(t.id) === battingTeamId);
-        teamBattingOrder = battingTeam?.members || [];
-      }
-    }
-
-    const allRounds = engineContext?.enrichedEntries || [];
-    let priorBattingRounds = 0;
-    for (const m of allRounds) {
-      if (m.orderNumber >= round.orderNumber) break;
-      const mBattingTeamId = m.isTop ? awayTeamId : homeTeamId;
-      if (mBattingTeamId === battingTeamId) priorBattingRounds++;
-    }
-
-    const ballOffset = priorBattingRounds * 3;
-    for (let i = 0; i < 3; i++) {
-      const player = resolvePlayerForBall(teamBattingOrder, ballOffset + i);
-      ballPlayers.push(player);
-      playerPerBall.push(player?.playerName || player?.name || '');
-    }
+  if (rowContext?.isDisabled || rowContext?.isWalkOff) {
+    effectiveAccessDenied = true;
+    statusMsg = rowContext.walkOffNotice || '🔒 Walk-off: Home team is leading in the bottom of the last inning. DO NOT PLAY EXTRA BALLS.';
+  } else if (isTDOrAdmin) {
+    effectiveAccessDenied = false;
+  } else {
+    effectiveAccessDenied = isAccessDenied || (isTeamMode && !isTeamMember);
   }
 
   const roundTitle = displayRoundLabel ? `${escapeHTML(displayRoundLabel)} ${displayRoundNumber}` : `${displayRoundNumber}`;
 
+  let sectionsHtml = '';
+  if (hasMatchup) {
+    sectionsHtml = sections.map(sec => {
+      const isDisabled = sec.isActiveParticipant ? effectiveAccessDenied : opponentAccessDenied;
+      const containerClass = sec.isActiveParticipant ? 'round-inputs-container' : 'opponent-inputs-container';
+      return `
+        <div class="participant-section ${sec.key}-section ${containerClass} ${isDisabled ? 'round-inputs-disabled' : ''}">
+          ${sec.roleLabel || sec.displayName ? `
+            <div class="role-section-header ${sec.key}-label">
+              ${sec.roleLabel ? `<span class="role-title">${escapeHTML(sec.roleLabel)}:</span>` : ''}
+              ${sec.displayName ? `<span class="role-name">${escapeHTML(sec.displayName)}</span>` : ''}
+            </div>
+          ` : ''}
+          <div class="inputs-row ${sec.key}-row"></div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    sectionsHtml = `<div class="round-inputs-container ${effectiveAccessDenied ? 'round-inputs-disabled' : ''}"></div>`;
+  }
+
   row.innerHTML = `
     <div class="round-info">
       <div class="round-label"><b>${roundTitle}:</b> ${escapeHTML(round.machineName)}</div>
-      ${roleHtml}
       ${summaryHtml}
       ${bonusHtml}
     </div>
@@ -224,21 +143,16 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
       ${renderThresholdGrid(engine.filterThresholds(round.values), formatNumber, engine, round.value1, round.value2)}
     </div>
     <div class="round-actions">
-      ${hasMatchup && !isPitcher ? `<div class="opponent-inputs-container ${opponentAccessDenied ? 'round-inputs-disabled' : ''}"><div class="role-section-header pitcher-label"><span class="role-title">Pitcher:</span> <span class="role-name">${escapeHTML(pitcherDisplayName)}</span></div></div>` : ''}
-      <div class="round-inputs-container ${effectiveAccessDenied ? 'round-inputs-disabled' : ''}">
-        ${hasMatchup ? `<div class="role-section-header"><span class="role-title">${isPitcher ? 'Pitcher:' : 'Batter:'}</span> <span class="role-name">${isPitcher ? escapeHTML(pitcherDisplayName) : (isTeamMode ? '' : escapeHTML(batterDisplayName))}</span></div>` : ''}
-      </div>
-      ${hasMatchup && isPitcher ? `<div class="opponent-inputs-container ${opponentAccessDenied ? 'round-inputs-disabled' : ''}"><div class="role-section-header batter-label"><span class="role-title">Batter:</span> <span class="role-name">${isTeamMode ? '' : escapeHTML(batterDisplayName)}</span></div></div>` : ''}
-      <button class="save-round-button btn-mgmt" ${effectiveAccessDenied && opponentAccessDenied ? 'hidden' : ''} disabled>Save</button>
+      ${sectionsHtml}
+      <button class="save-round-button btn-mgmt" ${effectiveAccessDenied ? 'hidden' : ''} disabled>Save</button>
     </div>
-    ${effectiveAccessDenied && opponentAccessDenied ? `
+    ${effectiveAccessDenied ? `
       <div class="round-status-bar">
-        <span class="round-msg">${escapeHTML(msg)}</span>
+        <span class="round-msg">${escapeHTML(statusMsg)}</span>
       </div>
     ` : ''}
   `;
 
-  const inputsContainer = row.querySelector('.round-inputs-container');
   const saveBtn = row.querySelector('.save-round-button');
 
   row.querySelector('.round-info').addEventListener('click', () => {
@@ -249,67 +163,80 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
     row.querySelector('.target-details').classList.add('hidden');
   });
 
-  for (let ball = 1; ball <= 3; ball += 1) {
-    const value = turnValues?.[`ball${ball}`] ?? '';
-    const placeholder = `Ball ${ball}`;
-    const isBallLocked = !!lockedBalls[`ball${ball}`];
-
-    const ballGroup = document.createElement('div');
-    ballGroup.className = 'ball-input-group';
-
-    const playerName = !isPitcher ? (playerPerBall[ball - 1] || '') : '';
-    if (playerName) {
-      const nameEl = document.createElement('div');
-      nameEl.className = 'ball-player-name';
-      nameEl.textContent = playerName;
-      ballGroup.appendChild(nameEl);
-    }
-    
-    const input = createRollInput(round.orderNumber, ball, round.machineId, value, placeholder);
-    
-    if (isBallLocked) {
-      input.readOnly = true;
-      input.classList.add('ball-locked');
-      input.setAttribute('aria-disabled', 'true');
-      input.setAttribute('tabindex', '-1');
-      input.dataset.savedValue = value;
-    }
-
-    input.addEventListener('input', () => {
-      saveBtn.disabled = false;
-      saveBtn.classList.add('is-dirty');
-    });
-
-    ballGroup.appendChild(input);
-    inputsContainer.appendChild(ballGroup);
-  }
-
   if (hasMatchup) {
-    const opponentContainers = row.querySelectorAll('.opponent-inputs-container');
-    if (opponentContainers.length > 0) {
-      const targetContainerSelector = isPitcher ? '.batter-label' : '.pitcher-label';
-      const opponentContainer = Array.from(opponentContainers).find(c => c.querySelector(targetContainerSelector));
-      if (opponentContainer) {
-        for (let ball = 1; ball <= 3; ball += 1) {
-          const oppValue = opponentScores?.[`ball${ball}`];
-          const displayValue = (oppValue !== undefined && oppValue !== null && oppValue !== 0) ? oppValue : '';
+    sections.forEach(sec => {
+      const sectionRow = row.querySelector(`.${sec.key}-row`);
+      if (!sectionRow) return;
 
-          const ballGroup = document.createElement('div');
-          ballGroup.className = 'ball-input-group';
+      const canEditSection = sec.isActiveParticipant && !effectiveAccessDenied;
+      const isBallLockedForSec = sec.isActiveParticipant && !isTDOrAdmin;
+      const perBallPlayers = sec.perBallPlayers || [];
 
-          const playerName = isPitcher ? (playerPerBall[ball - 1] || '') : '';
-          if (playerName) {
-            const nameEl = document.createElement('div');
-            nameEl.className = 'ball-player-name';
-            nameEl.textContent = playerName;
-            ballGroup.appendChild(nameEl);
-          }
+      for (let ball = 1; ball <= 3; ball += 1) {
+        const value = sec.isActiveParticipant ? turnValues?.[`ball${ball}`] : opponentScores?.[`ball${ball}`];
+        const displayValue = (value !== undefined && value !== null && value !== 0) ? value : '';
+        const isBallLocked = isBallLockedForSec && !!lockedBalls[`ball${ball}`];
 
-          const input = createRollInput(round.orderNumber, ball, round.machineId, displayValue, `Ball ${ball}`, { isOpponent: true });
-          ballGroup.appendChild(input);
-          opponentContainer.appendChild(ballGroup);
+        const ballGroup = document.createElement('div');
+        ballGroup.className = 'ball-input-group';
+
+        const pBallObj = perBallPlayers[ball - 1];
+        const playerName = pBallObj?.playerName || pBallObj?.name || (typeof pBallObj === 'string' ? pBallObj : '');
+        if (playerName) {
+          const nameEl = document.createElement('div');
+          nameEl.className = 'ball-player-name';
+          nameEl.textContent = playerName;
+          ballGroup.appendChild(nameEl);
         }
+
+        const input = createRollInput(round.orderNumber, ball, round.machineId, displayValue, `Ball ${ball}`, { isOpponent: !canEditSection });
+        input.dataset.sectionKey = sec.key;
+
+        if (isBallLocked) {
+          input.readOnly = true;
+          input.classList.add('ball-locked');
+          input.setAttribute('aria-disabled', 'true');
+          input.setAttribute('tabindex', '-1');
+          input.dataset.savedValue = displayValue;
+        }
+
+        if (canEditSection) {
+          input.addEventListener('input', () => {
+            saveBtn.disabled = false;
+            saveBtn.classList.add('is-dirty');
+          });
+        }
+
+        ballGroup.appendChild(input);
+        sectionRow.appendChild(ballGroup);
       }
+    });
+  } else {
+    // Non-matchup format (Bowling / Golf)
+    const inputsContainer = row.querySelector('.round-inputs-container');
+    for (let ball = 1; ball <= 3; ball += 1) {
+      const value = turnValues?.[`ball${ball}`] ?? '';
+      const isBallLocked = !!lockedBalls[`ball${ball}`];
+
+      const ballGroup = document.createElement('div');
+      ballGroup.className = 'ball-input-group';
+
+      const input = createRollInput(round.orderNumber, ball, round.machineId, value, `Ball ${ball}`);
+      if (isBallLocked) {
+        input.readOnly = true;
+        input.classList.add('ball-locked');
+        input.setAttribute('aria-disabled', 'true');
+        input.setAttribute('tabindex', '-1');
+        input.dataset.savedValue = value;
+      }
+
+      input.addEventListener('input', () => {
+        saveBtn.disabled = false;
+        saveBtn.classList.add('is-dirty');
+      });
+
+      ballGroup.appendChild(input);
+      inputsContainer.appendChild(ballGroup);
     }
   }
 
@@ -317,8 +244,12 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
     const currentPlayerId = getCurrentPlayerId();
     if (!currentPlayerId) return;
 
+    const activeSec = sections.find(s => s.isActiveParticipant);
+    const activeSectionSelector = activeSec ? `.${activeSec.key}-row` : '';
     const getBallValue = (ballNum) => {
-      const input = row.querySelector(`[data-ball="${ballNum}"]`);
+      const input = activeSectionSelector
+        ? row.querySelector(`${activeSectionSelector} [data-ball="${ballNum}"]`)
+        : row.querySelector(`[data-ball="${ballNum}"]`);
       if (input && input.dataset.savedValue !== undefined) {
         return Number(String(input.dataset.savedValue).replace(/\D/g, '')) || 0;
       }
@@ -338,16 +269,10 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
         let ball2PlayerId = null;
         let ball3PlayerId = null;
 
-        if (isTeamMode) {
-          if (isPitcher) {
-            ball1PlayerId = defendingPitcherObj?.id ? Number(defendingPitcherObj.id) : null;
-            ball2PlayerId = defendingPitcherObj?.id ? Number(defendingPitcherObj.id) : null;
-            ball3PlayerId = defendingPitcherObj?.id ? Number(defendingPitcherObj.id) : null;
-          } else {
-            ball1PlayerId = ballPlayers[0]?.id ? Number(ballPlayers[0].id) : null;
-            ball2PlayerId = ballPlayers[1]?.id ? Number(ballPlayers[1].id) : null;
-            ball3PlayerId = ballPlayers[2]?.id ? Number(ballPlayers[2].id) : null;
-          }
+        if (isTeamMode && activeSec?.perBallPlayers?.length) {
+          ball1PlayerId = activeSec.perBallPlayers[0]?.id ? Number(activeSec.perBallPlayers[0].id) : null;
+          ball2PlayerId = activeSec.perBallPlayers[1]?.id ? Number(activeSec.perBallPlayers[1].id) : null;
+          ball3PlayerId = activeSec.perBallPlayers[2]?.id ? Number(activeSec.perBallPlayers[2].id) : null;
         }
 
         await saveScoreCallback({
@@ -384,11 +309,12 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
 export function renderPreviewRow(engine, frame, index, isExpanded, formatNumber, escapeHTML, renderThresholdGrid) {
   const previewData = engine.getPreviewRowData(frame);
   const displayLabel = engine.getRoundDisplayLabel(index);
+  const showValueInputs = engine.showValueInputsInPreview ? engine.showValueInputsInPreview() : true;
   
   let headerHtml = '';
   let contentHtml = '';
 
-  if (engine.constructor.name === 'BaseballEngine') {
+  if (!showValueInputs) {
     headerHtml = `
       <div class="flex gap-12 w-100 wrap matchup-inning">
         <div class="flex gap-12 flex-1 min-250 align-center">

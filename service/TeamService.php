@@ -13,20 +13,14 @@ class TeamService {
     }
 
     /**
-     * Get all teams with their members, excluding individual wrapper teams by default.
+     * Get all teams with their members.
      *
-     * @param bool $includeWrappers Whether to include 1-person individual wrapper teams
      * @return array
      */
-    public function getAllTeams(bool $includeWrappers = false): array {
+    public function getAllTeams(): array {
         $pdo = $this->db->getPdo();
         
-        $sql = 'SELECT * FROM teams';
-        if (!$includeWrappers) {
-            $sql .= ' WHERE (is_individual_wrapper = 0 OR is_individual_wrapper IS NULL)';
-        }
-        $sql .= ' ORDER BY name ASC';
-        $stmt = $pdo->query($sql);
+        $stmt = $pdo->query('SELECT * FROM teams ORDER BY name ASC');
         $teams = $stmt->fetchAll();
         
         $stmt = $pdo->query(

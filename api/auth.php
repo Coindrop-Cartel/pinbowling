@@ -19,7 +19,7 @@ class AuthController extends ApiController {
     }
 
     protected function validateAccess(): void {
-        $publicTasks = ['me', 'login', 'forgot', 'reset_with_token'];
+        $publicTasks = ['me', 'login', 'register', 'forgot', 'reset_with_token'];
         if (!in_array($this->task, $publicTasks)) {
             $this->validateSessionOrSecret();
         }

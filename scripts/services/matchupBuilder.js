@@ -47,16 +47,16 @@ export function buildTeamRoundRobinMatchups(matchupWrapper, awayTeamMembers, hom
     matchups.push({
       orderNumber,
       playerId: awayTeamMembers[0].id,   // lead-off batter (Ball 1)
-      player1Id: Number(matchupWrapper.player1Id ?? matchupWrapper.player1_id),  // home (pitching team)
-      player2Id: Number(matchupWrapper.player2Id ?? matchupWrapper.player2_id),  // away (batting team)
+      player1Id: Number(matchupWrapper.team1Id),  // home (pitching team)
+      player2Id: Number(matchupWrapper.team2Id),  // away (batting team)
       playerOrder: 1,
       machineId: topMachineId,
-      teamId: Number(matchupWrapper.player2Id ?? matchupWrapper.player2_id),
+      teamId: Number(matchupWrapper.team2Id),
       isTop: true,
       inning: inning + 1,
       roundName: `Top ${inning + 1}`,
       playerName: awayTeamMembers[0].playerName,
-      opponentTeamId: Number(matchupWrapper.player1Id ?? matchupWrapper.player1_id),
+      opponentTeamId: Number(matchupWrapper.team1Id),
     });
     orderNumber++;
 
@@ -64,16 +64,16 @@ export function buildTeamRoundRobinMatchups(matchupWrapper, awayTeamMembers, hom
     matchups.push({
       orderNumber,
       playerId: homeTeamMembers[0].id,   // lead-off batter (Ball 1)
-      player1Id: Number(matchupWrapper.player1Id ?? matchupWrapper.player1_id),  // home (batting team)
-      player2Id: Number(matchupWrapper.player2Id ?? matchupWrapper.player2_id),  // away (pitching team)
+      player1Id: Number(matchupWrapper.team1Id),  // home (batting team)
+      player2Id: Number(matchupWrapper.team2Id),  // away (pitching team)
       playerOrder: 1,
       machineId: bottomMachineId,
-      teamId: Number(matchupWrapper.player1Id ?? matchupWrapper.player1_id),
+      teamId: Number(matchupWrapper.team1Id),
       isTop: false,
       inning: inning + 1,
       roundName: `Bottom ${inning + 1}`,
       playerName: homeTeamMembers[0].playerName,
-      opponentTeamId: Number(matchupWrapper.player2Id ?? matchupWrapper.player2_id),
+      opponentTeamId: Number(matchupWrapper.team2Id),
     });
     orderNumber++;
   }
@@ -118,7 +118,7 @@ export function resolveTeamMatchupRole(playerId, orderNumber, eventMatchups, tea
   const inningNumber = Math.ceil(Number(orderNumber) / 2);
   const displayRoundNumber = roundName || `${isTop ? 'Top' : 'Bottom'} ${inningNumber}`;
 
-  const homeTeamId = Number(targetMatchup?.player1Id ?? targetMatchup?.player1_id ?? 0);
+  const homeTeamId = Number(targetMatchup?.team1Id ?? 0);
   const selectedTeamId = Number(playerId);
   const isPlayer1 = selectedTeamId === homeTeamId;
   const opponentName = '';
@@ -205,8 +205,8 @@ export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups, tea
     return { matchup: null, isPlayer1: true, isTop: true, opponentName: '', displayRoundNumber: '' };
   }
 
-  const p1Id = targetMatchup.player1Id ?? targetMatchup.player1_id;
-  const p2Id = targetMatchup.player2Id ?? targetMatchup.player2_id;
+  const p1Id = targetMatchup.player1Id;
+  const p2Id = targetMatchup.player2Id;
 
   let isPlayer1 = false;
   let isPlayer2 = false;
@@ -215,8 +215,8 @@ export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups, tea
   const { allPlayersCache = [], activeLeague } = teamContext;
   const leagues = activeLeague ? [activeLeague] : [];
 
-  const p1Players = resolvePlayersForMatchupParticipant(p1Id, targetMatchup.player1Name ?? targetMatchup.player1_name, allPlayersCache, leagues);
-  const p2Players = resolvePlayersForMatchupParticipant(p2Id, targetMatchup.player2Name ?? targetMatchup.player2_name, allPlayersCache, leagues);
+  const p1Players = resolvePlayersForMatchupParticipant(p1Id, targetMatchup.player1Name, allPlayersCache, leagues);
+  const p2Players = resolvePlayersForMatchupParticipant(p2Id, targetMatchup.player2Name, allPlayersCache, leagues);
 
   const isInP1 = p1Players.some(p => String(p.id) === String(playerId)) || String(playerId) === String(p1Id);
   const isInP2 = p2Players.some(p => String(p.id) === String(playerId)) || String(playerId) === String(p2Id);
@@ -279,37 +279,35 @@ export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups, tea
 export function enrichTeamMatchupEntries(entries, matchupWrapper, awayTeamMembers, homeTeamMembers, roundName) {
   if (!entries?.length) return entries;
 
-  const homeTeamId = Number(matchupWrapper.player1Id ?? matchupWrapper.player1_id);
-  const awayTeamId = Number(matchupWrapper.player2Id ?? matchupWrapper.player2_id);
+  const wrapperHomeTeamId = Number(matchupWrapper.team1Id);
+  const wrapperAwayTeamId = Number(matchupWrapper.team2Id);
 
-  // Determine isTop from roundName if provided (e.g. "Top 1" → true, "Bottom 2" → false)
-  let isTop = true;
-  if (roundName) {
-    isTop = roundName.toLowerCase().startsWith('top');
-  }
-
-  const battingTeamId = isTop ? awayTeamId : homeTeamId;
-  const pitchingTeamId = isTop ? homeTeamId : awayTeamId;
-  const battingMembers = isTop ? awayTeamMembers : homeTeamMembers;
-  const pitchingMembers = isTop ? homeTeamMembers : awayTeamMembers;
-
-  // Build lookup maps for player info
-  const allMembers = [...battingMembers, ...pitchingMembers];
-  const memberMap = {};
-  allMembers.forEach(m => { memberMap[Number(m.id)] = m; });
+  const allMembersMap = {};
+  awayTeamMembers.forEach(m => { allMembersMap[Number(m.id)] = m; });
+  homeTeamMembers.forEach(m => { allMembersMap[Number(m.id)] = m; });
 
   const enriched = entries.map((entry, idx) => {
+    const entryTeam1Id = Number(entry.team1Id ?? entry.team1_id ?? 0);
+    const entryTeam2Id = Number(entry.team2Id ?? entry.team2_id ?? 0);
+
+    const pitchingTeamId = entryTeam1Id;
+    const battingTeamId = entryTeam2Id;
+    const isTop = entryTeam1Id === wrapperHomeTeamId;
+    const battingMembers = battingTeamId === wrapperAwayTeamId ? awayTeamMembers : homeTeamMembers;
+    const pitchingMembers = pitchingTeamId === wrapperHomeTeamId ? homeTeamMembers : awayTeamMembers;
+
     const batterId = Number(entry.playerId ?? entry.player_id ?? 0);
-    const batterMember = memberMap[batterId] || battingMembers[idx] || battingMembers[0];
+    const batterMember = allMembersMap[batterId] || battingMembers[idx] || battingMembers[0];
     const pitcherMember = pitchingMembers[idx] || pitchingMembers[0];
+    const resolvedRoundName = roundName || (isTop ? 'Top' : 'Bottom') + ' ' + Math.ceil((idx + 1) / 2);
 
     return {
       ...entry,
       playerId: batterId,
-      playerName: entry.playerName ?? entry.player_name ?? batterMember?.playerName ?? batterMember?.player_name ?? '',
+      playerName: entry.playerName ?? entry.player_name ?? batterMember?.playerName ?? '',
       teamId: battingTeamId,
       isTop,
-      roundName: roundName || '',
+      roundName: resolvedRoundName,
       slotIndex: idx,
       playerOrder: idx + 1,
       opponentTeamId: pitchingTeamId,

@@ -273,10 +273,10 @@ export async function isManagementAuthorized() {
  * @param {Object|null} currentUser - The currently authenticated user (from PB_API.getCurrentUser()).
  * @param {Object|null} targetPlayer - The player whose score is being entered.
  * @param {Object|null} turnValues - Existing score values for the round (ball1, ball2, ball3).
- * @param {string} [leagueType='standard'] - The type of league ('standard' or 'session').
+ * @param {boolean} [isSession=false] - Whether this is a session (quick play) event.
  * @returns {Promise<{access: 'allowed'|'denied', reason?: string, lockedBalls: Object<string, boolean>}>}
  */
-export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues, leagueType = 'standard', isTargetInRoster = true) {
+export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues, isSession = false, isTargetInRoster = true) {
   if (!isTargetInRoster) {
     return { access: 'denied', reason: 'Player is not registered in this league.', lockedBalls: {} };
   }
@@ -297,10 +297,8 @@ export async function getScoreAccessLevel(currentUser, targetPlayer, turnValues,
   // 1. Management Override: TD/Admin can always score/update anything.
   if (canUpdateAny) return { access: 'allowed', lockedBalls: {} };
 
-  // 2. Determine if the user has permission to update existing scores
-  //    This varies by league type and user role.
-  // 2. Standard League Specific Logic
-  if (leagueType === 'standard') {
+  // Standard League Logic
+  if (!isSession) {
     const lockedBalls = {};
     const reasonForDenial = 'Score locked. Contact TD to correct errors.';
     const isCurrentUserRegistered = !!currentUser; // Determine registration status once

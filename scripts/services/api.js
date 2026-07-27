@@ -148,6 +148,23 @@ export const PB_API = {
     clear: (eventId) => fetchJSON(`api/matchup.php?eventId=${eventId}`, { method: 'DELETE' }),
   },
 
+  teamScores: {
+    get: (eventId, teamEventMatchupId) => {
+      if (teamEventMatchupId) return fetchJSON(`api/team-score.php?teamEventMatchupId=${teamEventMatchupId}`);
+      if (eventId) return fetchJSON(`api/team-score.php?eventId=${eventId}`);
+      return [];
+    },
+    save: (score) => fetchJSON('api/team-score.php', { method: 'POST', body: JSON.stringify(score) }),
+  },
+
+  teamMatchups: {
+    get: (eventId, teamEventMatchupId) => {
+      if (teamEventMatchupId) return fetchJSON(`api/team-matchup.php?teamEventMatchupId=${teamEventMatchupId}`);
+      return fetchJSON(`api/team-matchup.php?eventId=${eventId}`);
+    },
+    clear: (eventId) => fetchJSON(`api/team-matchup.php?eventId=${eventId}`, { method: 'DELETE' }),
+  },
+
   leagues: {
     getAll: (params) => fetchJSON('api/league.php', { params }),
     get: (id) => fetchJSON(`api/league.php?id=${id}`),
@@ -191,6 +208,15 @@ export const PB_API = {
     updateMachine: (locationId, machineId, data) =>
       fetchJSON('api/location.php?task=units', { method: 'PUT', body: JSON.stringify({ locationId, machineId, ...data }) }),
     removeMachine: (locationId, machineId) => fetchJSON(`api/location.php?task=units&locationId=${locationId}&machineId=${machineId}`, { method: 'DELETE' }),
+  },
+
+  sessions: {
+    getAll: (params) => fetchJSON('api/session.php', { params }),
+    get: (id) => fetchJSON(`api/session.php?id=${id}`),
+    create: (session) => fetchJSON('api/session.php', { method: 'POST', body: JSON.stringify(session) }),
+    delete: (id) => fetchJSON('api/session.php?task=delete', { method: 'POST', body: JSON.stringify({ id }) }),
+    addPlayer: (sessionId, playerId) => fetchJSON('api/session.php?task=addPlayer', { method: 'POST', body: JSON.stringify({ sessionId, playerId }) }),
+    removePlayer: (sessionId, playerId) => fetchJSON('api/session.php?task=removePlayer', { method: 'POST', body: JSON.stringify({ sessionId, playerId }) }),
   },
 
   system: {

@@ -322,7 +322,7 @@ describe('BaseballEngine', () => {
     // Home (isPlayer1) pitches on Top (order 1,3), bats on Bottom (order 2,4).
     // Away bats on Top, pitches on Bottom. The opponent map holds the AWAY
     // player's scores on EVERY machine (batting on top, pitching on bottom),
-    // keyed by machine orderNumber — matching buildBaseballScoreMapForPlayer.
+    // keyed by machine orderNumber — matching buildPlayerScoreMap.
     const innings = [mockInning(1), mockInning(2), mockInning(3), mockInning(4)];
     const scoreMap = {
       isPlayer1: true,
@@ -623,7 +623,7 @@ describe('BaseballEngine', () => {
   });
 
   // ── buildPlayerScoreMap ──────────────────────────────────────────────
-  test('buildPlayerScoreMap - delegates to buildBaseballScoreMapForPlayer', () => {
+  test('buildPlayerScoreMap - builds score map with opponent scores', () => {
     const scoresByPlayer = { 1: [] };
     const matchups = [{ orderNumber: 1, playerId: 1, playerOrder: 1, machineId: 10 }];
     const result = engine.buildPlayerScoreMap(1, [], scoresByPlayer, matchups);
@@ -997,8 +997,8 @@ describe('BaseballEngine', () => {
     // Verify insertion fallback (no total-score div)
     expect(domRefs.resultsPanel.insertAdjacentHTML).toHaveBeenCalledWith('beforeend', expect.stringContaining('scoreboard-grid'));
 
-    // Check rendered total score (Away defaults to 'Opponent' with mocked score 5, Home resolves to 'Player One' with 0)
-    expect(domRefs.totalScore.innerHTML).toContain('Opponent 5');
+    // Check rendered total score (Away defaults to 'Away' with mocked score 5, Home resolves to 'Player One' with 0)
+    expect(domRefs.totalScore.innerHTML).toContain('Away 5');
     expect(domRefs.totalScore.innerHTML).toContain('Player One 0');
 
     calculateTurnResultsSpy.mockRestore();

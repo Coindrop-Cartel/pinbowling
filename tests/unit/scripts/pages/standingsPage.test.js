@@ -8,9 +8,13 @@ vi.mock('@services/api.js', () => ({
     machines: { getTargets: vi.fn() },
     scores: { get: vi.fn() },
     teams: { getAll: vi.fn().mockResolvedValue([]) },
+    matchups: { get: vi.fn().mockResolvedValue([]) },
+    teamMatchups: { get: vi.fn().mockResolvedValue([]) },
+    teamScores: { save: vi.fn() },
     auth: {
       me: vi.fn().mockResolvedValue(null)
-    }
+    },
+    sessions: { get: vi.fn() },
   }
 }));
 
@@ -44,9 +48,11 @@ vi.mock('@scripts/utils.js', () => ({
   getActiveEventId: vi.fn(),
   getActiveLeagueId: vi.fn(),
   setActiveEventId: vi.fn(),
+  setActiveLeagueId: vi.fn(),
   loadPage: vi.fn(), // Added mock for loadPage
   formatNumber: vi.fn(n => n?.toLocaleString() || '0'),
   escapeHTML: vi.fn(str => str), // Mock escapeHTML
+  getUrlParam: vi.fn(() => null),
 }));
 
 const uiMocks = vi.hoisted(() => ({

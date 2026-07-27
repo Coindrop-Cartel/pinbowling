@@ -1,10 +1,11 @@
 <?php
 /**
- * One-off recovery script to reconstruct league_teams and team_members from the scores table.
+ * One-off recovery script to reconstruct league rosters from the scores table.
  *
- * Use this script if league_players was dropped before rosters were converted into universal teams.
- * It inspects scores JOIN events, identifies every player who scored in a league event, creates a 1-player
- * team for them, and assigns them to the league in league_teams.
+ * Use this script if rosters were lost. It inspects scores JOIN events, identifies every
+ * player who scored in a league event, and reconstructs their roster entries:
+ * - Team leagues: creates 1-player teams, assigns via team_members + league_teams
+ * - Individual leagues: inserts directly into league_players
  */
 
 require_once __DIR__ . '/../includes/bootstrap.php';
@@ -57,13 +58,29 @@ try {
             $insertMember->execute([$teamId, $playerId]);
         }
 
-        // Step B: Link team to league in league_teams
-        $insertLT = $pdo->prepare("INSERT IGNORE INTO league_teams (league_id, team_id) VALUES (?, ?)");
-        $insertLT->execute([$leagueId, $teamId]);
+        // Step B: Check league participation type
+        $stmtPart = $pdo->prepare("SELECT participation_type FROM leagues WHERE id = ?");
+        $stmtPart->execute([$leagueId]);
+        $partType = $stmtPart->fetchColumn();
 
-        if ($insertLT->rowCount() > 0) {
-            $reassignedCount++;
-            echo "  + Reassigned '{$playerName}' (Player ID {$playerId}) to League ID {$leagueId}\n";
+        if ($partType === 'team') {
+            // Link team to league in league_teams
+            $insertLT = $pdo->prepare("INSERT IGNORE INTO league_teams (league_id, team_id) VALUES (?, ?)");
+            $insertLT->execute([$leagueId, $teamId]);
+
+            if ($insertLT->rowCount() > 0) {
+                $reassignedCount++;
+                echo "  + Reassigned '{$playerName}' (Player ID {$playerId}) to League ID {$leagueId}\n";
+            }
+        } else {
+            // Individual league: use league_players
+            $insertLP = $pdo->prepare("INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)");
+            $insertLP->execute([$leagueId, $playerId]);
+
+            if ($insertLP->rowCount() > 0) {
+                $reassignedCount++;
+                echo "  + Reassigned '{$playerName}' (Player ID {$playerId}) to League ID {$leagueId}\n";
+            }
         }
     }
 

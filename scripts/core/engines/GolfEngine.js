@@ -258,16 +258,24 @@ export class GolfEngine extends ScoringEngine {
    * Sorts standings by par-relative diff first (sport-specific),
    * then delegates to the CompetitionFormatStrategy for group/H2H tiebreaking.
    */
+  handlesSortCompletely() { return true; }
+
   sortStandings(rows, options = {}) {
-    const preSorted = [...rows].sort((a, b) => {
+    const sorted = [...rows].sort((a, b) => {
       if (a.hasScores !== b.hasScores) return a.hasScores ? -1 : 1;
       if (a.parDiff !== undefined && b.parDiff !== undefined) {
         const d = a.parDiff - b.parDiff;
         if (d !== 0) return d;
       }
-      return 0; // defer remaining tiebreaking to strategy
+      const holesA = a.ordersWithScores?.size ?? 0;
+      const holesB = b.ordersWithScores?.size ?? 0;
+      if (holesA !== holesB) return holesA - holesB;
+      return this.compareScores(a.totalSeasonPoints ?? a.total ?? 0, b.totalSeasonPoints ?? b.total ?? 0);
     });
-    return this.getCompetitionStrategy().sortStandings(preSorted, this, options);
+    if (options.seasonScoring === 'weekly') {
+      return this.getCompetitionStrategy().sortStandings(sorted, this, options);
+    }
+    return sorted;
   }
 
   /**

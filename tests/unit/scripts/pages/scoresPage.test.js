@@ -17,6 +17,9 @@ vi.mock('@services/api.js', () => ({
     machines: { getTargets: vi.fn() },
     scores: { get: vi.fn(), save: vi.fn() },
     matchups: { get: vi.fn(), save: vi.fn() },
+    teamMatchups: { get: vi.fn().mockResolvedValue([]), clear: vi.fn() },
+    teamScores: { get: vi.fn().mockResolvedValue([]), save: vi.fn() },
+    sessions: { get: vi.fn() },
   },
 }));
 
@@ -37,6 +40,7 @@ vi.mock('@scripts/utils.js', () => ({
   renderThresholdGrid: vi.fn(() => 'Grid'),
   loadPage: vi.fn(), // Added mock for loadPage
   escapeHTML: vi.fn(str => str), // Mock escapeHTML
+  getUrlParam: vi.fn(() => null),
 }));
 
 vi.mock('@services/auth.js', () => ({

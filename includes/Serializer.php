@@ -82,7 +82,6 @@ class Serializer {
         return [
             'id' => (int)$row['id'],
             'name' => $row['name'],
-            'type' => $row['type'] ?? 'standard',
             'competitionFormat' => $row['competition_format'] ?? 'group',
             'participationType' => $row['participation_type'] ?? 'individual',
             'teamSize' => isset($row['team_size']) ? (int)$row['team_size'] : 1,
@@ -106,18 +105,40 @@ class Serializer {
     }
 
     /**
+     * Normalizes a session database row.
+     */
+    public static function session($row) {
+        return [
+            'id' => (int)$row['id'],
+            'name' => $row['name'],
+            'scoringFormat' => $row['scoring_format'] ?? 'bowling',
+            'competitionFormat' => $row['competition_format'] ?? 'group',
+            'roundsPerGame' => isset($row['rounds_per_game']) && $row['rounds_per_game'] !== null ? (int)$row['rounds_per_game'] : null,
+            'matchupsPerRound' => isset($row['matchups_per_round']) && $row['matchups_per_round'] !== null ? (int)$row['matchups_per_round'] : null,
+            'locationId' => isset($row['location_id']) ? (int)$row['location_id'] : null,
+            'createdAt' => $row['created_at'] ?? null,
+            'events' => isset($row['events']) ? array_map([self::class, 'event'], $row['events']) : [],
+            'players' => isset($row['players']) ? array_map([self::class, 'player'], $row['players']) : [],
+            'locationIds' => $row['location_ids'] ?? []
+        ];
+    }
+
+    /**
      * Normalizes an event database row.
      */
     public static function event($row) {
         return [
             'id' => (int)$row['id'],
-            'leagueId' => (int)$row['league_id'],
+            'leagueId' => isset($row['league_id']) && $row['league_id'] !== null ? (int)$row['league_id'] : null,
+            'sessionId' => isset($row['session_id']) && $row['session_id'] !== null ? (int)$row['session_id'] : null,
             'locationId' => isset($row['location_id']) ? (int)$row['location_id'] : null,
             'eventName' => $row['event_name'],
             'eventDate' => $row['event_date'] ?? null,
             'scoringFormat' => $row['scoring_format'] ?? 'bowling',
             'locationName' => $row['location_name'] ?? null,
-            'matchups' => isset($row['matchups']) ? array_map([self::class, 'eventMatchup'], $row['matchups']) : []
+            'matchups' => isset($row['matchups']) ? array_map(function($m) {
+                return isset($m['team1_id']) ? self::teamEventMatchup($m) : self::eventMatchup($m);
+            }, $row['matchups']) : []
         ];
     }
 
@@ -128,9 +149,30 @@ class Serializer {
         return [
             'id' => (int)$row['id'],
             'playerId' => (isset($row['player_id']) && $row['player_id'] !== null) ? (int)$row['player_id'] : null,
-            'teamId' => (isset($row['team_id']) && $row['team_id'] !== null) ? (int)$row['team_id'] : null,
             'eventId' => (int)($row['event_id'] ?? 0),
             'eventMatchupId' => (isset($row['event_matchup_id']) && $row['event_matchup_id'] !== null) ? (int)$row['event_matchup_id'] : null,
+            'orderNumber' => (int)$row['order_number'],
+            'machineId' => (int)$row['machine_id'],
+            'machineName' => $row['machine_name'] ?? null,
+            'ball1' => (int)$row['ball1'],
+            'ball1PlayerId' => (isset($row['ball1_player_id']) && $row['ball1_player_id'] !== null) ? (int)$row['ball1_player_id'] : null,
+            'ball2' => (int)$row['ball2'],
+            'ball2PlayerId' => (isset($row['ball2_player_id']) && $row['ball2_player_id'] !== null) ? (int)$row['ball2_player_id'] : null,
+            'ball3' => (int)$row['ball3'],
+            'ball3PlayerId' => (isset($row['ball3_player_id']) && $row['ball3_player_id'] !== null) ? (int)$row['ball3_player_id'] : null,
+            'status' => $row['status'] ?? 'approved'
+        ];
+    }
+
+    /**
+     * Normalizes a team score database row.
+     */
+    public static function teamScore($row) {
+        return [
+            'id' => (int)$row['id'],
+            'teamId' => (isset($row['team_id']) && $row['team_id'] !== null) ? (int)$row['team_id'] : null,
+            'eventId' => (int)($row['event_id'] ?? 0),
+            'teamEventMatchupId' => (isset($row['team_event_matchup_id']) && $row['team_event_matchup_id'] !== null) ? (int)$row['team_event_matchup_id'] : null,
             'orderNumber' => (int)$row['order_number'],
             'machineId' => (int)$row['machine_id'],
             'machineName' => $row['machine_name'] ?? null,
@@ -247,6 +289,8 @@ class Serializer {
             'machineName' => $row['machine_name'] ?? null,
             'player1Id' => (isset($row['player1_id']) && $row['player1_id'] !== null) ? (int)$row['player1_id'] : null,
             'player2Id' => (isset($row['player2_id']) && $row['player2_id'] !== null) ? (int)$row['player2_id'] : null,
+            'player3Id' => (isset($row['player3_id']) && $row['player3_id'] !== null) ? (int)$row['player3_id'] : null,
+            'player4Id' => (isset($row['player4_id']) && $row['player4_id'] !== null) ? (int)$row['player4_id'] : null,
             'playerId' => (isset($row['player2_id']) && $row['player2_id'] !== null) ? (int)$row['player2_id'] : ((isset($row['player1_id']) && $row['player1_id'] !== null) ? (int)$row['player1_id'] : null),
             'playerName' => $row['player_name'] ?? null
         ];
@@ -255,12 +299,49 @@ class Serializer {
     /**
      * Normalizes an event matchup database row.
      */
+    public static function teamEventMatchup($row) {
+        return [
+            'id' => (int)$row['id'],
+            'eventId' => (int)$row['event_id'],
+            'leagueId' => isset($row['league_id']) ? (int)$row['league_id'] : null,
+            'team1Id' => (isset($row['team1_id']) && $row['team1_id'] !== null) ? (int)$row['team1_id'] : null,
+            'team2Id' => (isset($row['team2_id']) && $row['team2_id'] !== null) ? (int)$row['team2_id'] : null,
+            'team3Id' => (isset($row['team3_id']) && $row['team3_id'] !== null) ? (int)$row['team3_id'] : null,
+            'team4Id' => (isset($row['team4_id']) && $row['team4_id'] !== null) ? (int)$row['team4_id'] : null,
+            'team1Name' => $row['team1_name'] ?? null,
+            'team2Name' => $row['team2_name'] ?? null,
+            'team3Name' => $row['team3_name'] ?? null,
+            'team4Name' => $row['team4_name'] ?? null,
+            'team1Score' => (int)($row['team1_score'] ?? 0),
+            'team2Score' => (int)($row['team2_score'] ?? 0),
+            'team3Score' => (int)($row['team3_score'] ?? 0),
+            'team4Score' => (int)($row['team4_score'] ?? 0),
+            'teamWinnerId' => (isset($row['team_winner_id']) && $row['team_winner_id'] !== null) ? (int)$row['team_winner_id'] : null,
+            'status' => $row['status'] ?? 'pending',
+            'gameNumber' => (int)($row['game_number'] ?? 1),
+            'roundName' => $row['round_name'] ?? null,
+            'entries' => $row['entries'] ?? [],
+        ];
+    }
+
+    public static function teamMatchup($row) {
+        return [
+            'id' => (int)$row['id'],
+            'teamEventMatchupId' => (isset($row['team_event_matchup_id']) && $row['team_event_matchup_id'] !== null) ? (int)$row['team_event_matchup_id'] : null,
+            'orderNumber' => (int)$row['order_number'],
+            'machineId' => (int)$row['machine_id'],
+            'machineName' => $row['machine_name'] ?? null,
+            'team1Id' => (isset($row['team1_id']) && $row['team1_id'] !== null) ? (int)$row['team1_id'] : null,
+            'team2Id' => (isset($row['team2_id']) && $row['team2_id'] !== null) ? (int)$row['team2_id'] : null,
+        ];
+    }
+
     public static function eventMatchup($row) {
         return [
             'id' => (int)$row['id'],
             'eventId' => (int)$row['event_id'],
             'leagueId' => isset($row['league_id']) ? (int)$row['league_id'] : null,
-            'player1Id' => (int)$row['player1_id'],
+            'player1Id' => (isset($row['player1_id']) && $row['player1_id'] !== null) ? (int)$row['player1_id'] : null,
             'player2Id' => (isset($row['player2_id']) && $row['player2_id'] !== null) ? (int)$row['player2_id'] : null,
             'player3Id' => (isset($row['player3_id']) && $row['player3_id'] !== null) ? (int)$row['player3_id'] : null,
             'player4Id' => (isset($row['player4_id']) && $row['player4_id'] !== null) ? (int)$row['player4_id'] : null,
@@ -272,7 +353,7 @@ class Serializer {
             'player2Score' => (int)($row['player2_score'] ?? 0),
             'player3Score' => (int)($row['player3_score'] ?? 0),
             'player4Score' => (int)($row['player4_score'] ?? 0),
-            'winnerId' => (isset($row['winner_id']) && $row['winner_id'] !== null) ? (int)$row['winner_id'] : null,
+            'winnerId' => (isset($row['player_winner_id']) && $row['player_winner_id'] !== null) ? (int)$row['player_winner_id'] : null,
             'status' => $row['status'] ?? 'pending',
             'gameNumber' => (int)($row['game_number'] ?? 1),
             'roundName' => $row['round_name'] ?? null,

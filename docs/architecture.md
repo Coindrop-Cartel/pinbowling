@@ -56,21 +56,23 @@ A lightweight custom container (`includes/Container.php`) manages all service in
 | `EventService` | Individual event creation and lookup |
 | `SeasonService` | Season start/update logic, round-robin scheduling, team batting rotation |
 | `PlayoffService` | Postseason bracket creation and series advancement |
-| `MatchupGenerator` | Shared helper for creating inning/matchup slots with optional batting rotation (static) |
+| `MatchupGenerator` | Shared helper for creating round/matchup fixtures (static) |
 | `LocationService` | Venue management, machine-to-location mapping |
 | `MachineService` | Master machine registry, target score thresholds |
 | `ScoreService` | Score recording and retrieval |
 | `TeamService` | Team CRUD, member and league assignment |
 | `RosterService` | League roster management (players, staff, locations) |
-| `MatchupService` | Head-to-head matchup management (Baseball format) |
+| `MatchupService` | Individual head-to-head matchup management (Baseball format) |
+| `TeamMatchupService` | Team head-to-head matchup management (Baseball format) |
 | `CleanupService` | Session data cleanup |
 
 ### API Layer
 
 API endpoints live in `api/` and follow a consistent pattern:
 - Thin HTTP controllers that parse request parameters and delegate to service classes
+- Separate controllers for individual (`api/matchup.php`) vs team (`api/team-matchup.php`) head-to-head management
 - Use `?task=` query parameter for sub-resource routing (e.g., `league.php?task=fixture`)
-- Responses normalized through `serializeXxx()` functions in `serializers.php`
+- Responses normalized through `Serializer::*` functions in `includes/Serializer.php`
 - Auth enforced by calling `validateAdminAccess()`, `validateTDAccess()`, or `validateSessionOrSecret()` guards
 
 ### Authentication & Authorization
@@ -103,8 +105,9 @@ See `docs/database_schema.md` for the full ER diagram. Key relationships:
 - `leagues` → `events` (one-to-many)
 - `leagues` → `league_players` / `league_teams` / `league_locations` / `league_staff` (roster)
 - `events` → `scores` / `target_scores` (records + thresholds)
-- `events` → `event_matchups` → `matchups` (head2head pairing → half-inning slots)
-- `matchups` / `scores` → `machines` (played on)
+- Individual H2H: `events` → `event_matchups` → `matchups` (individual head2head pairings & matchups)
+- Team H2H: `events` → `team_event_matchups` → `team_matchups` & `team_scores` (team head2head pairings & matchups)
+- `matchups` / `team_matchups` / `scores` / `team_scores` → `machines` (played on)
 - `locations` → `location_machines` → `machines` (machine installation)
 - `players` ↔ `users` (optional 1:1 link for auth accounts)
 

@@ -1,5 +1,5 @@
 import { PB_API } from '@services/api.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, escapeHTML } from '@scripts/utils.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueId, setActiveEventId, escapeHTML, getUrlParam } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
@@ -55,19 +55,10 @@ export async function initStandingsPage() {
   // Guard: If we are no longer on the Standings page, abort initialization
   if (!document.getElementById('standings-body')) return;
 
-  // If we arrive at standings without an eventId (Standard Nav entry), 
-  // we must ensure we aren't "leaking" a session league into the standard scoreboard.
   const initialLeagueId = getActiveLeagueId();
   const initialEventId = getActiveEventId();
+  const initialSessionId = getUrlParam('sessionId');
 
-  if (initialLeagueId && !initialEventId) {
-    const active = allLeagues.find(l => String(l.id) === String(initialLeagueId)); // Use the full list
-    // If the active league is a session, clear it to reset the selector to standard leagues
-    if (active && active.type !== 'standard') {
-      setActiveLeagueId('');
-      setActiveEventId('');
-    }
-  }
   let lastEventId = initialEventId;
 
   if (tvBtn) {
@@ -148,7 +139,7 @@ export async function initStandingsPage() {
 
     const events = league?.events || [];
 
-    const { targetsByEvent, scoresByEventAndPlayer, matchupsByEvent } = await fetchSeasonData(leagueId, events, PB_API, engine);
+    const { targetsByEvent, scoresByEventAndPlayer, matchupsByEvent } = await fetchSeasonData(leagueId, events, PB_API, engine, isTeamLeague);
     
     try {
       const result = calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, matchupsByEvent, engine, selectedPlayerIds });
@@ -188,6 +179,7 @@ export async function initStandingsPage() {
   async function refresh() {
     const eventId = getActiveEventId();
     const leagueId = getActiveLeagueId();
+    const sessionId = getUrlParam('sessionId');
 
     if (!eventId) {
       if (standingsWrapper) standingsWrapper.classList.add('hidden');
@@ -213,14 +205,25 @@ export async function initStandingsPage() {
       lastEventId = eventId;
     }
 
-    // Fetch all leagues to support both standard tournaments and one-off sessions
-    const leagues = await PB_API.leagues.getAll();
+    let league = null;
+    let event = null;
 
-    if (tournamentSelector) {
-      tournamentSelector.setData(leagues);
+    if (sessionId) {
+      const session = await PB_API.sessions.get(sessionId);
+      if (session) {
+        league = { ...session, isSession: true, participationType: 'individual' };
+        event = eventId === 'summary' ? { eventName: session.name || 'Session Scoreboard' } : session.events?.find(e => String(e.id) === String(eventId)) || session.events?.[0];
+      }
     }
-    const league = leagues.find(l => String(l.id) === String(leagueId));
-    const event = eventId === 'summary' ? { eventName: 'Season Summary' } : league?.events.find(e => String(e.id) === String(eventId));
+
+    if (!league) {
+      const leagues = await PB_API.leagues.getAll();
+      if (tournamentSelector) {
+        tournamentSelector.setData(leagues);
+      }
+      league = leagues.find(l => String(l.id) === String(leagueId));
+      event = eventId === 'summary' ? { eventName: 'Season Summary' } : league?.events?.find(e => String(e.id) === String(eventId));
+    }
     
     // Priority: Event Format > League Format > Default
     const format = ScoringFormats.resolve(event?.scoringFormat || league?.scoringFormat);
@@ -238,7 +241,8 @@ export async function initStandingsPage() {
     }
 
     if (tournamentSelectorUI && tournamentSummary) {
-      const title = league?.type === 'session' 
+      const isSession = league?.isSession === true;
+      const title = isSession 
         ? (escapeHTML(event?.eventName) || 'Session Scoreboard')
         : `${escapeHTML(league?.name || 'League')} - ${escapeHTML(event?.eventName || 'Event')}`;
 
@@ -388,10 +392,14 @@ export async function initStandingsPage() {
     }
 
     const rawMachines = await PB_API.machines.getTargets(eventId);
+    const isTeamMode = league?.participationType === 'team';
+    const fetchMatchups = isTeamMode
+      ? PB_API.teamMatchups.get(eventId).catch(() => [])
+      : PB_API.matchups.get(eventId).catch(() => []);
     const [rawScores, allTeamsData, eventMatchups] = await Promise.all([
       PB_API.scores.get(null, Number(eventId)),
       PB_API.teams.getAll(),
-      Engine.getMatchupDescription(1) ? PB_API.matchups.get(eventId).catch(() => []) : Promise.resolve([])
+      Engine.getMatchupDescription(1) ? fetchMatchups : Promise.resolve([])
     ]);
     
     const allEventScores = normalizeScores(rawScores);
@@ -402,8 +410,8 @@ export async function initStandingsPage() {
     const currentScoreState = new Map();
 
     if (tvTitle) {
-      const event = league?.events?.find(e => String(e.id) === String(eventId));
-      if (league?.type === 'session') {
+      const isSession = league?.isSession === true;
+      if (isSession) {
         tvTitle.textContent = event?.eventName || 'Session Scoreboard';
       } else {
         tvTitle.textContent = `${league?.name || 'League'} - ${event?.eventName || 'Event'}`;

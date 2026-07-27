@@ -419,15 +419,17 @@ export async function showPlayerSelectionDialog(title, message, options, confirm
 }
 
 /**
- * Displays a modal dialog for setting a team's batting order.
+ * Displays a modal dialog for setting a team's roster/member order.
  *
  * @param {Object} options
  * @param {Object} options.team Team object { id, name }.
  * @param {Array<{id: number, playerName: string}>} options.members Team members list.
  * @param {Array<{id: number, playerName: string}>} [options.currentOrder] Initial order.
+ * @param {string} [options.title] Modal dialog title.
+ * @param {string} [options.confirmText] Modal confirm button text.
  * @returns {Promise<Array<{id: number, playerName: string}>|null>}
  */
-export async function showBattingOrderDialog({ team, members = [], currentOrder = [] }) {
+export async function showRosterOrderDialog({ team, members = [], currentOrder = [], title, confirmText }) {
   const memberIdSet = new Set((members || []).map(m => String(m.id)));
   const validCurrentOrder = (currentOrder || []).filter(o => memberIdSet.has(String(o.id)));
 
@@ -443,11 +445,11 @@ export async function showBattingOrderDialog({ team, members = [], currentOrder 
   });
 
   const customElement = document.createElement('div');
-  customElement.className = 'batting-order-modal mt-15';
+  customElement.className = 'roster-order-modal mt-15';
 
   const renderList = () => {
     customElement.innerHTML = `
-      <p class="small-hint mb-10">Arrange the batting order sequence (1st, 2nd, 3rd, etc.):</p>
+      <p class="small-hint mb-10">Arrange the roster sequence (1st, 2nd, 3rd, etc.):</p>
       <ul class="list-group no-bullets" style="padding: 0; margin: 0;">
         ${orderList.map((m, idx) => `
           <li class="flex-between align-center p-10 mb-8" style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px;">
@@ -491,18 +493,26 @@ export async function showBattingOrderDialog({ team, members = [], currentOrder 
 
   renderList();
 
+  const dialogTitle = title || `Set Roster Order — ${team?.name || 'Team'}`;
+  const dialogConfirmText = confirmText || 'Save Roster Order';
+
   return showDialog({
-    title: `Set Batting Order — ${team?.name || 'Team'}`,
+    title: dialogTitle,
     message: '',
-    confirmText: 'Save Batting Order',
+    confirmText: dialogConfirmText,
     cancelValue: null,
     customElement,
     resolveValue: () => orderList
   });
 }
 
+/** Legacy alias for backwards compatibility */
+export async function showBattingOrderDialog(options) {
+  return showRosterOrderDialog(options);
+}
+
 /**
- * Displays a modal dialog for assigning defensive/specialist roles for each machine/round.
+ * Displays a modal dialog for assigning segment/round roles for each machine/round.
  * Includes equal workload validation.
  *
  * @param {Object} options
@@ -510,8 +520,8 @@ export async function showBattingOrderDialog({ team, members = [], currentOrder 
  * @param {Array<{id: number, playerName: string}>} options.members Team members.
  * @param {Array<{orderNumber: number, label: string, machineName: string}>} options.machines List of round/segment slots.
  * @param {Object<string|number, number>} [options.currentAssignments] Map of `{ [orderNumber]: playerId }`.
- * @param {string} [options.roleName] Role label (e.g. "Pitcher", "Defender", "Player"). Default: "Pitcher".
- * @param {string} [options.actionLabel] Action label (e.g. "defending", "playing"). Default: "defending".
+ * @param {string} [options.roleName] Role label (e.g. "Pitcher", "Defender", "Player"). Default: "Role".
+ * @param {string} [options.actionLabel] Action label (e.g. "defending", "playing"). Default: "assigned".
  * @returns {Promise<Object<string|number, number>|null>}
  */
 export async function showRoleAssignmentDialog({
@@ -519,8 +529,8 @@ export async function showRoleAssignmentDialog({
   members = [],
   machines = [],
   currentAssignments = {},
-  roleName = 'Pitcher',
-  actionLabel = 'defending'
+  roleName = 'Role',
+  actionLabel = 'assigned'
 }) {
   const assignments = { ...currentAssignments };
 

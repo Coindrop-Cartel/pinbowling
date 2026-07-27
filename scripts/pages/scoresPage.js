@@ -1,11 +1,11 @@
 import { PB_API } from '@services/api.js';
 import { can, PERMISSIONS } from '@services/auth.js';
 import { getSelectablePlayers, getSelectableTeams, getAutoSelectedPlayerId, getAutoSelectedTeamId, getSpectatorStatus } from '@services/playerSelector.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActiveEventIdSilent, formatNumber, setCurrentPlayerIdSilent, getCurrentPlayerId, escapeHTML, getActiveEventMatchupId, setActiveEventMatchupIdSilent, loadPage } from '@scripts/utils.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActiveEventIdSilent, formatNumber, setCurrentPlayerIdSilent, getCurrentPlayerId, escapeHTML, getActiveEventMatchupId, setActiveEventMatchupIdSilent, loadPage, getUrlParam } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
-import { showDialog, showBattingOrderDialog, showPitcherAssignmentDialog } from '@ui/dialogs.js';
+import { showDialog, showRosterOrderDialog, showRoleAssignmentDialog } from '@ui/dialogs.js';
 import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
 import { enrichTeamMatchupEntries } from '@services/matchupBuilder.js';
 import { applyPreferredTheme } from '@ui/branding.js';
@@ -66,9 +66,7 @@ export async function initScoresPage() {
   // Requirement: Unregistered users only see leagues that have at least one guest player.
   // The initialLeagues filtering logic here is now handled by initTournamentSelector.
 
-  // If we land on the scores page with a session/non-standard league active, 
-  // we clear it so the selector resets and refreshes to show standard leagues.
-  // EXCEPTION: If we have both leagueId and eventId, we are deep-linking from "Let's Bowl".
+  let initialSessionId = getUrlParam('sessionId');
   let initialLeagueId = getActiveLeagueId();
   let initialEventId = getActiveEventId();
 
@@ -80,17 +78,9 @@ export async function initScoresPage() {
     initialEventId = '';
   }
 
-  if (initialLeagueId && !initialEventId) {
-    const active = allLeaguesCache.find(l => String(l.id) === String(initialLeagueId)); // Use the full cache
-    if (active && active.type !== 'standard') {
-      setActiveLeagueIdSilent('');
-      initialLeagueId = '';
-      setActiveEventIdSilent('');
-      initialEventId = '';
-    }
-  }
   let lastEventId = initialEventId;
   let lastLeagueId = initialLeagueId;
+  let lastSessionId = initialSessionId;
 
   let playerSearchInstance = null;
   let currentUser = user;
@@ -104,8 +94,8 @@ export async function initScoresPage() {
   let lastCalcResult = null;
   let activeEvent = null;
   let summaryTitle = '';
-  let battingOrdersByTeam = {};
-  let pitcherAssignmentsByTeam = {};
+  let rosterOrdersByTeam = {};
+  let roleAssignmentsByTeam = {};
 
   function updateTournamentSummary() {
     const activePlayerId = getCurrentPlayerId();
@@ -287,8 +277,8 @@ export async function initScoresPage() {
     const normalized = normalizeScores(scoreRows || []);
 
     const myScores = isTeamMode
-      ? normalized.filter(s => Number(s.teamId ?? s.team_id ?? 0) === selectedId)
-      : normalized.filter(s => Number(s.playerId ?? s.player_id ?? 0) === selectedId);
+      ? normalized.filter(s => Number(s.teamId ?? 0) === selectedId)
+      : normalized.filter(s => Number(s.playerId ?? 0) === selectedId);
 
     const scoreMap = myScores.reduce((map, row) => {
       map[String(row.orderNumber ?? row.order_number)] = row;
@@ -326,11 +316,9 @@ export async function initScoresPage() {
 
           if (isTeamMode) {
             const selectedTeamId = Number(getCurrentPlayerId());
-            const teamTotals = lastCalcResult?.teamTotals || (lastCalcResult ? { home: lastCalcResult.homeScore, away: lastCalcResult.awayScore } : null);
-            const teamP1Score = teamTotals?.home ?? null;
-            const teamP2Score = teamTotals?.away ?? null;
+            const rowTeamEventMatchupId = round.teamEventMatchupId || rowEventMatchupId;
 
-            await PB_API.scores.save({
+            await PB_API.teamScores.save({
               teamId: selectedTeamId,
               orderNumber: scoreData.orderNumber,
               eventId: Number(getActiveEventId()),
@@ -342,37 +330,8 @@ export async function initScoresPage() {
               ball1PlayerId: scoreData.ball1PlayerId ?? null,
               ball2PlayerId: scoreData.ball2PlayerId ?? null,
               ball3PlayerId: scoreData.ball3PlayerId ?? null,
-              eventMatchupId: rowEventMatchupId ? Number(rowEventMatchupId) : null,
-              player1Score: teamP1Score,
-              player2Score: teamP2Score
+              teamEventMatchupId: rowTeamEventMatchupId ? Number(rowTeamEventMatchupId) : null,
             });
-
-            if (scoreData.opponentScoreData) {
-              const oppData = scoreData.opponentScoreData;
-              const matchupW = eventMatchups?.[0] || {};
-              const homeTeamId = Number(matchupW.player1Id ?? matchupW.player1_id ?? 0);
-              const awayTeamId = Number(matchupW.player2Id ?? matchupW.player2_id ?? 0);
-              const defendingTeamId = selectedTeamId === homeTeamId ? awayTeamId : homeTeamId;
-
-              if (defendingTeamId) {
-                await PB_API.scores.save({
-                  teamId: defendingTeamId,
-                  orderNumber: oppData.orderNumber,
-                  eventId: Number(getActiveEventId()),
-                  leagueId: Number(getActiveLeagueId()),
-                  machineId: oppData.machineId,
-                  ball1: oppData.ball1,
-                  ball2: oppData.ball2,
-                  ball3: oppData.ball3,
-                  ball1PlayerId: oppData.ball1PlayerId ?? null,
-                  ball2PlayerId: oppData.ball2PlayerId ?? null,
-                  ball3PlayerId: oppData.ball3PlayerId ?? null,
-                  eventMatchupId: rowEventMatchupId ? Number(rowEventMatchupId) : null,
-                  player1Score: teamP1Score,
-                  player2Score: teamP2Score
-                });
-              }
-            }
           } else {
             await PB_API.scores.save({
               playerId: scoreData.playerId,
@@ -479,7 +438,7 @@ export async function initScoresPage() {
       const loader = skipSkeleton ? null : createSkeletonLoader(roundsInput, { count: 5 });
       try {
         // Fetch all scores for this event (event-wide across all half-innings in Team mode)
-        const scores = await PB_API.scores.get(null, Number(getActiveEventId()));
+        const scores = await PB_API.teamScores.get(Number(getActiveEventId()));
         allEventScores = scores;
 
         // Pass the team as a pseudo-player so loadScoresIntoForm can render rows
@@ -497,11 +456,11 @@ export async function initScoresPage() {
 
         // Check if scores have already been entered for this team in this matchup
         const teamHasScores = (allEventScores || []).some(s =>
-          Number(s.teamId ?? s.team_id ?? 0) === Number(selectedTeam.id) &&
+          Number(s.teamId ?? 0) === Number(selectedTeam.id) &&
           (Number(s.ball1 || 0) > 0 || Number(s.ball2 || 0) > 0 || Number(s.ball3 || 0) > 0)
         );
 
-        // Team Setup bar: batting order + pitcher assignment
+        // Team Setup bar
         let teamBar = scoringCard.querySelector('.team-actions-bar');
         if (!teamBar) {
           teamBar = document.createElement('div');
@@ -509,44 +468,50 @@ export async function initScoresPage() {
           teamBar.style.cssText = 'background: #e3f2fd; border: 1px solid #90caf9; border-radius: 6px;';
           scoringCard.insertBefore(teamBar, scoringCard.firstChild);
         }
+        const setupActions = Engine?.getTeamSetupActions ? Engine.getTeamSetupActions() : [];
+        const actionsHtml = setupActions.map(act => `
+          <button type="button" id="btn-${act.id}" class="btn-row secondary" ${teamHasScores ? 'disabled title="' + escapeHTML(act.label) + ' is locked because scores have been entered for this team."' : ''}>${escapeHTML(act.label)}</button>
+        `).join('');
+
         teamBar.innerHTML = `
           <div>
             <strong style="color: #1565c0;">Team Setup: ${escapeHTML(selectedTeam.name)}</strong>
             ${teamHasScores ? '<span class="ml-8" style="font-size: 0.85em; color: #c62828; font-weight: bold;">🔒 Locked (Scores Entered)</span>' : ''}
           </div>
           <div class="flex gap-8">
-            <button type="button" id="btn-set-batting-order" class="btn-row secondary" ${teamHasScores ? 'disabled title="Batting order is locked because scores have been entered for this team."' : ''}>Set Batting Order</button>
-            <button type="button" id="btn-assign-pitchers" class="btn-row secondary" ${teamHasScores ? 'disabled title="Pitcher assignments are locked because scores have been entered for this team."' : ''}>Assign Pitchers</button>
+            ${actionsHtml}
           </div>
         `;
 
         if (!teamHasScores) {
-          teamBar.querySelector('#btn-set-batting-order')?.addEventListener('click', async () => {
-            const teamIdStr = String(selectedTeam.id);
-            const currentOrder = battingOrdersByTeam[teamIdStr] || selectedTeam.members || [];
-            const res = await showBattingOrderDialog({
-              team: selectedTeam,
-              members: selectedTeam.members || [],
-              currentOrder
+          setupActions.forEach(act => {
+            const btn = teamBar.querySelector(`#btn-${act.id}`);
+            if (!btn) return;
+            btn.addEventListener('click', async () => {
+              const teamIdStr = String(selectedTeam.id);
+              if (act.action === 'rosterOrder') {
+                const currentOrder = rosterOrdersByTeam[teamIdStr] || selectedTeam.members || [];
+                const res = await showRosterOrderDialog({
+                  team: selectedTeam,
+                  members: selectedTeam.members || [],
+                  currentOrder,
+                  title: act.title
+                });
+                if (res) { rosterOrdersByTeam[teamIdStr] = res; await refreshPlayerSelection(); }
+              } else if (act.action === 'roleAssignments') {
+                const firstPlayerRounds = Engine.getFirstPlayerRounds(machines, getEngineContext());
+                const currentAssignments = roleAssignmentsByTeam[teamIdStr] || {};
+                const res = await showRoleAssignmentDialog({
+                  team: selectedTeam,
+                  members: selectedTeam.members || [],
+                  machines: firstPlayerRounds.map(m => ({ orderNumber: m.orderNumber, label: m.roundName || `Round ${m.orderNumber}`, machineName: m.machineName })),
+                  currentAssignments,
+                  roleName: act.roleName || 'Role',
+                  actionLabel: act.actionLabel || 'assigned'
+                });
+                if (res) { roleAssignmentsByTeam[teamIdStr] = res; await refreshPlayerSelection(); }
+              }
             });
-            if (res) { battingOrdersByTeam[teamIdStr] = res; await refreshPlayerSelection(); }
-          });
-
-          teamBar.querySelector('#btn-assign-pitchers')?.addEventListener('click', async () => {
-            const teamIdStr = String(selectedTeam.id);
-            const matchup = eventMatchups[0];
-            const homeTeamId = String(matchup?.player1Id ?? matchup?.player1_id ?? '');
-            const awayTeamId = String(matchup?.player2Id ?? matchup?.player2_id ?? '');
-            const isHomeTeam = teamIdStr === homeTeamId;
-            const pitchingRounds = machines.filter(m => isHomeTeam ? m.isTop : !m.isTop);
-            const currentAssignments = pitcherAssignmentsByTeam[teamIdStr] || {};
-            const res = await showPitcherAssignmentDialog({
-              team: selectedTeam,
-              members: selectedTeam.members || [],
-              machines: pitchingRounds.map(m => ({ orderNumber: m.orderNumber, label: m.roundName || `Inning ${m.orderNumber}`, machineName: m.machineName })),
-              currentAssignments
-            });
-            if (res) { pitcherAssignmentsByTeam[teamIdStr] = res; await refreshPlayerSelection(); }
           });
         }
 
@@ -625,8 +590,9 @@ export async function initScoresPage() {
         ]);
         
         const matchup = eventMatchups[0];
-        const awayName = matchup?.player2Name || 'BYE';
-        const homeName = matchup?.player1Name || 'Unknown';
+        const isTeamMode = activeLeague?.participationType === 'team';
+        const awayName = isTeamMode ? (matchup?.team2Name || 'BYE') : (matchup?.player2Name || 'BYE');
+        const homeName = isTeamMode ? (matchup?.team1Name || 'Unknown') : (matchup?.player1Name || 'Unknown');
         warning.innerHTML = `<strong>Spectator Mode:</strong> Viewing matchup in progress between ${escapeHTML(awayName)} and ${escapeHTML(homeName)}.`;
         warning.classList.remove('hidden');
         
@@ -677,12 +643,12 @@ export async function initScoresPage() {
     const selectedTeam = isTeamMode ? (activeLeague?.teams || []).find(t => String(t.id) === String(activeId)) : null;
     const selectedTeamIdStr = selectedTeam ? String(selectedTeam.id) : null;
 
-    const teamBattingOrder = selectedTeamIdStr && battingOrdersByTeam[selectedTeamIdStr]
-      ? battingOrdersByTeam[selectedTeamIdStr]
+    const teamRosterOrder = selectedTeamIdStr && rosterOrdersByTeam[selectedTeamIdStr]
+      ? rosterOrdersByTeam[selectedTeamIdStr]
       : (selectedTeam?.members || []);
 
-    const teamPitcherAssignments = selectedTeamIdStr && pitcherAssignmentsByTeam[selectedTeamIdStr]
-      ? pitcherAssignmentsByTeam[selectedTeamIdStr]
+    const teamRoleAssignments = selectedTeamIdStr && roleAssignmentsByTeam[selectedTeamIdStr]
+      ? roleAssignmentsByTeam[selectedTeamIdStr]
       : {};
 
     const isTDOrAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'td');
@@ -698,10 +664,14 @@ export async function initScoresPage() {
       activeLeague,
       isTeamMode,
       enrichedEntries: machines,
-      battingOrder: teamBattingOrder,
-      pitcherAssignments: teamPitcherAssignments,
-      battingOrdersByTeam,
-      pitcherAssignmentsByTeam,
+      rosterOrder: teamRosterOrder,
+      roleAssignments: teamRoleAssignments,
+      rosterOrdersByTeam,
+      roleAssignmentsByTeam,
+      // For backwards compatibility with existing engine/test references
+      battingOrder: teamRosterOrder,
+      pitcherAssignments: teamRoleAssignments,
+      battingOrdersByTeam: rosterOrdersByTeam,
       activeTeamMembers: selectedTeam?.members || [],
       isTDOrAdmin
     };
@@ -733,7 +703,7 @@ export async function initScoresPage() {
     }
     lastCalcResult = calcResult;
 
-    if (activeFormat === ScoringFormats.BASEBALL) {
+    if (Engine?.hasHead2HeadScoring?.()) {
       renderHead2HeadScoreboard(calcResult, machines, engineContext, {
         resultsPanel,
         resultsBody,
@@ -758,9 +728,10 @@ export async function initScoresPage() {
   const refresh = async () => {
     let eventId = getActiveEventId();
     let leagueId = getActiveLeagueId();
+    let sessionId = getUrlParam('sessionId');
     const activeEventMatchupId = getActiveEventMatchupId();
 
-    if (activeEventMatchupId) {
+    if (activeEventMatchupId && (!eventId || !leagueId)) {
       const matchup = await PB_API.matchups.get(null, Number(activeEventMatchupId));
       if (matchup) {
         eventId = String(matchup.eventId ?? matchup.event_id);
@@ -822,7 +793,7 @@ export async function initScoresPage() {
         const val1 = getTargetScoreForDifficulty(macObj, activeFormat, 'medium');
         return { value1: val1, value2: 1.5, values: null };
       }
-      return { value1: activeFormat === ScoringFormats.BASEBALL ? 5000000 : 50000000, value2: 1.5, values: null };
+      return Engine?.getDefaultFallbackTargetValues?.() || { value1: 50000000, value2: 1, values: null };
     };
 
     // Refresh the league list in the selector to catch any mid-session roster changes
@@ -830,8 +801,25 @@ export async function initScoresPage() {
       tournamentSelector.setData(allLeaguesCache);
     }
 
-    const league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
-    const event = league?.events?.find(e => String(e.id) === String(eventId)) || league?.events?.[0];
+    let league = null;
+    let event = null;
+
+    if (sessionId) {
+      const session = await PB_API.sessions.get(sessionId);
+      if (session) {
+        league = { ...session, isSession: true, participationType: 'individual' };
+        event = session.events?.find(e => String(e.id) === String(eventId)) || session.events?.[0];
+        if (event && !eventId) {
+          setActiveEventIdSilent(String(event.id));
+          eventId = String(event.id);
+        }
+      }
+    }
+
+    if (!league) {
+      league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
+      event = league?.events?.find(e => String(e.id) === String(eventId)) || league?.events?.[0];
+    }
 
     const format = ScoringFormats.resolve(event?.scoringFormat || league?.scoringFormat);
     activeFormat = format;
@@ -840,13 +828,11 @@ export async function initScoresPage() {
     // Ask the engine what additional data it needs for this event,
     // then fetch it generically — no format-specific branching required.
     const requiredData = Engine.getRequiredEventData(eventId, PB_API);
-    if (activeEventMatchupId) {
-      // Team mode: fetch ALL event_matchups for the event (multiple half-innings)
-      // Individual mode: fetch only the specific matchup by ID
-      const isTeamModeLeague = league?.participationType === 'team';
+    const isTeamModeLeague = league?.participationType === 'team';
+    if (activeEventMatchupId || isTeamModeLeague) {
       if (isTeamModeLeague) {
-        requiredData.eventMatchups = PB_API.matchups.get(eventId).catch(() => []);
-        requiredData.allEventScores = PB_API.scores.get(null, Number(eventId)).catch(() => []);
+        requiredData.eventMatchups = PB_API.teamMatchups.get(eventId).catch(() => []);
+        requiredData.allEventScores = PB_API.teamScores.get(eventId).catch(() => []);
       } else {
         requiredData.eventMatchups = PB_API.matchups.get(null, Number(activeEventMatchupId)).then(m => [m]);
         requiredData.allEventScores = PB_API.scores.get(null, null, null, Number(activeEventMatchupId));
@@ -873,8 +859,6 @@ export async function initScoresPage() {
       }
       return m;
     });
-    const isTeamModeLeague = league?.participationType === 'team';
-
     if (isTeamModeLeague && eventMatchups.length > 0) {
       let currentId = getCurrentPlayerId();
       if (!currentId) {
@@ -905,15 +889,15 @@ export async function initScoresPage() {
 
       // Team mode: filter eventMatchups to ONLY those belonging to this specific matchup pairing
       const activeEM = eventMatchups.find(em => String(em.id) === String(activeEventMatchupId))
-        || eventMatchups.find(em => String(em.player1Id ?? em.player1_id) === selectedIdStr || String(em.player2Id ?? em.player2_id) === selectedIdStr)
+        || eventMatchups.find(em => String(em.team1Id) === selectedIdStr || String(em.team2Id) === selectedIdStr)
         || eventMatchups[0];
 
-      const p1Id = String(activeEM.player1Id ?? activeEM.player1_id ?? '');
-      const p2Id = String(activeEM.player2Id ?? activeEM.player2_id ?? '');
+      const p1Id = String(activeEM.team1Id ?? '');
+      const p2Id = String(activeEM.team2Id ?? '');
 
       const targetMatchups = eventMatchups.filter(em => {
-        const emP1 = String(em.player1Id ?? em.player1_id ?? '');
-        const emP2 = String(em.player2Id ?? em.player2_id ?? '');
+        const emP1 = String(em.team1Id ?? '');
+        const emP2 = String(em.team2Id ?? '');
         return (emP1 === p1Id && emP2 === p2Id) || (emP1 === p2Id && emP2 === p1Id);
       });
 
@@ -922,8 +906,8 @@ export async function initScoresPage() {
       for (const em of targetMatchups) {
         const rawEntries = em.entries || [];
         const roundName = em.roundName ?? em.round_name ?? '';
-        const awayTeam = league.teams?.find(t => String(t.id) === String(em.player2Id ?? em.player2_id));
-        const homeTeam = league.teams?.find(t => String(t.id) === String(em.player1Id ?? em.player1_id));
+        const awayTeam = league.teams?.find(t => String(t.id) === String(em.team2Id));
+        const homeTeam = league.teams?.find(t => String(t.id) === String(em.team1Id));
         if (awayTeam && homeTeam) {
           const enriched = enrichTeamMatchupEntries(rawEntries, em, awayTeam.members || [], homeTeam.members || [], roundName);
           enrichedEntries.push(...enriched);
@@ -939,9 +923,11 @@ export async function initScoresPage() {
           values = Engine.buildRoundValues(value1, value2);
         }
         return {
+          ...entry,
           id: entry.id,
           eventId: entry.eventId,
           eventMatchupId: entry.eventMatchupId ?? null,
+          teamEventMatchupId: entry.teamEventMatchupId ?? null,
           orderNumber: sequentialOrderNumber,
           machineId: entry.machineId,
           machineName: entry.machineName,
@@ -951,7 +937,8 @@ export async function initScoresPage() {
           playerId: entry.playerId,
           playerName: entry.playerName,
           teamId: entry.teamId,
-          isTop: entry.isTop,
+          team1Id: entry.team1Id,
+          team2Id: entry.team2Id,
           roundName: entry.roundName || '',
           slotIndex: entry.slotIndex,
           playerOrder: entry.playerOrder,
@@ -984,13 +971,13 @@ export async function initScoresPage() {
     activeLeague = league;
     activeEvent = event;
 
-    const isSession = league?.type === 'session';
+    const isSession = league?.isSession === true || event?.sessionId != null;
     if (activeEventMatchupId && eventMatchups.length > 0) {
       const matchup = eventMatchups[0];
       summaryTitle = `
         <div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>
         <div class="meta-muted">Week: ${escapeHTML(event?.eventName || 'Week')}</div>
-        <div class="meta-muted">Matchup: ${escapeHTML(matchup?.player2Name || 'BYE')} vs ${escapeHTML(matchup?.player1Name)}</div>
+        <div class="meta-muted">Matchup: ${escapeHTML(league?.participationType === 'team' ? (matchup?.team2Name || 'BYE') : (matchup?.player2Name || 'BYE'))} vs ${escapeHTML(league?.participationType === 'team' ? matchup?.team1Name : matchup?.player1Name)}</div>
       `;
     } else {
       const leagueTitle = isSession ? '' : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;
@@ -1034,7 +1021,13 @@ export async function initScoresPage() {
           onPlayMatchup: (matchupId, evId) => {
             setActiveLeagueIdSilent(league.id);
             setActiveEventIdSilent(evId);
-            loadPage(ROUTE_PATHS.SCORES({ eventId: evId, leagueId: league.id, eventMatchupId: matchupId }));
+            const navParams = { eventId: evId, eventMatchupId: matchupId };
+            if (league.isSession) {
+              navParams.sessionId = league.id;
+            } else {
+              navParams.leagueId = league.id;
+            }
+            loadPage(ROUTE_PATHS.SCORES(navParams));
           }
         });
       }

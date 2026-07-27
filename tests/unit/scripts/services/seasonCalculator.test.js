@@ -6,6 +6,7 @@ import { calculateSeasonSummary } from '@services/seasonCalculator.js';
 // Provides a controllable engine for testing seasonCalculator logic
 function createMockEngine(overrides = {}) {
   return {
+    handlesSortCompletely: () => false,
     getMatchupDescription: vi.fn(() => null),
     buildPlayerScoreMap: vi.fn((_playerId, playerScores) => {
       const map = {};
@@ -888,11 +889,11 @@ describe('calculateSeasonSummary', () => {
       
       const matchupsByEvent = {
         100: [
-          { event_id: 100, awayPlayerId: 1, homePlayerId: 2, awayRuns: 5, homeRuns: 3, status: 'completed' }
+          { event_id: 100, player1Id: 1, player2Id: 2, player1Score: 5, player2Score: 3, status: 'completed' }
         ],
         101: [
-          { event_id: 101, awayPlayerId: 2, homePlayerId: 3, awayRuns: 4, homeRuns: 2, status: 'completed' },
-          { event_id: 101, awayPlayerId: 3, homePlayerId: 1, awayRuns: 5, homeRuns: 4, status: 'completed' }
+          { event_id: 101, player1Id: 2, player2Id: 3, player1Score: 4, player2Score: 2, status: 'completed' },
+          { event_id: 101, player1Id: 3, player2Id: 1, player1Score: 5, player2Score: 4, status: 'completed' }
         ]
       };
 

@@ -205,17 +205,17 @@ describe('initTournamentSelector', () => {
     getActiveLeagueId.mockReturnValue('');
   });
 
-  it('should filter for standard leagues by default', async () => {
+  it('should show all leagues (no type filtering)', async () => {
     await initTournamentSelector('.tournament-selector-container');
     const select = document.querySelector('.league-select-shared');
-    expect(select.options.length).toBe(2); 
+    expect(select.options.length).toBe(3);
     expect(select.innerHTML).toContain('Standard League');
-    expect(select.innerHTML).not.toContain('Session League');
+    expect(select.innerHTML).toContain('Session League');
   });
 
-  it('should include the active league even if it does not match the type filter', async () => {
+  it('should pre-select the active league', async () => {
     vi.mocked(getActiveLeagueId).mockReturnValue('2'); 
-    await initTournamentSelector('.tournament-selector-container', { typeFilter: 'standard' });
+    await initTournamentSelector('.tournament-selector-container');
     
     const select = document.querySelector('.league-select-shared');
     const search = document.getElementById('league-search-global');
@@ -859,8 +859,8 @@ describe('initTournamentSelector (additional)', () => {
     expect(select.innerHTML).toContain('Custom League');
   });
 
-  it('should show all leagues when typeFilter is null', async () => {
-    await initTournamentSelector('.tournament-selector-container', { typeFilter: null });
+  it('should show all leagues by default', async () => {
+    await initTournamentSelector('.tournament-selector-container');
     const select = document.querySelector('.league-select-shared');
     expect(select.innerHTML).toContain('Standard League');
     expect(select.innerHTML).toContain('Session League');

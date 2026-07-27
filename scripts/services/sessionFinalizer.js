@@ -5,7 +5,7 @@ import { generateSessionName } from '@services/sessionGenerator.js';
 
 /**
  * Finalizes a quick-play session:
- * 1. Creates a session league + event
+ * 1. Creates a session (includes its event)
  * 2. Saves generated target scores
  * 3. Joins the current user
  * 4. Handles matchup generation for H2H formats
@@ -35,36 +35,27 @@ export async function finalizeSession(options) {
 
   const eventName = generateSessionName(rawName, locName, date, time);
 
-  const newLeague = await PB_API.leagues.create({ 
-    name: eventName, 
-    startDate: now.toISOString().split('T')[0],
-    type: 'session',
+  const engine = getScoringEngine(currentSessionFormat);
+
+  const newSession = await PB_API.sessions.create({ 
+    name: eventName,
     scoringFormat: currentSessionFormat,
-    competitionFormat: currentSessionFormat === 'baseball' ? 'head2head' : 'group',
-    participationType: 'individual',
-    roundsPerGame: currentSessionFormat === 'baseball' ? (generatedFrames.length / 2) : 2,
-    matchupsPerRound: currentSessionFormat === 'baseball' ? 2 : null
-  });
-
-  if (!newLeague || !newLeague.id) {
-    throw new Error('Failed to create session league.');
-  }
-
-  const qpLeague = newLeague;
-
-  const newEvent = await PB_API.events.create({
-    leagueId: qpLeague.id,
-    eventName: eventName,
-    eventDate: now.toISOString().split('T')[0],
+    competitionFormat: engine?.getDefaultCompetitionFormat?.() || (currentSessionFormat === 'baseball' ? 'head2head' : 'group'),
+    roundsPerGame: engine?.getDefaultRoundsPerGame?.(generatedFrames.length) ?? (currentSessionFormat === 'baseball' ? Math.ceil(generatedFrames.length / 2) : 2),
+    matchupsPerRound: engine?.getDefaultMatchupsPerRound?.() ?? (currentSessionFormat === 'baseball' ? 2 : null),
     locationId: locId,
-    scoringFormat: currentSessionFormat
+    eventName: eventName,
+    eventDate: now.toISOString().split('T')[0]
   });
 
-  if (!newEvent || !newEvent.id) {
-    throw new Error('Failed to create event. Backend did not return an event ID. Check your createEvent endpoint.');
+  if (!newSession || !newSession.id) {
+    throw new Error('Failed to create session.');
   }
 
-  const event = newEvent;
+  const event = newSession.events?.[0];
+  if (!event || !event.id) {
+    throw new Error('Failed to create session event.');
+  }
 
   const targetPayloads = generatedFrames
     .filter(f => f.machineId)
@@ -85,15 +76,14 @@ export async function finalizeSession(options) {
 
   const currentUser = await PB_API.auth.me();
   if (currentUser?.player_id) {
-    await PB_API.leagues.addPlayer(qpLeague.id, currentUser.player_id);
+    await PB_API.sessions.addPlayer(newSession.id, currentUser.player_id);
   }
 
   let eventMatchupId = null;
-  const engine = getScoringEngine(currentSessionFormat);
   const matchupInfo = engine.getMatchupDescription(generatedFrames.length);
   if (matchupInfo) {
-    const leagueData = await PB_API.leagues.get(qpLeague.id);
-    const roster = leagueData?.players || [];
+    const sessionData = await PB_API.sessions.get(newSession.id);
+    const roster = sessionData?.players || [];
 
     if (roster.length < 2 && allPlayersCache.length > 0) {
       const opponentOptions = allPlayersCache
@@ -108,14 +98,14 @@ export async function finalizeSession(options) {
           'Add & Continue'
         );
         if (opponentId) {
-          await PB_API.leagues.addPlayer(qpLeague.id, Number(opponentId));
+          await PB_API.sessions.addPlayer(newSession.id, Number(opponentId));
           roster.push({ id: Number(opponentId) });
         }
       }
     }
 
-    const updatedLeague = roster.length >= 2 ? { players: roster } : await PB_API.leagues.get(qpLeague.id);
-    const finalRoster = updatedLeague?.players || [];
+    const updatedSession = roster.length >= 2 ? { players: roster } : await PB_API.sessions.get(newSession.id);
+    const finalRoster = updatedSession?.players || [];
 
     if (finalRoster.length >= 2) {
       const inningCount = generatedFrames.length / engine.getMachinesPerRound();
@@ -136,7 +126,7 @@ export async function finalizeSession(options) {
 
   loadPage(ROUTE_PATHS.SCORES({ 
     eventId: event.id, 
-    leagueId: qpLeague.id, 
+    sessionId: newSession.id,
     eventMatchupId: eventMatchupId || '', 
     playerId: currentUser?.player_id 
   }));

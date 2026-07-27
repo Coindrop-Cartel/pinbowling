@@ -30,25 +30,15 @@ class LeagueService {
     }
 
     /**
-     * Get all leagues, optionally filtered by type.
+     * Get all leagues.
      * NOTE: This is used internally by getAllLeaguesWithDetails(). External callers
      * should prefer that method to get events, players, and teams in a single pass.
      *
-     * @param string|null $type Optional type filter ('session', 'standard', etc)
      * @return array
      */
-    public function getAllLeagues(?string $type = null): array {
+    public function getAllLeagues(): array {
         $pdo = $this->db->getPdo();
-        
-        $sql = 'SELECT * FROM leagues';
-        if ($type) {
-            $sql .= ' WHERE type = ?';
-        }
-        $sql .= ' ORDER BY start_date DESC';
-
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($type ? [$type] : []);
-        return $stmt->fetchAll();
+        return $pdo->query('SELECT * FROM leagues ORDER BY start_date DESC')->fetchAll();
     }
 
     /**
@@ -82,21 +72,19 @@ class LeagueService {
         // Fetch event matchups
         $stmt = $pdo->prepare(
             'SELECT em.*, 
-                    COALESCE(p1.player_name, t1.name) as player1_name, 
-                    COALESCE(p2.player_name, t2.name) as player2_name,
-                    COALESCE(p3.player_name, t3.name) as player3_name,
-                    COALESCE(p4.player_name, t4.name) as player4_name,
+                    p1.player_name as player1_name,
+                    p2.player_name as player2_name,
+                    p3.player_name as player3_name,
+                    p4.player_name as player4_name,
                     w.player_name as winner_name
              FROM event_matchups em
+             JOIN events e ON em.event_id = e.id
+             LEFT JOIN leagues l ON e.league_id = l.id
              LEFT JOIN players p1 ON em.player1_id = p1.id
              LEFT JOIN players p2 ON em.player2_id = p2.id
              LEFT JOIN players p3 ON em.player3_id = p3.id
              LEFT JOIN players p4 ON em.player4_id = p4.id
-             LEFT JOIN teams t1 ON em.player1_id = t1.id
-             LEFT JOIN teams t2 ON em.player2_id = t2.id
-             LEFT JOIN teams t3 ON em.player3_id = t3.id
-             LEFT JOIN teams t4 ON em.player4_id = t4.id
-             LEFT JOIN players w ON em.winner_id = w.id
+             LEFT JOIN players w ON em.player_winner_id = w.id
              WHERE em.event_id IN (SELECT id FROM events WHERE league_id = ?)
              ORDER BY em.id ASC'
         );
@@ -107,42 +95,78 @@ class LeagueService {
         foreach ($matchups as $m) {
             $matchupsByEvent[(int)$m['event_id']][] = $m;
         }
+
+        // Fetch team event matchups for team leagues
+        $isTeam = ($league['participation_type'] ?? 'individual') === 'team';
+        if ($isTeam) {
+            $temStmt = $pdo->prepare(
+                'SELECT tem.*,
+                        t1.name as team1_name,
+                        t2.name as team2_name
+                 FROM team_event_matchups tem
+                 LEFT JOIN teams t1 ON tem.team1_id = t1.id
+                 LEFT JOIN teams t2 ON tem.team2_id = t2.id
+                 WHERE tem.event_id IN (SELECT id FROM events WHERE league_id = ?)
+                 ORDER BY tem.id ASC'
+            );
+            $temStmt->execute([$leagueId]);
+            foreach ($temStmt->fetchAll() as $tem) {
+                $matchupsByEvent[(int)$tem['event_id']][] = $tem;
+            }
+        }
         
         foreach ($league['events'] as &$event) {
             $event['matchups'] = $matchupsByEvent[(int)$event['id']] ?? [];
         }
 
-        // Fetch players
-        $stmt = $pdo->prepare(
-            'SELECT DISTINCT p.id, p.player_name, p.ifpa_id, u.id as user_id 
-             FROM players p 
-             JOIN team_members tm ON p.id = tm.player_id
-             JOIN league_teams lt ON tm.team_id = lt.team_id
-             LEFT JOIN users u ON p.id = u.player_id 
-             WHERE lt.league_id = ? 
-             ORDER BY p.player_name ASC'
-        );
-        $stmt->execute([$leagueId]);
-        $league['players'] = $stmt->fetchAll();
-
-        // Fetch teams with members
-        $stmt = $pdo->prepare(
-            'SELECT t.*, 
-                    GROUP_CONCAT(p.id, ":", p.player_name SEPARATOR "|") as member_data
-             FROM teams t
-             JOIN league_teams lt ON t.id = lt.team_id
-             LEFT JOIN team_members tm ON t.id = tm.team_id
-             LEFT JOIN players p ON tm.player_id = p.id
-             WHERE lt.league_id = ?
-             GROUP BY t.id'
-        );
-        $stmt->execute([$leagueId]);
-        $teams = $stmt->fetchAll();
-        
-        foreach ($teams as &$t) {
-            $t['members'] = $this->parseTeamMembers($t['member_data'] ?? '');
+        // Fetch players (path depends on participation_type)
+        if ($isTeam) {
+            $stmt = $pdo->prepare(
+                'SELECT DISTINCT p.id, p.player_name, p.ifpa_id, u.id as user_id 
+                 FROM players p 
+                 JOIN team_members tm ON p.id = tm.player_id
+                 JOIN league_teams lt ON tm.team_id = lt.team_id
+                 LEFT JOIN users u ON p.id = u.player_id 
+                 WHERE lt.league_id = ? 
+                 ORDER BY p.player_name ASC'
+            );
+            $stmt->execute([$leagueId]);
+            $league['players'] = $stmt->fetchAll();
+        } else {
+            $stmt = $pdo->prepare(
+                'SELECT DISTINCT p.id, p.player_name, p.ifpa_id, u.id as user_id 
+                 FROM players p 
+                 JOIN league_players lp ON p.id = lp.player_id
+                 LEFT JOIN users u ON p.id = u.player_id 
+                 WHERE lp.league_id = ? 
+                 ORDER BY p.player_name ASC'
+            );
+            $stmt->execute([$leagueId]);
+            $league['players'] = $stmt->fetchAll();
         }
-        $league['teams'] = $teams;
+
+        // Fetch teams with members (team leagues only)
+        if ($isTeam) {
+            $stmt = $pdo->prepare(
+                'SELECT t.*, 
+                        GROUP_CONCAT(p.id, ":", p.player_name SEPARATOR "|") as member_data
+                 FROM teams t
+                 JOIN league_teams lt ON t.id = lt.team_id
+                 LEFT JOIN team_members tm ON t.id = tm.team_id
+                 LEFT JOIN players p ON tm.player_id = p.id
+                 WHERE lt.league_id = ?
+                 GROUP BY t.id'
+            );
+            $stmt->execute([$leagueId]);
+            $teams = $stmt->fetchAll();
+            
+            foreach ($teams as &$t) {
+                $t['members'] = $this->parseTeamMembers($t['member_data'] ?? '');
+            }
+            $league['teams'] = $teams;
+        } else {
+            $league['teams'] = [];
+        }
 
         // Fetch locations
         $stmt = $pdo->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
@@ -155,50 +179,49 @@ class LeagueService {
     /**
      * Get all leagues with nested events, players, and teams in bulk (avoids N+1).
      *
-     * @param string|null $type
      * @return array
      */
-    public function getAllLeaguesWithDetails(?string $type = null): array {
+    public function getAllLeaguesWithDetails(): array {
         $pdo = $this->db->getPdo();
 
-        $sql = 'SELECT * FROM leagues';
-        $params = [];
-        if ($type === 'standard' || $type === 'league') {
-            $sql .= ' WHERE (type != \'session\' OR type IS NULL)';
-        } elseif ($type && $type !== 'all') {
-            $sql .= ' WHERE type = ?';
-            $params[] = $type;
-        }
-        $sql .= ' ORDER BY start_date DESC';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $leagues = $stmt->fetchAll();
+        $leagues = $pdo->query('SELECT * FROM leagues ORDER BY start_date DESC')->fetchAll();
 
         $emStmt = $pdo->query(
             'SELECT em.*, 
-                    COALESCE(p1.player_name, t1.name) as player1_name, 
-                    COALESCE(p2.player_name, t2.name) as player2_name,
-                    COALESCE(p3.player_name, t3.name) as player3_name,
-                    COALESCE(p4.player_name, t4.name) as player4_name,
+                    p1.player_name as player1_name,
+                    p2.player_name as player2_name,
+                    p3.player_name as player3_name,
+                    p4.player_name as player4_name,
                     w.player_name as winner_name,
                     loc.name as location_name
              FROM event_matchups em
              JOIN events e ON em.event_id = e.id
+             LEFT JOIN leagues l ON e.league_id = l.id
              LEFT JOIN locations loc ON COALESCE(em.location_id, e.location_id, (SELECT ll.location_id FROM league_locations ll WHERE ll.league_id = e.league_id LIMIT 1)) = loc.id
              LEFT JOIN players p1 ON em.player1_id = p1.id
              LEFT JOIN players p2 ON em.player2_id = p2.id
              LEFT JOIN players p3 ON em.player3_id = p3.id
              LEFT JOIN players p4 ON em.player4_id = p4.id
-             LEFT JOIN teams t1 ON em.player1_id = t1.id
-             LEFT JOIN teams t2 ON em.player2_id = t2.id
-             LEFT JOIN teams t3 ON em.player3_id = t3.id
-             LEFT JOIN teams t4 ON em.player4_id = t4.id
-             LEFT JOIN players w ON em.winner_id = w.id
+             LEFT JOIN players w ON em.player_winner_id = w.id
              ORDER BY em.id ASC'
         );
         $matchupsByEvent = [];
         foreach ($emStmt->fetchAll() as $em) {
             $matchupsByEvent[(int)$em['event_id']][] = $em;
+        }
+
+        // Fetch team event matchups for team leagues  
+        $temStmt = $pdo->query(
+            'SELECT tem.*,
+                    t1.name as team1_name,
+                    t2.name as team2_name
+             FROM team_event_matchups tem
+             LEFT JOIN teams t1 ON tem.team1_id = t1.id
+             LEFT JOIN teams t2 ON tem.team2_id = t2.id
+             ORDER BY tem.id ASC'
+        );
+        foreach ($temStmt->fetchAll() as $tem) {
+            $matchupsByEvent[(int)$tem['event_id']][] = $tem;
         }
 
         $allEvents = $this->getAllEvents();
@@ -208,26 +231,35 @@ class LeagueService {
             $eventsByLeague[(int)$event['league_id']][] = $event;
         }
 
+        // Players: union both paths — league_players for individual, team_members for team
         $lpStmt = $pdo->query(
-            'SELECT DISTINCT lt.league_id, p.id, p.player_name, p.ifpa_id, u.id as user_id
+            'SELECT lt.league_id, p.id, p.player_name, p.ifpa_id, u.id as user_id
              FROM players p
              JOIN team_members tm ON p.id = tm.player_id
              JOIN league_teams lt ON tm.team_id = lt.team_id
              LEFT JOIN users u ON p.id = u.player_id
-             ORDER BY p.player_name ASC'
+             UNION
+             SELECT lp.league_id, p.id, p.player_name, p.ifpa_id, u.id as user_id
+             FROM players p
+             JOIN league_players lp ON p.id = lp.player_id
+             LEFT JOIN users u ON p.id = u.player_id
+             ORDER BY player_name ASC'
         );
         $playersByLeague = [];
         foreach ($lpStmt->fetchAll() as $lp) {
             $playersByLeague[(int)$lp['league_id']][] = $lp;
         }
 
+        // Teams: only for team-participation leagues
         $ltStmt = $pdo->query(
             'SELECT lt.league_id, t.*,
                     GROUP_CONCAT(p.id, ":", p.player_name SEPARATOR "|") as member_data
              FROM teams t
              JOIN league_teams lt ON t.id = lt.team_id
+             JOIN leagues l ON lt.league_id = l.id
              LEFT JOIN team_members tm ON t.id = tm.team_id
              LEFT JOIN players p ON tm.player_id = p.id
+             WHERE l.participation_type = \'team\'
              GROUP BY lt.league_id, t.id
              ORDER BY t.name ASC'
         );
@@ -255,14 +287,14 @@ class LeagueService {
     }
 
     /**
-     * Get the type and scoring_format of a league.
+     * Get the scoring_format and participation_type of a league.
      *
      * @param int $leagueId
-     * @return array|false ['type' => ..., 'scoring_format' => ...] or false
+     * @return array|false or false
      */
     public function getLeagueMeta(int $leagueId) {
         $pdo = $this->db->getPdo();
-        $stmt = $pdo->prepare('SELECT type, scoring_format FROM leagues WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT scoring_format, participation_type FROM leagues WHERE id = ?');
         $stmt->execute([$leagueId]);
         return $stmt->fetch();
     }
@@ -272,7 +304,6 @@ class LeagueService {
      *
      * @param string $name
      * @param string|null $startDate
-     * @param string $type
      * @param string $competitionFormat
      * @param string $participationType
      * @param string $scoringFormat
@@ -286,7 +317,6 @@ class LeagueService {
     public function createLeague(
         string $name,
         ?string $startDate = null,
-        string $type = 'standard',
         string $competitionFormat = 'group',
         string $participationType = 'individual',
         string $scoringFormat = 'bowling',
@@ -304,14 +334,22 @@ class LeagueService {
             throw new \InvalidArgumentException('Baseball scoring format is only supported for head-to-head competitions.');
         }
 
+        if ($competitionFormat === 'head2head' || $competitionFormat === 'head_to_head' || $scoringFormat === 'baseball') {
+            if ($weeksInSeason === null || $weeksInSeason <= 0) {
+                throw new \InvalidArgumentException('Head-to-head competitions require weeksInSeason to be specified and greater than 0.');
+            }
+            if ($roundsPerGame === null || $roundsPerGame <= 0) $roundsPerGame = 2;
+            if ($matchupsPerRound === null || $matchupsPerRound <= 0) $matchupsPerRound = 2;
+        }
+
         $pdo = $this->db->getPdo();
         try {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare(
-                'INSERT INTO leagues (name, start_date, type, competition_format, participation_type, scoring_format, season_scoring, drop_lowest_weeks, drop_lowest_player_scores, weeks_in_season, rounds_per_game, matchups_per_round, weekly_points, point_spread)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO leagues (name, start_date, competition_format, participation_type, scoring_format, season_scoring, drop_lowest_weeks, drop_lowest_player_scores, weeks_in_season, rounds_per_game, matchups_per_round, weekly_points, point_spread)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
-            $stmt->execute([$name, $startDate, $type, $competitionFormat, $participationType, $scoringFormat, $seasonScoring, $dropLowestWeeks, $dropLowestPlayerScores, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread]);
+            $stmt->execute([$name, $startDate, $competitionFormat, $participationType, $scoringFormat, $seasonScoring, $dropLowestWeeks, $dropLowestPlayerScores, $weeksInSeason, $roundsPerGame, $matchupsPerRound, $weeklyPoints, $pointSpread]);
             $leagueId = (int)$pdo->lastInsertId();
             
             $this->syncLeagueLocations($pdo, $leagueId, $locationIds);
@@ -362,6 +400,14 @@ class LeagueService {
     ): array {
         if ($scoringFormat === 'baseball' && ($competitionFormat === 'group' || $competitionFormat === 'standard')) {
             throw new \InvalidArgumentException('Baseball scoring format is only supported for head-to-head competitions.');
+        }
+
+        if ($competitionFormat === 'head2head' || $competitionFormat === 'head_to_head' || $scoringFormat === 'baseball') {
+            if ($weeksInSeason === null || $weeksInSeason <= 0) {
+                throw new \InvalidArgumentException('Head-to-head competitions require weeksInSeason to be specified and greater than 0.');
+            }
+            if ($roundsPerGame === null || $roundsPerGame <= 0) $roundsPerGame = 2;
+            if ($matchupsPerRound === null || $matchupsPerRound <= 0) $matchupsPerRound = 2;
         }
 
         $pdo = $this->db->getPdo();
@@ -465,13 +511,13 @@ class LeagueService {
 
             // Clean up league associations
             $pdo->prepare("DELETE FROM league_teams WHERE league_id = ?")->execute([$leagueId]);
+            $pdo->prepare("DELETE FROM league_players WHERE league_id = ?")->execute([$leagueId]);
             $pdo->prepare("DELETE FROM league_staff WHERE league_id = ?")->execute([$leagueId]);
+            $pdo->prepare("DELETE FROM league_locations WHERE league_id = ?")->execute([$leagueId]);
 
             // Finally delete the league
             $stmt = $pdo->prepare("DELETE FROM leagues WHERE id = ?");
             $result = $stmt->execute([$leagueId]);
-
-            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
 
             $pdo->commit();
             return $result;
@@ -480,6 +526,8 @@ class LeagueService {
                 $pdo->rollBack();
             }
             throw new \Exception("Failed to delete league {$leagueId}: " . $e->getMessage(), 0, $e);
+        } finally {
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
         }
     }
 

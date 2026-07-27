@@ -43,14 +43,14 @@ export function calculateHead2HeadRecords(players, events, matchupsByEvent, scor
     matchups.forEach(m => {
       if (m.status !== 'completed') return;
 
-      const p1Id = Number(m.player1Id ?? m.player1_id ?? m.awayPlayerId ?? m.away_player_id);
-      const p2Id = Number(m.player2Id ?? m.player2_id ?? m.homePlayerId ?? m.home_player_id);
+      const p1Id = Number(m.team1Id ?? m.player1Id);
+      const p2Id = Number(m.team2Id ?? m.player2Id);
 
       // If it's a bye week, ignore for records calculation
       if (!p1Id || !p2Id) return;
 
-      const r1 = Number(m.player1Score ?? m.player1_score ?? m.awayRuns ?? m.away_runs ?? 0);
-      const r2 = Number(m.player2Score ?? m.player2_score ?? m.homeRuns ?? m.home_runs ?? 0);
+      const r1 = Number(m.team1Score ?? m.player1Score ?? 0);
+      const r2 = Number(m.team2Score ?? m.player2Score ?? 0);
 
       if (records[p1Id]) {
         records[p1Id].totalRuns += r1;
@@ -239,17 +239,28 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
         let displayValue;
         if (isH2H) {
           const eventMatchups = matchupsByEvent[event.id] || [];
+          const isTeamMode = league?.participationType === 'team';
           const entityMatchup = eventMatchups.find(m => {
             if (m.status !== 'completed') return false;
-            const e1 = Number(m.player1Id ?? m.player1_id ?? m.team1Id ?? m.team1_id);
-            const e2 = Number(m.player2Id ?? m.player2_id ?? m.team2Id ?? m.team2_id);
+            const e1 = isTeamMode
+              ? Number(m.team1Id)
+              : Number(m.player1Id);
+            const e2 = isTeamMode
+              ? Number(m.team2Id)
+              : Number(m.player2Id);
             return e1 === entity.id || e2 === entity.id;
           });
 
           if (entityMatchup) {
-            const r1 = Number(entityMatchup.player1Score ?? entityMatchup.player1_score ?? entityMatchup.team1Score ?? 0);
-            const r2 = Number(entityMatchup.player2Score ?? entityMatchup.player2_score ?? entityMatchup.team2Score ?? 0);
-            const e1 = Number(entityMatchup.player1Id ?? entityMatchup.player1_id ?? entityMatchup.team1Id ?? entityMatchup.team1_id);
+            const r1 = isTeamMode
+              ? Number(entityMatchup.team1Score ?? 0)
+              : Number(entityMatchup.player1Score ?? 0);
+            const r2 = isTeamMode
+              ? Number(entityMatchup.team2Score ?? 0)
+              : Number(entityMatchup.player2Score ?? 0);
+            const e1 = isTeamMode
+              ? Number(entityMatchup.team1Id)
+              : Number(entityMatchup.player1Id);
             const isEntity1 = e1 === entity.id;
             const scoreA = isEntity1 ? r1 : r2;
             const scoreB = isEntity1 ? r2 : r1;
@@ -332,12 +343,16 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
  * @param {Object} engine - Active scoring engine instance
  * @returns {Promise<{ targetsByEvent: Object, scoresByEventAndPlayer: Object, matchupsByEvent: Object }>}
  */
-export async function fetchSeasonData(leagueId, events, PB_API, engine) {
+export async function fetchSeasonData(leagueId, events, PB_API, engine, isTeamLeague = false) {
+  const fetchMatchups = isTeamLeague
+    ? e => PB_API.teamMatchups.get(e.id).catch(() => [])
+    : e => PB_API.matchups.get(e.id).catch(() => []);
+
   const [rawScores, allLeagueTargets, leagueMatchupsByEvent] = await Promise.all([
     PB_API.scores.get(null, null, leagueId),
     PB_API.machines.getTargets(null, leagueId),
     engine.getMatchupDescription(1)
-      ? Promise.all(events.map(e => PB_API.matchups.get(e.id).catch(() => []))).then(results => groupMatchupsByEvent(results.flat()))
+      ? Promise.all(events.map(fetchMatchups)).then(results => groupMatchupsByEvent(results.flat()))
       : Promise.resolve({})
   ]);
 

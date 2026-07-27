@@ -92,19 +92,35 @@ class EventService {
      * @return bool
      */
     public function deleteEvent(int $eventId): bool {
-        $this->db->exec('SET FOREIGN_KEY_CHECKS = 0');
+        $pdo = $this->db->getPdo();
+        $inTx = $pdo->inTransaction();
+        
+        try {
+            if (!$inTx) {
+                $pdo->beginTransaction();
+            }
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
 
-        $this->db->prepare('DELETE FROM scores WHERE event_id = ?')->execute([$eventId]);
-        $this->db->prepare('DELETE FROM matchups WHERE event_matchup_id IN (SELECT id FROM event_matchups WHERE event_id = ?)')->execute([$eventId]);
-        $this->db->prepare('DELETE FROM event_matchups WHERE event_id = ?')->execute([$eventId]);
-        $this->db->prepare('DELETE FROM target_scores WHERE event_id = ?')->execute([$eventId]);
+            $pdo->prepare('DELETE FROM scores WHERE event_id = ?')->execute([$eventId]);
+            $pdo->prepare('DELETE FROM matchups WHERE event_matchup_id IN (SELECT id FROM event_matchups WHERE event_id = ?)')->execute([$eventId]);
+            $pdo->prepare('DELETE FROM event_matchups WHERE event_id = ?')->execute([$eventId]);
+            $pdo->prepare('DELETE FROM target_scores WHERE event_id = ?')->execute([$eventId]);
 
-        $stmt = $this->db->prepare('DELETE FROM events WHERE id = ?');
-        $res = $stmt->execute([$eventId]);
+            $stmt = $pdo->prepare('DELETE FROM events WHERE id = ?');
+            $res = $stmt->execute([$eventId]);
 
-        $this->db->exec('SET FOREIGN_KEY_CHECKS = 1');
+            if (!$inTx) {
+                $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+                $pdo->commit();
+            }
 
-        return $res;
+            return $res;
+        } catch (\PDOException $e) {
+            if (!$inTx && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     /**

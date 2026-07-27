@@ -75,12 +75,12 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
 
   // Player / Team IDs come from the wrapper object
   const wrapper = eventMatchups[0];
-  const p1Id = Number(wrapper.player1Id ?? wrapper.player1_id);
-  const p2Id = Number(wrapper.player2Id ?? wrapper.player2_id);
+  const p1Id = Number(wrapper.player1Id);
+  const p2Id = Number(wrapper.player2Id);
 
   const leagues = activeLeague ? [activeLeague] : [];
-  const p1Players = resolvePlayersForMatchupParticipant(p1Id, wrapper.player1Name ?? wrapper.player1_name, allPlayersCache, leagues);
-  const p2Players = resolvePlayersForMatchupParticipant(p2Id, wrapper.player2Name ?? wrapper.player2_name, allPlayersCache, leagues);
+  const p1Players = resolvePlayersForMatchupParticipant(p1Id, wrapper.player1Name, allPlayersCache, leagues);
+  const p2Players = resolvePlayersForMatchupParticipant(p2Id, wrapper.player2Name, allPlayersCache, leagues);
 
   const p1Player = p1Players[0];
   const p2Player = p2Players[0];
@@ -88,34 +88,22 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
   const p1ActualId = Number(p1Player?.id ?? p1Id);
   const p2ActualId = Number(p2Player?.id ?? p2Id);
 
-  const isCurrentPlayer1 = currentPlayerId === p1ActualId || currentPlayerId === p1Id;
-  const activePlayerObj = isCurrentPlayer1 ? p1Player : p2Player;
-  const oppPlayerObj = isCurrentPlayer1 ? p2Player : p1Player;
-
-  const activeId = Number(activePlayerObj?.id ?? currentPlayerId);
-  const oppId = Number(oppPlayerObj?.id ?? (isCurrentPlayer1 ? p2Id : p1Id));
+  const p1Name = p1Player?.playerName || wrapper.player1Name || wrapper.player1_name || 'Home';
+  const p2Name = p2Player?.playerName || wrapper.player2Name || wrapper.player2_name || 'Away';
 
   const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
 
-  const playerResults = [
-    {
-      id: activeId,
-      name: activePlayerObj?.playerName || (isCurrentPlayer1 ? (wrapper.player1Name || 'You') : (wrapper.player2Name || 'You')),
-      scoreMap: engine.buildPlayerScoreMap(activeId, scoresByPlayer[activeId] || [], scoresByPlayer, eventMatchups)
-    },
-    {
-      id: oppId,
-      name: oppPlayerObj?.playerName || (isCurrentPlayer1 ? (wrapper.player2Name || 'Opponent') : (wrapper.player1Name || 'Opponent')),
-      scoreMap: engine.buildPlayerScoreMap(oppId, scoresByPlayer[oppId] || [], scoresByPlayer, eventMatchups)
-    }
-  ];
+  const p1Map = engine.buildPlayerScoreMap(p1ActualId, scoresByPlayer[p1ActualId] || [], scoresByPlayer, eventMatchups);
+  p1Map.isPlayer1 = true;
 
-  // Sort: Away (playerOrder 2) always first, Home (playerOrder 1) second.
-  playerResults.sort((a, b) => {
-    const aHome = a.scoreMap.isPlayer1 ? 1 : 0;
-    const bHome = b.scoreMap.isPlayer1 ? 1 : 0;
-    return aHome - bHome;
-  });
+  const p2Map = engine.buildPlayerScoreMap(p2ActualId, scoresByPlayer[p2ActualId] || [], scoresByPlayer, eventMatchups);
+  p2Map.isPlayer1 = false;
+
+  // Away (Player 2) always first, Home (Player 1) second
+  const playerResults = [
+    { id: p2ActualId, name: p2Name, isHome: false, scoreMap: p2Map },
+    { id: p1ActualId, name: p1Name, isHome: true, scoreMap: p1Map }
+  ];
 
   const playerTotalScores = {};
   const roundScores = {};
@@ -134,16 +122,16 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
       const roundKey = String(roundNumber);
       if (!roundScores[roundKey]) roundScores[roundKey] = {};
 
-      if (turn.played) {
+      if (turn.isWalkOff) {
+        if (turn.isBatter || roundScores[roundKey][playerIdNum] === undefined) {
+          roundScores[roundKey][playerIdNum] = 'X';
+        }
+      } else if (turn.played) {
         currentTotal += turn.score;
         if (turn.isBatter) {
           roundScores[roundKey][playerIdNum] = String(turn.score);
         } else if (roundScores[roundKey][playerIdNum] === undefined) {
           roundScores[roundKey][playerIdNum] = '0';
-        }
-      } else if (turn.isWalkOff) {
-        if (roundScores[roundKey][playerIdNum] === undefined) {
-          roundScores[roundKey][playerIdNum] = 'X';
         }
       } else {
         if (roundScores[roundKey][playerIdNum] === undefined) {
@@ -173,7 +161,7 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
   playerResults.forEach(pResult => {
     const playerIdNum = Number(pResult.id);
     const totalScoreValue = playerTotalScores[playerIdNum] || 0;
-    const homeAwayLabel = pResult.scoreMap.isPlayer1 ? 'Home' : 'Away';
+    const homeAwayLabel = pResult.isHome ? 'Home' : 'Away';
 
     scoreboardHTML += '<div class="scoreboard-row player-row">';
     scoreboardHTML += `<span class="player-name"><span class="home-away-label">${homeAwayLabel}:</span> ${escapeHTML(pResult.name)}</span>`;
@@ -194,13 +182,9 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
     resultsPanel.insertAdjacentHTML('beforeend', scoreboardHTML);
   }
 
-  const awayResult = playerResults.find(p => !p.scoreMap.isPlayer1);
-  const homeResult = playerResults.find(p => p.scoreMap.isPlayer1);
-  const awayTotal = awayResult ? (playerTotalScores[Number(awayResult.id)] ?? 0) : 0;
-  const homeTotal = homeResult ? (playerTotalScores[Number(homeResult.id)] ?? 0) : 0;
-  const awayName = awayResult ? escapeHTML(awayResult.name) : 'Away';
-  const homeName = homeResult ? escapeHTML(homeResult.name) : 'Home';
-  totalScore.innerHTML = `<span class="away-label">Away:</span> ${awayName} ${awayTotal} &nbsp; <span class="home-label">Home:</span> ${homeName} ${homeTotal}`;
+  const awayTotal = playerTotalScores[p2ActualId] ?? 0;
+  const homeTotal = playerTotalScores[p1ActualId] ?? 0;
+  totalScore.innerHTML = `<span class="away-label">Away:</span> ${escapeHTML(p2Name)} ${awayTotal} &nbsp; <span class="home-label">Home:</span> ${escapeHTML(p1Name)} ${homeTotal}`;
 
   resultsEmpty.classList.add('hidden');
   resultsPanel.classList.remove('hidden');
@@ -216,28 +200,22 @@ function _renderTeamScoreboard(calcResult, machines, context, domRefs, engine) {
   const { turnResults, teamTotals } = calcResult;
 
   const wrapper = eventMatchups[0];
-  const homeTeamId = Number(wrapper.player1Id ?? wrapper.player1_id);
-  const awayTeamId = Number(wrapper.player2Id ?? wrapper.player2_id);
-  const homeTeamName = wrapper.player1Name ?? wrapper.player1_name ?? 'Home';
-  const awayTeamName = wrapper.player2Name ?? wrapper.player2_name ?? 'Away';
+  const homeTeamId = Number(wrapper.team1Id);
+  const awayTeamId = Number(wrapper.team2Id);
+  const homeTeamName = wrapper.team1Name ?? 'Home';
+  const awayTeamName = wrapper.team2Name ?? 'Away';
 
   // Group turn results by half-inning (machine)
   const machineGroups = [];
-  const seenMachines = new Set();
   machines.forEach(m => {
+    const orderNum = Number(m.orderNumber ?? m.order_number);
     const machineId = Number(m.machineId ?? m.id);
-    if (!seenMachines.has(machineId)) {
-      seenMachines.add(machineId);
-      machineGroups.push({
-        machineId,
-        machineName: m.machineName,
-        isTop: m.isTop,
-        entries: turnResults.filter(tr => {
-          const mach = machines.find(mac => Number(mac.orderNumber ?? mac.order_number) === Number(tr.orderNumber));
-          return mach && Number(mach.machineId ?? mach.id) === machineId;
-        })
-      });
-    }
+    machineGroups.push({
+      orderNumber: orderNum,
+      machineId,
+      machineName: m.machineName,
+      entries: turnResults.filter(tr => Number(tr.orderNumber) === orderNum)
+    });
   });
 
   // Group by inning (pairs of half-innings)

@@ -153,40 +153,6 @@ export function flattenMatchupEntries(eventMatchups) {
   return (eventMatchups || []).flatMap(em => em.entries || (Array.isArray(em) ? em : []));
 }
 
-export function buildBaseballScoreMapForPlayer(playerId, scoresByPlayer, matchups) {
-  const id = Number(playerId);
-  const playerScores = scoresByPlayer?.[id] || scoresByPlayer?.[String(id)] || [];
-  const scoreMap = buildScoreMapFromRows(playerScores);
-  const opponent = {};
-
-  const targetMatchup = matchups?.[0];
-  const entries = flattenMatchupEntries(matchups);
-  if (!targetMatchup || !entries || entries.length === 0) {
-    scoreMap.isPlayer1 = true;
-    scoreMap.opponent = opponent;
-    return scoreMap;
-  }
-
-  const p1Id = Number(targetMatchup.player1Id ?? targetMatchup.player1_id);
-  const p2Id = Number(targetMatchup.player2Id ?? targetMatchup.player2_id);
-  const isPlayer1 = id === p1Id;
-  const opponentId = isPlayer1 ? p2Id : p1Id;
-  const opponentScores = scoresByPlayer?.[opponentId] || scoresByPlayer?.[String(opponentId)] || [];
-
-  scoreMap.isPlayer1 = isPlayer1;
-
-  entries.forEach(matchup => {
-    const roundNumber = Number(matchup.orderNumber ?? matchup.order_number);
-    const opponentRow = opponentScores.find(s => Number(s.orderNumber ?? s.order_number) === roundNumber);
-    if (opponentRow) {
-      opponent[String(roundNumber)] = buildScoreMapFromRows([opponentRow])[String(roundNumber)];
-    }
-  });
-
-  scoreMap.opponent = opponent;
-  return scoreMap;
-}
-
 /**
  * Builds a score map from an array of score rows, keyed by order number.
  * Each entry contains ball scores as `{ ball1, ball2, ball3 }`.

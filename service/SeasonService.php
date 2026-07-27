@@ -41,7 +41,7 @@ class SeasonService {
             
             $weeksInSeason = (int)($league['weeks_in_season'] ?? 0);
             if ($weeksInSeason <= 0) {
-                throw new \Exception("Weeks in season must be greater than 0.");
+                throw new \Exception("Weeks in season must be greater than 0. Please edit the league to specify the number of weeks in season.");
             }
             
             // Total matchups per game = rounds × matchups_per_round
@@ -50,13 +50,22 @@ class SeasonService {
             $matchupsPerRound = (int)($league['matchups_per_round'] ?? 2);
             $isTeam = ($league['participation_type'] ?? 'individual') === 'team';
             
-            // Fetch roster / participants from league_teams
-            $stmt = $pdo->prepare(
-                'SELECT t.id, t.name as player_name 
-                 FROM teams t 
-                 JOIN league_teams lt ON t.id = lt.team_id 
-                 WHERE lt.league_id = ?'
-            );
+            // Fetch roster / participants
+            if ($isTeam) {
+                $stmt = $pdo->prepare(
+                    'SELECT t.id, t.name as player_name 
+                     FROM teams t 
+                     JOIN league_teams lt ON t.id = lt.team_id 
+                     WHERE lt.league_id = ?'
+                );
+            } else {
+                $stmt = $pdo->prepare(
+                    'SELECT p.id, p.player_name 
+                     FROM players p 
+                     JOIN league_players lp ON p.id = lp.player_id 
+                     WHERE lp.league_id = ?'
+                );
+            }
             $stmt->execute([$leagueId]);
             $players = $stmt->fetchAll();
             if (count($players) < 2) {
@@ -225,57 +234,47 @@ class SeasonService {
             if ($awayPlayer === null) {
                 // BYE Week matchup
                 $stmt = $pdo->prepare(
-                    "INSERT INTO event_matchups (event_id, location_id, player1_id, player2_id, player1_score, player2_score, winner_id, status, game_number)
+                    "INSERT INTO event_matchups (event_id, location_id, player1_id, player2_id, player1_score, player2_score, player_winner_id, status, game_number)
                      VALUES (?, ?, ?, NULL, 0, 0, NULL, 'completed', 1)"
                 );
                 $stmt->execute([$eventId, $matchupLocId, $homePlayer['id']]);
             } else {
                 if ($isTeam) {
-                    // Team baseball: 1 event_matchup per half-inning -- ALL INNINGS STAY AT $matchupLocId
+                    // Team baseball: 1 team_event_matchup per half-inning
                     $homeTeamMembers = $this->getTeamMembers($pdo, $homePlayer['id']);
                     $awayTeamMembers = $this->getTeamMembers($pdo, $awayPlayer['id']);
-                    $homeTeamSize = count($homeTeamMembers);
-                    $awayTeamSize = count($awayTeamMembers);
 
                     for ($inning = 1; $inning <= $rounds; $inning++) {
-                        // Each half-inning uses exactly 1 machine.
-                        // Batter rotation (Ball 1 → Batter 1, Ball 2 → Batter 2, etc.)
-                        // is handled at scoring time by the batting order assignment —
-                        // NOT by creating separate matchup rows per batter.
-
-                        // Cycle machines across innings so different machines are used each half
                         $machineCount = count($matchupMachineIds);
                         $topMachineIdx   = (($inning - 1) * 2)     % max($machineCount, 1);
                         $bottomMachineIdx = (($inning - 1) * 2 + 1) % max($machineCount, 1);
                         $topMachines    = [$matchupMachineIds[$topMachineIdx]];
                         $bottomMachines = [$matchupMachineIds[$bottomMachineIdx]];
 
-                        // Top half: Away team bats, Home team pitches
+                        // Top half: Home team pitches (team1), Away team bats (team2)
                         $topMatchupStmt = $pdo->prepare(
-                            'INSERT INTO event_matchups (event_id, location_id, player1_id, player2_id, status, game_number, round_name)
+                            'INSERT INTO team_event_matchups (event_id, location_id, team1_id, team2_id, status, game_number, round_name)
                              VALUES (?, ?, ?, ?, \'pending\', ?, ?)'
                         );
                         $topMatchupStmt->execute([$eventId, $matchupLocId, $homePlayer['id'], $awayPlayer['id'], $inning, "Top $inning"]);
                         $topMatchupId = (int)$pdo->lastInsertId();
 
-                        // 1 matchup row per half-inning (rounds=1, count=1)
-                        MatchupGenerator::createMatchupSlots(
-                            $pdo, $topMatchupId,
-                            1, 1, $topMachines, []
+                        MatchupGenerator::createTeamMatchupSlots(
+                            $pdo, $topMatchupId, $topMachines, $eventId, $matchupLocId,
+                            $homePlayer['id'], $awayPlayer['id']
                         );
 
-                        // Bottom half: Home team bats, Away team pitches
+                        // Bottom half: Away team pitches (team1), Home team bats (team2)
                         $bottomMatchupStmt = $pdo->prepare(
-                            'INSERT INTO event_matchups (event_id, location_id, player1_id, player2_id, status, game_number, round_name)
+                            'INSERT INTO team_event_matchups (event_id, location_id, team1_id, team2_id, status, game_number, round_name)
                              VALUES (?, ?, ?, ?, \'pending\', ?, ?)'
                         );
                         $bottomMatchupStmt->execute([$eventId, $matchupLocId, $homePlayer['id'], $awayPlayer['id'], $inning, "Bottom $inning"]);
                         $bottomMatchupId = (int)$pdo->lastInsertId();
 
-                        // 1 matchup row per half-inning (rounds=1, count=1)
-                        MatchupGenerator::createMatchupSlots(
-                            $pdo, $bottomMatchupId,
-                            1, 1, $bottomMachines, []
+                        MatchupGenerator::createTeamMatchupSlots(
+                            $pdo, $bottomMatchupId, $bottomMachines, $eventId, $matchupLocId,
+                            $awayPlayer['id'], $homePlayer['id']
                         );
                     }
                 } else {
@@ -342,9 +341,8 @@ class SeasonService {
                 $stmt = $pdo->prepare(
                     'SELECT DISTINCT p.id, p.player_name 
                      FROM players p 
-                     JOIN team_members tm ON p.id = tm.player_id
-                     JOIN league_teams lt ON tm.team_id = lt.team_id 
-                     WHERE lt.league_id = ?'
+                     JOIN league_players lp ON p.id = lp.player_id 
+                     WHERE lp.league_id = ?'
                 );
                 $stmt->execute([$leagueId]);
                 $players = $stmt->fetchAll();

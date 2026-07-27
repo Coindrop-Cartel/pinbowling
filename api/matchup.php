@@ -98,25 +98,32 @@ class MatchupController extends ApiController {
                 $firstMatchup = $matchups[0];
                 $eventId = (int)($firstMatchup['eventId'] ?? $firstMatchup['event_id'] ?? 0);
 
-                $leagueService = $this->container->get(\App\Service\LeagueService::class);
-                $isSession = false;
                 $scoringFormat = 'bowling';
                 if ($eventId) {
-                    $leagueId = $leagueService->getEventLeagueId($eventId);
-                    if ($leagueId) {
-                        $meta = $leagueService->getLeagueMeta($leagueId);
-                        $isSession = ($meta && $meta['type'] === 'session');
-                        $scoringFormat = $meta['scoring_format'] ?? 'bowling';
+                    $pdo = $this->container->get(\App\Service\DatabaseService::class)->getPdo();
+
+                    // Check the event's own scoring_format first (handles sessions)
+                    $stmt = $pdo->prepare('SELECT scoring_format FROM events WHERE id = ?');
+                    $stmt->execute([$eventId]);
+                    $scoringFormat = $stmt->fetchColumn() ?: 'bowling';
+
+                    // Fall back to league scoring_format if event doesn't specify one
+                    if ($scoringFormat === 'bowling') {
+                        $leagueId = $this->container->get(\App\Service\LeagueService::class)->getEventLeagueId($eventId);
+                        if ($leagueId) {
+                            $stmt = $pdo->prepare('SELECT scoring_format FROM leagues WHERE id = ?');
+                            $stmt->execute([$leagueId]);
+                            $scoringFormat = $stmt->fetchColumn() ?: 'bowling';
+                        }
                     }
                 }
 
-                if ($isSession) {
-                    $this->validateSessionOrSecret();
-                } else {
-                    $this->validateTDAccess();
-                }
+                $this->validateTDAccess();
 
                 $eventMatchupId = null;
+                $__lg = function ($msg) { error_log("[pinbowling] $msg\n", 3, sys_get_temp_dir() . '/pinbowling-debug.log'); };
+                $__lg("matchup POST: eventId=$eventId scoringFormat=$scoringFormat matchups=" . json_encode(array_map(function($m) { return ['teamId' => $m['teamId'] ?? null, 'playerId' => $m['playerId'] ?? null, 'eventMatchupId' => $m['eventMatchupId'] ?? null]; }, $matchups)));
+
                 // For baseball session/quickplay games, automatically create/resolve the event_matchup record
                 if ($scoringFormat === 'baseball') {
                     $providedMatchupId = isset($firstMatchup['eventMatchupId']) ? (int)$firstMatchup['eventMatchupId'] : 0;
@@ -132,8 +139,9 @@ class MatchupController extends ApiController {
 
                         if ($existingId) {
                             $eventMatchupId = (int)$existingId;
+                            $__lg("RESOLVED existing event_matchup id=$eventMatchupId for eventId=$eventId");
                         } else {
-                            // Find home (playerOrder=1) and away (playerOrder=2) players
+                            // Individual baseball: find home (playerOrder=1) and away (playerOrder=2) players
                             $homePlayerId = 0;
                             $awayPlayerId = 0;
                             foreach ($matchups as $m) {
@@ -153,6 +161,9 @@ class MatchupController extends ApiController {
                                 );
                                 $stmt->execute([$eventId, $homePlayerId, $awayPlayerId]);
                                 $eventMatchupId = (int)$pdo->lastInsertId();
+                                $__lg("CREATED individual event_matchup id=$eventMatchupId p1=$homePlayerId p2=$awayPlayerId");
+                            } else {
+                                $__lg("FAILED to create individual event_matchup: homePlayerId=$homePlayerId awayPlayerId=$awayPlayerId");
                             }
                         }
                     }

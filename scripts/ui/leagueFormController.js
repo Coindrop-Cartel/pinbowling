@@ -1,4 +1,4 @@
-import { SCORING_FORMATS } from '../core/engine.js';
+import { SCORING_FORMATS, getScoringEngine } from '../core/engine.js';
 import { ScoringFormats } from '../services/scoringFormat.js';
 import { getCookie } from '../utils.js';
 import { showMultiSelectDialog, showAlert } from './dialogs.js';
@@ -132,7 +132,7 @@ export function createLeagueFormController(elements, options) {
     const currentValue = leagueFormatInput.value;
     const allowed = isH2H
       ? SCORING_FORMATS
-      : SCORING_FORMATS.filter(f => f.value !== ScoringFormats.BASEBALL);
+      : SCORING_FORMATS.filter(f => !getScoringEngine(f.value)?.requiresHeadToHead?.());
     leagueFormatInput.innerHTML = allowed.map(f =>
       `<option value="${f.value}">${f.label}</option>`
     ).join('');
@@ -203,8 +203,11 @@ export function createLeagueFormController(elements, options) {
   function editLeague(league) {
     editingLeagueId = league.id;
     leagueNameInput.value = league.name;
-    leagueDateInput.value = league.startDate || '';
-    if (leagueCompetitionInput) leagueCompetitionInput.value = league.competitionFormat || 'group';
+    if (leagueDateInput) leagueDateInput.value = league.startDate || '';
+    if (leagueCompetitionInput) {
+      const rawComp = league.competitionFormat || 'group';
+      leagueCompetitionInput.value = (rawComp === 'head_to_head' || rawComp === 'head2head') ? 'head2head' : rawComp;
+    }
     if (leagueParticipantsInput) leagueParticipantsInput.value = league.participationType || 'individual';
     if (leagueSeasonScoringInput) leagueSeasonScoringInput.value = league.seasonScoring || 'weekly';
     if (leagueDropLowestInput) leagueDropLowestInput.value = league.dropLowestWeeks || 0;
@@ -320,10 +323,12 @@ export function createLeagueFormController(elements, options) {
     const participationType = leagueParticipantsInput?.value || 'individual';
     const seasonScoring = leagueSeasonScoringInput?.value || 'weekly';
     const dropLowestWeeks = parseInt(leagueDropLowestInput?.value || '0', 10);
-    const isH2H = competitionFormat === 'head2head';
+    const selectedEngine = getScoringEngine(scoringFormat);
+    const isH2H = competitionFormat === 'head2head' || competitionFormat === 'head_to_head' || selectedEngine?.requiresHeadToHead?.();
     const isWeekly = seasonScoring === 'weekly';
-    const weeksInSeason = (isH2H && leagueWeeksInput) ? parseInt(leagueWeeksInput.value, 10) : null;
-    const roundsPerGame = (isH2H && leagueInningsInput) ? parseInt(leagueInningsInput.value, 10) : null;
+    const weeksInSeasonRaw = isH2H && leagueWeeksInput ? parseInt(leagueWeeksInput.value, 10) : null;
+    const weeksInSeason = isH2H ? (isNaN(weeksInSeasonRaw) ? null : weeksInSeasonRaw) : null;
+    const roundsPerGame = isH2H ? (parseInt(leagueInningsInput?.value || '2', 10) || 2) : null;
     const matchupsPerRound = isH2H ? 2 : null;
     const weeklyPoints = (!isH2H && isWeekly && leagueWeeklyPointsInput?.value) ? parseInt(leagueWeeklyPointsInput.value, 10) : null;
     const pointSpread = (!isH2H && isWeekly && leaguePointSpreadInput?.value) ? parseInt(leaguePointSpreadInput.value, 10) : null;
@@ -331,14 +336,22 @@ export function createLeagueFormController(elements, options) {
     createBtn.disabled = true;
     createBtn.textContent = 'Saving...';
 
-    if (scoringFormat === 'baseball' && competitionFormat !== 'head2head' && competitionFormat !== 'head_to_head') {
-      showAlert('Baseball scoring format is only supported for head-to-head competitions.');
+    if (selectedEngine?.requiresHeadToHead?.() && competitionFormat !== 'head2head' && competitionFormat !== 'head_to_head') {
+      const brandName = selectedEngine?.getBranding?.()?.brandName || 'Selected';
+      showAlert(`${brandName} scoring format is only supported for head-to-head competitions.`);
       createBtn.disabled = false;
       createBtn.textContent = editingLeagueId ? 'Update League' : 'Save League';
       return;
     }
 
-    if (isH2H && weeksInSeason && selectedLocationIds.length === 0) {
+    if (isH2H && (!weeksInSeason || weeksInSeason <= 0)) {
+      showAlert('Please specify the number of weeks in season for head-to-head competitions.');
+      createBtn.disabled = false;
+      createBtn.textContent = editingLeagueId ? 'Update League' : 'Save League';
+      return;
+    }
+
+    if (isH2H && selectedLocationIds.length === 0) {
       showAlert('Please select at least one location for head-to-head seasons.');
       createBtn.disabled = false;
       createBtn.textContent = editingLeagueId ? 'Update League' : 'Save League';

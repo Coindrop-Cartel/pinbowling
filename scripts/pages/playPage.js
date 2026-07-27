@@ -74,16 +74,15 @@ export async function initPlayPage() {
   };
 
   async function refreshSessionsData() {
-    // Fetch only session-type leagues directly from the server
-    const sessionLeagues = await PB_API.leagues.getAll({ type: 'session' });
+    const sessions = await PB_API.sessions.getAll();
     const today = new Date().toISOString().split('T')[0];
     
     todayEvents = [];
-    sessionLeagues.forEach(league => {
-      const matches = (league.events || []).filter(e => e.eventDate === today);
+    sessions.forEach(session => {
+      const matches = (session.events || []).filter(e => e.eventDate === today);
       matches.forEach(event => {
-        const format = ScoringFormats.resolve(event.scoringFormat || league.scoringFormat);
-        todayEvents.push({ ...event, leagueId: league.id, roster: league.players || [], scoringFormat: format });
+        const format = ScoringFormats.resolve(event.scoringFormat || session.scoringFormat);
+        todayEvents.push({ ...event, sessionId: session.id, roster: session.players || [], scoringFormat: format });
       });
     });
 
@@ -133,7 +132,7 @@ export async function initPlayPage() {
 
       row.querySelector('.scoreboard-btn').onclick = (e) => {
         e.stopPropagation();
-        loadPage(ROUTE_PATHS.STANDINGS({ eventId: event.id, leagueId: event.leagueId }));
+        loadPage(ROUTE_PATHS.STANDINGS({ eventId: event.id, sessionId: event.sessionId }));
       };
 
       row.querySelector('.play-btn').onclick = async (e) => {
@@ -161,7 +160,7 @@ export async function initPlayPage() {
 
         if (selectedId) {
           try {
-            // If the selected player isn't in the league yet, join them automatically
+            // If the selected player isn't in the session yet, join them automatically
             if (!joinedIds.has(Number(selectedId))) {
               const engine = getScoringEngine(event.scoringFormat);
               const maxRoster = engine.getMaxRosterSize();
@@ -170,10 +169,10 @@ export async function initPlayPage() {
                 showDialog({title: 'Session Full', message: `This session has reached its maximum roster size of ${maxRoster} and cannot accept more players.`, confirmText: 'OK' , hideCancel: true });
                 return;
               }
-              const result = await PB_API.leagues.addPlayer(event.leagueId, Number(selectedId));
+              const result = await PB_API.sessions.addPlayer(event.sessionId, Number(selectedId));
               if (result.error) throw new Error(result.error);
             }
-            loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, leagueId: event.leagueId, playerId: selectedId }));
+            loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, sessionId: event.sessionId, playerId: selectedId }));
           } catch (err) {
             console.error('[Play] Failed to join session:', err);
             const message = err?.message || String(err);

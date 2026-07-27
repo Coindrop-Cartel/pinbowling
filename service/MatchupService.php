@@ -67,24 +67,21 @@ class MatchupService {
         $stmt = $this->db->query(
             'SELECT em.*, 
                     e.league_id,
-                    COALESCE(p1.player_name, t1.name) as player1_name, 
-                    COALESCE(p2.player_name, t2.name) as player2_name,
-                    COALESCE(p3.player_name, t3.name) as player3_name,
-                    COALESCE(p4.player_name, t4.name) as player4_name,
+                    p1.player_name as player1_name,
+                    p2.player_name as player2_name,
+                    p3.player_name as player3_name,
+                    p4.player_name as player4_name,
                     w.player_name as winner_name,
                     loc.name as location_name
              FROM event_matchups em
              JOIN events e ON em.event_id = e.id
+             LEFT JOIN leagues l ON e.league_id = l.id
              LEFT JOIN locations loc ON COALESCE(em.location_id, e.location_id, (SELECT ll.location_id FROM league_locations ll WHERE ll.league_id = e.league_id LIMIT 1)) = loc.id
              LEFT JOIN players p1 ON em.player1_id = p1.id
              LEFT JOIN players p2 ON em.player2_id = p2.id
              LEFT JOIN players p3 ON em.player3_id = p3.id
              LEFT JOIN players p4 ON em.player4_id = p4.id
-             LEFT JOIN teams t1 ON em.player1_id = t1.id
-             LEFT JOIN teams t2 ON em.player2_id = t2.id
-             LEFT JOIN teams t3 ON em.player3_id = t3.id
-             LEFT JOIN teams t4 ON em.player4_id = t4.id
-             LEFT JOIN players w ON em.winner_id = w.id
+             LEFT JOIN players w ON em.player_winner_id = w.id
              WHERE em.id = ?',
             [$eventMatchupId]
         );

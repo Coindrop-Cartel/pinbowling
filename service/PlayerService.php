@@ -105,16 +105,6 @@ class PlayerService {
         if ($playerName !== null) {
             $fields[] = "player_name = ?";
             $params[] = $playerName;
-
-            // Sync the 1-person wrapper team name if one exists for this player
-            $pdo = $this->db->getPdo();
-            $stmtWrapper = $pdo->prepare("
-                UPDATE teams t
-                JOIN team_members tm ON t.id = tm.team_id
-                SET t.name = ?
-                WHERE tm.player_id = ? AND t.is_individual_wrapper = 1
-            ");
-            $stmtWrapper->execute([$playerName, $playerId]);
         }
         if ($ifpaId !== null) {
             $fields[] = "ifpa_id = ?";
@@ -149,6 +139,14 @@ class PlayerService {
         
         try {
             $pdo->beginTransaction();
+
+            // Remove league player registrations
+            $stmt = $pdo->prepare("DELETE FROM league_players WHERE player_id = ?");
+            $stmt->execute([$playerId]);
+
+            // Remove any remaining team memberships for this player
+            $stmt = $pdo->prepare("DELETE FROM team_members WHERE player_id = ?");
+            $stmt->execute([$playerId]);
 
             // Delete user account associated with this player
             $stmt = $pdo->prepare("DELETE FROM users WHERE player_id = ?");
@@ -345,6 +343,13 @@ class PlayerService {
             $stmt = $pdo->prepare("UPDATE team_members SET player_id = ? WHERE player_id = ?");
             $stmt->execute([$playerAId, $playerBId]);
 
+            // 4. Merge League Players
+            $stmt = $pdo->prepare("DELETE FROM league_players WHERE player_id = ? AND league_id IN (SELECT league_id FROM league_players WHERE player_id = ?)");
+            $stmt->execute([$playerBId, $playerAId]);
+
+            $stmt = $pdo->prepare("UPDATE league_players SET player_id = ? WHERE player_id = ?");
+            $stmt->execute([$playerAId, $playerBId]);
+
             // 5. Merge Event Matchups
             // event_matchups has three player-referencing columns. All must be
             // reassigned before player B is deleted, because player1_id is
@@ -352,7 +357,7 @@ class PlayerService {
             //
             // Edge case: if A and B appeared against each other in the same matchup
             // (possible with duplicate accounts), we skip the player1/player2 swap to avoid
-            // creating a self-referential row, but we still promote winner_id to A.
+            // creating a self-referential row, but we still promote player_winner_id to A.
 
             // 5a. Rows where B is player1 and A is NOT already player2
             $stmt = $pdo->prepare("
@@ -373,7 +378,7 @@ class PlayerService {
             $stmt->execute([$playerAId, $playerBId, $playerAId]);
 
             // 5c. Promote winner references unconditionally (safe regardless of the above)
-            $stmt = $pdo->prepare("UPDATE event_matchups SET winner_id = ? WHERE winner_id = ?");
+            $stmt = $pdo->prepare("UPDATE event_matchups SET player_winner_id = ? WHERE player_winner_id = ?");
             $stmt->execute([$playerAId, $playerBId]);
 
             // 6. Delete player B's player record

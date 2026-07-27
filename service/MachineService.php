@@ -282,24 +282,39 @@ class MachineService {
      * @return bool
      */
     public function reorderTargetScores(array $updates): bool {
+        if (empty($updates)) {
+            return true;
+        }
+
         $pdo = $this->db->getPdo();
         
         try {
             $pdo->beginTransaction();
             
-            // Shift all to temporary high numbers to avoid unique constraint violations
-            $stmt = $pdo->prepare('SELECT event_id FROM target_scores WHERE id = ? LIMIT 1');
-            $stmt->execute([(int)$updates[0]['id']]);
-            $eventId = $stmt->fetchColumn();
-            
-            $highNum = 10000;
-            $stmt = $pdo->prepare('UPDATE target_scores SET order_number = ? WHERE event_id = ?');
-            $stmt->execute([$highNum, $eventId]);
+            $firstItem = reset($updates);
+            $firstId = (int)($firstItem['id'] ?? 0);
+
+            if ($firstId > 0) {
+                // Shift all to temporary high numbers to avoid unique constraint violations
+                $stmt = $pdo->prepare('SELECT event_id FROM target_scores WHERE id = ? LIMIT 1');
+                $stmt->execute([$firstId]);
+                $eventId = $stmt->fetchColumn();
+
+                if ($eventId) {
+                    $highNum = 10000;
+                    $stmt = $pdo->prepare('UPDATE target_scores SET order_number = ? WHERE event_id = ?');
+                    $stmt->execute([$highNum, $eventId]);
+                }
+            }
             
             // Now set to correct numbers
             $updateStmt = $pdo->prepare('UPDATE target_scores SET order_number = ? WHERE id = ?');
             foreach ($updates as $update) {
-                $updateStmt->execute([$update['orderNumber'], $update['id']]);
+                $orderNum = $update['orderNumber'] ?? $update['order_number'] ?? 0;
+                $targetId = $update['id'] ?? 0;
+                if ($targetId > 0) {
+                    $updateStmt->execute([$orderNum, $targetId]);
+                }
             }
             
             $pdo->commit();

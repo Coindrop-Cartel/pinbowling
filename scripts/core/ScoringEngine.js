@@ -1,6 +1,7 @@
 import { escapeHTML } from '../utils.js';
 import { getPlayerAssignmentStrategy } from './PlayerAssignmentStrategy.js';
 import { getCompetitionFormatStrategy } from './CompetitionFormatStrategy.js';
+import { FormatBranding } from '../services/scoringFormatBranding.js';
 
 /**
  * Base class for all scoring logic in the PinBowling application.
@@ -129,6 +130,25 @@ export class ScoringEngine {
    */
   getBonusTargets() { return { t1: 0, t2: 0 }; }
 
+  /**
+   * Returns generic team setup action configurations for UI buttons and modals.
+   * @returns {Array<{id: string, label: string, action: string, title?: string, roleName?: string, actionLabel?: string}>}
+   */
+  getTeamSetupActions() {
+    return [
+      { id: 'set-roster-order', label: 'Set Roster Order', action: 'rosterOrder' },
+      { id: 'assign-roles', label: 'Assign Roles', action: 'roleAssignments' }
+    ];
+  }
+
+  /**
+   * Returns rounds in which the active team/player is assigned to the first participant role.
+   * @param {Array} machines Machine lineup.
+   * @param {Object} context Engine context.
+   * @returns {Array} List of matching machines/rounds.
+   */
+  getFirstPlayerRounds(machines, context) { return []; }
+
 
 
   /**
@@ -185,6 +205,13 @@ export class ScoringEngine {
   sortStandings(rows, options = {}) {
     return this._competitionStrategy.sortStandings(rows, this, options);
   }
+
+  /**
+   * Whether this engine's sortStandings handles ALL sorting (including tiebreaking)
+   * so the competition strategy should not re-sort by total score.
+   * Override in engines that have sport-specific primary sort keys (e.g. parDiff in Golf).
+   */
+  handlesSortCompletely() { return false; }
 
   /**
    * Formats the total score for display (e.g., adds par relativity).
@@ -397,19 +424,146 @@ export class ScoringEngine {
   /**
    * Returns format-specific context for a round row in the scoring form.
    * Default implementation returns an empty object (no extra context).
-   * Head-to-head formats override this to provide matchup/role information.
+   * Head-to-head formats override this to provide participant sections and matchup info.
    *
    * @param {Object} round The machine configuration for this round.
    * @param {Object} context Format-specific context data (same keys as enrichScoreMap).
-   * @returns {Object} Format-specific row context. May include:
+   * @returns {Object} Format-specific row context containing:
    *   - {Object|null} matchup The matchup for this round (if applicable).
-   *   - {boolean} isPlayer1 Whether the current player is player1 in the matchup.
-   *   - {string} opponentName Name of the opponent.
-   *   - {string} displayRoundNumber How to label this round (e.g. "Top of Inning 1").
-   *   - {string} roleHtml Additional HTML for the role indicator.
+   *   - {string} displayRoundNumber How to label this round (e.g. "Top of 1" or "1").
+   *   - {string} [displayRoundLabel] Terminology prefix for the round label.
+   *   - {Array<{key: string, roleLabel: string, displayName: string, isActiveParticipant: boolean, perBallPlayers?: Array}>} [sections] Participant descriptors.
    */
   getRoundRowContext(round, context) {
-    return {};
+    if (!round || Object.keys(round).length === 0) return {};
+    return {
+      displayRoundNumber: round?.orderNumber || 1,
+      displayRoundLabel: this.getRoundLabel(),
+      matchup: null,
+      sections: []
+    };
+  }
+
+  /**
+   * Returns default target thresholds and multipliers for this scoring format.
+   * @returns {{easy: number, medium: number, hard: number, multiplier: number}}
+   */
+  static getFormatDefaults() {
+    return {
+      easy: 25000000,
+      medium: 50000000,
+      hard: 100000000,
+      multiplier: 1.0,
+    };
+  }
+  getFormatDefaults() {
+    return this.constructor.getFormatDefaults ? this.constructor.getFormatDefaults() : ScoringEngine.getFormatDefaults();
+  }
+
+  /**
+   * Returns whether this engine format uses head-to-head matchup scoring.
+   * @returns {boolean}
+   */
+  static hasHead2HeadScoring() {
+    return false;
+  }
+  hasHead2HeadScoring() {
+    return this.constructor.hasHead2HeadScoring ? this.constructor.hasHead2HeadScoring() : false;
+  }
+
+  static requiresHeadToHead() {
+    return false;
+  }
+  requiresHeadToHead() {
+    return this.constructor.requiresHeadToHead ? this.constructor.requiresHeadToHead() : false;
+  }
+
+  static getDefaultCompetitionFormat() {
+    return 'group';
+  }
+  getDefaultCompetitionFormat() {
+    return this.constructor.getDefaultCompetitionFormat ? this.constructor.getDefaultCompetitionFormat() : 'group';
+  }
+
+  static getDefaultRoundsPerGame(_totalFrames = 0) {
+    return 2;
+  }
+  getDefaultRoundsPerGame(totalFrames = 0) {
+    return this.constructor.getDefaultRoundsPerGame ? this.constructor.getDefaultRoundsPerGame(totalFrames) : 2;
+  }
+
+  static getDefaultMatchupsPerRound() {
+    return null;
+  }
+  getDefaultMatchupsPerRound() {
+    return this.constructor.getDefaultMatchupsPerRound ? this.constructor.getDefaultMatchupsPerRound() : null;
+  }
+
+  static getDefaultQuickFillTargets() {
+    return null;
+  }
+  getDefaultQuickFillTargets() {
+    return this.constructor.getDefaultQuickFillTargets ? this.constructor.getDefaultQuickFillTargets() : null;
+  }
+
+  static getDefaultFallbackTargetValues() {
+    return { value1: 50000000, value2: 1, values: null };
+  }
+  getDefaultFallbackTargetValues() {
+    return this.constructor.getDefaultFallbackTargetValues ? this.constructor.getDefaultFallbackTargetValues() : { value1: 50000000, value2: 1, values: null };
+  }
+
+  static getDefaultTargetForDifficulty(difficulty = 'medium') {
+    const diff = String(difficulty).toLowerCase();
+    if (diff === 'easy') return 25000000;
+    if (diff === 'hard') return 100000000;
+    return 50000000;
+  }
+  getDefaultTargetForDifficulty(difficulty = 'medium') {
+    return this.constructor.getDefaultTargetForDifficulty ? this.constructor.getDefaultTargetForDifficulty(difficulty) : 50000000;
+  }
+
+  static getCrossFormatPreferenceOrder() {
+    return [
+      { format: 'bowling', scale: 1 },
+      { format: 'golf', scale: 1 },
+      { format: 'baseball', scale: 10 }
+    ];
+  }
+  getCrossFormatPreferenceOrder() {
+    return this.constructor.getCrossFormatPreferenceOrder ? this.constructor.getCrossFormatPreferenceOrder() : [];
+  }
+
+  /**
+   * Returns presentational branding metadata for this engine format.
+   * @returns {Object}
+   */
+  getBranding() {
+    return FormatBranding.get(this.config?.format || 'bowling');
+  }
+
+  /**
+   * Returns the hint message for the last round/frame.
+   * @returns {string}
+   */
+  getLastFrameHint() {
+    return this.getBranding().lastFrameHint || '';
+  }
+
+  /**
+   * Returns the main scoring hint message for players.
+   * @returns {string}
+   */
+  getScoringHint() {
+    return this.getBranding().scoringHint || '';
+  }
+
+  /**
+   * Returns whether the session setup preview row should show value inputs (value1 / value2).
+   * @returns {boolean}
+   */
+  showValueInputsInPreview() {
+    return true;
   }
 
   /**

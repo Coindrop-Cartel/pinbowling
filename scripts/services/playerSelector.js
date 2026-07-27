@@ -7,17 +7,17 @@ export function resolvePlayersForMatchupParticipant(participantId, participantNa
   if (!participantId) return [];
   const pIdStr = String(participantId);
 
-  // 1. Direct match in allPlayers
-  const directPlayer = allPlayers.find(p => String(p.id) === pIdStr);
-  if (directPlayer) return [directPlayer];
-
-  // 2. Check team members across all leagues
+  // 1. Check team members across all leagues
   for (const league of allLeaguesCache) {
     const team = (league?.teams || []).find(t => String(t.id) === pIdStr);
     if (team?.members?.length) {
       return team.members;
     }
   }
+
+  // 2. Direct match in allPlayers
+  const directPlayer = allPlayers.find(p => String(p.id) === pIdStr);
+  if (directPlayer) return [directPlayer];
 
   // 3. Fallback to name match in allPlayers
   if (participantName) {
@@ -43,8 +43,8 @@ export function getSelectableTeams(params) {
 
   if (activeMatchupId && eventMatchups.length > 0) {
     const matchup = eventMatchups[0];
-    const awayId = String(matchup.player2Id ?? matchup.player2_id ?? '');
-    const homeId = String(matchup.player1Id ?? matchup.player1_id ?? '');
+    const awayId = String(matchup.team2Id ?? '');
+    const homeId = String(matchup.team1Id ?? '');
 
     const awayTeam = (league.teams || []).find(t => String(t.id) === awayId);
     const homeTeam = (league.teams || []).find(t => String(t.id) === homeId);
@@ -63,8 +63,8 @@ export function getSelectableTeams(params) {
  */
 export function isPlayerInMatchup(playerId, matchup, allLeaguesCache = []) {
   if (!matchup || !playerId) return false;
-  const p1Id = String(matchup.player1Id ?? matchup.player1_id ?? '');
-  const p2Id = String(matchup.player2Id ?? matchup.player2_id ?? '');
+  const p1Id = String(matchup.team1Id ?? matchup.player1Id ?? '');
+  const p2Id = String(matchup.team2Id ?? matchup.player2Id ?? '');
   const curId = String(playerId);
 
   if (p1Id === curId || p2Id === curId) return true;
@@ -103,16 +103,18 @@ export function getSelectablePlayers(params) {
   if (isMatchupContext) {
     const matchup = eventMatchups[0];
     if (matchup) {
-      if (matchup.player2Id) {
-        const awayPlayers = resolvePlayersForMatchupParticipant(matchup.player2Id, matchup.player2Name, allPlayers, allLeaguesCache);
+      const p2Id = matchup.team2Id ?? matchup.player2Id;
+      if (p2Id) {
+        const awayPlayers = resolvePlayersForMatchupParticipant(p2Id, matchup.team2Name ?? matchup.player2Name, allPlayers, allLeaguesCache);
         awayPlayers.forEach(p => {
           if (!selectablePlayers.some(sp => String(sp.id) === String(p.id))) {
             selectablePlayers.push(p);
           }
         });
       }
-      if (matchup.player1Id) {
-        const homePlayers = resolvePlayersForMatchupParticipant(matchup.player1Id, matchup.player1Name, allPlayers, allLeaguesCache);
+      const p1Id = matchup.team1Id ?? matchup.player1Id;
+      if (p1Id) {
+        const homePlayers = resolvePlayersForMatchupParticipant(p1Id, matchup.team1Name ?? matchup.player1Name, allPlayers, allLeaguesCache);
         homePlayers.forEach(p => {
           if (!selectablePlayers.some(sp => String(sp.id) === String(p.id))) {
             selectablePlayers.push(p);

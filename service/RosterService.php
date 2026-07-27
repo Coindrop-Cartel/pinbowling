@@ -4,6 +4,9 @@ namespace App\Service;
 
 /**
  * Service managing league players, registrations, and roster stats.
+ *
+ * Individual-participation leagues use league_players (direct player-to-league).
+ * Team-participation leagues use league_teams (team-to-league, with members via team_members).
  */
 class RosterService {
     private DatabaseService $db;
@@ -13,45 +16,26 @@ class RosterService {
     }
 
     /**
-     * Add a player to a league by linking/creating their team in league_teams.
+     * Add a player to an individual-participation league.
      *
      * @param int $leagueId
      * @param int $playerId
      * @return bool Success
+     * @throws \Exception If the league uses team participation
      */
     public function addPlayerToLeague(int $leagueId, int $playerId): bool {
         $pdo = $this->db->getPdo();
-        
-        $stmt = $pdo->prepare('SELECT player_name FROM players WHERE id = ?');
-        $stmt->execute([$playerId]);
-        $playerName = $stmt->fetchColumn();
-        if (!$playerName) {
-            return false;
+
+        $stmt = $pdo->prepare('SELECT participation_type FROM leagues WHERE id = ?');
+        $stmt->execute([$leagueId]);
+        $participationType = $stmt->fetchColumn();
+
+        if ($participationType === 'team') {
+            throw new \Exception("Cannot add a player directly to a team-participation league. Add the player to a team first.");
         }
 
-        // Find existing 1-player team or create one
-        $stmt = $pdo->prepare(
-            'SELECT t.id FROM teams t 
-             JOIN team_members tm ON t.id = tm.team_id 
-             GROUP BY t.id HAVING COUNT(tm.player_id) = 1 AND SUM(tm.player_id = ?) = 1'
-        );
-        $stmt->execute([$playerId]);
-        $teamId = $stmt->fetchColumn();
-
-        if (!$teamId) {
-            $stmt = $pdo->prepare('INSERT INTO teams (name, is_individual_wrapper) VALUES (?, 1)');
-            $stmt->execute([$playerName]);
-            $teamId = (int)$pdo->lastInsertId();
-
-            $stmt = $pdo->prepare('INSERT INTO team_members (team_id, player_id) VALUES (?, ?)');
-            $stmt->execute([$teamId, $playerId]);
-        } else {
-            $stmt = $pdo->prepare('UPDATE teams SET name = ?, is_individual_wrapper = 1 WHERE id = ? AND is_individual_wrapper = 1');
-            $stmt->execute([$playerName, $teamId]);
-        }
-
-        $stmt = $pdo->prepare('INSERT IGNORE INTO league_teams (league_id, team_id) VALUES (?, ?)');
-        return $stmt->execute([$leagueId, $teamId]);
+        $stmt = $pdo->prepare('INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)');
+        return $stmt->execute([$leagueId, $playerId]);
     }
 
     /**
@@ -63,21 +47,31 @@ class RosterService {
      */
     public function removePlayerFromLeague(int $leagueId, int $playerId): bool {
         $pdo = $this->db->getPdo();
+
         $pdo->prepare('DELETE FROM scores WHERE player_id = ? AND event_id IN (SELECT id FROM events WHERE league_id = ?)')
             ->execute([$playerId, $leagueId]);
 
-        $stmt = $pdo->prepare(
-            'SELECT lt.team_id FROM league_teams lt 
-             JOIN team_members tm ON lt.team_id = tm.team_id 
-             WHERE lt.league_id = ? AND tm.player_id = ?'
-        );
-        $stmt->execute([$leagueId, $playerId]);
-        $teamIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        $stmt = $pdo->prepare('SELECT participation_type FROM leagues WHERE id = ?');
+        $stmt->execute([$leagueId]);
+        $participationType = $stmt->fetchColumn();
 
-        if (!empty($teamIds)) {
-            $in = implode(',', array_fill(0, count($teamIds), '?'));
-            $pdo->prepare("DELETE FROM league_teams WHERE league_id = ? AND team_id IN ($in)")
-                ->execute(array_merge([$leagueId], $teamIds));
+        if ($participationType === 'team') {
+            $stmt = $pdo->prepare(
+                'SELECT lt.team_id FROM league_teams lt 
+                 JOIN team_members tm ON lt.team_id = tm.team_id 
+                 WHERE lt.league_id = ? AND tm.player_id = ?'
+            );
+            $stmt->execute([$leagueId, $playerId]);
+            $teamIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+
+            if (!empty($teamIds)) {
+                $in = implode(',', array_fill(0, count($teamIds), '?'));
+                $pdo->prepare("DELETE FROM league_teams WHERE league_id = ? AND team_id IN ($in)")
+                    ->execute(array_merge([$leagueId], $teamIds));
+            }
+        } else {
+            $stmt = $pdo->prepare('DELETE FROM league_players WHERE league_id = ? AND player_id = ?');
+            $stmt->execute([$leagueId, $playerId]);
         }
 
         return true;
@@ -90,12 +84,25 @@ class RosterService {
      * @return int
      */
     public function getLeaguePlayerCount(int $leagueId): int {
-        $stmt = $this->db->getPdo()->prepare(
-            'SELECT COUNT(DISTINCT tm.player_id) 
-             FROM league_teams lt 
-             JOIN team_members tm ON lt.team_id = tm.team_id 
-             WHERE lt.league_id = ?'
-        );
+        $pdo = $this->db->getPdo();
+
+        $stmt = $pdo->prepare('SELECT participation_type FROM leagues WHERE id = ?');
+        $stmt->execute([$leagueId]);
+        $participationType = $stmt->fetchColumn();
+
+        if ($participationType === 'team') {
+            $stmt = $pdo->prepare(
+                'SELECT COUNT(DISTINCT tm.player_id) 
+                 FROM league_teams lt 
+                 JOIN team_members tm ON lt.team_id = tm.team_id 
+                 WHERE lt.league_id = ?'
+            );
+        } else {
+            $stmt = $pdo->prepare(
+                'SELECT COUNT(*) FROM league_players WHERE league_id = ?'
+            );
+        }
+
         $stmt->execute([$leagueId]);
         return (int)$stmt->fetchColumn();
     }

@@ -45,6 +45,8 @@ export function renderMatchupSchedule(matchupsList, event, { onPlayMatchup }) {
  * @private
  */
 function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup) {
+  const isTeamMode = event?.isTeam || (matchups.length > 0 && matchups[0].team1Id !== null && matchups[0].team1Id !== undefined);
+
   const seriesMap = {};
   matchups.forEach(m => {
     const sId = m.seriesId || 1;
@@ -55,28 +57,40 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup) {
   matchupsList.innerHTML = Object.entries(seriesMap).map(([sId, games]) => {
     games.sort((a, b) => a.gameNumber - b.gameNumber);
     const firstGame = games[0];
-    const homeName = escapeHTML(firstGame.player1Name);
-    const awayName = escapeHTML(firstGame.player2Name);
+    const p1Name = isTeamMode ? firstGame.team1Name : firstGame.player1Name;
+    const p2Name = isTeamMode ? firstGame.team2Name : firstGame.player2Name;
+    const homeName = escapeHTML(p1Name || 'Home');
+    const awayName = escapeHTML(p2Name || 'Away');
     
     let homeWins = 0;
     let awayWins = 0;
     games.forEach(g => {
+      const p1Id = isTeamMode ? g.team1Id : g.player1Id;
+      const p2Id = isTeamMode ? g.team2Id : g.player2Id;
       if (g.status === 'completed') {
-        if (g.winnerId === g.player1Id) homeWins++;
-        else if (g.winnerId === g.player2Id) awayWins++;
+        if (g.winnerId === p1Id) homeWins++;
+        else if (g.winnerId === p2Id) awayWins++;
       }
     });
     
     const gamesHtml = games.map(g => {
-      const winnerHome = g.status === 'completed' && g.winnerId === g.player1Id;
-      const winnerAway = g.status === 'completed' && g.winnerId === g.player2Id;
+      const p1Id = isTeamMode ? g.team1Id : g.player1Id;
+      const p2Id = isTeamMode ? g.team2Id : g.player2Id;
+      const p1Score = isTeamMode
+        ? Number(g.team1Score ?? 0)
+        : Number(g.player1Score ?? 0);
+      const p2Score = isTeamMode
+        ? Number(g.team2Score ?? 0)
+        : Number(g.player2Score ?? 0);
+      const winnerHome = g.status === 'completed' && g.winnerId === p1Id;
+      const winnerAway = g.status === 'completed' && g.winnerId === p2Id;
       
       return `
         <div class="playoff-game-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-top: 6px; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #2196f3;">
           <span class="meta-strong" style="font-size: 0.9em;">Game ${g.gameNumber}</span>
           <div class="game-score" style="font-size: 0.9em;">
             ${g.status === 'completed' ? `
-              <span class="${winnerAway ? 'font-bold' : ''}">${g.player2Score}</span> - <span class="${winnerHome ? 'font-bold' : ''}">${g.player1Score}</span>
+              <span class="${winnerAway ? 'font-bold' : ''}">${p2Score}</span> - <span class="${winnerHome ? 'font-bold' : ''}">${p1Score}</span>
             ` : `
               <span class="badge pending" style="background: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">Pending</span>
             `}
@@ -111,7 +125,9 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup) {
  * @private
  */
 function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, event = null) {
-  // Group matchups by location, then by (player1Id, player2Id) pair.
+  const isTeamMode = event?.isTeam || (matchups.length > 0 && matchups[0].team1Id !== null && matchups[0].team1Id !== undefined);
+
+  // Group matchups by location, then by participant pair.
   const locationGroups = {};
   const locationOrder = [];
 
@@ -122,7 +138,9 @@ function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, event = n
       locationOrder.push(locName);
     }
     const locGroup = locationGroups[locName];
-    const key = `${m.player1Id ?? 'null'}-${m.player2Id ?? 'null'}`;
+    const p1Id = isTeamMode ? m.team1Id : m.player1Id;
+    const p2Id = isTeamMode ? m.team2Id : m.player2Id;
+    const key = `${p1Id ?? 'null'}-${p2Id ?? 'null'}`;
     if (!locGroup.grouped[key]) {
       locGroup.grouped[key] = [];
       locGroup.groupedOrder.push(key);
@@ -135,7 +153,9 @@ function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, event = n
     const matchupsHtml = groupedOrder.map(key => {
       const pair = grouped[key];
       const m = pair[0]; // Use first matchup for names, id, status
-      const isBye = m.player2Id === null;
+      const p1Id = isTeamMode ? m.team1Id : m.player1Id;
+      const p2Id = isTeamMode ? m.team2Id : m.player2Id;
+      const isBye = p2Id === null || p2Id === undefined;
 
       // Aggregate scores across all half-innings in the group
       let totalP1Score = 0;
@@ -143,22 +163,35 @@ function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, event = n
       let allCompleted = true;
       let anyCompleted = false;
       pair.forEach(g => {
-        totalP1Score += Number(g.player1Score ?? 0);
-        totalP2Score += Number(g.player2Score ?? 0);
+        const p1Score = isTeamMode
+          ? Number(g.team1Score ?? 0)
+          : Number(g.player1Score ?? 0);
+        const p2Score = isTeamMode
+          ? Number(g.team2Score ?? 0)
+          : Number(g.player2Score ?? 0);
+        totalP1Score += p1Score;
+        totalP2Score += p2Score;
         if (g.status === 'completed') anyCompleted = true;
         else allCompleted = false;
       });
 
-      const winnerHome = allCompleted && anyCompleted && totalP1Score > totalP2Score;
-      const winnerAway = allCompleted && anyCompleted && totalP2Score > totalP1Score;
+      const winnerHome = (allCompleted || anyCompleted) && totalP1Score > totalP2Score;
+      const winnerAway = (allCompleted || anyCompleted) && totalP2Score > totalP1Score;
       const isCompleted = allCompleted && anyCompleted;
+      const hasScores = (totalP1Score > 0 || totalP2Score > 0 || anyCompleted);
+
+      const p1Name = isTeamMode ? (m.team1Name || m.team1_name) : (m.player1Name || m.player1_name);
+      const p2Name = isTeamMode ? (m.team2Name || m.team2_name) : (m.player2Name || m.player2_name);
+
+      const awayName = escapeHTML(p2Name || 'BYE');
+      const homeName = escapeHTML(p1Name || 'Home');
 
       return `
         <li class="list-item-row" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; background: #fff;">
           <div class="matchup-players" style="font-weight: 500;">
-            <span class="${winnerAway ? 'font-bold' : ''}" style="${winnerAway ? 'color: #2e7d32;' : ''}">${escapeHTML(m.player2Name || 'BYE')}</span> 
+            <span class="${winnerAway ? 'font-bold' : ''}" style="${winnerAway ? 'color: #2e7d32;' : ''}">${awayName}</span> 
             <span class="meta-muted" style="margin: 0 8px;">(Away) vs</span> 
-            <span class="${winnerHome ? 'font-bold' : ''}" style="${winnerHome ? 'color: #2e7d32;' : ''}">${escapeHTML(m.player1Name)}</span>
+            <span class="${winnerHome ? 'font-bold' : ''}" style="${winnerHome ? 'color: #2e7d32;' : ''}">${homeName}</span>
             <span class="meta-muted" style="margin-left: 8px;">(Home)</span>
           </div>
           <div class="matchup-score-badge" style="display: flex; align-items: center; gap: 12px;">
@@ -166,8 +199,12 @@ function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, event = n
               <span class="badge completed font-bold" style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px;">
                 ${totalP2Score} - ${totalP1Score}
               </span>
-            ` : `
+            ` : hasScores ? `
               <span class="badge pending" style="background: #fff3e0; color: #e65100; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;">
+                In Progress (${totalP2Score} - ${totalP1Score})
+              </span>
+            ` : `
+              <span class="badge pending" style="background: #f5f5f5; color: #757575; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;">
                 Pending
               </span>
             `}

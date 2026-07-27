@@ -42,7 +42,7 @@ export async function initLeaguesPage() {
   try {
     [isAuthorized, leaguesData] = await Promise.all([
       isManagementAuthorized(),
-      PB_API.leagues.getAll({ type: 'standard' })
+      PB_API.leagues.getAll()
     ]);
   } catch (err) { console.error('Initialization failed:', err); }
 

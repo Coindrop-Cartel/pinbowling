@@ -3,7 +3,9 @@
  * Restore Scores & Reconstruct League Rosters Script.
  *
  * Use this script to recover scores from `migrate/scores_insert.sql` and automatically
- * recreate missing 1-player teams in `teams` / `team_members` and re-assign them to `league_teams`.
+ * recreate missing rosters for leagues. For team leagues, creates 1-player teams in
+ * `teams` / `team_members` and assigns them to `league_teams`. For individual leagues,
+ * inserts directly into `league_players`.
  *
  * Usage: php migrate/restore_scores_and_rosters.php
  */
@@ -54,46 +56,52 @@ try {
 
     $reassignedCount = 0;
 
-    // Ensure is_individual_wrapper column exists in teams table
-    try {
-        $pdo->exec("ALTER TABLE `teams` ADD COLUMN `is_individual_wrapper` TINYINT(1) DEFAULT 0");
-    } catch (\PDOException $e) {
-        // Column already exists
-    }
-
     foreach ($rows as $row) {
         $leagueId = (int)$row['league_id'];
         $playerId = (int)$row['player_id'];
         $playerName = $row['player_name'];
 
-        // Step A: Find existing 1-player team for this player, or create one
-        $stmtTeam = $pdo->prepare("
-            SELECT t.id FROM teams t
-            JOIN team_members tm ON t.id = tm.team_id
-            GROUP BY t.id
-            HAVING COUNT(tm.player_id) = 1 AND SUM(tm.player_id = ?) = 1
-        ");
-        $stmtTeam->execute([$playerId]);
-        $teamId = $stmtTeam->fetchColumn();
+        // Step A: Check league participation type
+        $stmtPart = $pdo->prepare("SELECT participation_type FROM leagues WHERE id = ?");
+        $stmtPart->execute([$leagueId]);
+        $partType = $stmtPart->fetchColumn();
 
-        if (!$teamId) {
-            $insertTeam = $pdo->prepare("INSERT INTO teams (name, is_individual_wrapper) VALUES (?, 1)");
-            $insertTeam->execute([$playerName]);
-            $teamId = (int)$pdo->lastInsertId();
+        if ($partType === 'team') {
+            // Team league: find or create 1-player team, link via league_teams
+            $stmtTeam = $pdo->prepare("
+                SELECT t.id FROM teams t
+                JOIN team_members tm ON t.id = tm.team_id
+                GROUP BY t.id
+                HAVING COUNT(tm.player_id) = 1 AND SUM(tm.player_id = ?) = 1
+            ");
+            $stmtTeam->execute([$playerId]);
+            $teamId = $stmtTeam->fetchColumn();
 
-            $insertMember = $pdo->prepare("INSERT INTO team_members (team_id, player_id) VALUES (?, ?)");
-            $insertMember->execute([$teamId, $playerId]);
+            if (!$teamId) {
+                $insertTeam = $pdo->prepare("INSERT INTO teams (name) VALUES (?)");
+                $insertTeam->execute([$playerName]);
+                $teamId = (int)$pdo->lastInsertId();
+
+                $insertMember = $pdo->prepare("INSERT INTO team_members (team_id, player_id) VALUES (?, ?)");
+                $insertMember->execute([$teamId, $playerId]);
+            }
+
+            $insertLT = $pdo->prepare("INSERT IGNORE INTO league_teams (league_id, team_id) VALUES (?, ?)");
+            $insertLT->execute([$leagueId, $teamId]);
+
+            if ($insertLT->rowCount() > 0) {
+                $reassignedCount++;
+                echo "  + Re-linked '{$playerName}' (Player ID {$playerId}) to League ID {$leagueId}\n";
+            }
         } else {
-            $pdo->prepare("UPDATE teams SET is_individual_wrapper = 1 WHERE id = ?")->execute([$teamId]);
-        }
+            // Individual league: use league_players
+            $insertLP = $pdo->prepare("INSERT IGNORE INTO league_players (league_id, player_id) VALUES (?, ?)");
+            $insertLP->execute([$leagueId, $playerId]);
 
-        // Step B: Link team to league in league_teams
-        $insertLT = $pdo->prepare("INSERT IGNORE INTO league_teams (league_id, team_id) VALUES (?, ?)");
-        $insertLT->execute([$leagueId, $teamId]);
-
-        if ($insertLT->rowCount() > 0) {
-            $reassignedCount++;
-            echo "  + Re-linked '{$playerName}' (Player ID {$playerId}) to League ID {$leagueId}\n";
+            if ($insertLP->rowCount() > 0) {
+                $reassignedCount++;
+                echo "  + Re-linked '{$playerName}' (Player ID {$playerId}) to League ID {$leagueId}\n";
+            }
         }
     }
 

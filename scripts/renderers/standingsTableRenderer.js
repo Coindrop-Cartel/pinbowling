@@ -187,36 +187,15 @@ export function renderStandingsTable({
           return { team, teamMembers, teamTotal };
         }).sort((a, b) => engine.compareScores(a.teamTotal, b.teamTotal));
 
+        const colspan = columns.length + (supportsMatchups ? 2 : 1);
         bodyEl.innerHTML = teamResults.map((tr, idx) => {
-          const teamHeader = `
+          return `
             <tr class="team-header">
               <td class="text-center">${idx + 1}</td>
-              <td colspan="${columns.length + 1}">${escapeHTML(tr.team.name)}</td>
+              <td colspan="${colspan}">${escapeHTML(tr.team.name)}</td>
               <td class="standings-total">${engine.formatTotalScore(tr.teamTotal)}</td>
             </tr>
           `;
-          const memberRows = tr.teamMembers.map(res => {
-            let rowHasUpdate = false;
-            const turnsHtml = res.turnResults.map(t => {
-              const scoreKey = `${res.player.id}-${t.orderNumber}`;
-              const isNew = lastScoreState.has(scoreKey) && lastScoreState.get(scoreKey) !== currentScoreState.get(scoreKey);
-              if (isNew) rowHasUpdate = true;
-              return renderTurnCell(t, scoreKey, lastScoreState, currentScoreState, isTvMode);
-            }).join('');
-
-            const totalUpdateClass = (isTvMode && rowHasUpdate) ? 'score-just-updated' : '';
-
-            return `
-              <tr>
-                <td></td>
-                <td class="player-name-cell player-name-indent">${escapeHTML(res.player.playerName)}</td>
-                ${turnsHtml}
-                <td class="standings-total ${totalUpdateClass}">${res.totalDisplay}</td>
-              </tr>
-            `;
-          }).join('');
-
-          return teamHeader + memberRows;
         }).join('');
       } else if (supportsMatchups) {
         // 4a. Head-to-head scoreboard: Result, W-L (season), Total Runs (season)

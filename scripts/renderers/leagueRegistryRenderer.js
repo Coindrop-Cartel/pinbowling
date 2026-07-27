@@ -26,7 +26,8 @@ export function updateLeagueHeaderStats(leagueId, league, getParticipantMeta, ge
       ? league.locationIds.map(id => getLocationName ? getLocationName(id) : id).join(', ')
       : 'None';
 
-    statsEl.innerHTML = `Started: ${league.startDate || 'N/A'} | ${participantMeta.mode} | ${eventLabel}: ${league.events?.length || 0} | ${participantMeta.countLabel}: ${participantMeta.count} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''} | Status: ${league.status || 'N/A'}<br>Format: ${league.scoringFormat || 'N/A'} | Locations: ${locationStr}`;
+    const eventCount = league.weeksInSeason ? league.weeksInSeason : (league.events?.length || 0);
+    statsEl.innerHTML = `Started: ${league.startDate || 'N/A'} | ${participantMeta.mode} | ${eventLabel}: ${eventCount} | ${participantMeta.countLabel}: ${participantMeta.count} | Scoring: ${league.seasonScoring === 'weekly' ? 'Weekly' : 'Cumulative'}${league.dropLowestWeeks > 0 ? ` | Drop: ${league.dropLowestWeeks}` : ''} | Status: ${league.status || 'N/A'}<br>Format: ${league.scoringFormat || 'N/A'} | Locations: ${locationStr}`;
   }
 }
 

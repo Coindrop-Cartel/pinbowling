@@ -19,12 +19,7 @@ class LeagueController extends ApiController {
     }
 
     private function authorizeLeagueAccess(int $leagueId): void {
-        $meta = $this->leagueService->getLeagueMeta($leagueId);
-        if ($meta['type'] === 'session') {
-            $this->validateSessionOrSecret();
-        } else {
-            $this->validateTDAccess();
-        }
+        $this->validateTDAccess();
     }
 
     private function buildLeagueParams(): array {
@@ -61,7 +56,7 @@ class LeagueController extends ApiController {
                         if (!$league) $this->sendError('League not found', 404);
                         $this->sendJson(Serializer::league($league));
                     } else {
-                        $leagues = $this->leagueService->getAllLeaguesWithDetails($_GET['type'] ?? null);
+                        $leagues = $this->leagueService->getAllLeaguesWithDetails();
                         $this->sendJson(array_map([Serializer::class, 'league'], $leagues));
                     }
                 }
@@ -73,25 +68,7 @@ class LeagueController extends ApiController {
                         $this->sendError('leagueId and playerId are required', 400);
                     }
 
-                    $meta = $this->leagueService->getLeagueMeta((int)$this->input['leagueId']);
-                    if ($meta['type'] === 'session') {
-                        $apiSecret = \Configuration::getInstance()->getApiSecret();
-                        $providedSecret = getHeader('X-PB-Secret');
-                        $hasSecret = ($providedSecret && $providedSecret === $apiSecret);
-                        $currentUser = \App\Service\AuthService::getCurrentUser();
-
-                        if ($hasSecret || $currentUser) {
-                            $this->validateSessionOrSecret();
-                        } else {
-                            $playerService = $this->container->get(\App\Service\PlayerService::class);
-                            $player = $playerService->getPlayer((int)$this->input['playerId']);
-                            if (!$player || $player['user_id'] !== null) {
-                                $this->sendError('Unauthorized: Guests can only join unregistered players.', 401);
-                            }
-                        }
-                    } else {
-                        $this->validateTDAccess();
-                    }
+                    $this->validateTDAccess();
 
                     $this->leagueService->addPlayerToLeague((int)$this->input['leagueId'], (int)$this->input['playerId']);
                     $this->sendJson(['success' => true]);
@@ -162,7 +139,6 @@ class LeagueController extends ApiController {
                     $league = $this->leagueService->createLeague(
                         $p['name'],
                         $p['startDate'],
-                        $this->input['type'] ?? 'standard',
                         $p['competitionFormat'],
                         $p['participationType'],
                         $p['scoringFormat'],

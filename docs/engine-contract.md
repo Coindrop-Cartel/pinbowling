@@ -1,9 +1,20 @@
 # Scoring Engine Contract
 
-This document defines the public API that every scoring engine must expose.  The
-contract is intentionally **data‑only** – engines should never touch the DOM,
-fetch data, or perform side‑effects.  The UI layer is responsible for rendering
-and for any interactions with the browser.
+This document defines the public API that every scoring engine must expose.
+
+## Core Architectural Principles
+
+1. **Neutral Hierarchy Terminology:**
+   - The application layer, database schema, and UI strictly use generic domain terms: **Games**, **Events**, **Rounds**, and **Matchups**.
+   - The term "slots" is avoided across all modules.
+2. **Encapsulated Format Logic:**
+   - Engines contain all sport-specific calculations and role interpretations (e.g. mapping `player1` = Away / Pitcher and `player2` = Home / Batter in Baseball, or calculating marks/frames/strokes).
+3. **Single Source of Truth for Calculations:**
+   - The application layer and UI must **only ever query the engines** for format-specific logic:
+     - How to display results, format marks, and render row summaries
+     - How to calculate turn/matchup scores
+     - How to compute season standings, weekly totals, and row aggregations.
+   - Engines remain **data-only** (pure calculation/formatting logic) and perform no DOM manipulation or side-effects.
 
 ## Core Methods
 

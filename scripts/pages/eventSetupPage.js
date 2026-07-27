@@ -197,15 +197,8 @@ export async function initEventSetupPage() {
       }
     }
 
-    if (format === 'baseball') {
-      return {
-        easy: 5000000,
-        med: 7500000,
-        hard: 10000000
-      };
-    }
-
-    return null;
+    const eng = getScoringEngine(format);
+    return eng?.getDefaultQuickFillTargets?.() || null;
   };
 
   const updateQuickFillState = (machineName) => {

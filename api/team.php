@@ -21,9 +21,18 @@ class TeamController extends ApiController {
     protected function handle(): void {
         switch ($this->method) {
             case 'GET':
-                $includeWrappers = isset($_GET['includeWrappers']) && $_GET['includeWrappers'] === 'true';
-                $teams = $this->teamService->getAllTeams($includeWrappers);
-                $this->sendJson(array_map([Serializer::class, 'team'], $teams));
+                $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+                if ($id) {
+                    $team = $this->teamService->getTeam($id);
+                    if (!$team) {
+                        $this->sendError('Team not found', 404);
+                    }
+                    $this->sendJson(Serializer::team($team));
+                } else {
+                    $includeWrappers = isset($_GET['includeWrappers']) && $_GET['includeWrappers'] === 'true';
+                    $teams = $this->teamService->getAllTeams($includeWrappers);
+                    $this->sendJson(array_map([Serializer::class, 'team'], $teams));
+                }
                 break;
 
             case 'POST':

@@ -27,7 +27,7 @@ export function escapeHTML(str) {
  * @param {string} key 
  * @returns {string|null}
  */
-function getUrlParam(key) {
+export function getUrlParam(key) {
   return new URLSearchParams(window.location.search).get(key);
 }
 

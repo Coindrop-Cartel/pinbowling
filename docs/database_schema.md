@@ -8,32 +8,30 @@
 ## Design Principles
 
 1. **Format-agnostic storage.** Tables use neutral column names
-   (`player1_id`, `player2_id`, `player3_id`, `player4_id`,
+   (`player1_id`, `player2_id`, `team1_id`, `team2_id`,
    `player1_score`, `player2_score`, `order_number`, `value1`, `value2`).
    No format-specific terminology lives in the schema. Each scoring engine
    is responsible for translating these columns into format vocabulary:
-   - **Baseball (team)** — `player1` = Home team, `player2` = Away team;
-     `player1_score`/`player2_score` = Home Runs / Away Runs;
+   - **Baseball (team)** — `team_event_matchups.team1_id` = Home team, `team2_id` = Away team;
+     `team1_score`/`team2_score` = Home Runs / Away Runs;
      `round_name` = half-inning label ("Top N" / "Bottom N");
-     `matchups.player_id` = batter assigned by rotation.
-   - **Baseball (individual)** — `player1` = Home, `player2` = Away;
+     `team_matchups.team1_id`/`team2_id` = Pitching Team / Batting Team per half-inning slot;
+     `team_scores.ball1_player_id`..`ball3_player_id` = batter assigned by lineup rotation per ball.
+   - **Baseball (individual)** — `event_matchups.player1_id` = Home, `player2_id` = Away;
      `player1_score`/`player2_score` = Home Runs / Away Runs;
      `order_number` on `matchups` = half-inning slot (Top/Bottom of inning N).
    - **Bowling / Golf** — `player1`/`player2` are unused (individual formats);
      `order_number` on `scores`/`target_scores` = frame number / hole number.
-2. **Two participation models.**
-   - `leagues.participation_type = 'individual'` — everyone plays everyone
-     (Bowling, Golf). Roster via `league_players`.
-   - `leagues.participation_type = 'team'` — teams compete (Team Baseball).
-     Roster via `league_teams` → `team_members`.
-   - `leagues.participants = 'head2head'` — paired play (Individual Baseball).
-     Pairings tracked through `event_matchups` + `matchups`.
-3. **Two league lifecycles.**
-   - `leagues.type = 'session'` — a one-off single-event session (Quick Play).
-   - `leagues.type = 'standard'` — a multi-event league spanning weeks/season.
+2. **Explicit separation of Team and Individual tables (Migration 11).**
+   - Individual competitions use `event_matchups`, `matchups`, and `scores`.
+   - Team competitions use `team_event_matchups`, `team_matchups`, and `team_scores`.
+   - Eliminates complex conditional checks (`if participation === 'team'`) across API controllers and SQL queries.
+3. **Dedicated League and Session lifecycles (Migration 10).**
+   - Standard multi-event leagues live in `leagues`.
+   - Quick Play sessions are managed separately without cluttering `leagues`.
 4. **Targets vs. Scores.** `target_scores` defines the *expected* thresholds
    per machine per round (par for golf, run baseline for baseball, frame
-   baseline for bowling). `scores` records what each player *actually* shot.
+   baseline for bowling). `scores` and `team_scores` record what each participant *actually* shot.
 
 ---
 
@@ -48,22 +46,33 @@ erDiagram
     leagues ||--o{ league_locations : "plays at"
 
     events ||--|| target_scores : "defines thresholds"
-    events ||--o{ scores : "records"
-    events ||--o{ event_matchups : "head2head pairings"
 
-    event_matchups ||--o{ matchups : "half-inning slots"
+    %% Individual H2H & Scoring
+    events ||--o{ scores : "individual scores"
+    events ||--o{ event_matchups : "individual H2H pairings"
+    event_matchups ||--o{ matchups : "individual half-inning slots"
     event_matchups ||--o| players : "player1 (home)"
     event_matchups ||--o| players : "player2 (away)"
-    event_matchups ||--o| players : "winner"
-
+    event_matchups ||--o| players : "player_winner"
     matchups ||--|| machines : "played on"
     matchups }o--|| event_matchups : "belongs to"
-
     scores ||--|| machines : "played on"
-    scores }o--o| players : "shot by (individual modes)"
-    scores }o--o| teams : "shot by (team mode)"
+    scores }o--o| players : "shot by (individual)"
     scores }o--|| events : "part of"
-    scores }o--o| event_matchups : "head2head context"
+    scores }o--o| event_matchups : "H2H context"
+
+    %% Team H2H & Scoring
+    events ||--o{ team_event_matchups : "team H2H pairings"
+    team_event_matchups ||--o{ team_matchups : "team half-inning slots"
+    team_event_matchups ||--o{ team_scores : "team scores"
+    team_event_matchups ||--o| teams : "team1 (home)"
+    team_event_matchups ||--o| teams : "team2 (away)"
+    team_event_matchups ||--o| teams : "team_winner"
+    team_matchups ||--|| machines : "played on"
+    team_matchups }o--|| team_event_matchups : "belongs to"
+    team_scores ||--|| machines : "played on"
+    team_scores }o--o| teams : "shot by (team)"
+    team_scores }o--|| team_event_matchups : "belongs to"
 
     target_scores ||--|| machines : "thresholds for"
     target_scores }o--|| events : "part of"
@@ -92,30 +101,23 @@ erDiagram
 | Column | Type | Notes |
 |---|---|---|
 | `id` | int PK auto | |
-| `name` | varchar(255) | League or session name |
-| `type` | enum(`standard`,`session`) | `session` = Quick Play one-off; `standard` = multi-week |
-| `participation_type` | enum(`individual`,`team`) | Legacy format property; unified under Universal Team Model |
-| `team_size` | int default 1 | **Universal Team Model**: `1` for individual play (teams of 1; team names hidden in UI), `> 1` for multi-player teams |
+| `name` | varchar(255) | League name |
+| `participation_type` | enum(`individual`,`team`) | Controls roster storage: `individual` uses `league_players`, `team` uses `league_teams` + `team_members` |
+| `team_size` | int default 1 | `1` for individual play, `> 1` for multi-player teams |
 | `start_date` | date | |
 | `scoring_format` | varchar(50) | `bowling` / `golf` / `baseball` |
 | `season_scoring` | enum(`cumulative`,`weekly`) | Season aggregation strategy |
 | `drop_lowest_weeks` | int | Season scoring tweak |
-| `weekly_points` | int (nullable) | Season config (standard leagues) |
-| `point_spread` | int (nullable) | Season config (standard leagues) |
-| `rounds_per_game` | int (nullable) | Number of rounds in a game. Bowling = 10 (full), sessions often 3/6/10. Golf = 9 or 18. Baseball = innings. |
-| `matchups_per_round` | int (nullable) | Number of 1-on-1 matchup rows per round. Total `matchups` rows per game = `rounds_per_game * matchups_per_round`. |
+| `weekly_points` | int (nullable) | Season config |
+| `point_spread` | int (nullable) | Season config |
+| `rounds_per_game` | int (nullable) | Number of rounds in a game. Bowling = 10 (full), Golf = 9 or 18, Baseball = innings. |
+| `matchups_per_round` | int (nullable) | Number of 1-on-1 matchup rows per round. |
 | `weeks_in_season` | int (nullable) | Number of weeks/events in a standard season |
 | `status` | enum(`setup`,`active`,`completed`) | |
 | `playoff_series_length` | int (nullable) | Number of games per playoff series |
 
 **Relationships:** 1→many `events`, `league_players`, `league_teams`,
 `league_staff`, `league_locations`.
-
-> Game sizing is split across two independent columns (`rounds_per_game` ×
-> `matchups_per_round`) instead of a single combined count, so the schema
-> has no opinion about how many sides a head2head format has. The engine
-> materializes `rounds_per_game * matchups_per_round` rows in the `matchups`
-> table when a head2head event is created.
 
 ---
 
@@ -131,112 +133,107 @@ erDiagram
 | `scoring_format` | varchar(50) | Denormalized from league for convenience |
 
 **Relationships:** belongs to `leagues`; has many `scores`, `target_scores`,
-`event_matchups`.
-
-> For a `session`-type league, there is typically exactly one event. For a
-> `standard` league, each week of play is a separate `events` row.
+`event_matchups`, `team_event_matchups`.
 
 ---
 
-### `event_matchups` — A single head-to-head pairing within an event
+### `event_matchups` — Individual head-to-head pairings
 
-Used **only for `head2head` (Baseball)** formats. Individual formats skip this
-table entirely.
+Used **only for individual head-to-head** (Baseball) formats.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | int PK auto | |
 | `event_id` | int FK→`events.id` | |
-| `player1_id` | int FK→`players.id` | **Engine-translated**: Home team (team) or Home player (individual) |
-| `player2_id` | int FK→`players.id` (nullable) | **Engine-translated**: Away team (team) or Away player (individual) |
-| `player1_score` | int default 0 | **Engine-translated**: Home Runs |
-| `player2_score` | int default 0 | **Engine-translated**: Away Runs |
-| `player3_id` | int FK→`players.id` (nullable) | Reserved for future use (generic column) |
-| `player4_id` | int FK→`players.id` (nullable) | Reserved for future use (generic column) |
-| `player3_score` | int default 0 | Reserved for future use |
-| `player4_score` | int default 0 | Reserved for future use |
-| `winner_id` | int FK→`players.id` (nullable) | Resolved when `status='completed'` |
+| `player1_id` | int FK→`players.id` | Home player |
+| `player2_id` | int FK→`players.id` (nullable) | Away player |
+| `player1_score` | int default 0 | Home Runs |
+| `player2_score` | int default 0 | Away Runs |
+| `player3_id` / `player4_id` | int FK→`players.id` (nullable) | Multi-player individual assignments |
+| `player3_score` / `player4_score` | int default 0 | Multi-player individual scores |
+| `player_winner_id` | int FK→`players.id` (nullable) | Resolved when `status='completed'` |
 | `status` | enum(`pending`,`completed`) | |
 | `game_number` | int default 1 | For multi-game series within one event |
-| `round_name` | varchar(50) (nullable) | Team baseball only. Half-inning label, e.g. `"Top 1"`, `"Bottom 2"`. Individual mode: NULL. |
-
-**Relationships:** belongs to `events`; has many `matchups` (the half-inning
-slots); references `players` three times (player1, player2, winner).
-
-> **Team baseball model:** Each `event_matchups` row represents one half-inning.
-> `player1_id` = home team, `player2_id` = away team. The `round_name` field
-> stores the half-inning label (e.g. "Top 1"). A 2-inning team game has 4
-> `event_matchups` rows (Top 1, Bottom 1, Top 2, Bottom 2), each with N
-> `matchups` rows (one per batter in the batting rotation).
->
-> **Individual baseball model:** Each `event_matchups` row represents one
-> head-to-head pairing between two players. `player1_id` = home player,
-> `player2_id` = away player. `round_name` is NULL. A 2-inning game has 1
-> `event_matchups` row with 4 `matchups` rows (Top 1, Bottom 1, Top 2, Bottom 2).
->
-> The engine layer is responsible for mapping `player1`/`player2` to
-> Home/Away and `player1_score`/`player2_score` to Home/Away Runs. The DB
-> stores only neutral `player1`/`player2` semantics.
+| `round_name` | varchar(50) (nullable) | Optional round label |
 
 ---
 
-### `matchups` — Individual half-inning slots (Baseball)
+### `team_event_matchups` — Team head-to-head pairings
 
-One row per half-inning per game. For an N-inning baseball game there are
-**N × 2** rows here (Top of 1st, Bottom of 1st, Top of 2nd, Bottom of 2nd, …).
+Used **only for team head-to-head** (Team Baseball) formats.
 
+| Column | Type | Notes |
+|---|---|---|
 | `id` | int PK auto | |
-| `event_matchup_id` | int FK→`event_matchups.id` (nullable) | Grouping parent |
-| `order_number` | int | Sequential matchup index (1-based) within the game |
-| `machine_id` | int FK→`machines.id` | The machine played for this matchup |
-| `player1_id` | int FK→`players.id` (nullable) | Pitcher (defensive player) in Baseball; Active Player 1 in match play |
-| `player2_id` | int FK→`players.id` (nullable) | Batter (offensive player) in Baseball; Active Player 2 in match play |
-
-**Unique key:** `unique_matchup_round` (`event_matchup_id`, `order_number`) — drives `ON DUPLICATE KEY UPDATE` in matchup saves.
-
-**Relationships:** belongs to `event_matchups`; references `machines`, `players`.
-
-> `order_number` semantics:
-> - Represents 1-on-1 matchup positions across `rounds_per_game * matchups_per_round`.
-> - **Baseball**: `player1_id` = Pitcher, `player2_id` = Batter.
-> - **Bowling / Golf**: `player1_id` = Active Player.
+| `event_id` | int FK→`events.id` | |
+| `location_id` | int FK→`locations.id` (nullable) | |
+| `team1_id` | int FK→`teams.id` | Home team |
+| `team2_id` | int FK→`teams.id` (nullable) | Away team |
+| `team3_id` / `team4_id` | int FK→`teams.id` (nullable) | Multi-team assignments |
+| `team1_score` / `team2_score` | int default 0 | Home / Away Runs |
+| `team3_score` / `team4_score` | int default 0 | Multi-team scores |
+| `team_winner_id` | int FK→`teams.id` (nullable) | Resolved when `status='completed'` |
+| `status` | enum(`pending`,`completed`) | |
+| `game_number` | int default 1 | For multi-game series within one event |
+| `round_name` | varchar(50) (nullable) | Half-inning label, e.g. `"Top 1"`, `"Bottom 2"` |
 
 ---
 
-### `scores` — Actual scores per round/machine
+### `matchups` — Individual matchups per round
 
-Stores what was actually shot. Supports two ownership models:
-- **Individual / Team-member modes**: `player_id` is set; `team_id` is NULL.
-- **Team-level modes** (e.g. team baseball H2H): `team_id` is set; `player_id` is NULL.
+| Column | Type | Notes |
+|---|---|---|
+| `id` | int PK auto | |
+| `event_matchup_id` | int FK→`event_matchups.id` | Grouping parent |
+| `order_number` | int | Sequential matchup index (1-based) within the game |
+| `machine_id` | int FK→`machines.id` | Machine played |
+| `player1_id` | int FK→`players.id` (nullable) | Player 1 / Pitcher |
+| `player2_id` | int FK→`players.id` (nullable) | Player 2 / Batter |
 
-Exactly one of `player_id` or `team_id` must be non-NULL per row.
+---
+
+### `team_matchups` — Team matchups per round
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | int PK auto | |
+| `team_event_matchup_id` | int FK→`team_event_matchups.id` | Grouping parent |
+| `order_number` | int | Sequential matchup index (1-based) |
+| `machine_id` | int FK→`machines.id` | Machine played |
+| `team1_id` | int FK→`teams.id` (nullable) | Pitching team for this half-inning slot |
+| `team2_id` | int FK→`teams.id` (nullable) | Batting team for this half-inning slot |
+| `team3_id` / `team4_id` | int FK→`teams.id` (nullable) | Multi-team slot roles |
+
+---
+
+### `scores` — Individual scores per round/machine
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | int PK auto | |
 | `event_id` | int FK→`events.id` | |
 | `event_matchup_id` | int FK→`event_matchups.id` (nullable) | Set for head2head formats |
-| `player_id` | int FK→`players.id` **nullable** | Individual/team-member row owner. NULL for team-level rows. |
-| `team_id` | int FK→`teams.id` **nullable** | Team row owner (team baseball H2H). NULL for individual rows. |
+| `player_id` | int FK→`players.id` **NOT NULL** | Individual score owner |
 | `order_number` | int | Round/frame/hole/half-inning index |
-| `machine_id` | int FK→`machines.id` | |
-| `ball1` / `ball2` / `ball3` | bigint | The three ball scores for the round |
-| `match_key` | varchar(100) STORED GENERATED | Composite key for upserts. Computed from `event_id`/`event_matchup_id` + `order_number` |
-
-**Unique keys:**
-- `unique_scores_key` (`player_id`, `match_key`) — per-player row dedup.
-- `uq_score_team` (`event_matchup_id`, `team_id`, `order_number`) — per-team row dedup.
-
-**Relationships:** belongs to `events`, `event_matchups` (optional),
-`players` (optional), `teams` (optional), `machines`.
-
-> `order_number` aligns with `matchups.order_number` for baseball (so the
-> engine can join a player's balls to the half-inning's machine/targets) and
-> with `target_scores.order_number` for bowling/golf.
+| `machine_id` | int FK→`machines.id` | Machine played |
+| `ball1` / `ball2` / `ball3` | bigint | Ball scores recorded |
+| `match_key` | varchar(100) STORED GENERATED | Composite key for upserts |
 
 ---
 
-### `target_scores` — Expected thresholds per machine per round
+### `team_scores` — Team scores per half-inning/machine
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | int PK auto | |
+| `team_event_matchup_id` | int FK→`team_event_matchups.id` | Grouping parent |
+| `team_id` | int FK→`teams.id` | Team score owner |
+| `machine_id` | int FK→`machines.id` | Machine played |
+| `order_number` | int | Half-inning slot index |
+| `ball1` / `ball2` / `ball3` | bigint | Ball scores recorded |
+| `ball1_player_id` | int FK→`players.id` (nullable) | Player who shot ball 1 |
+| `ball2_player_id` | int FK→`players.id` (nullable) | Player who shot ball 2 |
+| `ball3_player_id` | int FK→`players.id` (nullable) | Player who shot ball 3 |
 
 | Column | Type | Notes |
 |---|---|---|
@@ -490,7 +487,7 @@ How engines interpret generic schema columns under the Universal Team Model:
 
 ## Schema Design Principles & Implementation Guidelines
 
-1. **Universal Team Model:** All competitions treat participants as teams (`team_size = 1` for individuals). This unifies roster management (`league_teams`), fixture generation (`MatchupGenerator`), and scoring engine calculations into a single execution path.
+1. **Universal Team Model:** All competitions treat participants as teams (`team_size = 1` for individuals). This unifies fixture generation (`MatchupGenerator`) and scoring engine calculations into a single execution path. Roster storage branches on `leagues.participation_type`: `individual` leagues use `league_players`, `team` leagues use `league_teams` + `team_members`.
 2. **Single Source of Truth for Calculations:** Scoring logic lives exclusively within the scoring engine classes (`BaseballEngine.js`, `BowlingEngine.js`, `GolfEngine.js`). Database storage holds raw inputs (`ball1`, `ball2`, `ball3`, `value1`, `value2`), eliminating duplicate calculation engines on the server.
-3. **Format-Neutral 1-on-1 Matchups:** Every `matchups` row connects `player1_id` and `player2_id` on a `machine_id`. Engines translate these neutral columns into sport-specific roles at runtime without adding ad-hoc database columns.
+3. **Format-Neutral Matchups:** Every `matchups` row connects participants via `player1_id`/`player2_id` (individual) or `team1_id`/`team2_id` (team) on a `machine_id`. Engines translate these columns into sport-specific roles at runtime.
 

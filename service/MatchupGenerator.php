@@ -52,6 +52,61 @@ class MatchupGenerator {
      * @param array $allMachineIds    Full pool of machine IDs to draw from.
      * @param array $playerIds        Optional array of player IDs to assign to slots (for team baseball).
      */
+    public static function createTeamMatchupSlots(
+        PDO $pdo,
+        int $teamEventMatchupId,
+        array $machineIds,
+        ?int $eventId = null,
+        ?int $locationId = null,
+        ?int $team1Id = null,
+        ?int $team2Id = null
+    ): void {
+        $stmt = $pdo->prepare(
+            'INSERT INTO team_matchups (team_event_matchup_id, order_number, machine_id, team1_id, team2_id)
+             VALUES (?, ?, ?, ?, ?)'
+        );
+
+        $tsStmt = $pdo->prepare(
+            'INSERT INTO target_scores
+                (event_id, machine_id, order_number, value1, value2,
+                 score1, score2, score3, score4, score5,
+                 score6, score7, score8, score9, score10)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                machine_id = VALUES(machine_id),
+                value1 = VALUES(value1),
+                value2 = VALUES(value2),
+                score1 = VALUES(score1),  score2  = VALUES(score2),
+                score3 = VALUES(score3),  score4  = VALUES(score4),
+                score5 = VALUES(score5),  score6  = VALUES(score6),
+                score7 = VALUES(score7),  score8  = VALUES(score8),
+                score9 = VALUES(score9),  score10 = VALUES(score10)'
+        );
+
+        foreach ($machineIds as $i => $machineId) {
+            $orderNum = $i + 1;
+            $stmt->execute([$teamEventMatchupId, $orderNum, $machineId, $team1Id, $team2Id]);
+
+            if ($eventId) {
+                $format = 'baseball';
+                $targetScores = TargetResolver::resolveTarget($pdo, $machineId, $format, 'medium', $locationId);
+                $value1 = $targetScores['value1'] ?? 5000000;
+                $value2 = $targetScores['value2'] ?? 1.5;
+
+                $scoreValues = [];
+                for ($rank = 1; $rank <= 10; $rank++) {
+                    $scoreValues[$rank] = (int)round($value1 * pow($value2, $rank - 1));
+                }
+
+                $tsStmt->execute([
+                    $eventId, $machineId, $orderNum, $value1, $value2,
+                    $scoreValues[1], $scoreValues[2], $scoreValues[3], $scoreValues[4], $scoreValues[5],
+                    $scoreValues[6], $scoreValues[7], $scoreValues[8], $scoreValues[9], $scoreValues[10]
+                ]);
+            }
+        }
+    }
+
     public static function createMatchupSlots(
         PDO $pdo,
         int $eventMatchupId,
@@ -65,7 +120,7 @@ class MatchupGenerator {
         $totalSlots = $rounds * $matchupsPerRound;
         $machineSlots = self::selectMachines($allMachineIds, $totalSlots);
 
-        // Fetch event_id, location_id, and scoring_format from event_matchups
+        // Fetch event_id, location_id, scoring_format, and player IDs from event_matchups
         $stmt = $pdo->prepare(
             'SELECT e.id as event_id, e.location_id, e.scoring_format as event_format, l.scoring_format as league_format
              FROM event_matchups em

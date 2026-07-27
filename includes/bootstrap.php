@@ -20,9 +20,12 @@ use App\Service\PlayoffService;
 use App\Service\LocationService;
 use App\Service\MachineService;
 use App\Service\ScoreService;
+use App\Service\TeamScoreService;
 use App\Service\TeamService;
 use App\Service\MatchupService;
+use App\Service\TeamMatchupService;
 use App\Service\CleanupService;
+use App\Service\SessionService;
 
 // 1. Create a Settings object from the Configuration singleton
 $dbConfig = $config->getDbConfig();
@@ -105,6 +108,11 @@ $container->set(ScoreService::class, function (Container $c) {
     return new ScoreService($c->get(DatabaseService::class), $c->get(PlayoffService::class));
 });
 
+// 10b. Register TeamScoreService
+$container->set(TeamScoreService::class, function (Container $c) {
+    return new TeamScoreService($c->get(DatabaseService::class));
+});
+
 // 11. Register TeamService
 $container->set(TeamService::class, function (Container $c) {
     return new TeamService($c->get(DatabaseService::class));
@@ -115,9 +123,19 @@ $container->set(MatchupService::class, function (Container $c) {
     return new MatchupService($c->get(DatabaseService::class));
 });
 
+// 12b. Register TeamMatchupService
+$container->set(TeamMatchupService::class, function (Container $c) {
+    return new TeamMatchupService($c->get(DatabaseService::class));
+});
+
 // 13. Register CleanupService
 $container->set(CleanupService::class, function (Container $c) {
     return new CleanupService($c->get(DatabaseService::class));
+});
+
+// 14. Register SessionService
+$container->set(SessionService::class, function (Container $c) {
+    return new SessionService($c->get(DatabaseService::class));
 });
 
 // Store the container in the global scope for easy access in the legacy procedural files

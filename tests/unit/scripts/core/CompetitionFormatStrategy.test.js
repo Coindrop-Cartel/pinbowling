@@ -27,7 +27,7 @@ describe('CompetitionFormatStrategy', () => {
         { entity: { id: 3 }, totalSeasonPoints: 35 }
       ];
 
-      const sorted = strategy.sortStandings(rows, golfEngine);
+      const sorted = golfEngine.sortStandings(rows);
       expect(sorted.map(r => r.entity.id)).toEqual([2, 3, 1]); // 30, 35, 40
     });
 

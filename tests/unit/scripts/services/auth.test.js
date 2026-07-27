@@ -376,7 +376,7 @@ describe('Auth Service (auth.js)', () => {
       PB_API.auth.me.mockResolvedValue({ role: 'player', player_id: 5 });
       const targetPlayer = { id: 5, userId: 10 };
       const turnValues = { ball1: '1000', ball2: '2000', ball3: '3000' };
-      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, 'standard');
+      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, false);
       expect(result.access).toBe('denied');
       expect(result.reason).toContain('locked');
       expect(result.lockedBalls).toEqual({ ball1: true, ball2: true, ball3: true });
@@ -386,7 +386,7 @@ describe('Auth Service (auth.js)', () => {
       PB_API.auth.me.mockResolvedValue({ role: 'player', player_id: 5 });
       const targetPlayer = { id: 5, userId: 10 };
       const turnValues = { ball1: '1000' };
-      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, 'session');
+      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, true);
       expect(result).toEqual({ access: 'allowed', lockedBalls: { } });
     });
 
@@ -437,7 +437,7 @@ describe('Auth Service (auth.js)', () => {
       const targetPlayer = { id: 5, userId: 10 };
       // Only ball1 has a value — ball2 and ball3 are empty
       const turnValues = { ball1: '500' };
-      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, 'standard');
+      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, false);
       // Round should be 'allowed' (not all balls filled), but ball1 should be locked
       expect(result.access).toBe('allowed');
       expect(result.lockedBalls).toEqual({ ball1: true });
@@ -448,7 +448,7 @@ describe('Auth Service (auth.js)', () => {
       const targetPlayer = { id: 5, userId: 10 };
       // ball1 and ball2 have values, ball3 is empty
       const turnValues = { ball1: '500', ball2: '600' };
-      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, 'standard');
+      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, false);
       expect(result.access).toBe('allowed');
       expect(result.lockedBalls).toEqual({ ball1: true, ball2: true });
     });
@@ -457,7 +457,7 @@ describe('Auth Service (auth.js)', () => {
       PB_API.auth.me.mockResolvedValue({ role: 'player', player_id: 5 });
       const targetPlayer = { id: 5, userId: 10 };
       const turnValues = { ball1: '500', ball2: '600', ball3: '700' };
-      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, 'standard');
+      const result = await getScoreAccessLevel({ player_id: 5 }, targetPlayer, turnValues, false);
       expect(result.access).toBe('denied');
       expect(result.reason).toContain('locked');
       expect(result.lockedBalls).toEqual({ ball1: true, ball2: true, ball3: true });

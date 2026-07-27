@@ -147,7 +147,7 @@ class PlayoffService {
         $matchupsPerRound = (int)($league['matchups_per_round'] ?? 2);
 
         $seriesStmt = $this->db->prepare(
-            'SELECT winner_id FROM event_matchups 
+            'SELECT player_winner_id FROM event_matchups 
              WHERE event_id = ? AND round_name = ? AND series_id = ? AND status = \'completed\''
         );
         $seriesStmt->execute([$eventId, $roundName, $seriesId]);
@@ -156,7 +156,7 @@ class PlayoffService {
         $homeWins = 0;
         $awayWins = 0;
         foreach ($games as $g) {
-            $winId = isset($g['winner_id']) ? (int) $g['winner_id'] : null;
+            $winId = isset($g['player_winner_id']) ? (int) $g['player_winner_id'] : null;
             if ($winId === $homePlayerId) {
                 $homeWins++;
             } elseif ($winId === $awayPlayerId) {
@@ -181,7 +181,7 @@ class PlayoffService {
             }
 
             $allRoundStmt = $this->db->prepare(
-                'SELECT series_id, winner_id, player1_id, player2_id FROM event_matchups 
+                'SELECT series_id, player_winner_id, player1_id, player2_id FROM event_matchups 
                  WHERE event_id = ? AND round_name = ? AND status = \'completed\''
             );
             $allRoundStmt->execute([$eventId, $roundName]);
@@ -195,8 +195,8 @@ class PlayoffService {
 
                 if (!isset($seriesWinners[$sId])) {
                     $specStmt = $this->db->prepare(
-                        'SELECT winner_id FROM event_matchups 
-                         WHERE event_id = ? AND round_name = ? AND series_id = ? AND status = \'completed\''
+'SELECT player_winner_id FROM event_matchups 
+                          WHERE event_id = ? AND round_name = ? AND series_id = ? AND status = \'completed\''
                     );
                     $specStmt->execute([$eventId, $roundName, $sId]);
                     $specGames = $specStmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -204,7 +204,7 @@ class PlayoffService {
                     $sHomeWins = 0;
                     $sAwayWins = 0;
                     foreach ($specGames as $sg) {
-                        $sgWinId = isset($sg['winner_id']) ? (int) $sg['winner_id'] : null;
+                        $sgWinId = isset($sg['player_winner_id']) ? (int) $sg['player_winner_id'] : null;
                         if ($sgWinId === $hId) {
                             $sHomeWins++;
                         } elseif ($sgWinId === $aId) {
@@ -296,7 +296,7 @@ class PlayoffService {
                 if ($oldHome !== (int)$pair['home'] || $oldAway !== (int)$pair['away']) {
                     $updateStmt = $pdo->prepare(
                         'UPDATE event_matchups 
-                         SET player1_id = ?, player2_id = ?, winner_id = NULL, player1_score = 0, player2_score = 0, status = \'pending\' 
+                         SET player1_id = ?, player2_id = ?, player_winner_id = NULL, player1_score = 0, player2_score = 0, status = \'pending\' 
                          WHERE id = ?'
                     );
                     $updateStmt->execute([$pair['home'], $pair['away'], $emId]);
