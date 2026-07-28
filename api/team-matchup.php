@@ -50,8 +50,27 @@ class TeamMatchupController extends ApiController {
                         }
                     }
 
+                    error_log("[PinBowling DEBUG] GET /api/team-matchup.php?eventId=$eventId — returning " . count($result) . " teamEventMatchups: " . json_encode(array_map(function($r) {
+                        return ['id' => $r['id'] ?? null, 'roundName' => $r['roundName'] ?? null, 'team1Id' => $r['team1Id'] ?? null, 'team2Id' => $r['team2Id'] ?? null, 'team1Score' => $r['team1Score'] ?? null, 'team2Score' => $r['team2Score'] ?? null, 'status' => $r['status'] ?? null];
+                    }, $result)));
+
                     $this->sendJson($result);
                 }
+                break;
+
+            case 'POST':
+                $this->validateTDAccess();
+                if (empty($this->input)) {
+                    $this->sendError('Request body is empty', 400);
+                }
+
+                $matchups = isset($this->input[0]) ? $this->input : [$this->input];
+                if (empty($matchups)) {
+                    $this->sendError('Request body is empty', 400);
+                }
+
+                $this->teamMatchupService->saveTeamMatchups($matchups);
+                $this->sendJson(['success' => true]);
                 break;
 
             case 'DELETE':

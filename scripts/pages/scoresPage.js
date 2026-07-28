@@ -15,6 +15,7 @@ import { FormatBranding } from '@services/scoringFormatBranding.js';
 import { renderStandardScoreboard, renderHead2HeadScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
 import { renderMatchupSchedule } from '@scripts/renderers/matchupScheduleRenderer.js';
 import { getTargetScoreForDifficulty } from '@services/sessionGenerator.js';
+import { openMatchupEditor } from '@ui/matchupEditor.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
 
 /**
@@ -85,6 +86,10 @@ export async function initScoresPage() {
   let playerSearchInstance = null;
   let currentUser = user;
   let activeLeague = null;
+  let activeSession = null;
+  const isSessionMode = () => !!activeSession;
+  const getSessionName = () => activeSession?.name || '';
+  const getSessionPlayers = () => activeSession?.players || [];
   let allPlayersCache = [];
   let selectablePlayers = [];
   let machines = [];
@@ -215,7 +220,8 @@ export async function initScoresPage() {
           activeMatchupId: getActiveEventMatchupId(),
           eventMatchups,
           currentUser,
-          currentPlayerId
+          currentPlayerId,
+          sessionPlayers: isSessionMode() ? getSessionPlayers() : undefined
         });
       }
 
@@ -316,13 +322,27 @@ export async function initScoresPage() {
 
           if (isTeamMode) {
             const selectedTeamId = Number(getCurrentPlayerId());
-            const rowTeamEventMatchupId = round.teamEventMatchupId || rowEventMatchupId;
+            // Use the game-level teamEventMatchupId from the first eventMatchup
+            const gameTemId = eventMatchups?.[0]?.id
+              ? Number(eventMatchups[0].id)
+              : (round.teamEventMatchupId ? Number(round.teamEventMatchupId) : null);
+
+            if (window.PB_DEBUG_MODE) {
+              console.log('[ScoresPage] Team save:', {
+                teamId: selectedTeamId,
+                orderNumber: scoreData.orderNumber,
+                machineId: scoreData.machineId,
+                ball1: scoreData.ball1,
+                ball2: scoreData.ball2,
+                ball3: scoreData.ball3,
+                gameTemId
+              });
+            }
 
             await PB_API.teamScores.save({
               teamId: selectedTeamId,
               orderNumber: scoreData.orderNumber,
               eventId: Number(getActiveEventId()),
-              leagueId: Number(getActiveLeagueId()),
               machineId: scoreData.machineId,
               ball1: scoreData.ball1,
               ball2: scoreData.ball2,
@@ -330,9 +350,12 @@ export async function initScoresPage() {
               ball1PlayerId: scoreData.ball1PlayerId ?? null,
               ball2PlayerId: scoreData.ball2PlayerId ?? null,
               ball3PlayerId: scoreData.ball3PlayerId ?? null,
-              teamEventMatchupId: rowTeamEventMatchupId ? Number(rowTeamEventMatchupId) : null,
+              teamEventMatchupId: gameTemId,
             });
           } else {
+            if (window.PB_DEBUG_MODE) {
+              console.log('[ScoresPage] Individual save — lastCalcResult:', lastCalcResult, 'totals:', totals, 'scoreData:', scoreData);
+            }
             await PB_API.scores.save({
               playerId: scoreData.playerId,
               orderNumber: scoreData.orderNumber,
@@ -351,9 +374,10 @@ export async function initScoresPage() {
         refreshCallback: async () => {
           const isTeamMode = activeLeague?.participationType === 'team';
           try {
-            const activeEventMatchupId = getActiveEventMatchupId();
-            if (activeEventMatchupId && !isTeamMode) {
-              allEventScores = await PB_API.scores.get(null, null, null, Number(activeEventMatchupId));
+            if (isTeamMode) {
+              allEventScores = await PB_API.teamScores.get(Number(getActiveEventId()));
+            } else if (getActiveEventMatchupId()) {
+              allEventScores = await PB_API.scores.get(null, null, null, Number(getActiveEventMatchupId()));
             } else {
               allEventScores = await PB_API.scores.get(null, Number(getActiveEventId()));
             }
@@ -504,7 +528,12 @@ export async function initScoresPage() {
                 const res = await showRoleAssignmentDialog({
                   team: selectedTeam,
                   members: selectedTeam.members || [],
-                  machines: firstPlayerRounds.map(m => ({ orderNumber: m.orderNumber, label: m.roundName || `Round ${m.orderNumber}`, machineName: m.machineName })),
+                  machines: firstPlayerRounds.map(m => {
+                    const orderNum = Number(m.orderNumber ?? 1);
+                    const isTop = orderNum % 2 === 1;
+                    const inning = Math.floor((orderNum - 1) / 2) + 1;
+                    return { orderNumber: orderNum, label: `${isTop ? 'Top' : 'Bottom'} ${inning}`, machineName: m.machineName };
+                  }),
                   currentAssignments,
                   roleName: act.roleName || 'Role',
                   actionLabel: act.actionLabel || 'assigned'
@@ -807,16 +836,20 @@ export async function initScoresPage() {
     if (sessionId) {
       const session = await PB_API.sessions.get(sessionId);
       if (session) {
-        league = { ...session, isSession: true, participationType: 'individual' };
+        activeSession = session;
         event = session.events?.find(e => String(e.id) === String(eventId)) || session.events?.[0];
         if (event && !eventId) {
           setActiveEventIdSilent(String(event.id));
           eventId = String(event.id);
         }
+      } else {
+        activeSession = null;
       }
+    } else {
+      activeSession = null;
     }
 
-    if (!league) {
+    if (!isSessionMode()) {
       league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
       event = league?.events?.find(e => String(e.id) === String(eventId)) || league?.events?.[0];
     }
@@ -828,7 +861,7 @@ export async function initScoresPage() {
     // Ask the engine what additional data it needs for this event,
     // then fetch it generically — no format-specific branching required.
     const requiredData = Engine.getRequiredEventData(eventId, PB_API);
-    const isTeamModeLeague = league?.participationType === 'team';
+    const isTeamModeLeague = !isSessionMode() && league?.participationType === 'team';
     if (activeEventMatchupId || isTeamModeLeague) {
       if (isTeamModeLeague) {
         requiredData.eventMatchups = PB_API.teamMatchups.get(eventId).catch(() => []);
@@ -844,6 +877,10 @@ export async function initScoresPage() {
       if (key === 'eventMatchups') eventMatchups = requiredValues[i] || [];
       else if (key === 'allEventScores') allEventScores = requiredValues[i] || [];
     });
+
+    if (window.PB_DEBUG_MODE) {
+      console.log('[ScoresPage] Data loaded — eventMatchups:', JSON.stringify(eventMatchups?.slice(0, 10)), 'allEventScores count:', allEventScores?.length);
+    }
     // Clear any keys not declared by this engine
     if (!requiredKeys.includes('eventMatchups')) eventMatchups = [];
     if (!requiredKeys.includes('allEventScores')) allEventScores = [];
@@ -885,66 +922,49 @@ export async function initScoresPage() {
         }
       }
 
-      const selectedIdStr = String(currentId || '');
-
-      // Team mode: filter eventMatchups to ONLY those belonging to this specific matchup pairing
+      // Single temId per game — use first matchup's entries directly
       const activeEM = eventMatchups.find(em => String(em.id) === String(activeEventMatchupId))
-        || eventMatchups.find(em => String(em.team1Id) === selectedIdStr || String(em.team2Id) === selectedIdStr)
         || eventMatchups[0];
 
-      const p1Id = String(activeEM.team1Id ?? '');
-      const p2Id = String(activeEM.team2Id ?? '');
-
-      const targetMatchups = eventMatchups.filter(em => {
-        const emP1 = String(em.team1Id ?? '');
-        const emP2 = String(em.team2Id ?? '');
-        return (emP1 === p1Id && emP2 === p2Id) || (emP1 === p2Id && emP2 === p1Id);
-      });
-
-      // Flatten entries for this matchup pairing only
-      const enrichedEntries = [];
-      for (const em of targetMatchups) {
-        const rawEntries = em.entries || [];
-        const roundName = em.roundName ?? em.round_name ?? '';
-        const awayTeam = league.teams?.find(t => String(t.id) === String(em.team2Id));
-        const homeTeam = league.teams?.find(t => String(t.id) === String(em.team1Id));
+      if (activeEM) {
+        const rawEntries = activeEM.entries || [];
+        const awayTeam = league.teams?.find(t => String(t.id) === String(activeEM.team2Id));
+        const homeTeam = league.teams?.find(t => String(t.id) === String(activeEM.team1Id));
+        let enrichedEntries = [];
         if (awayTeam && homeTeam) {
-          const enriched = enrichTeamMatchupEntries(rawEntries, em, awayTeam.members || [], homeTeam.members || [], roundName);
-          enrichedEntries.push(...enriched);
+          enrichedEntries = enrichTeamMatchupEntries(rawEntries, activeEM, awayTeam.members || [], homeTeam.members || []);
         } else {
-          enrichedEntries.push(...rawEntries);
+          enrichedEntries = rawEntries;
         }
+        machinesNormalized = enrichedEntries.map((entry, i) => {
+          const orderNum = Number(entry.orderNumber ?? entry.order_number ?? (i + 1));
+          const { value1, value2, values: rawValues } = resolveTargetVal(entry, orderNum);
+          let values = rawValues;
+          if ((!values || Object.values(values).every(v => Number(v) === 0)) && Engine?.buildRoundValues) {
+            values = Engine.buildRoundValues(value1, value2);
+          }
+          return {
+            ...entry,
+            id: entry.id,
+            eventId: entry.eventId,
+            teamEventMatchupId: activeEM.id ?? null,
+            orderNumber: orderNum,
+            machineId: entry.machineId,
+            machineName: entry.machineName,
+            value1,
+            value2,
+            values,
+            playerId: entry.playerId,
+            playerName: entry.playerName,
+            teamId: entry.teamId,
+            team1Id: entry.team1Id,
+            team2Id: entry.team2Id,
+            slotIndex: entry.slotIndex,
+            playerOrder: entry.playerOrder,
+            opponentPlayerId: entry.opponentPlayerId,
+          };
+        });
       }
-      machinesNormalized = enrichedEntries.map((entry, i) => {
-        const sequentialOrderNumber = i + 1;
-        const { value1, value2, values: rawValues } = resolveTargetVal(entry, sequentialOrderNumber);
-        let values = rawValues;
-        if ((!values || Object.values(values).every(v => Number(v) === 0)) && Engine?.buildRoundValues) {
-          values = Engine.buildRoundValues(value1, value2);
-        }
-        return {
-          ...entry,
-          id: entry.id,
-          eventId: entry.eventId,
-          eventMatchupId: entry.eventMatchupId ?? null,
-          teamEventMatchupId: entry.teamEventMatchupId ?? null,
-          orderNumber: sequentialOrderNumber,
-          machineId: entry.machineId,
-          machineName: entry.machineName,
-          value1,
-          value2,
-          values,
-          playerId: entry.playerId,
-          playerName: entry.playerName,
-          teamId: entry.teamId,
-          team1Id: entry.team1Id,
-          team2Id: entry.team2Id,
-          roundName: entry.roundName || '',
-          slotIndex: entry.slotIndex,
-          playerOrder: entry.playerOrder,
-          opponentPlayerId: entry.opponentPlayerId,
-        };
-      });
     } else if (activeEventMatchupId && eventMatchups.length > 0) {
         // Individual mode: use first matchup's entries
         const matchupDetails = eventMatchups[0];
@@ -971,18 +991,18 @@ export async function initScoresPage() {
     activeLeague = league;
     activeEvent = event;
 
-    const isSession = league?.isSession === true || event?.sessionId != null;
     if (activeEventMatchupId && eventMatchups.length > 0) {
       const matchup = eventMatchups[0];
+      const sessionLabel = isSessionMode() ? '' : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;
       summaryTitle = `
-        <div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>
+        ${sessionLabel}
         <div class="meta-muted">Week: ${escapeHTML(event?.eventName || 'Week')}</div>
         <div class="meta-muted">Matchup: ${escapeHTML(league?.participationType === 'team' ? (matchup?.team2Name || 'BYE') : (matchup?.player2Name || 'BYE'))} vs ${escapeHTML(league?.participationType === 'team' ? matchup?.team1Name : matchup?.player1Name)}</div>
       `;
     } else {
-      const leagueTitle = isSession ? '' : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;
+      const sessionTitle = isSessionMode() ? `<div class="meta-strong">Session: ${escapeHTML(getSessionName())}</div>` : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;
       const eventTitle = `<div class="meta-muted">Event: ${escapeHTML(event?.eventName || 'Event')}</div>`;
-      summaryTitle = `${leagueTitle}${eventTitle}`;
+      summaryTitle = `${sessionTitle}${eventTitle}`;
     }
 
     tournamentSelectorUI.classList.add('hidden');
@@ -1005,7 +1025,7 @@ export async function initScoresPage() {
 
     machines = machinesNormalized;
 
-    const isH2H = league?.competitionFormat === 'head2head';
+    const isH2H = !isSessionMode() && league?.competitionFormat === 'head2head';
     const scheduleContainer = document.getElementById('matchups-schedule-container');
     
     if (isH2H && !activeEventMatchupId) {
@@ -1017,18 +1037,26 @@ export async function initScoresPage() {
       if (scheduleContainer) {
         scheduleContainer.classList.remove('hidden');
         const matchupsList = scheduleContainer.querySelector('.week-matchups-list');
+        const isAdmin = await can(PERMISSIONS.MANAGE_LEAGUES);
+        const isTeamMode = league?.participationType === 'team';
         renderMatchupSchedule(matchupsList, event, {
           onPlayMatchup: (matchupId, evId) => {
             setActiveLeagueIdSilent(league.id);
             setActiveEventIdSilent(evId);
-            const navParams = { eventId: evId, eventMatchupId: matchupId };
-            if (league.isSession) {
-              navParams.sessionId = league.id;
-            } else {
-              navParams.leagueId = league.id;
-            }
+            const navParams = { eventId: evId, eventMatchupId: matchupId, leagueId: league.id };
             loadPage(ROUTE_PATHS.SCORES(navParams));
-          }
+          },
+          isAdmin,
+          onSetupMatchup: isAdmin ? (matchupId, evId) => {
+            openMatchupEditor({
+              matchupId,
+              eventId: evId,
+              isTeam: isTeamMode,
+              onSaved: () => {
+                loadPage(ROUTE_PATHS.SCORES({ leagueId: league.id, eventId: evId }));
+              }
+            });
+          } : undefined
         });
       }
       return;

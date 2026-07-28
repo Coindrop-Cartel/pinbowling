@@ -155,11 +155,8 @@ class Serializer {
             'machineId' => (int)$row['machine_id'],
             'machineName' => $row['machine_name'] ?? null,
             'ball1' => (int)$row['ball1'],
-            'ball1PlayerId' => (isset($row['ball1_player_id']) && $row['ball1_player_id'] !== null) ? (int)$row['ball1_player_id'] : null,
             'ball2' => (int)$row['ball2'],
-            'ball2PlayerId' => (isset($row['ball2_player_id']) && $row['ball2_player_id'] !== null) ? (int)$row['ball2_player_id'] : null,
             'ball3' => (int)$row['ball3'],
-            'ball3PlayerId' => (isset($row['ball3_player_id']) && $row['ball3_player_id'] !== null) ? (int)$row['ball3_player_id'] : null,
             'status' => $row['status'] ?? 'approved'
         ];
     }
@@ -320,6 +317,7 @@ class Serializer {
             'status' => $row['status'] ?? 'pending',
             'gameNumber' => (int)($row['game_number'] ?? 1),
             'roundName' => $row['round_name'] ?? null,
+            'seriesId' => isset($row['series_id']) ? (int)$row['series_id'] : null,
             'entries' => $row['entries'] ?? [],
         ];
     }

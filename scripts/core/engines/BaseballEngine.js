@@ -765,10 +765,10 @@ export class BaseballEngine extends ScoringEngine {
       const matchupW = eventMatchups?.[0] || {};
       const homeTeamId = Number(matchupW.team1Id ?? matchupW.player1Id ?? 0);
       const isPlayer1 = homeTeamId === currentPlayerId;
-      const entryTeam1Id = Number(round.team1Id ?? 0);
-      const entryTeam2Id = Number(round.team2Id ?? 0);
-      const isTop = entryTeam1Id === homeTeamId;
-      const displayRoundNumber = round.roundName || (isTop ? 'Top' : 'Bottom') + ' ' + Math.ceil((round.orderNumber ?? 1) / 2);
+      const orderNum = Number(round.orderNumber ?? round.order_number ?? 1);
+      const isTop = orderNum % 2 === 1;
+      const inningNumber = Math.floor((orderNum - 1) / 2) + 1;
+      const displayRoundNumber = (isTop ? 'Top' : 'Bottom') + ' ' + inningNumber;
       result = { matchup: round, isPlayer1, isTop, opponentName: '', displayRoundNumber };
     } else {
       result = resolveMatchupRole(

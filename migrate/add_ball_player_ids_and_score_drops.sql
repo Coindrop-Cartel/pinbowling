@@ -1,6 +1,11 @@
 -- ============================================================
 -- MIGRATION: Add ball_player_ids and score drop settings
 -- ============================================================
+-- NOTE: The ball1-3_player_id columns on the `scores` table
+-- were never populated (individual mode doesn't use them).
+-- They have been removed in Migration 12 of migrate.php.
+-- The team_scores table retains its own ball1-3_player_id columns.
+-- ============================================================
 -- Purpose:
 --   1. Support ball-level player tracking for Baseball Team mode
 --      (ball1_player_id, ball2_player_id, ball3_player_id).

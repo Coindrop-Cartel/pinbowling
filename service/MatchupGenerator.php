@@ -59,7 +59,8 @@ class MatchupGenerator {
         ?int $eventId = null,
         ?int $locationId = null,
         ?int $team1Id = null,
-        ?int $team2Id = null
+        ?int $team2Id = null,
+        int $startOrder = 1
     ): void {
         $stmt = $pdo->prepare(
             'INSERT INTO team_matchups (team_event_matchup_id, order_number, machine_id, team1_id, team2_id)
@@ -84,7 +85,7 @@ class MatchupGenerator {
         );
 
         foreach ($machineIds as $i => $machineId) {
-            $orderNum = $i + 1;
+            $orderNum = $startOrder + $i;
             $stmt->execute([$teamEventMatchupId, $orderNum, $machineId, $team1Id, $team2Id]);
 
             if ($eventId) {

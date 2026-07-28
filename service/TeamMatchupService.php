@@ -67,4 +67,36 @@ class TeamMatchupService {
             $pdo->prepare("DELETE FROM team_event_matchups WHERE id IN ($placeholders)")->execute($ids);
         }
     }
+
+    public function saveTeamMatchups(array $matchups): bool {
+        $pdo = $this->db->getPdo();
+
+        try {
+            $pdo->beginTransaction();
+
+            $stmt = $pdo->prepare(
+                'INSERT INTO team_matchups (team_event_matchup_id, order_number, machine_id, team1_id, team2_id)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), team1_id = VALUES(team1_id), team2_id = VALUES(team2_id)'
+            );
+
+            foreach ($matchups as $m) {
+                $stmt->execute([
+                    $m['teamEventMatchupId'] ?? $m['team_event_matchup_id'] ?? null,
+                    $m['orderNumber'] ?? $m['order_number'] ?? 0,
+                    $m['machineId'] ?? $m['machine_id'] ?? 0,
+                    $m['team1Id'] ?? $m['team1_id'] ?? null,
+                    $m['team2Id'] ?? $m['team2_id'] ?? null,
+                ]);
+            }
+
+            $pdo->commit();
+            return true;
+        } catch (\PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
 }

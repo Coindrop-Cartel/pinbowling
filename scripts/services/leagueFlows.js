@@ -117,7 +117,11 @@ export async function startPlayoffsFlow({ leagueId, allLeagues, loaderParent, on
       throw new Error('Not enough players have recorded stats to seed the bracket.');
     }
     
-    await PB_API.leagues.startPlayoffs(leagueId, seeds, seriesLength);
+    if (isTeam) {
+      await PB_API.leagues.startTeamPlayoffs(leagueId, seeds, seriesLength);
+    } else {
+      await PB_API.leagues.startPlayoffs(leagueId, seeds, seriesLength);
+    }
     
     if (onComplete) await onComplete();
     

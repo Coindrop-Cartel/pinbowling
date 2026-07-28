@@ -260,6 +260,15 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
     const ball2 = getBallValue(2);
     const ball3 = getBallValue(3);
 
+    if (window.PB_DEBUG_MODE) {
+      const sectionKey = activeSec?.key ?? 'unknown';
+      console.log(`[RoundRow] Save clicked — section=${sectionKey} order=${round.orderNumber} machine=${round.machineId} balls=${ball1}/${ball2}/${ball3}`, {
+        perBallPlayers: activeSec?.perBallPlayers,
+        isTeamMode,
+        round
+      });
+    }
+
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
 
@@ -275,7 +284,7 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
           ball3PlayerId = activeSec.perBallPlayers[2]?.id ? Number(activeSec.perBallPlayers[2].id) : null;
         }
 
-        await saveScoreCallback({
+        const savePayload = {
           playerId: Number(currentPlayerId),
           orderNumber: Number(round.orderNumber),
           machineId: Number(round.machineId),
@@ -285,7 +294,9 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
           ball1PlayerId,
           ball2PlayerId,
           ball3PlayerId
-        });
+        };
+        if (window.PB_DEBUG_MODE) console.log('[RoundRow] Calling saveScoreCallback with:', JSON.stringify(savePayload));
+        await saveScoreCallback(savePayload);
       }
       saveBtn.classList.remove('is-dirty');
       if (refreshCallback) {

@@ -15,8 +15,10 @@ import { escapeHTML } from '@scripts/utils.js';
  * @param {Object} event The event object (with .matchups and .eventName).
  * @param {Object} options
  * @param {Function} options.onPlayMatchup Callback with (matchupId, eventId) when a Play/View button is clicked.
+ * @param {boolean} [options.isAdmin=false] Whether the current user is admin/TD.
+ * @param {Function} [options.onSetupMatchup] Callback with (matchupId, eventId) when Setup is clicked (admin only).
  */
-export function renderMatchupSchedule(matchupsList, event, { onPlayMatchup }) {
+export function renderMatchupSchedule(matchupsList, event, { onPlayMatchup, isAdmin = false, onSetupMatchup }) {
   const matchups = event?.matchups || [];
 
   if (matchups.length === 0) {
@@ -27,15 +29,22 @@ export function renderMatchupSchedule(matchupsList, event, { onPlayMatchup }) {
   const isPlayoffs = event?.eventName && event.eventName.startsWith('Playoffs:');
 
   if (isPlayoffs) {
-    _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup);
+    _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, isAdmin, onSetupMatchup);
   } else {
-    _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, event);
+    _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, isAdmin, onSetupMatchup, event);
   }
 
-  // Bind play/view buttons
+  // Bind play/view buttons (always navigates to scores)
   matchupsList.querySelectorAll('.play-matchup-btn').forEach(btn => {
     btn.onclick = () => {
       if (onPlayMatchup) onPlayMatchup(Number(btn.dataset.matchupId), Number(btn.dataset.eventId));
+    };
+  });
+
+  // Bind setup buttons (admin only — opens machine/difficulty editor)
+  matchupsList.querySelectorAll('.setup-matchup-btn').forEach(btn => {
+    btn.onclick = () => {
+      if (onSetupMatchup) onSetupMatchup(Number(btn.dataset.matchupId), Number(btn.dataset.eventId));
     };
   });
 }
@@ -44,7 +53,7 @@ export function renderMatchupSchedule(matchupsList, event, { onPlayMatchup }) {
  * Renders the playoff series schedule with grouped games.
  * @private
  */
-function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup) {
+function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, isAdmin, onSetupMatchup) {
   const isTeamMode = event?.isTeam || (matchups.length > 0 && matchups[0].team1Id !== null && matchups[0].team1Id !== undefined);
 
   const seriesMap = {};
@@ -99,6 +108,9 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup) {
             <button class="play-matchup-btn primary btn-row btn-small" data-matchup-id="${g.id}" data-event-id="${g.eventId}" style="padding: 2px 8px; font-size: 0.85em;">
               ${g.status === 'completed' ? 'View/Edit' : 'Play'}
             </button>
+            ${isAdmin && onSetupMatchup ? `
+              <button class="setup-matchup-btn secondary btn-row btn-small" data-matchup-id="${g.id}" data-event-id="${g.eventId}" style="padding: 2px 8px; font-size: 0.85em;">Setup</button>
+            ` : ''}
           </div>
         </div>
       `;
@@ -124,10 +136,9 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup) {
  * Renders the regular season matchup schedule.
  * @private
  */
-function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, event = null) {
+function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, isAdmin, onSetupMatchup, event = null) {
   const isTeamMode = event?.isTeam || (matchups.length > 0 && matchups[0].team1Id !== null && matchups[0].team1Id !== undefined);
 
-  // Group matchups by location, then by participant pair.
   const locationGroups = {};
   const locationOrder = [];
 
@@ -152,12 +163,11 @@ function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, event = n
     const { grouped, groupedOrder } = locationGroups[locName];
     const matchupsHtml = groupedOrder.map(key => {
       const pair = grouped[key];
-      const m = pair[0]; // Use first matchup for names, id, status
+      const m = pair[0];
       const p1Id = isTeamMode ? m.team1Id : m.player1Id;
       const p2Id = isTeamMode ? m.team2Id : m.player2Id;
       const isBye = p2Id === null || p2Id === undefined;
 
-      // Aggregate scores across all half-innings in the group
       let totalP1Score = 0;
       let totalP2Score = 0;
       let allCompleted = true;
@@ -214,6 +224,9 @@ function _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, event = n
                 <button class="play-matchup-btn primary btn-row btn-small" data-matchup-id="${m.id}" data-event-id="${m.eventId}">
                   ${isCompleted ? 'View/Edit' : 'Play'}
                 </button>
+              ` : ''}
+              ${isAdmin && onSetupMatchup && !isBye ? `
+                <button class="setup-matchup-btn secondary btn-row btn-small" data-matchup-id="${m.id}" data-event-id="${m.eventId}">Setup</button>
               ` : ''}
             </div>
           </div>

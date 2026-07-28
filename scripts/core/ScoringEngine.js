@@ -338,6 +338,17 @@ export class ScoringEngine {
   getMaxRosterSize() { return Infinity; }
 
   /**
+   * Returns how many more players can join the current roster.
+   * @param {number} currentRosterSize Number of players already in the session.
+   * @returns {number} Number of available spots (Infinity means unlimited).
+   */
+  availableSpots(currentRosterSize) {
+    const max = this.getMaxRosterSize();
+    if (max === Infinity) return Infinity;
+    return Math.max(0, max - currentRosterSize);
+  }
+
+  /**
    * Returns the display label for a round at the given index.
    * Used in the session generator preview to show round headers.
    * Default: "Frame N" or "Hole N" based on round label.

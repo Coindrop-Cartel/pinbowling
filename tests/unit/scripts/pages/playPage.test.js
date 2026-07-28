@@ -59,6 +59,7 @@ const engineMock = vi.hoisted(() => ({
   getMachinesPerRound: vi.fn(() => 1),
   generateValue2Defaults: vi.fn(() => []),
   getMaxRosterSize: vi.fn(() => Infinity),
+  availableSpots: vi.fn(() => Infinity),
   getMatchupDescription: vi.fn(() => null),
   getPreviewRowHtml: vi.fn((frame, index) => ({
     headerHtml: `<div class="header"><span>${index}</span><span>${frame.machineName}</span></div>`,

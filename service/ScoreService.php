@@ -10,7 +10,7 @@ class ScoreService
     private DatabaseService $db;
     private PlayoffService $playoffService;
 
-    private const SCORE_COLUMNS = 's.id, s.player_id, s.event_id, s.event_matchup_id, s.order_number, s.machine_id, s.ball1, s.ball1_player_id, s.ball2, s.ball2_player_id, s.ball3, s.ball3_player_id, m.machine_name';
+    private const SCORE_COLUMNS = 's.id, s.player_id, s.event_id, s.event_matchup_id, s.order_number, s.machine_id, s.ball1, s.ball2, s.ball3, m.machine_name';
 
     public function __construct(DatabaseService $db, PlayoffService $playoffService)
     {
@@ -113,10 +113,7 @@ class ScoreService
         ?int $ball3 = null,
         ?int $eventMatchupId = null,
         ?int $player1Score = null,
-        ?int $player2Score = null,
-        ?int $ball1PlayerId = null,
-        ?int $ball2PlayerId = null,
-        ?int $ball3PlayerId = null
+        ?int $player2Score = null
     ): bool {
         $pdo = $this->db->getPdo();
 
@@ -159,14 +156,17 @@ class ScoreService
         }
 
         $stmt = $pdo->prepare(
-            'INSERT INTO scores (event_id, event_matchup_id, player_id, machine_id, order_number, ball1, ball1_player_id, ball2, ball2_player_id, ball3, ball3_player_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE ball1 = VALUES(ball1), ball1_player_id = VALUES(ball1_player_id), ball2 = VALUES(ball2), ball2_player_id = VALUES(ball2_player_id), ball3 = VALUES(ball3), ball3_player_id = VALUES(ball3_player_id)'
+            'INSERT INTO scores (event_id, event_matchup_id, player_id, machine_id, order_number, ball1, ball2, ball3)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE ball1 = VALUES(ball1), ball2 = VALUES(ball2), ball3 = VALUES(ball3)'
         );
 
-        $stmt->execute([$eventId, $eventMatchupId, $playerId, $machineId, $orderNumber, $ball1, $ball1PlayerId, $ball2, $ball2PlayerId, $ball3, $ball3PlayerId]);
+        $stmt->execute([$eventId, $eventMatchupId, $playerId, $machineId, $orderNumber, $ball1, $ball2, $ball3]);
+
+        error_log("[PinBowling DEBUG] ScoreService::saveScore — INSERT id=$eventId order=$orderNumber player=$playerId machine=$machineId balls=$ball1/$ball2/$ball3 matchupId=$eventMatchupId");
 
         if ($eventMatchupId !== null) {
+            error_log("[PinBowling DEBUG] ScoreService::saveScore — calling updateMatchupTotals for matchupId=$eventMatchupId player1Score=$player1Score player2Score=$player2Score");
             $this->updateMatchupTotals($eventMatchupId, $player1Score, $player2Score);
         }
 
@@ -204,6 +204,8 @@ class ScoreService
         // Use pre-computed totals when provided (single source of truth from JS engine)
         if ($player1Score !== null && $player2Score !== null) {
             $hasScores = ($player1Score > 0 || $player2Score > 0);
+
+            error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH A (pre-computed) matchupId=$eventMatchupId player1Score=$player1Score player2Score=$player2Score hasScores=" . ($hasScores ? 'yes' : 'no'));
 
             $status = 'pending';
             $winnerId = null;
@@ -249,6 +251,8 @@ class ScoreService
                     $status = 'completed';
                     $winnerId = $player1Id;
                 }
+
+                error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH A results: allPlayed=" . ($allPlayed ? 'yes' : 'no') . " isWalkoff=" . ($isWalkoff ? 'yes' : 'no') . " winnerId=$winnerId status=$status");
             }
 
             $stmt = $pdo->prepare(
@@ -258,6 +262,8 @@ class ScoreService
             );
             $stmt->execute([$player1Score, $player2Score, $winnerId, $status, $eventMatchupId]);
 
+            error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH A executed UPDATE event_matchups SET player1_score=$player1Score player2_score=$player2Score winner=$winnerId status=$status WHERE id=$eventMatchupId");
+
             if ($status === 'completed') {
                 $this->playoffService->handlePlayoffAdvancement($eventMatchupId);
             }
@@ -266,14 +272,19 @@ class ScoreService
 
         // Fallback: server-side calculation when no pre-computed totals provided
         if (!$player1Id || !$player2Id) {
+            error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH B aborted: missing player IDs (p1Id=$player1Id p2Id=$player2Id)");
             return;
         }
 
         $scores = $this->getMatchupScores($eventMatchupId);
 
+        error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH B (fallback) matchupId=$eventMatchupId p1Id=$player1Id p2Id=$player2Id scoresCount=" . count($scores) . " matchupRowsCount=" . count($matchupRows));
+
         $scoreMap = [];
         foreach ($scores as $s) {
-            $scoreMap[(int) $s['player_id']][(int) $s['order_number']] = $s;
+            $idKey = (int) ($s['player_id'] ?? 0);
+            $scoreMap[$idKey][(int) $s['order_number']] = $s;
+            error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — scoreMap[player=$idKey][order={$s['order_number']}] = ball1={$s['ball1']} ball2={$s['ball2']} ball3={$s['ball3']}");
         }
 
         $stmt = $pdo->prepare(
@@ -336,6 +347,8 @@ class ScoreService
             }
         }
 
+        error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH B computed: player1Score=$player1Score player2Score=$player2Score hasScores=" . ($hasScores ? 'yes' : 'no') . " isWalkoff=" . ($isWalkoff ? 'yes' : 'no') . " roundsCount=$roundsCount");
+
         $fullyPlayed = true;
         for ($round = 1; $round <= $roundsCount; $round++) {
             $topOrderNum    = ($round - 1) * 2 + 1;
@@ -376,6 +389,8 @@ class ScoreService
                 $winnerId = null;
             }
         }
+
+        error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH B final: UPDATE event_matchups SET p1Score=$player1Score p2Score=$player2Score winner=$winnerId status=$status fullyPlayed=" . ($fullyPlayed ? 'yes' : 'no') . " WHERE id=$eventMatchupId");
 
         $stmt = $pdo->prepare(
             'UPDATE event_matchups 

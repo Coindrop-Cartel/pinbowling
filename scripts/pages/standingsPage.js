@@ -401,6 +401,10 @@ export async function initStandingsPage() {
       PB_API.teams.getAll(),
       Engine.getMatchupDescription(1) ? fetchMatchups : Promise.resolve([])
     ]);
+
+    if (window.PB_DEBUG_MODE) {
+      console.log('[StandingsPage] Loaded data for eventId=' + eventId + ' teamMode=' + isTeamMode + ' rawScores=' + (rawScores?.length ?? 0) + ' eventMatchups=', JSON.stringify(eventMatchups?.slice(0, 20)));
+    }
     
     const allEventScores = normalizeScores(rawScores);
     const machines = normalizeTargets(rawMachines);

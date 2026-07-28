@@ -65,6 +65,7 @@ export async function fetchJSON(url, options = {}) {
   // We must only attach the body if the method is intended to carry one.
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     fetchOptions.body = options.body || JSON.stringify({});
+    if (getDebugEnabled()) console.log(`[API] Request body for ${method} ${url}:`, fetchOptions.body);
   }
 
   try {
@@ -162,6 +163,7 @@ export const PB_API = {
       if (teamEventMatchupId) return fetchJSON(`api/team-matchup.php?teamEventMatchupId=${teamEventMatchupId}`);
       return fetchJSON(`api/team-matchup.php?eventId=${eventId}`);
     },
+    save: (matchups) => fetchJSON('api/team-matchup.php', { method: 'POST', body: JSON.stringify(matchups) }),
     clear: (eventId) => fetchJSON(`api/team-matchup.php?eventId=${eventId}`, { method: 'DELETE' }),
   },
 
@@ -176,6 +178,7 @@ export const PB_API = {
     startSeason: (leagueId) => fetchJSON('api/league.php?task=start_season', { method: 'POST', body: JSON.stringify({ leagueId }) }),
     updateSeason: (leagueId) => fetchJSON('api/league.php?task=update_season', { method: 'POST', body: JSON.stringify({ leagueId }) }),
     startPlayoffs: (leagueId, seeds, seriesLength) => fetchJSON('api/league.php?task=start_playoffs', { method: 'POST', body: JSON.stringify({ leagueId, seeds, seriesLength }) }),
+    startTeamPlayoffs: (leagueId, seeds, seriesLength) => fetchJSON('api/league.php?task=start_team_playoffs', { method: 'POST', body: JSON.stringify({ leagueId, seeds, seriesLength }) }),
     updateStatus: (id, status) => fetchJSON(`api/league.php?id=${id}&task=updateStatus`, { method: 'PUT', body: JSON.stringify({ status }) }),
   },
 

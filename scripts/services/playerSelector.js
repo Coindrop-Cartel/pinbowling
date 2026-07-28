@@ -94,7 +94,8 @@ export function getSelectablePlayers(params) {
     activeMatchupId,
     eventMatchups = [],
     currentUser,
-    currentPlayerId
+    currentPlayerId,
+    sessionPlayers
   } = params;
 
   let selectablePlayers = [];
@@ -122,6 +123,8 @@ export function getSelectablePlayers(params) {
         });
       }
     }
+  } else if (sessionPlayers) {
+    selectablePlayers = sessionPlayers;
   } else if (leagueId) {
     const league = allLeaguesCache.find(l => String(l.id) === String(leagueId));
     if (league?.participationType === 'team') {
@@ -141,7 +144,7 @@ export function getSelectablePlayers(params) {
     selectablePlayers = filterPlayersForUser(selectablePlayers, currentUser);
   }
 
-  if (currentPlayerId && !selectablePlayers.some(p => String(p.id) === String(currentPlayerId))) {
+  if (!sessionPlayers && currentPlayerId && !selectablePlayers.some(p => String(p.id) === String(currentPlayerId))) {
     const p = allPlayers.find(p => String(p.id) === String(currentPlayerId));
     if (p) selectablePlayers.unshift(p);
   }
@@ -169,9 +172,10 @@ export function getAutoSelectedPlayerId(params) {
   if (activePlayerId) return activePlayerId;
 
   if (currentUser?.player_id) {
+    const isInSelectable = selectablePlayers.some(p => String(p.id) === String(currentUser.player_id));
     const isInRoster = allPlayersCache.some(p => String(p.id) === String(currentUser.player_id));
     const isMatchupParticipant = activeMatchupId && eventMatchups[0] && isPlayerInMatchup(currentUser.player_id, eventMatchups[0], allLeaguesCache);
-    if (isInRoster && (!activeMatchupId || isMatchupParticipant)) {
+    if (isInSelectable && isInRoster && (!activeMatchupId || isMatchupParticipant)) {
       return String(currentUser.player_id);
     }
   }

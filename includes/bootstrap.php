@@ -22,6 +22,7 @@ use App\Service\MachineService;
 use App\Service\ScoreService;
 use App\Service\TeamScoreService;
 use App\Service\TeamService;
+use App\Service\TeamPlayoffService;
 use App\Service\MatchupService;
 use App\Service\TeamMatchupService;
 use App\Service\CleanupService;
@@ -83,13 +84,17 @@ $container->set(SeasonService::class, function (Container $c) {
 $container->set(PlayoffService::class, function (Container $c) {
     return new PlayoffService($c->get(DatabaseService::class), $c->get(EventService::class));
 });
+$container->set(TeamPlayoffService::class, function (Container $c) {
+    return new TeamPlayoffService($c->get(DatabaseService::class), $c->get(EventService::class));
+});
 $container->set(LeagueService::class, function (Container $c) {
     return new LeagueService(
         $c->get(DatabaseService::class),
         $c->get(EventService::class),
         $c->get(RosterService::class),
         $c->get(SeasonService::class),
-        $c->get(PlayoffService::class)
+        $c->get(PlayoffService::class),
+        $c->get(TeamPlayoffService::class)
     );
 });
 
@@ -110,7 +115,7 @@ $container->set(ScoreService::class, function (Container $c) {
 
 // 10b. Register TeamScoreService
 $container->set(TeamScoreService::class, function (Container $c) {
-    return new TeamScoreService($c->get(DatabaseService::class));
+    return new TeamScoreService($c->get(DatabaseService::class), $c->get(TeamPlayoffService::class));
 });
 
 // 11. Register TeamService

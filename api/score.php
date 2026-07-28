@@ -40,6 +40,8 @@ class ScoreController extends ApiController {
                     }
                 }
 
+                $count = is_array($scores) ? count($scores) : 0;
+                error_log("[PinBowling DEBUG] GET /api/score.php — eventMatchupId=$eventMatchupId eventId=$eventId playerId=$playerId leagueId=$leagueId — returning $count scores");
                 $this->sendJson(array_map([Serializer::class, 'score'], $scores));
                 break;
 
@@ -77,20 +79,23 @@ class ScoreController extends ApiController {
                     }
                 }
 
+                $eventId = (int) $this->input['eventId'];
+                $playerId = (int) $this->input['playerId'];
+                $machineId = (int) $this->input['machineId'];
+                $orderNumber = (int) $this->input['orderNumber'];
+                $ball1 = $this->input['ball1'] ?? null;
+                $ball2 = $this->input['ball2'] ?? null;
+                $ball3 = $this->input['ball3'] ?? null;
+                $eventMatchupId = isset($this->input['eventMatchupId']) ? (int) $this->input['eventMatchupId'] : null;
+                $player1Score = isset($this->input['player1Score']) ? (int) $this->input['player1Score'] : null;
+                $player2Score = isset($this->input['player2Score']) ? (int) $this->input['player2Score'] : null;
+
+                error_log("[PinBowling DEBUG] POST /api/score.php — eventId=$eventId playerId=$playerId machineId=$machineId order=$orderNumber balls=$ball1/$ball2/$ball3 matchupId=$eventMatchupId p1Score=$player1Score p2Score=$player2Score");
+
                 $this->scoreService->saveScore(
-                    (int) $this->input['eventId'],
-                    (int) $this->input['playerId'],
-                    (int) $this->input['machineId'],
-                    (int) $this->input['orderNumber'],
-                    $this->input['ball1'] ?? null,
-                    $this->input['ball2'] ?? null,
-                    $this->input['ball3'] ?? null,
-                    isset($this->input['eventMatchupId']) ? (int) $this->input['eventMatchupId'] : null,
-                    isset($this->input['player1Score']) ? (int) $this->input['player1Score'] : null,
-                    isset($this->input['player2Score']) ? (int) $this->input['player2Score'] : null,
-                    isset($this->input['ball1PlayerId']) ? (int) $this->input['ball1PlayerId'] : null,
-                    isset($this->input['ball2PlayerId']) ? (int) $this->input['ball2PlayerId'] : null,
-                    isset($this->input['ball3PlayerId']) ? (int) $this->input['ball3PlayerId'] : null
+                    $eventId, $playerId, $machineId, $orderNumber,
+                    $ball1, $ball2, $ball3,
+                    $eventMatchupId, $player1Score, $player2Score
                 );
 
                 $this->sendJson(['success' => true]);

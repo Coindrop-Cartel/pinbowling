@@ -108,6 +108,11 @@ export async function initPlayPage() {
     }
 
     filtered.forEach(event => {
+      const engine = getScoringEngine(event.scoringFormat);
+      const rosterSize = event.roster?.length || 0;
+      const spots = engine.availableSpots(rosterSize);
+      const showJoin = spots === Infinity || spots > 0;
+
       const row = createExpandableRow(sessionsList, {
         id: event.id,
         className: 'session-item',
@@ -118,9 +123,10 @@ export async function initPlayPage() {
               <strong>${escapeHTML(event.eventName)}</strong>
             </div>
             <div class="session-stats">
-              ${escapeHTML(event.locationName) || 'No Location'} | ${escapeHTML(event.eventDate)} | Players: ${event.roster?.length || 0}
+              ${escapeHTML(event.locationName) || 'No Location'} | ${escapeHTML(event.eventDate)} | Players: ${rosterSize}
             </div>
             <div class="play-action-buttons">
+              ${showJoin ? '<button class="join-btn primary btn-row">Join</button>' : ''}
               <button class="play-btn secondary btn-row">Play</button>
               <button class="scoreboard-btn secondary btn-row">Scoreboard</button>
             </div>
@@ -135,9 +141,7 @@ export async function initPlayPage() {
         loadPage(ROUTE_PATHS.STANDINGS({ eventId: event.id, sessionId: event.sessionId }));
       };
 
-      row.querySelector('.play-btn').onclick = async (e) => {
-        e.stopPropagation();
-        
+      const joinSessionAction = async (navigateAfterJoin) => {
         const currentUser = await PB_API.auth.me().catch(err => {
           console.warn("Failed to fetch current user, likely not logged in:", err);
           return null;
@@ -145,34 +149,52 @@ export async function initPlayPage() {
         const joinedIds = new Set(event.roster.map(p => p.id));
         let selectedId = null;
 
-        if (currentUser?.player_id) {
-            selectedId = currentUser.player_id;
+        if (!navigateAfterJoin) {
+          // Join button: always show player selection to add someone new
+          const notAlreadyJoined = allPlayersCache.filter(p => !joinedIds.has(p.id));
+          const currentSpots = engine.availableSpots(joinedIds.size);
+          const available = filterPlayersForUser(notAlreadyJoined, currentUser);
+          const usable = currentSpots === Infinity
+            ? available
+            : available.slice(0, currentSpots);
+          const options = usable.map(p => ({ value: p.id, label: p.playerName }));
+
+          if (options.length === 0) {
+            showDialog({title: 'Session Full', message: 'No available roster spots remaining for this session format.', confirmText: 'OK' , hideCancel: true });
+            return;
+          }
+
+          selectedId = await showPlayerSelectionDialog('Join Session', 'Add player to session:', options, 'Add');
         } else {
-            // For guests, show players from the cache. We filter to non-users to prevent 
-            // guest sessions from hijacking registered accounts.
-            const available = filterPlayersForUser(allPlayersCache, currentUser);
-            const options = available.map(p => ({ 
-              value: p.id, 
-              label: joinedIds.has(p.id) ? p.playerName : `${p.playerName} (Join)` 
+          // Play button: auto-select the current user, or pick a guest
+          if (currentUser?.player_id) {
+            selectedId = currentUser.player_id;
+          } else {
+            const notJoined = allPlayersCache.filter(p => !joinedIds.has(p.id));
+            const available = filterPlayersForUser(notJoined, currentUser);
+            const options = available.map(p => ({
+              value: p.id,
+              label: joinedIds.has(p.id) ? p.playerName : `${p.playerName} (Join)`
             }));
             selectedId = await showPlayerSelectionDialog('Play Session', 'Who is playing?', options, 'Play');
+          }
         }
 
         if (selectedId) {
           try {
-            // If the selected player isn't in the session yet, join them automatically
             if (!joinedIds.has(Number(selectedId))) {
-              const engine = getScoringEngine(event.scoringFormat);
               const maxRoster = engine.getMaxRosterSize();
-              // Enforce roster limit for formats with player constraints (e.g., baseball)
               if (joinedIds.size >= maxRoster) {
                 showDialog({title: 'Session Full', message: `This session has reached its maximum roster size of ${maxRoster} and cannot accept more players.`, confirmText: 'OK' , hideCancel: true });
                 return;
               }
               const result = await PB_API.sessions.addPlayer(event.sessionId, Number(selectedId));
               if (result.error) throw new Error(result.error);
+              event.roster.push({ id: Number(selectedId) });
             }
-            loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, sessionId: event.sessionId, playerId: selectedId }));
+            if (navigateAfterJoin) {
+              loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, sessionId: event.sessionId, playerId: selectedId }));
+            }
           } catch (err) {
             console.error('[Play] Failed to join session:', err);
             const message = err?.message || String(err);
@@ -183,6 +205,16 @@ export async function initPlayPage() {
             }
           }
         }
+      };
+
+      row.querySelector('.join-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        joinSessionAction(false);
+      });
+
+      row.querySelector('.play-btn').onclick = (e) => {
+        e.stopPropagation();
+        joinSessionAction(true);
       };
     });
   }

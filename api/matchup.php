@@ -81,6 +81,10 @@ class MatchupController extends ApiController {
                         ];
                     }
 
+                    error_log("[PinBowling DEBUG] GET /api/matchup.php?eventId=$eventId — returning " . count($result) . " matchups: " . json_encode(array_map(function($r) {
+                        return ['id' => $r['id'] ?? null, 'player1Id' => $r['player1Id'] ?? null, 'player2Id' => $r['player2Id'] ?? null, 'player1Score' => $r['player1Score'] ?? null, 'player2Score' => $r['player2Score'] ?? null, 'winnerId' => $r['winnerId'] ?? null, 'status' => $r['status'] ?? null, 'roundName' => $r['roundName'] ?? null];
+                    }, $result)));
+
                     $this->sendJson($result);
                 }
                 break;

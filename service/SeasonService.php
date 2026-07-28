@@ -43,7 +43,9 @@ class SeasonService {
             if ($weeksInSeason <= 0) {
                 throw new \Exception("Weeks in season must be greater than 0. Please edit the league to specify the number of weeks in season.");
             }
-            
+
+            error_log("[PinBowling DEBUG] SeasonService::startSeason — leagueId=$leagueId weeks=$weeksInSeason status={$league['status']} start_date={$league['start_date']} participation={$league['participation_type']}");
+
             // Total matchups per game = rounds × matchups_per_round
             // e.g. baseball: 2 innings × 2 sides = 4 matchup rows
             $rounds = (int)($league['rounds_per_game'] ?? 2);
@@ -99,6 +101,7 @@ class SeasonService {
             // 3. Prepare Round-Robin schedule
             $pairingsByRound = $this->buildRoundRobinPairings($players);
             $roundsCount = count($pairingsByRound);
+            error_log("[PinBowling DEBUG] SeasonService::startSeason — participants=" . count($players) . " pairingsRounds=$roundsCount pairingsByRound=" . json_encode($pairingsByRound));
             
             // 4. Generate Weeks (Events) and Matchups
             $startDate = $league['start_date'] ?: date('Y-m-d');
@@ -117,6 +120,9 @@ class SeasonService {
                 
                 // Get matchups for this week and distribute them across all assigned locations
                 $pairings = $pairingsByRound[($w - 1) % $roundsCount];
+
+                error_log("[PinBowling DEBUG] SeasonService::startSeason — week #$w: eventId=$eventId date=$eventDate locId=$primaryLocId pairings=" . json_encode($pairings));
+
                 $this->generateWeekMatchups(
                     $pdo, $eventId, $assignedLocationIds, ($w - 1), $pairings,
                     $isTeam, $rounds, $matchupsPerRound, $allMachineIds, $machinesByLocation
@@ -219,9 +225,12 @@ class SeasonService {
         $locations = !empty($assignedLocationIds) ? array_values($assignedLocationIds) : [];
         $locCount = count($locations);
 
+        error_log("[PinBowling DEBUG] SeasonService::generateWeekMatchups — eventId=$eventId isTeam=" . ($isTeam ? 'yes' : 'no') . " rounds=$rounds matchupsPerRound=$matchupsPerRound pairingsCount=" . count($pairings));
+
         foreach ($pairings as $pairIndex => $pair) {
             $homePlayer = $pair['home'];
             $awayPlayer = $pair['away'];
+            error_log("[PinBowling DEBUG] SeasonService::generateWeekMatchups — pair #$pairIndex: homeId={$homePlayer['id']} homeName={$homePlayer['player_name']} awayId=" . ($awayPlayer ? $awayPlayer['id'] : 'BYE') . " awayName=" . ($awayPlayer ? $awayPlayer['player_name'] : 'BYE'));
 
             // Round-robin assignment across available locations to guarantee EVERY location is used each week
             $matchupLocId = $locCount > 0 ? (int)$locations[($weekIndex + $pairIndex) % $locCount] : null;
@@ -230,6 +239,9 @@ class SeasonService {
             $matchupMachineIds = ($matchupLocId && !empty($machinesByLocation[$matchupLocId]))
                 ? $machinesByLocation[$matchupLocId]
                 : $allMachineIds;
+
+            // Shuffle machine order per game so each matchup gets a different sequence
+            shuffle($matchupMachineIds);
             
             if ($awayPlayer === null) {
                 // BYE Week matchup
@@ -240,41 +252,37 @@ class SeasonService {
                 $stmt->execute([$eventId, $matchupLocId, $homePlayer['id']]);
             } else {
                 if ($isTeam) {
-                    // Team baseball: 1 team_event_matchup per half-inning
+                    // Team baseball: 1 team_event_matchup per game (team1=home, team2=away)
                     $homeTeamMembers = $this->getTeamMembers($pdo, $homePlayer['id']);
                     $awayTeamMembers = $this->getTeamMembers($pdo, $awayPlayer['id']);
 
-                    for ($inning = 1; $inning <= $rounds; $inning++) {
-                        $machineCount = count($matchupMachineIds);
-                        $topMachineIdx   = (($inning - 1) * 2)     % max($machineCount, 1);
-                        $bottomMachineIdx = (($inning - 1) * 2 + 1) % max($machineCount, 1);
-                        $topMachines    = [$matchupMachineIds[$topMachineIdx]];
-                        $bottomMachines = [$matchupMachineIds[$bottomMachineIdx]];
+                    // Create 1 game-level temId
+                    $temStmt = $pdo->prepare(
+                        'INSERT INTO team_event_matchups (event_id, location_id, team1_id, team2_id, status, game_number)
+                         VALUES (?, ?, ?, ?, \'pending\', 1)'
+                    );
+                    $temStmt->execute([$eventId, $matchupLocId, $homePlayer['id'], $awayPlayer['id']]);
+                    $temId = (int)$pdo->lastInsertId();
+                    error_log("[PinBowling DEBUG] SeasonService::generateWeekMatchups — game temId=$temId home={$homePlayer['id']} away={$awayPlayer['id']}");
 
-                        // Top half: Home team pitches (team1), Away team bats (team2)
-                        $topMatchupStmt = $pdo->prepare(
-                            'INSERT INTO team_event_matchups (event_id, location_id, team1_id, team2_id, status, game_number, round_name)
-                             VALUES (?, ?, ?, ?, \'pending\', ?, ?)'
-                        );
-                        $topMatchupStmt->execute([$eventId, $matchupLocId, $homePlayer['id'], $awayPlayer['id'], $inning, "Top $inning"]);
-                        $topMatchupId = (int)$pdo->lastInsertId();
+                    // Each inning has Top (away bats) and Bottom (home bats) = 2 half-innings
+                    for ($orderNum = 1; $orderNum <= $rounds * 2; $orderNum++) {
+                        $isTop = ($orderNum % 2 === 1);
+                        $inning = (int)(($orderNum - 1) / 2) + 1;
 
-                        MatchupGenerator::createTeamMatchupSlots(
-                            $pdo, $topMatchupId, $topMachines, $eventId, $matchupLocId,
-                            $homePlayer['id'], $awayPlayer['id']
-                        );
+                        // Assign pitcher (team1) and batter (team2) based on half-inning role
+                        $pitcherTeamId = $isTop ? $homePlayer['id'] : $awayPlayer['id'];
+                        $batterTeamId  = $isTop ? $awayPlayer['id'] : $homePlayer['id'];
 
-                        // Bottom half: Away team pitches (team1), Home team bats (team2)
-                        $bottomMatchupStmt = $pdo->prepare(
-                            'INSERT INTO team_event_matchups (event_id, location_id, team1_id, team2_id, status, game_number, round_name)
-                             VALUES (?, ?, ?, ?, \'pending\', ?, ?)'
-                        );
-                        $bottomMatchupStmt->execute([$eventId, $matchupLocId, $homePlayer['id'], $awayPlayer['id'], $inning, "Bottom $inning"]);
-                        $bottomMatchupId = (int)$pdo->lastInsertId();
+                        // Round-robin machine selection across all half-innings
+                        $machineIdx = ($orderNum - 1) % max(count($matchupMachineIds), 1);
+                        $machines = [$matchupMachineIds[$machineIdx]];
+
+                        error_log("[PinBowling DEBUG] SeasonService::generateWeekMatchups — orderNum=$orderNum " . ($isTop ? 'Top' : 'Bottom') . " $inning: pitcher=$pitcherTeamId batter=$batterTeamId machine=" . $machines[0]);
 
                         MatchupGenerator::createTeamMatchupSlots(
-                            $pdo, $bottomMatchupId, $bottomMachines, $eventId, $matchupLocId,
-                            $awayPlayer['id'], $homePlayer['id']
+                            $pdo, $temId, $machines, $eventId, $matchupLocId,
+                            $pitcherTeamId, $batterTeamId, $orderNum
                         );
                     }
                 } else {

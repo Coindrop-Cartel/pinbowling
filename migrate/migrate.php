@@ -186,11 +186,8 @@ function initializeDatabaseSchema($pdo) {
         `order_number` INT NOT NULL,
         `machine_id` INT NOT NULL,
         `ball1` BIGINT DEFAULT 0,
-        `ball1_player_id` INT NULL DEFAULT NULL,
         `ball2` BIGINT DEFAULT 0,
-        `ball2_player_id` INT NULL DEFAULT NULL,
         `ball3` BIGINT DEFAULT 0,
-        `ball3_player_id` INT NULL DEFAULT NULL,
         `match_key` VARCHAR(100) GENERATED ALWAYS AS (
             IF(`event_matchup_id` IS NULL,
                CONCAT('evt_', `event_id`, '_rnd_', `order_number`),
@@ -201,10 +198,7 @@ function initializeDatabaseSchema($pdo) {
         CONSTRAINT `fk_scores_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_scores_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_scores_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE,
-        CONSTRAINT `fk_score_event_matchup` FOREIGN KEY (`event_matchup_id`) REFERENCES `event_matchups` (`id`) ON DELETE CASCADE,
-        CONSTRAINT `fk_scores_b1_player` FOREIGN KEY (`ball1_player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL,
-        CONSTRAINT `fk_scores_b2_player` FOREIGN KEY (`ball2_player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL,
-        CONSTRAINT `fk_scores_b3_player` FOREIGN KEY (`ball3_player_id`) REFERENCES `players` (`id`) ON DELETE SET NULL
+        CONSTRAINT `fk_score_event_matchup` FOREIGN KEY (`event_matchup_id`) REFERENCES `event_matchups` (`id`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `target_scores` (
@@ -399,21 +393,6 @@ function alignTableColumns($pdo) {
         }
     }
 
-    // --- matchups ---
-    $checkTable = $pdo->query("SHOW TABLES LIKE 'matchups'")->fetch();
-    if ($checkTable) {
-        $mCols = [
-            'player3_id' => "ALTER TABLE `matchups` ADD COLUMN `player3_id` INT DEFAULT NULL AFTER `player2_id`",
-            'player4_id' => "ALTER TABLE `matchups` ADD COLUMN `player4_id` INT DEFAULT NULL AFTER `player3_id`",
-        ];
-        foreach ($mCols as $col => $sql) {
-            $exists = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE '$col'")->fetch();
-            if (!$exists) {
-                $pdo->exec($sql);
-            }
-        }
-    }
-
     // --- scores ---
     $checkTable = $pdo->query("SHOW TABLES LIKE 'scores'")->fetch();
     if ($checkTable) {
@@ -427,6 +406,12 @@ function alignTableColumns($pdo) {
             if (!$fkExists) {
                 $pdo->exec("ALTER TABLE `scores` ADD CONSTRAINT `fk_score_event_matchup` FOREIGN KEY (`event_matchup_id`) REFERENCES `event_matchups` (`id`) ON DELETE CASCADE");
             }
+        }
+
+        // Drop legacy matchup_id column if present
+        $hasLegacyMatchupId = $pdo->query("SHOW COLUMNS FROM `scores` LIKE 'matchup_id'")->fetch();
+        if ($hasLegacyMatchupId) {
+            $pdo->exec("ALTER TABLE `scores` DROP COLUMN `matchup_id`");
         }
 
         $hasMatchKey = $pdo->query("SHOW COLUMNS FROM `scores` LIKE 'match_key'")->fetch();
@@ -444,17 +429,6 @@ function alignTableColumns($pdo) {
             $pdo->exec("ALTER TABLE `scores` ADD UNIQUE KEY `unique_scores_key` (`player_id`, `match_key`)");
         }
 
-        $ballCols = [
-            'ball1_player_id' => "ALTER TABLE `scores` ADD COLUMN `ball1_player_id` INT NULL DEFAULT NULL AFTER `ball1`",
-            'ball2_player_id' => "ALTER TABLE `scores` ADD COLUMN `ball2_player_id` INT NULL DEFAULT NULL AFTER `ball2`",
-            'ball3_player_id' => "ALTER TABLE `scores` ADD COLUMN `ball3_player_id` INT NULL DEFAULT NULL AFTER `ball3`",
-        ];
-        foreach ($ballCols as $col => $sql) {
-            $exists = $pdo->query("SHOW COLUMNS FROM `scores` LIKE '$col'")->fetch();
-            if (!$exists) {
-                $pdo->exec($sql);
-            }
-        }
     }
 
     // --- matchups ---
@@ -474,6 +448,20 @@ function alignTableColumns($pdo) {
 
         $hasPlayerId = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'player_id'")->fetch();
         if ($hasPlayerId) {
+            // Drop any FK constraints referencing player_id before dropping the column
+            $playerFks = $pdo->query(
+                "SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matchups'
+                 AND COLUMN_NAME = 'player_id' AND REFERENCED_TABLE_NAME IS NOT NULL"
+            )->fetchAll(\PDO::FETCH_COLUMN);
+            foreach ($playerFks as $fk) {
+                $pdo->exec("ALTER TABLE `matchups` DROP FOREIGN KEY `$fk`");
+            }
+
+            if (!$pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'player1_id'")->fetch()) {
+                $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `player1_id` INT DEFAULT NULL AFTER `machine_id`");
+                $pdo->exec("UPDATE `matchups` SET `player1_id` = `player_id`");
+            }
             $pdo->exec("ALTER TABLE `matchups` DROP COLUMN `player_id`");
         }
 
@@ -486,11 +474,57 @@ function alignTableColumns($pdo) {
         if (!$hasP2Id) {
             $pdo->exec("ALTER TABLE `matchups` ADD COLUMN `player2_id` INT DEFAULT NULL AFTER `player1_id`");
         }
+
+        $mCols = [
+            'player3_id' => "ALTER TABLE `matchups` ADD COLUMN `player3_id` INT DEFAULT NULL AFTER `player2_id`",
+            'player4_id' => "ALTER TABLE `matchups` ADD COLUMN `player4_id` INT DEFAULT NULL AFTER `player3_id`",
+        ];
+        foreach ($mCols as $col => $sql) {
+            $exists = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE '$col'")->fetch();
+            if (!$exists) {
+                $pdo->exec($sql);
+            }
+        }
     }
 
     // --- event_matchups ---
     $checkTable = $pdo->query("SHOW TABLES LIKE 'event_matchups'")->fetch();
     if ($checkTable) {
+        // Handle legacy home_player_id / away_player_id → player1_id / player2_id
+        $hasHomeId = $pdo->query("SHOW COLUMNS FROM `event_matchups` LIKE 'home_player_id'")->fetch();
+        if ($hasHomeId) {
+            $hasP1Id = $pdo->query("SHOW COLUMNS FROM `event_matchups` LIKE 'player1_id'")->fetch();
+            if (!$hasP1Id) {
+                $pdo->exec("ALTER TABLE `event_matchups` CHANGE COLUMN `home_player_id` `player1_id` INT DEFAULT NULL");
+            } else {
+                $pdo->exec("ALTER TABLE `event_matchups` DROP COLUMN `home_player_id`");
+            }
+        }
+        $hasAwayId = $pdo->query("SHOW COLUMNS FROM `event_matchups` LIKE 'away_player_id'")->fetch();
+        if ($hasAwayId) {
+            $hasP2Id = $pdo->query("SHOW COLUMNS FROM `event_matchups` LIKE 'player2_id'")->fetch();
+            if (!$hasP2Id) {
+                $pdo->exec("ALTER TABLE `event_matchups` CHANGE COLUMN `away_player_id` `player2_id` INT DEFAULT NULL");
+            } else {
+                $pdo->exec("ALTER TABLE `event_matchups` DROP COLUMN `away_player_id`");
+            }
+        }
+
+        // Ensure player1_id/player1_score and player2_id/player2_score exist
+        // (may be missing if neither home/away nor current columns were on this table)
+        $ensureCols = [
+            'player1_id'    => "ALTER TABLE `event_matchups` ADD COLUMN `player1_id` INT DEFAULT NULL AFTER `location_id`",
+            'player2_id'    => "ALTER TABLE `event_matchups` ADD COLUMN `player2_id` INT DEFAULT NULL AFTER `player1_id`",
+            'player1_score' => "ALTER TABLE `event_matchups` ADD COLUMN `player1_score` INT DEFAULT 0 AFTER `location_id`",
+            'player2_score' => "ALTER TABLE `event_matchups` ADD COLUMN `player2_score` INT DEFAULT 0 AFTER `player1_score`",
+        ];
+        foreach ($ensureCols as $col => $sql) {
+            $exists = $pdo->query("SHOW COLUMNS FROM `event_matchups` LIKE '$col'")->fetch();
+            if (!$exists) {
+                $pdo->exec($sql);
+            }
+        }
+
         $cols = [
             'player3_id'    => "ALTER TABLE `event_matchups` ADD COLUMN `player3_id` INT DEFAULT NULL AFTER `player2_id`",
             'player4_id'    => "ALTER TABLE `event_matchups` ADD COLUMN `player4_id` INT DEFAULT NULL AFTER `player3_id`",
@@ -614,6 +648,21 @@ function alignTableColumns($pdo) {
         }
     }
 
+    // --- team_event_matchups ---
+    $checkTable = $pdo->query("SHOW TABLES LIKE 'team_event_matchups'")->fetch();
+    if ($checkTable) {
+        $temCols = [
+            'round_name' => "ALTER TABLE `team_event_matchups` ADD COLUMN `round_name` VARCHAR(50) DEFAULT NULL AFTER `game_number`",
+            'series_id'  => "ALTER TABLE `team_event_matchups` ADD COLUMN `series_id` INT DEFAULT NULL AFTER `round_name`",
+        ];
+        foreach ($temCols as $col => $sql) {
+            $exists = $pdo->query("SHOW COLUMNS FROM `team_event_matchups` LIKE '$col'")->fetch();
+            if (!$exists) {
+                $pdo->exec($sql);
+            }
+        }
+    }
+
     $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
 }
 
@@ -723,6 +772,12 @@ try {
         $pdo->exec("UPDATE `leagues` SET competition_format = 'group', participation_type = 'team' WHERE participants = 'team'");
         $pdo->exec("UPDATE `leagues` SET competition_format = 'head2head', participation_type = 'individual' WHERE participants = 'head2head'");
 
+        // Drop the now-obsolete participants column
+        $hasParticipants = $pdo->query("SHOW COLUMNS FROM `leagues` LIKE 'participants'")->fetch();
+        if ($hasParticipants) {
+            $pdo->exec("ALTER TABLE `leagues` DROP COLUMN `participants`");
+        }
+
         $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('split_participants_into_format_and_type')")->execute();
         echo "✓ Split participants into competition_format and participation_type.\n";
     } else {
@@ -819,15 +874,20 @@ try {
         echo "  league_players has $restored rows after backfill.\n";
 
         // Step 2: Null out scores.team_id for individual leagues (they use player_id now)
-        $nullCount = $pdo->exec("
-            UPDATE scores s
-            JOIN events e ON s.event_id = e.id
-            JOIN leagues l ON e.league_id = l.id
-            SET s.team_id = NULL
-            WHERE l.participation_type = 'individual'
-              AND s.team_id IS NOT NULL
-        ");
-        echo "  Nulled $nullCount scores.team_id references for individual leagues.\n";
+        $hasTeamIdCol = $pdo->query("SHOW COLUMNS FROM `scores` LIKE 'team_id'")->fetch();
+        if ($hasTeamIdCol) {
+            $nullCount = $pdo->exec("
+                UPDATE scores s
+                JOIN events e ON s.event_id = e.id
+                JOIN leagues l ON e.league_id = l.id
+                SET s.team_id = NULL
+                WHERE l.participation_type = 'individual'
+                  AND s.team_id IS NOT NULL
+            ");
+            echo "  Nulled $nullCount scores.team_id references for individual leagues.\n";
+        } else {
+            echo "  scores.team_id column does not exist — skipping UPDATE.\n";
+        }
 
         // Step 3: Delete league_teams entries for individual leagues (roster now in league_players)
         $ltCount = $pdo->exec("
@@ -933,6 +993,7 @@ try {
             `status` ENUM('pending', 'completed') DEFAULT 'pending',
             `game_number` INT DEFAULT 1,
             `round_name` VARCHAR(50) DEFAULT NULL,
+            `series_id` INT DEFAULT NULL,
             CONSTRAINT `fk_tem_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
             CONSTRAINT `fk_tem_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
@@ -1035,6 +1096,158 @@ try {
         echo "✓ Migration 11 — split team and individual tables.\n";
     } else {
         echo "Team/individual table split already applied.\n";
+    }
+
+    // -----------------------------------------------------------------------
+    // Migration 12: remove_ball_player_ids_from_scores
+    // -----------------------------------------------------------------------
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'remove_ball_player_ids_from_scores'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+
+        foreach (['fk_scores_b1_player', 'fk_scores_b2_player', 'fk_scores_b3_player'] as $fk) {
+            $exists = $pdo->query(
+                "SELECT 1 FROM information_schema.KEY_COLUMN_USAGE
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'scores'
+                 AND CONSTRAINT_NAME = '$fk'"
+            )->fetch();
+            if ($exists) {
+                $pdo->exec("ALTER TABLE `scores` DROP FOREIGN KEY `$fk`");
+            }
+        }
+
+        foreach (['ball1_player_id', 'ball2_player_id', 'ball3_player_id'] as $col) {
+            $colExists = $pdo->query("SHOW COLUMNS FROM `scores` LIKE '$col'")->fetch();
+            if ($colExists) {
+                $pdo->exec("ALTER TABLE `scores` DROP COLUMN `$col`");
+            }
+        }
+
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('remove_ball_player_ids_from_scores')")->execute();
+        echo "✓ Migration 12 — removed ball1-3_player_id columns from scores table.\n";
+    } else {
+        echo "Ball player ID columns removal from scores already applied.\n";
+    }
+
+    // -----------------------------------------------------------------------
+    // Migration 13: consolidate_team_event_matchups_to_one_per_game
+    // -----------------------------------------------------------------------
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'consolidate_team_event_matchups_to_one_per_game'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+
+        // 1. For each distinct game (event_id, team1_id, team2_id), merge
+        //    the multiple half-inning rows into a single row with summed scores.
+        $rows = $pdo->query(
+            "SELECT id, event_id, team1_id, team2_id, team1_score, team2_score, status, game_number
+             FROM team_event_matchups
+             ORDER BY event_id ASC, team1_id ASC, team2_id ASC, id ASC"
+        )->fetchAll();
+
+        $games = [];
+        foreach ($rows as $r) {
+            $key = (int)$r['event_id'] . '_' . (int)$r['team1_id'] . '_' . (int)$r['team2_id'];
+            if (!isset($games[$key])) {
+                $games[$key] = [
+                    'survivor_id' => (int)$r['id'],
+                    'event_id' => (int)$r['event_id'],
+                    'team1_id' => (int)$r['team1_id'],
+                    'team2_id' => (int)$r['team2_id'],
+                    'team1_score' => (int)($r['team1_score'] ?? 0),
+                    'team2_score' => (int)($r['team2_score'] ?? 0),
+                    'game_number' => (int)($r['game_number'] ?? 1),
+                    'duplicate_ids' => [],
+                ];
+            } else {
+                $games[$key]['duplicate_ids'][] = (int)$r['id'];
+                $games[$key]['team1_score'] += (int)($r['team1_score'] ?? 0);
+                $games[$key]['team2_score'] += (int)($r['team2_score'] ?? 0);
+            }
+        }
+
+        foreach ($games as $g) {
+            $survivorId = $g['survivor_id'];
+            $dupIds = $g['duplicate_ids'];
+
+            if (empty($dupIds)) {
+                // Single row only — just clear round_name
+                $pdo->prepare("UPDATE team_event_matchups SET round_name = NULL WHERE id = ?")->execute([$survivorId]);
+                continue;
+            }
+
+            // Update survivor with summed scores
+            $pdo->prepare(
+                "UPDATE team_event_matchups SET team1_score = ?, team2_score = ?, round_name = NULL WHERE id = ?"
+            )->execute([$g['team1_score'], $g['team2_score'], $survivorId]);
+
+            // Re-point team_matchups entries: update temId and adjust order_number
+            // Each temId had order_numbers starting at 1. We accumulate an offset
+            // equal to the count of entries already assigned, so the final sequence
+            // is 1, 2, 3, ... across all consolidated entries.
+            $entriesForSurvivor = $pdo->prepare(
+                "SELECT COUNT(*) FROM team_matchups WHERE team_event_matchup_id = ?"
+            );
+            $entriesForSurvivor->execute([$survivorId]);
+            $offset = (int)$entriesForSurvivor->fetchColumn();
+
+            foreach ($dupIds as $dupId) {
+                // Re-point team_matchups entries
+                $tmStmt = $pdo->prepare(
+                    "SELECT id, order_number FROM team_matchups WHERE team_event_matchup_id = ? ORDER BY order_number ASC"
+                );
+                $tmStmt->execute([$dupId]);
+                $tmEntries = $tmStmt->fetchAll();
+
+                foreach ($tmEntries as $tm) {
+                    $newOrder = $offset + (int)$tm['order_number'];
+                    $pdo->prepare(
+                        "UPDATE team_matchups SET team_event_matchup_id = ?, order_number = ? WHERE id = ?"
+                    )->execute([$survivorId, $newOrder, (int)$tm['id']]);
+                }
+
+                // Re-point team_scores entries (same offset as team_matchups)
+                $tsStmt = $pdo->prepare(
+                    "SELECT id, order_number FROM team_scores WHERE team_event_matchup_id = ? ORDER BY order_number ASC"
+                );
+                $tsStmt->execute([$dupId]);
+                $tsEntries = $tsStmt->fetchAll();
+
+                foreach ($tsEntries as $ts) {
+                    $newOrder = $offset + (int)$ts['order_number'];
+                    $pdo->prepare(
+                        "UPDATE team_scores SET team_event_matchup_id = ?, order_number = ? WHERE id = ?"
+                    )->execute([$survivorId, $newOrder, (int)$ts['id']]);
+                }
+
+                // Advance offset by the number of order_number positions consumed
+                $offset += count($tmEntries);
+            }
+
+            // Delete duplicate team_event_matchups
+            $placeholders = implode(',', array_fill(0, count($dupIds), '?'));
+            $pdo->prepare("DELETE FROM team_event_matchups WHERE id IN ($placeholders)")->execute($dupIds);
+        }
+
+        // 2. Clear inning-based round_name values ("Top 1", "Bottom 1", etc.)
+        //    but preserve playoff bracket values ("Quarterfinals", "Semifinals", "Finals").
+        $pdo->exec("UPDATE team_event_matchups SET round_name = NULL WHERE round_name REGEXP '^(Top|Bottom) [0-9]+$'");
+
+        // 3. Add series_id for playoff series tracking
+        $colExists = $pdo->query("SHOW COLUMNS FROM `team_event_matchups` LIKE 'series_id'")->fetch();
+        if (!$colExists) {
+            $pdo->exec("ALTER TABLE `team_event_matchups` ADD COLUMN `series_id` INT DEFAULT NULL AFTER `game_number`");
+        }
+
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('consolidate_team_event_matchups_to_one_per_game')")->execute();
+        echo "✓ Migration 13 — consolidated team_event_matchups to 1 row per game, cleared inning round_name, added series_id.\n";
+    } else {
+        echo "Team event matchup consolidation already applied.\n";
     }
 
     echo "\n✓ All migrations complete.\n";

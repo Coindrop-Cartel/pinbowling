@@ -14,19 +14,22 @@ class LeagueService {
     private RosterService $rosterService;
     private SeasonService $seasonService;
     private PlayoffService $playoffService;
+    private TeamPlayoffService $teamPlayoffService;
 
     public function __construct(
         DatabaseService $db,
         EventService $eventService,
         RosterService $rosterService,
         SeasonService $seasonService,
-        PlayoffService $playoffService
+        PlayoffService $playoffService,
+        TeamPlayoffService $teamPlayoffService
     ) {
         $this->db = $db;
         $this->eventService = $eventService;
         $this->rosterService = $rosterService;
         $this->seasonService = $seasonService;
         $this->playoffService = $playoffService;
+        $this->teamPlayoffService = $teamPlayoffService;
     }
 
     /**
@@ -110,7 +113,11 @@ class LeagueService {
                  ORDER BY tem.id ASC'
             );
             $temStmt->execute([$leagueId]);
-            foreach ($temStmt->fetchAll() as $tem) {
+            $allTems = $temStmt->fetchAll();
+            error_log("[PinBowling DEBUG] LeagueService::getLeague — leagueId=$leagueId fetched " . count($allTems) . " team_event_matchups: " . json_encode(array_map(function($t) {
+                return ['id' => $t['id'], 'eventId' => $t['event_id'], 'team1Id' => $t['team1_id'], 'team2Id' => $t['team2_id'], 'team1Score' => $t['team1_score'], 'team2Score' => $t['team2_score'], 'status' => $t['status']];
+            }, $allTems)));
+            foreach ($allTems as $tem) {
                 $matchupsByEvent[(int)$tem['event_id']][] = $tem;
             }
         }
@@ -606,5 +613,9 @@ class LeagueService {
 
     public function startPlayoffs(int $leagueId, array $seeds, int $seriesLength): bool {
         return $this->playoffService->startPlayoffs($leagueId, $seeds, $seriesLength);
+    }
+
+    public function startTeamPlayoffs(int $leagueId, array $seeds, int $seriesLength): bool {
+        return $this->teamPlayoffService->startPlayoffs($leagueId, $seeds, $seriesLength);
     }
 }
