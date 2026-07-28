@@ -46,17 +46,26 @@ pinbowling/
 │   └── layout.php          # HTML shell template (importmap, assets)
 ├── service/                # Business logic service classes
 │   ├── AuthService.php
-│   ├── LeagueService.php
-│   ├── PlayerService.php
-│   ├── LocationService.php
-│   ├── MachineService.php
-│   ├── ScoreService.php
-│   ├── TeamService.php
-│   ├── MatchupService.php
-│   ├── TeamMatchupService.php
 │   ├── CleanupService.php
 │   ├── DatabaseService.php
-│   └── SettingsService.php
+│   ├── EventService.php
+│   ├── LeagueService.php
+│   ├── LocationService.php
+│   ├── MachineService.php
+│   ├── MatchupGenerator.php   # Shared round/fixture helper
+│   ├── MatchupService.php
+│   ├── PlayerService.php
+│   ├── PlayoffService.php
+│   ├── RosterService.php
+│   ├── ScoreService.php
+│   ├── SeasonService.php      # Season generation, round-robin scheduling
+│   ├── SessionService.php
+│   ├── SettingsService.php
+│   ├── TargetResolver.php     # Machine target score resolution
+│   ├── TeamMatchupService.php
+│   ├── TeamPlayoffService.php # Team bracket creation & advancement
+│   ├── TeamScoreService.php
+│   └── TeamService.php
 ├── scripts/                # Frontend ES6 modules
 │   ├── core/               # Scoring engine implementations
 │   │   ├── ScoringEngine.js    # Abstract base class
@@ -64,7 +73,7 @@ pinbowling/
 │   │   └── engines/            # BowlingEngine, GolfEngine, BaseballEngine
 │   ├── pages/              # Page-specific UI and orchestration
 │   ├── services/           # API client, auth, state, normalizer
-│   ├── ui/                 # Navigation, dialogs, branding, printing
+│   ├── ui/                 # Navigation, dialogs, branding, matchup editor
 │   ├── main.js             # App entry point and page detection
 │   ├── routes.js           # Centralized route configuration
 │   ├── types.js            # JSDoc type definitions

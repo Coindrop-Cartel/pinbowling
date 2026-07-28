@@ -175,7 +175,8 @@ Used **only for team head-to-head** (Team Baseball) formats.
 | `team_winner_id` | int FK→`teams.id` (nullable) | Resolved when `status='completed'` |
 | `status` | enum(`pending`,`completed`) | |
 | `game_number` | int default 1 | For multi-game series within one event |
-| `round_name` | varchar(50) (nullable) | Half-inning label, e.g. `"Top 1"`, `"Bottom 2"` |
+| `round_name` | varchar(50) (nullable) | Half-inning label (`"Top 1"`, `"Bottom 2"`) or playoff round name (`"Quarterfinals"`, `"Semifinals"`, `"Finals"`) |
+| `series_id` | int (nullable) | Groups games within a playoff series; used for bracket bracket alignment |
 
 ---
 
@@ -424,16 +425,18 @@ For team leagues (`leagues.participation_type = 'team'`), the model differs:
 1. **`leagues`** — Created with `participation_type:'team'`, `scoring_format:'baseball'`.
 2. **`events`** — One event per week.
 3. **`target_scores`** — Same as individual: one row per half-inning slot.
-4. **`event_matchups`** — **One row per half-inning** (not per pairing). A
-   2-inning team game creates **4 rows** (Top 1, Bottom 1, Top 2, Bottom 2). Each row has:
-   - `player1_id` = home team ID, `player2_id` = away team ID
-   - `round_name` = `"Top N"` or `"Bottom N"`
-5. **`matchups`** — Each `event_matchup` has exactly **1 matchup row** (one machine per
-   half-inning). The batting order rotation — Ball 1 → Batter 1, Ball 2 → Batter 2, etc. —
+4. **`team_event_matchups`** — **One row per game pairing** (consistent with the 1-row-per-game pattern of `event_matchups`). Each row has:
+   - `team1_id` = home team, `team2_id` = away team
+   - `game_number` = game index within a series (1-based)
+   - `round_name` = `"Quarterfinals"`, `"Semifinals"`, `"Finals"` for playoff series, or `null` for regular season
+   - `series_id` = groups games in a bracket series (both games of a best-of-3 share the same `series_id`)
+5. **`team_matchups`** — Each half-inning slot gets one `team_matchup` row (one machine per
+   half-inning). A 2-inning game creates **4 rows** (Top 1, Bottom 1, Top 2, Bottom 2), all pointing at the parent `team_event_matchup`. The batting order rotation — Ball 1 → Batter 1, Ball 2 → Batter 2, etc. —
    is resolved at scoring time by the `Set Batting Order` dialog, not by pre-creating
    separate rows per batter.
-6. **`scores`** — Team baseball uses `team_id`-keyed rows (one per half-inning).
-   `player_id` is NULL for these rows. `team_id` = the team that scored in that half-inning.
+6. **`team_scores`** — Team baseball uses `team_id`-keyed rows (one per half-inning).
+   Each row records `ball1`/`ball2`/`ball3` and the `ball*_player_id` who shot each ball.
+7. **Playoff advancement** — When the last game in a series is completed, `TeamScoreService` calls `TeamPlayoffService::handlePlayoffAdvancement()`, which sets the series winner and generates the next round's `team_event_matchup` rows with alternating home/away based on game number parity.
 
 ### Score ownership by format
 
@@ -451,9 +454,12 @@ For team leagues (`leagues.participation_type = 'team'`), the model differs:
 | `leagues` | 1 | 1 | The session/standard league |
 | `events` | 1 | 4 (one per week) | Individual = session; Team = standard |
 | `target_scores` | 4 | 4 per event | 2 innings × 2 half-innings |
-| `event_matchups` | 1 | 4 per event | Individual = 1 pairing; Team = 1 per half-inning |
-| `matchups` | 4 | 4 per event | Individual = 4 half-inning slots; Team = 1 machine per half-inning |
-| `scores` (per team/player) | 4 rows (player-keyed) | 4 rows (team-keyed) | One score row per half-inning |
+| `event_matchups` | 1 | — | Individual only |
+| `team_event_matchups` | — | 1 per event | Team = 1 row per game pairing |
+| `matchups` | 4 | — | Individual only |
+| `team_matchups` | — | 4 per event | Team = 1 machine per half-inning |
+| `scores` (per player) | 4 rows (player-keyed) | — | Individual score rows |
+| `team_scores` (per team) | — | 4 rows (team-keyed) | One score row per half-inning, per team |
 | `league_players` or `league_teams` | 2 | 2 teams | Home + Away |
 
 If you observe unexpected row counts, check the payload generation path
@@ -464,7 +470,10 @@ or `SeasonService::startSeason` for team) or the `inningCount` argument.
 
 ## Format Translation Matrix
 
-How engines interpret generic schema columns under the Universal Team Model:
+How engines interpret generic schema columns under the Universal Team Model.
+*Individual Baseball uses `event_matchups`/`matchups`/`scores` columns; Team Baseball uses the parallel `team_event_matchups`/`team_matchups`/`team_scores` columns with the same conceptual mapping.*
+
+
 
 | Generic Column | Bowling | Golf | Baseball (Universal Team Model) |
 |---|---|---|---|

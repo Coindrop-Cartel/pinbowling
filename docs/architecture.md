@@ -55,15 +55,20 @@ A lightweight custom container (`includes/Container.php`) manages all service in
 | `LeagueService` | League/event CRUD, roster management, season config |
 | `EventService` | Individual event creation and lookup |
 | `SeasonService` | Season start/update logic, round-robin scheduling, team batting rotation |
-| `PlayoffService` | Postseason bracket creation and series advancement |
+| `PlayoffService` | Individual postseason bracket creation and series advancement |
+| `TeamPlayoffService` | Team postseason bracket creation, series advancement, home/away alternation |
+| `EventService` | Individual event creation and lookup |
 | `MatchupGenerator` | Shared helper for creating round/matchup fixtures (static) |
 | `LocationService` | Venue management, machine-to-location mapping |
 | `MachineService` | Master machine registry, target score thresholds |
 | `ScoreService` | Score recording and retrieval |
+| `TeamScoreService` | Team score recording, lineup ball-to-player assignment |
 | `TeamService` | Team CRUD, member and league assignment |
 | `RosterService` | League roster management (players, staff, locations) |
 | `MatchupService` | Individual head-to-head matchup management (Baseball format) |
 | `TeamMatchupService` | Team head-to-head matchup management (Baseball format) |
+| `SessionService` | Quick Play session creation and lifecycle |
+| `TargetResolver` | Machine target score resolution (global → location override) |
 | `CleanupService` | Session data cleanup |
 
 ### API Layer
@@ -105,9 +110,8 @@ See `docs/database_schema.md` for the full ER diagram. Key relationships:
 - `leagues` → `events` (one-to-many)
 - `leagues` → `league_players` / `league_teams` / `league_locations` / `league_staff` (roster)
 - `events` → `scores` / `target_scores` (records + thresholds)
-- Individual H2H: `events` → `event_matchups` → `matchups` (individual head2head pairings & matchups)
-- Team H2H: `events` → `team_event_matchups` → `team_matchups` & `team_scores` (team head2head pairings & matchups)
-- `matchups` / `team_matchups` / `scores` / `team_scores` → `machines` (played on)
+- Individual H2H: `events` → `event_matchups` → `matchups` (individual head2head pairings & half-inning slots)
+- Team H2H: `events` → `team_event_matchups` → `team_matchups` & `team_scores` (team head2head pairings, half-inning slots, and ball-level scores)
 - `locations` → `location_machines` → `machines` (machine installation)
 - `players` ↔ `users` (optional 1:1 link for auth accounts)
 
@@ -183,7 +187,9 @@ classDiagram
     ScoringEngine <|-- BaseballEngine
 ```
 
-> **Score flow (Baseball):** `BaseballEngine.calculateTurnResults()` returns `homeScore`/`awayScore` — the pre-computed matchup totals. The client sends these with each score save via `POST /api/score`, and `ScoreService` stores them directly in `event_matchups.player1_score/player2_score`. This makes the JS engine the single source of truth for run calculation; the server-side `calculateRunsForHalfRound()` is only a fallback for non-JS clients.
+> **Score flow (Baseball):**
+> - **Individual:** `BaseballEngine.calculateTurnResults()` returns `homeScore`/`awayScore` — pre-computed matchup totals. The client sends these via `POST /api/score`, and `ScoreService` stores them in `event_matchups.player1_score/player2_score`.
+> - **Team:** The same engine computes totals client-side, sent via `POST /api/team-score`, and `TeamScoreService` stores them in `team_event_matchups.team1_score/team2_score`. `TeamScoreService` also updates `team_winner_id` and triggers playoff advancement via `TeamPlayflowService::handlePlayoffAdvancement()` when a game is completed.
 
 ### State Management
 

@@ -107,20 +107,24 @@ Server entries in `enrichTeamMatchupEntries` tests now include `team1_id` /
 `team2_id`. Added `bottomServerEntries` fixture. Updated test names and
 expectations to match the data-driven role resolution.
 
-## Data model
+## Data model (post-Migration 13)
 
 ```
-team_event_matchups         (pairing — always home=team1, away=team2)
+team_event_matchups         (pairing — always home=team1, away=team2, 1 row per game)
 ├── team1_id                home team
 ├── team2_id                away team
-├── round_name              "Top N" / "Bottom N"
+├── round_name              playoff round name ("Quarterfinals", "Semifinals", "Finals") or NULL for regular season
+├── series_id               groups games within a playoff series (both games of best-of-3 share same series_id)
+├── game_number             1-based index within a series
 │
-└── team_matchups           (per half-inning — pitcher=batter)
+└── team_matchups           (per half-inning — pitcher=batter, 4 rows per 2-inning game)
     ├── team1_id            pitching team for this half-inning
     ├── team2_id            batting team for this half-inning
     ├── machine_id
-    └── order_number        always 1 (one machine per half-inning)
+    └── order_number        1-based sequential index across all half-innings of the game
 ```
+
+Half-inning context ("Top N" / "Bottom N") is derived from `order_number` parity at the engine level, no longer stored as `round_name` on `team_event_matchups`.
 
 Mirrors individual baseball:
 
