@@ -487,11 +487,13 @@ export async function initPlayPage() {
     finalizeBtn.textContent = 'Starting Session...';
 
     try {
+      const participationTypeSelect = document.getElementById('qp-participation-type');
       await finalizeSession({
         rawName: nameInput.value.trim(),
         locId: Number(locSelect.value),
         locationsCache,
         currentSessionFormat,
+        participationType: participationTypeSelect?.value || 'individual',
         generatedFrames,
         allPlayersCache,
         PB_API,

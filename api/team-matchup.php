@@ -69,8 +69,12 @@ class TeamMatchupController extends ApiController {
                     $this->sendError('Request body is empty', 400);
                 }
 
-                $this->teamMatchupService->saveTeamMatchups($matchups);
-                $this->sendJson(['success' => true]);
+                $createdTemIds = $this->teamMatchupService->saveTeamEventMatchups($matchups);
+
+                $this->sendJson([
+                    'success' => true,
+                    'teamEventMatchupIds' => $createdTemIds
+                ]);
                 break;
 
             case 'DELETE':

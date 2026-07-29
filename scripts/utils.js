@@ -106,6 +106,25 @@ export function setActiveEventIdSilent(id) {
 /** @returns {string|null} The currently active player ID from the URL. */
 export const getCurrentPlayerId = () => getUrlParam('playerId');
 
+/** @returns {string|null} The currently active team ID from the URL (for team sessions/leagues). */
+export const getActiveTeamId = () => getUrlParam('teamId');
+
+/** @param {string|null} teamId - Sets the active team ID in the URL. */
+export function setActiveTeamId(teamId) {
+  setUrlParam('teamId', teamId);
+}
+
+/**
+ * Sets the active team ID in the URL without dispatching pb:pageChanged.
+ * @param {string|null} teamId
+ */
+export function setActiveTeamIdSilent(teamId) {
+  const url = new URL(window.location.href);
+  if (teamId) url.searchParams.set('teamId', teamId);
+  else url.searchParams.delete('teamId');
+  window.history.replaceState({}, '', url);
+}
+
 /** @param {string|null} playerId - Sets the active player ID in the URL. */
 export function setCurrentPlayerId(playerId) {
   setUrlParam('playerId', playerId);
@@ -126,6 +145,9 @@ export function setCurrentPlayerIdSilent(playerId) {
 
 /** @returns {string|null} The currently active event matchup ID from the URL. */
 export const getActiveEventMatchupId = () => getUrlParam('eventMatchupId');
+
+/** @returns {string|null} The currently active team event matchup ID from the URL. */
+export const getActiveTeamEventMatchupId = () => getUrlParam('teamEventMatchupId');
 
 /** @param {string|null} id - Sets the active event matchup ID in the URL. */
 export function setActiveEventMatchupId(id) {

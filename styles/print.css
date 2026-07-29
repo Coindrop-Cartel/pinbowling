@@ -12,14 +12,14 @@
   box-sizing: border-box;
 }
 
-.print-frame {
+.print-card {
   border: 6px solid #000;
   padding: 50px;
   width: 100%;
   max-width: 1100px;
 }
 
-.print-frame-header {
+.print-card-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;

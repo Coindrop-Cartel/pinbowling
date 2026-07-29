@@ -27,6 +27,13 @@
           <label for="qp-event-name">Session Name</label>
           <input type="text" id="qp-event-name" data-testid="qp-event-name-input" placeholder="e.g. Casual Friday Pinball">
         </div>
+        <div class="form-row">
+          <label for="qp-participation-type">Participation</label>
+          <select id="qp-participation-type" data-testid="qp-participation-type-select">
+            <option value="individual">Individual</option>
+            <option value="team">Team</option>
+          </select>
+        </div>
       </div>
  
       <div id="qp-setup-summary" data-testid="qp-setup-summary" class="hidden summary-box">

@@ -211,7 +211,7 @@ export async function initStandingsPage() {
     if (sessionId) {
       const session = await PB_API.sessions.get(sessionId);
       if (session) {
-        league = { ...session, isSession: true, participationType: 'individual' };
+        league = { ...session, isSession: true, participationType: session.participationType || 'individual' };
         event = eventId === 'summary' ? { eventName: session.name || 'Session Scoreboard' } : session.events?.find(e => String(e.id) === String(eventId)) || session.events?.[0];
       }
     }

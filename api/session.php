@@ -45,6 +45,22 @@ class SessionController extends ApiController {
                     }
                     $this->sessionService->removePlayerFromSession($sessionId, $playerId);
                     $this->sendJson(['success' => true]);
+                } elseif ($this->task === 'addTeam') {
+                    $sessionId = (int)($this->input['sessionId'] ?? 0);
+                    $teamId = (int)($this->input['teamId'] ?? 0);
+                    if (!$sessionId || !$teamId) {
+                        $this->sendError('sessionId and teamId are required', 400);
+                    }
+                    $this->sessionService->addTeamToSession($sessionId, $teamId);
+                    $this->sendJson(['success' => true]);
+                } elseif ($this->task === 'removeTeam') {
+                    $sessionId = (int)($this->input['sessionId'] ?? 0);
+                    $teamId = (int)($this->input['teamId'] ?? 0);
+                    if (!$sessionId || !$teamId) {
+                        $this->sendError('sessionId and teamId are required', 400);
+                    }
+                    $this->sessionService->removeTeamFromSession($sessionId, $teamId);
+                    $this->sendJson(['success' => true]);
                 } elseif ($this->task === 'delete') {
                     $id = (int)($this->input['id'] ?? 0);
                     if (!$id) $this->sendError('id is required', 400);
@@ -58,6 +74,8 @@ class SessionController extends ApiController {
                         $name,
                         $this->input['scoringFormat'] ?? 'bowling',
                         $this->input['competitionFormat'] ?? 'group',
+                        $this->input['participationType'] ?? 'individual',
+                        isset($this->input['teamSize']) ? (int)$this->input['teamSize'] : 1,
                         isset($this->input['roundsPerGame']) ? (int)$this->input['roundsPerGame'] : null,
                         isset($this->input['matchupsPerRound']) ? (int)$this->input['matchupsPerRound'] : null,
                         !empty($this->input['locationId']) ? (int)$this->input['locationId'] : null,

@@ -220,6 +220,8 @@ export const PB_API = {
     delete: (id) => fetchJSON('api/session.php?task=delete', { method: 'POST', body: JSON.stringify({ id }) }),
     addPlayer: (sessionId, playerId) => fetchJSON('api/session.php?task=addPlayer', { method: 'POST', body: JSON.stringify({ sessionId, playerId }) }),
     removePlayer: (sessionId, playerId) => fetchJSON('api/session.php?task=removePlayer', { method: 'POST', body: JSON.stringify({ sessionId, playerId }) }),
+    addTeam: (sessionId, teamId) => fetchJSON('api/session.php?task=addTeam', { method: 'POST', body: JSON.stringify({ sessionId, teamId }) }),
+    removeTeam: (sessionId, teamId) => fetchJSON('api/session.php?task=removeTeam', { method: 'POST', body: JSON.stringify({ sessionId, teamId }) }),
   },
 
   system: {

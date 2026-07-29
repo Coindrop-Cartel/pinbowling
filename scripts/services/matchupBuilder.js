@@ -113,7 +113,7 @@ export function resolveTeamMatchupRole(playerId, orderNumber, eventMatchups, tea
     return emId === entryEmId;
   }) || eventMatchups[0];
 
-  let isTop = (Number(orderNumber) % 2 !== 0);
+  const isTop = (Number(orderNumber) % 2 !== 0);
   const inningNumber = Math.ceil(Number(orderNumber) / 2);
   const displayRoundNumber = `${isTop ? 'Top' : 'Bottom'} ${inningNumber}`;
 
@@ -274,7 +274,7 @@ export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups, tea
  * @param {Object[]} homeTeamMembers Members of the home team [{id, playerName}].
  * @returns {Array} Enriched entries with player info.
  */
-export function enrichTeamMatchupEntries(entries, matchupWrapper, awayTeamMembers, homeTeamMembers) {
+export function enrichTeamMatchupEntries(entries, matchupWrapper, awayTeamMembers, homeTeamMembers, roundName) {
   if (!entries?.length) return entries;
 
   const wrapperHomeTeamId = Number(matchupWrapper.team1Id);
@@ -284,11 +284,14 @@ export function enrichTeamMatchupEntries(entries, matchupWrapper, awayTeamMember
   awayTeamMembers.forEach(m => { allMembersMap[Number(m.id)] = m; });
   homeTeamMembers.forEach(m => { allMembersMap[Number(m.id)] = m; });
 
+  const halfMatch = roundName?.match(/^(Top|Bottom)\s+\d+$/i);
+  const derivedIsTop = halfMatch ? halfMatch[1] === 'Top' : undefined;
+
   const enriched = entries.map((entry, idx) => {
     const orderNum = Number(entry.orderNumber ?? entry.order_number ?? (idx + 1));
-    const isTop = orderNum % 2 === 1;
-
     const entryTeam1Id = Number(entry.team1Id ?? entry.team1_id ?? 0);
+    const isTop = derivedIsTop ?? (entryTeam1Id === wrapperHomeTeamId ? true : (entryTeam1Id === wrapperAwayTeamId ? false : orderNum % 2 === 1));
+
     const entryTeam2Id = Number(entry.team2Id ?? entry.team2_id ?? 0);
 
     const pitchingTeamId = entryTeam1Id;

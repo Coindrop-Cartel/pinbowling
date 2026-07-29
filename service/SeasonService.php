@@ -280,7 +280,7 @@ class SeasonService {
 
                         error_log("[PinBowling DEBUG] SeasonService::generateWeekMatchups — orderNum=$orderNum " . ($isTop ? 'Top' : 'Bottom') . " $inning: pitcher=$pitcherTeamId batter=$batterTeamId machine=" . $machines[0]);
 
-                        MatchupGenerator::createTeamMatchupSlots(
+                        MatchupGenerator::createTeamMatchups(
                             $pdo, $temId, $machines, $eventId, $matchupLocId,
                             $pitcherTeamId, $batterTeamId, $orderNum
                         );

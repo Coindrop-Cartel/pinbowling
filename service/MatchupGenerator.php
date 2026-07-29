@@ -40,19 +40,19 @@ class MatchupGenerator {
     }
 
     /**
-     * Insert the slot rows into the `matchups` table for one head-to-head
-     * event matchup, and populate default/machine target_scores for the event.
-     *
-     * Total slots created = $rounds * $matchupsPerRound with sequential order numbers.
+     * Insert rows into the `team_matchups` table for one team event matchup,
+     * and populate default/machine target_scores for the event.
      *
      * @param PDO   $pdo              Active PDO connection (already in a transaction).
-     * @param int   $eventMatchupId   The event_matchup ID these slots belong to.
-     * @param int   $rounds           Number of rounds per game.
-     * @param int   $matchupsPerRound Number of matchup slots per round.
-     * @param array $allMachineIds    Full pool of machine IDs to draw from.
-     * @param array $playerIds        Optional array of player IDs to assign to slots (for team baseball).
+     * @param int   $teamEventMatchupId   The team_event_matchup ID these rows belong to.
+     * @param array $machineIds       Machine IDs to assign to each half-inning.
+     * @param int|null $eventId      Event ID for target_scores (optional).
+     * @param int|null $locationId   Location ID for target score resolution.
+     * @param int|null $team1Id      Team ID for the pitching team.
+     * @param int|null $team2Id      Team ID for the batting team.
+     * @param int    $startOrder     Starting order number (default 1).
      */
-    public static function createTeamMatchupSlots(
+    public static function createTeamMatchups(
         PDO $pdo,
         int $teamEventMatchupId,
         array $machineIds,

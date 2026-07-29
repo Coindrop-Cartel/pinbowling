@@ -34,12 +34,15 @@ vi.mock('@scripts/utils.js', () => ({
   setCurrentPlayerId: vi.fn(),
   setCurrentPlayerIdSilent: vi.fn(),
   getActiveEventMatchupId: vi.fn(),
+  getActiveTeamEventMatchupId: vi.fn(),
+  getActiveTeamId: vi.fn(),
+  setActiveTeamIdSilent: vi.fn(),
   setActiveEventMatchupIdSilent: vi.fn(),
   formatNumber: (n) => String(n),
   applyScoreFormatting: vi.fn(),
   renderThresholdGrid: vi.fn(() => 'Grid'),
-  loadPage: vi.fn(), // Added mock for loadPage
-  escapeHTML: vi.fn(str => str), // Mock escapeHTML
+  loadPage: vi.fn(),
+  escapeHTML: vi.fn(str => str),
   getUrlParam: vi.fn(() => null),
 }));
 

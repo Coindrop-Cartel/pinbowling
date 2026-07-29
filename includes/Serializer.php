@@ -113,12 +113,15 @@ class Serializer {
             'name' => $row['name'],
             'scoringFormat' => $row['scoring_format'] ?? 'bowling',
             'competitionFormat' => $row['competition_format'] ?? 'group',
+            'participationType' => $row['participation_type'] ?? 'individual',
+            'teamSize' => isset($row['team_size']) ? (int)$row['team_size'] : 1,
             'roundsPerGame' => isset($row['rounds_per_game']) && $row['rounds_per_game'] !== null ? (int)$row['rounds_per_game'] : null,
             'matchupsPerRound' => isset($row['matchups_per_round']) && $row['matchups_per_round'] !== null ? (int)$row['matchups_per_round'] : null,
             'locationId' => isset($row['location_id']) ? (int)$row['location_id'] : null,
             'createdAt' => $row['created_at'] ?? null,
             'events' => isset($row['events']) ? array_map([self::class, 'event'], $row['events']) : [],
             'players' => isset($row['players']) ? array_map([self::class, 'player'], $row['players']) : [],
+            'teams' => isset($row['teams']) ? array_map([self::class, 'team'], $row['teams']) : [],
             'locationIds' => $row['location_ids'] ?? []
         ];
     }

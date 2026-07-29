@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { can, PERMISSIONS } from '@services/auth.js';
 import { getSelectablePlayers, getSelectableTeams, getAutoSelectedPlayerId, getAutoSelectedTeamId, getSpectatorStatus } from '@services/playerSelector.js';
-import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActiveEventIdSilent, formatNumber, setCurrentPlayerIdSilent, getCurrentPlayerId, escapeHTML, getActiveEventMatchupId, setActiveEventMatchupIdSilent, loadPage, getUrlParam } from '@scripts/utils.js';
+import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActiveEventIdSilent, formatNumber, setCurrentPlayerIdSilent, getCurrentPlayerId, getActiveTeamId, setActiveTeamIdSilent, escapeHTML, getActiveEventMatchupId, getActiveTeamEventMatchupId, setActiveEventMatchupIdSilent, loadPage, getUrlParam } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
@@ -196,15 +196,21 @@ export async function initScoresPage() {
       allPlayersCache.length = 0;
       allPlayersCache.push(...allPlayers);
 
-      const isTeamMode = activeLeague?.participationType === 'team';
+      const isTeamMode = (isSessionMode() ? activeSession?.participationType : activeLeague?.participationType) === 'team';
       const currentPlayerId = getCurrentPlayerId();
+
+      const headingEl = playerSelectorUI?.querySelector('h2');
+      if (headingEl) {
+        headingEl.textContent = isTeamMode ? 'Team Selection' : 'Player Selection';
+      }
 
       if (isTeamMode) {
         const selectableTeams = getSelectableTeams({
-          activeMatchupId: getActiveEventMatchupId(),
+          activeMatchupId: getActiveTeamEventMatchupId() || getActiveEventMatchupId(),
           eventMatchups,
           allLeaguesCache,
-          leagueId
+          leagueId,
+          sessionTeams: isSessionMode() ? activeSession?.teams : undefined
         });
         selectablePlayers = selectableTeams.map(t => ({
           id: t.id,
@@ -312,7 +318,7 @@ export async function initScoresPage() {
         engineContext: getEngineContext(),
         getCurrentPlayerId,
         saveScoreCallback: async (scoreData) => {
-          const isTeamMode = activeLeague?.participationType === 'team';
+          const isTeamMode = (isSessionMode() ? activeSession?.participationType : activeLeague?.participationType) === 'team';
           // Use the per-half-inning eventMatchupId from the round entry,
           // NOT the URL-level activeEventMatchupId which always points to the first half-inning.
           const rowEventMatchupId = round.eventMatchupId || getActiveEventMatchupId();
@@ -372,7 +378,7 @@ export async function initScoresPage() {
           }
         },
         refreshCallback: async () => {
-          const isTeamMode = activeLeague?.participationType === 'team';
+          const isTeamMode = (isSessionMode() ? activeSession?.participationType : activeLeague?.participationType) === 'team';
           try {
             if (isTeamMode) {
               allEventScores = await PB_API.teamScores.get(Number(getActiveEventId()));
@@ -421,7 +427,7 @@ export async function initScoresPage() {
   async function refreshPlayerSelection(options = {}) {
     const { skipSkeleton = false } = options;
     const activeEventMatchupId = getActiveEventMatchupId();
-    const isTeamMode = activeLeague?.participationType === 'team';
+    const isTeamMode = (isSessionMode() ? activeSession?.participationType : activeLeague?.participationType) === 'team';
 
     // ── TEAM MODE ──────────────────────────────────────────────────────────
     if (isTeamMode) {
@@ -456,7 +462,8 @@ export async function initScoresPage() {
         return;
       }
 
-      const selectedTeam = (activeLeague.teams || []).find(t => String(t.id) === String(activeTeamId));
+      const teamsPool = isSessionMode() ? (activeSession?.teams || []) : (activeLeague?.teams || []);
+      const selectedTeam = teamsPool.find(t => String(t.id) === String(activeTeamId));
       if (!selectedTeam) return;
 
       const loader = skipSkeleton ? null : createSkeletonLoader(roundsInput, { count: 5 });
@@ -645,6 +652,7 @@ export async function initScoresPage() {
         }
       } else {
         warning.classList.add('hidden');
+        playerSelectorUI?.classList.add('hidden');
         playerSummary?.classList.remove('hidden');
         renderActionSummary(playerSummary, `Player: ${player?.playerName || 'Selected'}`, [
           { text: 'Change', onclick: handlePlayerChange }
@@ -667,9 +675,10 @@ export async function initScoresPage() {
    * branching on activeFormat.
    */
   function getEngineContext() {
-    const isTeamMode = activeLeague?.participationType === 'team';
-    const activeId = getCurrentPlayerId();
-    const selectedTeam = isTeamMode ? (activeLeague?.teams || []).find(t => String(t.id) === String(activeId)) : null;
+    const isTeamMode = (isSessionMode() ? activeSession?.participationType : activeLeague?.participationType) === 'team';
+    const activeId = isTeamMode ? getActiveTeamId() : getCurrentPlayerId();
+    const teamsPool = isSessionMode() ? (activeSession?.teams || []) : (activeLeague?.teams || []);
+    const selectedTeam = isTeamMode ? teamsPool.find(t => String(t.id) === String(activeId)) : null;
     const selectedTeamIdStr = selectedTeam ? String(selectedTeam.id) : null;
 
     const teamRosterOrder = selectedTeamIdStr && rosterOrdersByTeam[selectedTeamIdStr]
@@ -687,10 +696,12 @@ export async function initScoresPage() {
       eventMatchups,
       allPlayersCache,
       getCurrentPlayerId,
+      getActiveTeamId,
       normalizeScores,
       groupScoresByPlayer,
       escapeHTML,
       activeLeague,
+      activeSession,
       isTeamMode,
       enrichedEntries: machines,
       rosterOrder: teamRosterOrder,
@@ -759,6 +770,7 @@ export async function initScoresPage() {
     let leagueId = getActiveLeagueId();
     let sessionId = getUrlParam('sessionId');
     const activeEventMatchupId = getActiveEventMatchupId();
+    const activeTeamEventMatchupId = getActiveTeamEventMatchupId();
 
     if (activeEventMatchupId && (!eventId || !leagueId)) {
       const matchup = await PB_API.matchups.get(null, Number(activeEventMatchupId));
@@ -769,6 +781,18 @@ export async function initScoresPage() {
         // re-trigger initApp() -> initScoresPage() -> refresh() in an infinite loop.
         setActiveEventIdSilent(eventId);
         setActiveLeagueIdSilent(leagueId);
+      }
+    }
+
+    if (activeTeamEventMatchupId && (!eventId || !leagueId)) {
+      const teamMatchup = await PB_API.teamMatchups.get(null, Number(activeTeamEventMatchupId)).catch(() => null);
+      if (teamMatchup) {
+        eventId = String(teamMatchup.eventId);
+        if (teamMatchup.leagueId) {
+          leagueId = String(teamMatchup.leagueId);
+          setActiveLeagueIdSilent(leagueId);
+        }
+        setActiveEventIdSilent(eventId);
       }
     }
 
@@ -850,8 +874,15 @@ export async function initScoresPage() {
     }
 
     if (!isSessionMode()) {
-      league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
+      const lid = getActiveLeagueId();
+      if (lid && typeof PB_API.leagues?.get === 'function') {
+        league = await PB_API.leagues.get(lid).catch(() => leagues.find(l => String(l.id) === String(lid)));
+      } else {
+        league = leagues.find(l => String(l.id) === String(getActiveLeagueId()));
+      }
       event = league?.events?.find(e => String(e.id) === String(eventId)) || league?.events?.[0];
+      if (league) activeLeague = league;
+      if (event) activeEvent = event;
     }
 
     const format = ScoringFormats.resolve(event?.scoringFormat || league?.scoringFormat);
@@ -860,13 +891,18 @@ export async function initScoresPage() {
 
     // Ask the engine what additional data it needs for this event,
     // then fetch it generically — no format-specific branching required.
-    const requiredData = Engine.getRequiredEventData(eventId, PB_API);
-    const isTeamModeLeague = !isSessionMode() && league?.participationType === 'team';
-    if (activeEventMatchupId || isTeamModeLeague) {
-      if (isTeamModeLeague) {
-        requiredData.eventMatchups = PB_API.teamMatchups.get(eventId).catch(() => []);
-        requiredData.allEventScores = PB_API.teamScores.get(eventId).catch(() => []);
-      } else {
+    const requiredData = Engine.getRequiredEventData(eventId, PB_API) || {};
+    const isTeamMode = (isSessionMode() ? activeSession?.participationType : league?.participationType) === 'team';
+    if (activeEventMatchupId || activeTeamEventMatchupId || isTeamMode) {
+      if (isTeamMode) {
+        if (activeTeamEventMatchupId) {
+          requiredData.eventMatchups = PB_API.teamMatchups.get(null, Number(activeTeamEventMatchupId)).then(m => m ? [m] : []).catch(() => []);
+          requiredData.allEventScores = PB_API.teamScores.get(null, Number(activeTeamEventMatchupId)).catch(() => []);
+        } else {
+          requiredData.eventMatchups = PB_API.teamMatchups.get(eventId).catch(() => []);
+          requiredData.allEventScores = PB_API.teamScores.get(eventId).catch(() => []);
+        }
+      } else if (activeEventMatchupId) {
         requiredData.eventMatchups = PB_API.matchups.get(null, Number(activeEventMatchupId)).then(m => [m]);
         requiredData.allEventScores = PB_API.scores.get(null, null, null, Number(activeEventMatchupId));
       }
@@ -875,7 +911,7 @@ export async function initScoresPage() {
     const requiredValues = await Promise.all(Object.values(requiredData));
     requiredKeys.forEach((key, i) => {
       if (key === 'eventMatchups') eventMatchups = requiredValues[i] || [];
-      else if (key === 'allEventScores') allEventScores = requiredValues[i] || [];
+      else if (key === 'allEventScores' || key === 'scores') allEventScores = requiredValues[i] || [];
     });
 
     if (window.PB_DEBUG_MODE) {
@@ -883,7 +919,7 @@ export async function initScoresPage() {
     }
     // Clear any keys not declared by this engine
     if (!requiredKeys.includes('eventMatchups')) eventMatchups = [];
-    if (!requiredKeys.includes('allEventScores')) allEventScores = [];
+    if (!requiredKeys.includes('allEventScores') && !requiredKeys.includes('scores')) allEventScores = [];
 
     // Customize the target machines list to be matchup-specific if deep-linked
     let machinesNormalized = normalizeTargets(eventTargets);
@@ -896,14 +932,15 @@ export async function initScoresPage() {
       }
       return m;
     });
-    if (isTeamModeLeague && eventMatchups.length > 0) {
+    if (isTeamMode && eventMatchups.length > 0) {
       let currentId = getCurrentPlayerId();
       if (!currentId) {
         const selectableTeams = getSelectableTeams({
-          activeMatchupId: getActiveEventMatchupId(),
+          activeMatchupId: getActiveTeamEventMatchupId() || getActiveEventMatchupId(),
           eventMatchups,
           allLeaguesCache,
-          leagueId
+          leagueId,
+          sessionTeams: isSessionMode() ? activeSession?.teams : undefined
         });
         const formattedSelectable = selectableTeams.map(t => ({
           id: t.id,
@@ -922,14 +959,15 @@ export async function initScoresPage() {
         }
       }
 
-      // Single temId per game — use first matchup's entries directly
-      const activeEM = eventMatchups.find(em => String(em.id) === String(activeEventMatchupId))
+      // Single temId per game — use matching matchup's entries directly
+      const activeEM = eventMatchups.find(em => String(em.id) === String(getActiveTeamEventMatchupId() || getActiveEventMatchupId()))
         || eventMatchups[0];
 
       if (activeEM) {
         const rawEntries = activeEM.entries || [];
-        const awayTeam = league.teams?.find(t => String(t.id) === String(activeEM.team2Id));
-        const homeTeam = league.teams?.find(t => String(t.id) === String(activeEM.team1Id));
+        const teamsSource = isSessionMode() ? (activeSession?.teams || []) : (league?.teams || []);
+        const awayTeam = teamsSource.find(t => String(t.id) === String(activeEM.team2Id));
+        const homeTeam = teamsSource.find(t => String(t.id) === String(activeEM.team1Id));
         let enrichedEntries = [];
         if (awayTeam && homeTeam) {
           enrichedEntries = enrichTeamMatchupEntries(rawEntries, activeEM, awayTeam.members || [], homeTeam.members || []);
@@ -991,13 +1029,13 @@ export async function initScoresPage() {
     activeLeague = league;
     activeEvent = event;
 
-    if (activeEventMatchupId && eventMatchups.length > 0) {
+    if ((activeEventMatchupId || activeTeamEventMatchupId) && eventMatchups.length > 0) {
       const matchup = eventMatchups[0];
       const sessionLabel = isSessionMode() ? '' : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;
       summaryTitle = `
         ${sessionLabel}
         <div class="meta-muted">Week: ${escapeHTML(event?.eventName || 'Week')}</div>
-        <div class="meta-muted">Matchup: ${escapeHTML(league?.participationType === 'team' ? (matchup?.team2Name || 'BYE') : (matchup?.player2Name || 'BYE'))} vs ${escapeHTML(league?.participationType === 'team' ? matchup?.team1Name : matchup?.player1Name)}</div>
+        <div class="meta-muted">Matchup: ${escapeHTML(isTeamMode ? (matchup?.team2Name || 'BYE') : (matchup?.player2Name || 'BYE'))} vs ${escapeHTML(isTeamMode ? matchup?.team1Name : matchup?.player1Name)}</div>
       `;
     } else {
       const sessionTitle = isSessionMode() ? `<div class="meta-strong">Session: ${escapeHTML(getSessionName())}</div>` : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;

@@ -42,8 +42,8 @@ export function printMachineScores(machines, format = ScoringFormats.DEFAULT) {
 
     return `
       <div class="print-page">
-        <div class="print-frame">
-          <div class="print-frame-header">
+        <div class="print-card">
+          <div class="print-card-header">
             <h1 class="print-title">${escapeHTML(Engine.getRoundLabel())} ${m.orderNumber}</h1>
             <h2 class="print-title">${escapeHTML(m.machineName)}</h2>
           </div>
@@ -56,7 +56,7 @@ export function printMachineScores(machines, format = ScoringFormats.DEFAULT) {
   const printCss = `
     body { margin: 0; font-family: sans-serif; }
     .print-page { height:100vh; }
-    .print-frame { box-sizing: border-box; }
+    .print-card { box-sizing: border-box; }
   `;
 
   printWindow.document.write(`<html><head><style>${printCss}</style></head><body>${pagesHtml}</body></html>`);
@@ -102,7 +102,7 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = S
     </div>
   `;
 
-  // Now, iterate through machines to create individual frame/hole sections
+  // Now, iterate through machines to create individual round sections
   const machineSectionsHtml = machines.map((m) => {
     const isLast = m.orderNumber === maxOrder;
     const lfHint = isLast ? FormatBranding.get(format).lastFrameHint : null;
@@ -215,7 +215,7 @@ export function printScoreSheet(machines, leagueName, eventName, format = Scorin
   // Compute per-round scores for the Score column
   const turnResults = Engine.calculateTurnResults(machines, scoreMap);
 
-  // Iterate through machines to create individual frame/hole sections with scores
+  // Iterate through machines to create individual round sections with scores
   const machineSectionsHtml = machines.map((m) => {
     const isLast = m.orderNumber === maxOrder;
     const lfHint = isLast ? FormatBranding.get(format).lastFrameHint : null;
@@ -318,8 +318,8 @@ export function printScoreSheet(machines, leagueName, eventName, format = Scorin
     .scoreboard-row .player-name.half-label { font-weight: 400; font-size: 0.8em; padding-left: 1.5em; color: #666; }
     .scoreboard-row .player-col { text-align: left; }
     .scoreboard-row .player-name { text-align: left; font-weight: 600; white-space: nowrap; }
-    .scoreboard-row .inning-header { min-width: 48px; font-size: 0.8em; }
-    .scoreboard-row .inning-score { min-width: 36px; }
+    .scoreboard-row .round-header { min-width: 48px; font-size: 0.8em; }
+    .scoreboard-row .round-score { min-width: 36px; }
     .scoreboard-row .total-header, .scoreboard-row .total-score { font-weight: bold; min-width: 48px; border-left: 2px solid #0a2d48; }
     .home-away-label { font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.3em; }
     .away-label { color: #0a2d48; font-weight: 700; text-transform: uppercase; font-size: 0.85em; }
@@ -419,20 +419,20 @@ export function printSeasonResults(league, players, events, locations, allLeague
       p1Turns.forEach(t => { if (t.played) awayTotal += t.score; });
       p2Turns.forEach(t => { if (t.played) homeTotal += t.score; });
       
-      const totalInnings = Math.ceil(eventMachines.length / 2);
-      const inningData = { away: {}, home: {} };
+      const totalRounds = Math.ceil(eventMachines.length / 2);
+      const roundData = { away: {}, home: {} };
       
       const formatTurns = (turns, side) => {
         for (let i = 0; i < turns.length; i++) {
           const turn = turns[i];
-          const inningNumber = Math.floor(i / 2) + 1;
-          const inningKey = String(inningNumber);
+          const roundNumber = Math.floor(i / 2) + 1;
+          const roundKey = String(roundNumber);
           if (turn.played) {
-            if (turn.isBatter && inningData[side][inningKey] === undefined) {
-              inningData[side][inningKey] = String(turn.score);
+            if (turn.isBatter && roundData[side][roundKey] === undefined) {
+              roundData[side][roundKey] = String(turn.score);
             }
           } else if (turn.isWalkOff) {
-            if (inningData[side][inningKey] === undefined) inningData[side][inningKey] = 'X';
+            if (roundData[side][roundKey] === undefined) roundData[side][roundKey] = 'X';
           }
         }
       };
@@ -441,22 +441,22 @@ export function printSeasonResults(league, players, events, locations, allLeague
       
       let scoreboardHTML = '<div class="scoreboard-grid">';
       scoreboardHTML += '<div class="scoreboard-row header"><span class="player-col">Player</span>';
-      for (let i = 1; i <= totalInnings; i++) {
-        scoreboardHTML += `<span class="inning-header">${i}</span>`;
+      for (let i = 1; i <= totalRounds; i++) {
+        scoreboardHTML += `<span class="round-header">${i}</span>`;
       }
       scoreboardHTML += '<span class="total-header">TOTAL</span></div>';
       
       scoreboardHTML += '<div class="scoreboard-row player-row top-row">';
       scoreboardHTML += `<span class="player-name"><span class="home-away-label">Away:</span> ${escapeHTML(matchup.awayPlayerName || 'BYE')}</span>`;
-      for (let i = 1; i <= totalInnings; i++) {
-        scoreboardHTML += `<span class="inning-score">${inningData.away[String(i)] || '-'}</span>`;
+      for (let i = 1; i <= totalRounds; i++) {
+        scoreboardHTML += `<span class="round-score">${roundData.away[String(i)] || '-'}</span>`;
       }
       scoreboardHTML += `<span class="total-score">${awayTotal}</span></div>`;
       
       scoreboardHTML += '<div class="scoreboard-row player-row bot-row">';
       scoreboardHTML += `<span class="player-name"><span class="home-away-label">Home:</span> ${escapeHTML(matchup.homePlayerName)}</span>`;
-      for (let i = 1; i <= totalInnings; i++) {
-        scoreboardHTML += `<span class="inning-score">${inningData.home[String(i)] || '-'}</span>`;
+      for (let i = 1; i <= totalRounds; i++) {
+        scoreboardHTML += `<span class="round-score">${roundData.home[String(i)] || '-'}</span>`;
       }
       scoreboardHTML += `<span class="total-score">${homeTotal}</span></div>`;
       

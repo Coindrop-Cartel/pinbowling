@@ -142,6 +142,8 @@ function initializeDatabaseSchema($pdo) {
         `name` VARCHAR(255) NOT NULL,
         `scoring_format` VARCHAR(50) DEFAULT 'bowling',
         `competition_format` ENUM('group', 'head2head') DEFAULT 'group',
+        `participation_type` ENUM('individual', 'team') DEFAULT 'individual',
+        `team_size` INT DEFAULT 1,
         `rounds_per_game` INT DEFAULT NULL,
         `matchups_per_round` INT DEFAULT NULL,
         `location_id` INT DEFAULT NULL,
@@ -163,6 +165,14 @@ function initializeDatabaseSchema($pdo) {
         PRIMARY KEY (`session_id`, `location_id`),
         CONSTRAINT `fk_sl_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_sl_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS `session_teams` (
+        `session_id` INT NOT NULL,
+        `team_id` INT NOT NULL,
+        PRIMARY KEY (`session_id`, `team_id`),
+        CONSTRAINT `fk_st_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`id`) ON DELETE CASCADE,
+        CONSTRAINT `fk_st_team` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `events` (
@@ -603,6 +613,8 @@ function alignTableColumns($pdo) {
             `name` VARCHAR(255) NOT NULL,
             `scoring_format` VARCHAR(50) DEFAULT 'bowling',
             `competition_format` ENUM('group', 'head2head') DEFAULT 'group',
+            `participation_type` ENUM('individual', 'team') DEFAULT 'individual',
+            `team_size` INT DEFAULT 1,
             `rounds_per_game` INT DEFAULT NULL,
             `matchups_per_round` INT DEFAULT NULL,
             `location_id` INT DEFAULT NULL,
@@ -624,6 +636,14 @@ function alignTableColumns($pdo) {
             PRIMARY KEY (`session_id`, `location_id`),
             CONSTRAINT `fk_sl_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`id`) ON DELETE CASCADE,
             CONSTRAINT `fk_sl_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `session_teams` (
+            `session_id` INT NOT NULL,
+            `team_id` INT NOT NULL,
+            PRIMARY KEY (`session_id`, `team_id`),
+            CONSTRAINT `fk_st_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`id`) ON DELETE CASCADE,
+            CONSTRAINT `fk_st_team` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     }
 
@@ -1248,6 +1268,41 @@ try {
         echo "✓ Migration 13 — consolidated team_event_matchups to 1 row per game, cleared inning round_name, added series_id.\n";
     } else {
         echo "Team event matchup consolidation already applied.\n";
+    }
+
+    // -----------------------------------------------------------------------
+    // Migration 14: add team support to sessions
+    // -----------------------------------------------------------------------
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'add_team_support_to_sessions'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+
+        $checkTable = $pdo->query("SHOW TABLES LIKE 'sessions'")->fetch();
+        if ($checkTable) {
+            $cols = [
+                'participation_type' => "ALTER TABLE `sessions` ADD COLUMN `participation_type` ENUM('individual', 'team') DEFAULT 'individual' AFTER `competition_format`",
+                'team_size'          => "ALTER TABLE `sessions` ADD COLUMN `team_size` INT DEFAULT 1 AFTER `participation_type`",
+            ];
+            foreach ($cols as $col => $sql) {
+                $exists = $pdo->query("SHOW COLUMNS FROM `sessions` LIKE '$col'")->fetch();
+                if (!$exists) {
+                    $pdo->exec($sql);
+                }
+            }
+        }
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `session_teams` (
+            `session_id` INT NOT NULL,
+            `team_id` INT NOT NULL,
+            PRIMARY KEY (`session_id`, `team_id`),
+            CONSTRAINT `fk_st_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`id`) ON DELETE CASCADE,
+            CONSTRAINT `fk_st_team` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('add_team_support_to_sessions')")->execute();
+        echo "✓ Migration 14 — added participation_type, team_size to sessions, created session_teams table.\n";
+    } else {
+        echo "Session team support already applied.\n";
     }
 
     echo "\n✓ All migrations complete.\n";

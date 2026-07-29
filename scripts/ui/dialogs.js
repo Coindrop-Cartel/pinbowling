@@ -506,11 +506,6 @@ export async function showRosterOrderDialog({ team, members = [], currentOrder =
   });
 }
 
-/** Legacy alias for backwards compatibility */
-export async function showBattingOrderDialog(options) {
-  return showRosterOrderDialog(options);
-}
-
 /**
  * Displays a modal dialog for assigning segment/round roles for each machine/round.
  * Includes equal workload validation.
@@ -616,7 +611,3 @@ export async function showRoleAssignmentDialog({
   });
 }
 
-/** Legacy alias for showRoleAssignmentDialog */
-export async function showPitcherAssignmentDialog(options) {
-  return showRoleAssignmentDialog({ ...options, roleName: 'Pitcher', actionLabel: 'defending' });
-}

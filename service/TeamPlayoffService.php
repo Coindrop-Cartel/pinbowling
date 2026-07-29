@@ -357,7 +357,7 @@ class TeamPlayoffService {
             $machineIdx = ($orderNum - 1) % max($machineCount, 1);
             $machines = [$machineIds[$machineIdx]];
 
-            MatchupGenerator::createTeamMatchupSlots(
+            MatchupGenerator::createTeamMatchups(
                 $pdo, $temId, $machines, $eventId, null,
                 $pitcherTeamId, $batterTeamId, $orderNum
             );

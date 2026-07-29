@@ -205,7 +205,7 @@ function _renderTeamScoreboard(calcResult, machines, context, domRefs, engine) {
   const homeTeamName = wrapper.team1Name ?? 'Home';
   const awayTeamName = wrapper.team2Name ?? 'Away';
 
-  // Group turn results by half-inning (machine)
+  // Group turn results by machine (round)
   const machineGroups = [];
   machines.forEach(m => {
     const orderNum = Number(m.orderNumber ?? m.order_number);
@@ -218,13 +218,13 @@ function _renderTeamScoreboard(calcResult, machines, context, domRefs, engine) {
     });
   });
 
-  // Group by inning (pairs of half-innings)
-  const innings = [];
+  // Pair machines into rounds (2 turns per round for baseball: top/bottom)
+  const roundGroups = [];
   for (let i = 0; i < machineGroups.length; i += 2) {
     const topGroup = machineGroups[i];
     const bottomGroup = machineGroups[i + 1];
-    innings.push({
-      inningNumber: Math.floor(i / 2) + 1,
+    roundGroups.push({
+      roundNumber: Math.floor(i / 2) + 1,
       top: topGroup,
       bottom: bottomGroup
     });
@@ -233,27 +233,28 @@ function _renderTeamScoreboard(calcResult, machines, context, domRefs, engine) {
   let scoreboardHTML = '<div class="scoreboard-grid">';
 
   // Header row
+  const roundLabel = engine.getRoundLabel();
   scoreboardHTML += '<div class="scoreboard-row header"><span class="player-col">Team</span>';
-  innings.forEach(inn => {
-    scoreboardHTML += `<span class="round-header" style="min-width: 80px;">Inning ${inn.inningNumber}</span>`;
+  roundGroups.forEach(rg => {
+    scoreboardHTML += `<span class="round-header" style="min-width: 80px;">${roundLabel} ${rg.roundNumber}</span>`;
   });
   scoreboardHTML += '<span class="total-header">TOTAL</span></div>';
 
   // Away team row
   scoreboardHTML += '<div class="scoreboard-row player-row">';
   scoreboardHTML += `<span class="player-name"><span class="home-away-label">Away:</span> ${escapeHTML(awayTeamName)}</span>`;
-  innings.forEach(inn => {
-    const topRuns = inn.top?.entries.reduce((sum, e) => sum + (e.played ? e.score : 0), 0) ?? '-';
-    scoreboardHTML += `<span class="round-score">${topRuns === 0 && !inn.top?.entries.some(e => e.played) ? '-' : topRuns}</span>`;
+  roundGroups.forEach(rg => {
+    const topRuns = rg.top?.entries.reduce((sum, e) => sum + (e.played ? e.score : 0), 0) ?? '-';
+    scoreboardHTML += `<span class="round-score">${topRuns === 0 && !rg.top?.entries.some(e => e.played) ? '-' : topRuns}</span>`;
   });
   scoreboardHTML += `<span class="total-score">${teamTotals.away}</span></div>`;
 
   // Home team row
   scoreboardHTML += '<div class="scoreboard-row player-row">';
   scoreboardHTML += `<span class="player-name"><span class="home-away-label">Home:</span> ${escapeHTML(homeTeamName)}</span>`;
-  innings.forEach(inn => {
-    const bottomRuns = inn.bottom?.entries.reduce((sum, e) => sum + (e.played ? e.score : 0), 0) ?? '-';
-    scoreboardHTML += `<span class="round-score">${bottomRuns === 0 && !inn.bottom?.entries.some(e => e.played) ? '-' : bottomRuns}</span>`;
+  roundGroups.forEach(rg => {
+    const bottomRuns = rg.bottom?.entries.reduce((sum, e) => sum + (e.played ? e.score : 0), 0) ?? '-';
+    scoreboardHTML += `<span class="round-score">${bottomRuns === 0 && !rg.bottom?.entries.some(e => e.played) ? '-' : bottomRuns}</span>`;
   });
   scoreboardHTML += `<span class="total-score">${teamTotals.home}</span></div>`;
 

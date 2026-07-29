@@ -41,11 +41,28 @@ class SessionService {
             $locationsBySession[(int)$ll['session_id']][] = (int)$ll['location_id'];
         }
 
+        $teamStmt = $pdo->query(
+            'SELECT st.session_id, t.*,
+                    GROUP_CONCAT(p.id, ":", p.player_name SEPARATOR "|") as member_data
+             FROM session_teams st
+             JOIN teams t ON st.team_id = t.id
+             LEFT JOIN team_members tm ON t.id = tm.team_id
+             LEFT JOIN players p ON tm.player_id = p.id
+             GROUP BY st.session_id, t.id
+             ORDER BY t.name ASC'
+        );
+        $teamsBySession = [];
+        foreach ($teamStmt->fetchAll() as $t) {
+            $t['members'] = $this->parseTeamMembers($t['member_data'] ?? '');
+            $teamsBySession[(int)$t['session_id']][] = $t;
+        }
+
         foreach ($sessions as &$session) {
             $id = (int)$session['id'];
             $session['events']  = $eventsBySession[$id]  ?? [];
             $session['players'] = $playersBySession[$id] ?? [];
             $session['location_ids'] = $locationsBySession[$id] ?? [];
+            $session['teams'] = $teamsBySession[$id] ?? [];
         }
 
         return $sessions;
@@ -108,18 +125,51 @@ class SessionService {
         $stmt->execute([$id]);
         $session['location_ids'] = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 
+        $stmt = $pdo->prepare(
+            'SELECT t.*,
+                    GROUP_CONCAT(p.id, ":", p.player_name SEPARATOR "|") as member_data
+             FROM teams t
+             JOIN session_teams st ON t.id = st.team_id
+             LEFT JOIN team_members tm ON t.id = tm.team_id
+             LEFT JOIN players p ON tm.player_id = p.id
+             WHERE st.session_id = ?
+             GROUP BY t.id
+             ORDER BY t.name ASC'
+        );
+        $stmt->execute([$id]);
+        $teams = $stmt->fetchAll();
+        foreach ($teams as &$t) {
+            $t['members'] = $this->parseTeamMembers($t['member_data'] ?? '');
+        }
+        $session['teams'] = $teams;
+
         return $session;
     }
 
-    public function createSession(string $name, string $scoringFormat = 'bowling', string $competitionFormat = 'group', ?int $roundsPerGame = null, ?int $matchupsPerRound = null, ?int $locationId = null, string $eventName = null, string $eventDate = null): array {
+    private function parseTeamMembers(string $memberData): array {
+        if (empty($memberData)) return [];
+        $members = [];
+        foreach (explode('|', $memberData) as $item) {
+            $parts = explode(':', $item, 2);
+            if (count($parts) === 2 && !empty($parts[0])) {
+                $members[] = [
+                    'id' => (int)$parts[0],
+                    'player_name' => $parts[1]
+                ];
+            }
+        }
+        return $members;
+    }
+
+    public function createSession(string $name, string $scoringFormat = 'bowling', string $competitionFormat = 'group', string $participationType = 'individual', int $teamSize = 1, ?int $roundsPerGame = null, ?int $matchupsPerRound = null, ?int $locationId = null, string $eventName = null, string $eventDate = null): array {
         $pdo = $this->db->getPdo();
         try {
             $pdo->beginTransaction();
 
             $stmt = $pdo->prepare(
-                'INSERT INTO sessions (name, scoring_format, competition_format, rounds_per_game, matchups_per_round, location_id) VALUES (?, ?, ?, ?, ?, ?)'
+                'INSERT INTO sessions (name, scoring_format, competition_format, participation_type, team_size, rounds_per_game, matchups_per_round, location_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
             );
-            $stmt->execute([$name, $scoringFormat, $competitionFormat, $roundsPerGame, $matchupsPerRound, $locationId]);
+            $stmt->execute([$name, $scoringFormat, $competitionFormat, $participationType, $teamSize, $roundsPerGame, $matchupsPerRound, $locationId]);
             $sessionId = (int)$pdo->lastInsertId();
 
             if ($locationId) {
@@ -162,6 +212,7 @@ class SessionService {
 
             $pdo->prepare('DELETE FROM events WHERE session_id = ?')->execute([$id]);
             $pdo->prepare('DELETE FROM session_players WHERE session_id = ?')->execute([$id]);
+            $pdo->prepare('DELETE FROM session_teams WHERE session_id = ?')->execute([$id]);
             $pdo->prepare('DELETE FROM session_locations WHERE session_id = ?')->execute([$id]);
             $stmt = $pdo->prepare('DELETE FROM sessions WHERE id = ?');
             $result = $stmt->execute([$id]);
@@ -185,6 +236,18 @@ class SessionService {
         $pdo = $this->db->getPdo();
         $stmt = $pdo->prepare('DELETE FROM session_players WHERE session_id = ? AND player_id = ?');
         return $stmt->execute([$sessionId, $playerId]);
+    }
+
+    public function addTeamToSession(int $sessionId, int $teamId): bool {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare('INSERT IGNORE INTO session_teams (session_id, team_id) VALUES (?, ?)');
+        return $stmt->execute([$sessionId, $teamId]);
+    }
+
+    public function removeTeamFromSession(int $sessionId, int $teamId): bool {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare('DELETE FROM session_teams WHERE session_id = ? AND team_id = ?');
+        return $stmt->execute([$sessionId, $teamId]);
     }
 
     public function getSessionByEventId(int $eventId) {

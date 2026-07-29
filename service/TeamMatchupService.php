@@ -14,7 +14,7 @@ class TeamMatchupService {
             'SELECT tm.*, mac.machine_name, tem.event_id
              FROM team_matchups tm
              JOIN team_event_matchups tem ON tm.team_event_matchup_id = tem.id
-             JOIN machines mac ON tm.machine_id = mac.id
+             LEFT JOIN machines mac ON tm.machine_id = mac.id
              WHERE tem.event_id = ?
              ORDER BY tm.order_number ASC, tm.id ASC',
             [$eventId]
@@ -26,7 +26,7 @@ class TeamMatchupService {
         $stmt = $this->db->query(
             'SELECT tm.*, mac.machine_name
              FROM team_matchups tm
-             JOIN machines mac ON tm.machine_id = mac.id
+             LEFT JOIN machines mac ON tm.machine_id = mac.id
              WHERE tm.team_event_matchup_id = ?
              ORDER BY tm.order_number ASC, tm.id ASC',
             [$teamEventMatchupId]
@@ -65,6 +65,76 @@ class TeamMatchupService {
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
             $pdo->prepare("DELETE FROM team_matchups WHERE team_event_matchup_id IN ($placeholders)")->execute($ids);
             $pdo->prepare("DELETE FROM team_event_matchups WHERE id IN ($placeholders)")->execute($ids);
+        }
+    }
+
+    public function createTeamEventMatchup(int $eventId, ?int $team1Id, ?int $team2Id, string $status = 'pending', int $gameNumber = 1): int {
+        $pdo = $this->db->getPdo();
+        $stmt = $pdo->prepare(
+            'INSERT INTO team_event_matchups (event_id, team1_id, team2_id, status, game_number)
+             VALUES (?, ?, ?, ?, ?)'
+        );
+        $stmt->execute([$eventId, $team1Id, $team2Id, $status, $gameNumber]);
+        return (int)$pdo->lastInsertId();
+    }
+
+    public function saveTeamEventMatchups(array $matchups): array {
+        $pdo = $this->db->getPdo();
+        $createdTemIds = [];
+
+        try {
+            $pdo->beginTransaction();
+
+            $temMap = [];
+            foreach ($matchups as &$m) {
+                if (isset($m['eventId']) && (!isset($m['teamEventMatchupId']) || $m['teamEventMatchupId'] === null || $m['teamEventMatchupId'] === '')) {
+                    $t1 = isset($m['team1Id']) ? (int)$m['team1Id'] : 0;
+                    $t2 = isset($m['team2Id']) ? (int)$m['team2Id'] : 0;
+                    $minT = min($t1, $t2);
+                    $maxT = max($t1, $t2);
+                    $gameNum = (int)($m['gameNumber'] ?? 1);
+                    $key = (int)$m['eventId'] . '_' . $minT . '_' . $maxT . '_' . $gameNum;
+
+                    if (!isset($temMap[$key])) {
+                        $temId = $this->createTeamEventMatchup(
+                            (int)$m['eventId'],
+                            $t1 ?: null,
+                            $t2 ?: null,
+                            $m['status'] ?? 'pending',
+                            $gameNum
+                        );
+                        $temMap[$key] = $temId;
+                        $createdTemIds[] = $temId;
+                    }
+                    $m['teamEventMatchupId'] = $temMap[$key];
+                }
+            }
+            unset($m);
+
+            $stmt = $pdo->prepare(
+                'INSERT INTO team_matchups (team_event_matchup_id, order_number, machine_id, team1_id, team2_id)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE machine_id = VALUES(machine_id), team1_id = VALUES(team1_id), team2_id = VALUES(team2_id)'
+            );
+
+            foreach ($matchups as $m) {
+                $stmt->execute([
+                    $m['teamEventMatchupId'] ?? $m['team_event_matchup_id'] ?? null,
+                    $m['orderNumber'] ?? $m['order_number'] ?? 0,
+                    $m['machineId'] ?? $m['machine_id'] ?? 0,
+                    $m['team1Id'] ?? $m['team1_id'] ?? null,
+                    $m['team2Id'] ?? $m['team2_id'] ?? null,
+                ]);
+            }
+
+            $pdo->commit();
+
+            return $createdTemIds;
+        } catch (\Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
     }
 

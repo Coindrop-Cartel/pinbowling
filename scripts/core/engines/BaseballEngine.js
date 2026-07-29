@@ -573,11 +573,10 @@ export class BaseballEngine extends ScoringEngine {
    * @returns {Object} The enriched score map with opponent data.
    */
   enrichScoreMap(scoreMap, context) {
-    const { allEventScores, eventMatchups, getCurrentPlayerId, normalizeScores, groupScoresByPlayer, activeLeague, enrichedEntries } = context;
+    const { allEventScores, eventMatchups, getCurrentPlayerId, getActiveTeamId, normalizeScores, groupScoresByPlayer, activeLeague, activeSession, enrichedEntries } = context;
     const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
-    const selectedPlayerId = getCurrentPlayerId();
-
-    const isTeamMode = activeLeague?.participationType === 'team';
+    const isTeamMode = activeLeague?.participationType === 'team' || activeSession?.participationType === 'team';
+    const selectedPlayerId = isTeamMode ? (getActiveTeamId?.() ?? getCurrentPlayerId()) : getCurrentPlayerId();
 
     if (isTeamMode) {
       const normalized = normalizeScores(allEventScores || []);
@@ -754,11 +753,11 @@ export class BaseballEngine extends ScoringEngine {
    * @returns {Object} { matchup, displayRoundNumber, displayRoundLabel, sections }
    */
   getRoundRowContext(round, context) {
-    const { eventMatchups, getCurrentPlayerId, allPlayersCache, activeLeague, enrichedEntries } = context;
+    const { eventMatchups, getCurrentPlayerId, getActiveTeamId, allPlayersCache, activeLeague, activeSession, enrichedEntries } = context;
     const roleAssignmentsByTeam = context.roleAssignmentsByTeam || context.pitcherAssignmentsByTeam;
     const rosterOrdersByTeam = context.rosterOrdersByTeam || context.battingOrdersByTeam;
-    const currentPlayerId = Number(getCurrentPlayerId?.() ?? 0);
-    const isTeamMode = activeLeague?.participationType === 'team';
+    const isTeamMode = activeLeague?.participationType === 'team' || activeSession?.participationType === 'team';
+    const currentPlayerId = Number(isTeamMode ? (getActiveTeamId?.() ?? getCurrentPlayerId()) : getCurrentPlayerId());
 
     let result;
     if (isTeamMode) {
@@ -808,7 +807,7 @@ export class BaseballEngine extends ScoringEngine {
     const battingTeamId = Number(round.team2Id ?? (isTopInning ? awayTeamId : homeTeamId));
 
     // Pitcher resolution
-    const activeLeagueTeams = activeLeague?.teams || [];
+    const activeLeagueTeams = activeLeague?.teams || activeSession?.teams || [];
     const defendingTeam = activeLeagueTeams.find(t => Number(t.id) === defendingTeamId);
     const defendingMembers = defendingTeam?.members || [];
     const defendingTeamIdStr = String(defendingTeamId);
@@ -947,11 +946,11 @@ export class BaseballEngine extends ScoringEngine {
   }
 
   getFirstPlayerRounds(machines, context) {
-    const { getCurrentPlayerId, eventMatchups, activeLeague } = context || {};
-    const isTeamMode = activeLeague?.participationType === 'team';
+    const { getCurrentPlayerId, getActiveTeamId, eventMatchups, activeLeague, activeSession } = context || {};
+    const isTeamMode = activeLeague?.participationType === 'team' || activeSession?.participationType === 'team';
     if (!isTeamMode) return [];
 
-    const teamIdStr = String(getCurrentPlayerId?.() ?? '');
+    const teamIdStr = String(getActiveTeamId?.() ?? getCurrentPlayerId?.() ?? '');
     const matchup = eventMatchups?.[0] || {};
     const homeTeamId = String(matchup?.team1Id ?? matchup?.player1Id ?? '');
     const awayTeamId = String(matchup?.team2Id ?? matchup?.player2Id ?? '');

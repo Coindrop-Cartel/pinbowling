@@ -36,18 +36,19 @@ export function resolvePlayersForMatchupParticipant(participantId, participantNa
  * @returns {Array<{ id: number, name: string, members: Array, roleLabel?: string }>} List of selectable team objects.
  */
 export function getSelectableTeams(params) {
-  const { activeMatchupId, eventMatchups = [], allLeaguesCache = [], leagueId } = params;
+  const { activeMatchupId, eventMatchups = [], allLeaguesCache = [], leagueId, sessionTeams } = params;
   const league = allLeaguesCache.find(l => String(l.id) === String(leagueId));
 
-  if (!league || league.participationType !== 'team') return [];
+  const teamsPool = sessionTeams || league?.teams || [];
+  if (teamsPool.length === 0) return [];
 
   if (activeMatchupId && eventMatchups.length > 0) {
     const matchup = eventMatchups[0];
     const awayId = String(matchup.team2Id ?? '');
     const homeId = String(matchup.team1Id ?? '');
 
-    const awayTeam = (league.teams || []).find(t => String(t.id) === awayId);
-    const homeTeam = (league.teams || []).find(t => String(t.id) === homeId);
+    const awayTeam = teamsPool.find(t => String(t.id) === awayId);
+    const homeTeam = teamsPool.find(t => String(t.id) === homeId);
 
     const selectable = [];
     if (awayTeam) selectable.push({ ...awayTeam, roleLabel: 'Away' });
@@ -55,7 +56,7 @@ export function getSelectableTeams(params) {
     return selectable;
   }
 
-  return league.teams || [];
+  return teamsPool;
 }
 
 /**

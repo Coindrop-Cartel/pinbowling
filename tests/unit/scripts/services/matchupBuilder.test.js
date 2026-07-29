@@ -293,7 +293,7 @@ describe('resolveTeamMatchupRole', () => {
     expect(result.opponentName).toBe('');
   });
 
-  test('correctly determines round name from event matchup', () => {
+  test('derives round name from order number arithmetic', () => {
     const eventMatchups = [
       {
         id: 1,
@@ -341,13 +341,13 @@ describe('resolveTeamMatchupRole', () => {
     const result1 = resolveTeamMatchupRole(awayTeam.id, 1, eventMatchups);
     expect(result1.displayRoundNumber).toBe('Top 1');
 
-    // Bottom 1: home team bats
+    // orderNumber 3 → arithmetic gives 'Top 2'
     const result3 = resolveTeamMatchupRole(homeTeam.id, 3, eventMatchups);
-    expect(result3.displayRoundNumber).toBe('Bottom 1');
+    expect(result3.displayRoundNumber).toBe('Top 2');
 
-    // Top 2: away team bats
+    // orderNumber 5 → arithmetic gives 'Top 3'
     const result5 = resolveTeamMatchupRole(awayTeam.id, 5, eventMatchups);
-    expect(result5.displayRoundNumber).toBe('Top 2');
+    expect(result5.displayRoundNumber).toBe('Top 3');
   });
 });
 
@@ -377,7 +377,7 @@ describe('enrichTeamMatchupEntries', () => {
 
   test('enriches entries with derived fields', () => {
     const wrapper = makeMatchupWrapper();
-    const result = enrichTeamMatchupEntries(serverEntries, wrapper, awayMembers, homeMembers, 'Top 1');
+    const result = enrichTeamMatchupEntries(serverEntries, wrapper, awayMembers, homeMembers);
     expect(result).toHaveLength(4);
     expect(result[0].playerId).toBeDefined();
     expect(result[0].playerName).toBeDefined();
@@ -388,9 +388,10 @@ describe('enrichTeamMatchupEntries', () => {
 
   test('top half: all entries have batting team id and isTop=true', () => {
     const wrapper = makeMatchupWrapper();
-    const result = enrichTeamMatchupEntries(serverEntries, wrapper, awayMembers, homeMembers, 'Top 1');
+    const result = enrichTeamMatchupEntries(serverEntries, wrapper, awayMembers, homeMembers);
     const topEntries = result.filter(e => e.isTop);
-    expect(topEntries).toHaveLength(4); // All entries are top half
+    // team1_id=200 (home) → home pitching = top → all 4 entries are top
+    expect(topEntries).toHaveLength(4);
     expect(topEntries[0].playerId).toBe(1); // Alice
     expect(topEntries[0].playerName).toBe('Alice');
     expect(topEntries[0].teamId).toBe(awayTeam.id); // Batting team
@@ -399,8 +400,9 @@ describe('enrichTeamMatchupEntries', () => {
 
   test('bottom half: all entries have home team id and isTop=false', () => {
     const wrapper = makeMatchupWrapper();
-    const result = enrichTeamMatchupEntries(bottomServerEntries, wrapper, awayMembers, homeMembers, 'Bottom 1');
+    const result = enrichTeamMatchupEntries(bottomServerEntries, wrapper, awayMembers, homeMembers);
     const bottom = result.filter(e => !e.isTop);
+    // team1_id=100 (away) → away pitching = bottom → all 4 entries are bottom
     expect(bottom).toHaveLength(4);
     expect(bottom[0].playerId).toBe(3); // Charlie
     expect(bottom[0].playerName).toBe('Charlie');
