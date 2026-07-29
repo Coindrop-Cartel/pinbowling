@@ -40,7 +40,7 @@ class LeagueService {
      * @return array
      */
     public function getAllLeagues(): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         return $pdo->query('SELECT * FROM leagues ORDER BY start_date DESC')->fetchAll();
     }
 
@@ -51,7 +51,7 @@ class LeagueService {
      * @return array|false League with nested data or false if not found
      */
     public function getLeague(int $leagueId) {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         $stmt = $pdo->prepare('SELECT * FROM leagues WHERE id = ?');
         $stmt->execute([$leagueId]);
@@ -189,7 +189,7 @@ class LeagueService {
      * @return array
      */
     public function getAllLeaguesWithDetails(): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         $leagues = $pdo->query('SELECT * FROM leagues ORDER BY start_date DESC')->fetchAll();
 
@@ -300,7 +300,7 @@ class LeagueService {
      * @return array|false or false
      */
     public function getLeagueMeta(int $leagueId) {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('SELECT scoring_format, participation_type FROM leagues WHERE id = ?');
         $stmt->execute([$leagueId]);
         return $stmt->fetch();
@@ -349,7 +349,7 @@ class LeagueService {
             if ($matchupsPerRound === null || $matchupsPerRound <= 0) $matchupsPerRound = 2;
         }
 
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         try {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare(
@@ -417,7 +417,7 @@ class LeagueService {
             if ($matchupsPerRound === null || $matchupsPerRound <= 0) $matchupsPerRound = 2;
         }
 
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         try {
             $pdo->beginTransaction();
 
@@ -461,7 +461,7 @@ class LeagueService {
      * @return void
      */
     public function updateLeagueStatus(int $leagueId, string $status): void {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('UPDATE leagues SET status = ? WHERE id = ?');
         $stmt->execute([$status, $leagueId]);
     }
@@ -473,7 +473,7 @@ class LeagueService {
      * @return array
      */
     public function getLeagueLocations(int $leagueId): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
         $stmt->execute([$leagueId]);
         return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
@@ -482,11 +482,11 @@ class LeagueService {
     /**
      * Sync assigned locations for a league.
      */
-    private function syncLeagueLocations(PDO $pdo, int $leagueId, array $locationIds): void {
-        $stmt = $pdo->prepare('DELETE FROM league_locations WHERE league_id = ?');
+    private function syncLeagueLocations(DatabaseService $db, int $leagueId, array $locationIds): void {
+        $stmt = $db->prepare('DELETE FROM league_locations WHERE league_id = ?');
         $stmt->execute([$leagueId]);
         if (!empty($locationIds)) {
-            $stmt = $pdo->prepare('INSERT INTO league_locations (league_id, location_id) VALUES (?, ?)');
+            $stmt = $db->prepare('INSERT INTO league_locations (league_id, location_id) VALUES (?, ?)');
             foreach ($locationIds as $locId) {
                 $stmt->execute([$leagueId, (int)$locId]);
             }
@@ -500,7 +500,7 @@ class LeagueService {
      * @return bool Success
      */
     public function deleteLeague(int $leagueId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         try {
             $pdo->beginTransaction();

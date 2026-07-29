@@ -104,7 +104,7 @@ class MatchupController extends ApiController {
 
                 $scoringFormat = 'bowling';
                 if ($eventId) {
-                    $pdo = $this->container->get(\App\Service\DatabaseService::class)->getPdo();
+                    $pdo = $this->container->get(\App\Service\DatabaseService::class);
 
                     // Check the event's own scoring_format first (handles sessions)
                     $stmt = $pdo->prepare('SELECT scoring_format FROM events WHERE id = ?');
@@ -136,7 +136,7 @@ class MatchupController extends ApiController {
                     } else {
                         // Check if an event_matchup already exists for this event
                         $db = $this->container->get(\App\Service\DatabaseService::class);
-                        $pdo = $db->getPdo();
+                        $pdo = $db;
                         $stmt = $pdo->prepare('SELECT id FROM event_matchups WHERE event_id = ?');
                         $stmt->execute([$eventId]);
                         $existingId = $stmt->fetchColumn();

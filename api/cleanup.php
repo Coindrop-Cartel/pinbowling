@@ -40,7 +40,7 @@ class CleanupController extends ApiController {
                 $tables = [];
 
                 try {
-                    $pdo = $this->container->get(DatabaseService::class)->getPdo();
+                    $pdo = $this->container->get(DatabaseService::class);
                     $stmt = $pdo->query('SELECT DATABASE() AS dbname, @@hostname AS hostname');
                     $info = $stmt->fetch(\PDO::FETCH_ASSOC);
                     $connectedHost = $info['hostname'] ?? 'unknown';

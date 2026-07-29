@@ -22,12 +22,12 @@ class TeamPlayoffService {
      * @return bool Success
      */
     public function startPlayoffs(int $leagueId, array $seeds, int $seriesLength): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         try {
-            $pdo->beginTransaction();
+            $db->beginTransaction();
 
-            $stmt = $pdo->prepare('SELECT status, rounds_per_game, matchups_per_round FROM leagues WHERE id = ?');
+            $stmt = $db->prepare('SELECT status, rounds_per_game, matchups_per_round FROM leagues WHERE id = ?');
             $stmt->execute([$leagueId]);
             $league = $stmt->fetch();
             if (!$league) {
@@ -55,7 +55,7 @@ class TeamPlayoffService {
             $event = $this->eventService->createEvent($leagueId, "Playoffs: " . $roundName, null, null, 'baseball');
             $eventId = (int)$event['id'];
 
-            $machinesStmt = $pdo->query('SELECT id FROM machines');
+            $machinesStmt = $db->query('SELECT id FROM machines');
             $allMachineIds = $machinesStmt->fetchAll(PDO::FETCH_COLUMN);
             if (empty($allMachineIds)) {
                 throw new \Exception("No machines found in database.");
@@ -77,25 +77,25 @@ class TeamPlayoffService {
             }
 
             foreach ($pairings as $pair) {
-                $stmt = $pdo->prepare(
+                $stmt = $db->prepare(
                     'INSERT INTO team_event_matchups (event_id, team1_id, team2_id, status, game_number, round_name, series_id)
                      VALUES (?, ?, ?, \'pending\', 1, ?, ?)'
                 );
                 $stmt->execute([$eventId, $pair['home'], $pair['away'], $roundName, $pair['series_id']]);
-                $temId = (int)$pdo->lastInsertId();
+                $temId = (int)$db->lastInsertId();
 
                 $matchupMachineIds = $this->getMatchupMachinePool($leagueId, $allMachineIds);
                 $this->createTeamGameSlots($pdo, $temId, $eventId, $matchupMachineIds, $rounds, $pair['home'], $pair['away']);
             }
 
-            $stmt = $pdo->prepare('UPDATE leagues SET status = \'active\', playoff_series_length = ? WHERE id = ?');
+            $stmt = $db->prepare('UPDATE leagues SET status = \'active\', playoff_series_length = ? WHERE id = ?');
             $stmt->execute([$seriesLength, $leagueId]);
 
-            $pdo->commit();
+            $db->commit();
             return true;
         } catch (\Exception $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
+            if ($db->inTransaction()) {
+                $db->rollBack();
             }
             throw $e;
         }
@@ -210,7 +210,7 @@ class TeamPlayoffService {
             }
 
             if (count($seriesWinners) === $expectedSeriesCount) {
-                $pdo = $this->db->getPdo();
+                $pdo = $this->db;
                 if ($roundName === 'Quarterfinals') {
                     $this->advanceToPlayoffRound(
                         $pdo, $leagueId, 'Semifinals', $rounds, $seriesLength, [
@@ -236,16 +236,16 @@ class TeamPlayoffService {
             $nextHomeId = ($nextGameNumber % 2 === 0) ? $awayTeamId : $homeTeamId;
             $nextAwayId = ($nextGameNumber % 2 === 0) ? $homeTeamId : $awayTeamId;
 
-            $pdo = $this->db->getPdo();
+            $pdo = $this->db;
 
-            $insertStmt = $pdo->prepare(
+            $insertStmt = $db->prepare(
                 'INSERT INTO team_event_matchups (event_id, team1_id, team2_id, status, game_number, round_name, series_id)
                  VALUES (?, ?, ?, \'pending\', ?, ?, ?)'
             );
             $insertStmt->execute([$eventId, $nextHomeId, $nextAwayId, $nextGameNumber, $roundName, $seriesId]);
-            $nextTemId = (int)$pdo->lastInsertId();
+            $nextTemId = (int)$db->lastInsertId();
 
-            $machinesStmt = $pdo->query('SELECT id FROM machines');
+            $machinesStmt = $db->query('SELECT id FROM machines');
             $allMachineIds = $machinesStmt->fetchAll(\PDO::FETCH_COLUMN);
             $matchupMachineIds = $this->getMatchupMachinePool($leagueId, $allMachineIds);
 
@@ -257,14 +257,14 @@ class TeamPlayoffService {
      * Advance to the next playoff round.
      */
     private function advanceToPlayoffRound(
-        PDO $pdo,
+        DatabaseService $db,
         int $leagueId,
         string $nextRoundName,
         int $rounds,
         int $seriesLength,
         array $pairings
     ): void {
-        $stmt = $pdo->prepare('SELECT id FROM events WHERE league_id = ? AND event_name = ?');
+        $stmt = $db->prepare('SELECT id FROM events WHERE league_id = ? AND event_name = ?');
         $stmt->execute([$leagueId, "Playoffs: " . $nextRoundName]);
         $nextEventId = $stmt->fetchColumn();
 
@@ -275,11 +275,11 @@ class TeamPlayoffService {
             $nextEventId = (int)$event['id'];
         }
 
-        $machinesStmt = $pdo->query('SELECT id FROM machines');
+        $machinesStmt = $db->query('SELECT id FROM machines');
         $allMachineIds = $machinesStmt->fetchAll(\PDO::FETCH_COLUMN);
 
         foreach ($pairings as $pair) {
-            $stmt = $pdo->prepare(
+            $stmt = $db->prepare(
                 'SELECT id, team1_id, team2_id FROM team_event_matchups
                  WHERE event_id = ? AND series_id = ? AND game_number = 1'
             );
@@ -292,17 +292,17 @@ class TeamPlayoffService {
                 $oldAway = (int)$existingMatchup['team2_id'];
 
                 if ($oldHome !== (int)$pair['home'] || $oldAway !== (int)$pair['away']) {
-                    $updateStmt = $pdo->prepare(
+                    $updateStmt = $db->prepare(
                         'UPDATE team_event_matchups
                          SET team1_id = ?, team2_id = ?, team_winner_id = NULL, team1_score = 0, team2_score = 0, status = \'pending\'
                          WHERE id = ?'
                     );
                     $updateStmt->execute([$pair['home'], $pair['away'], $temId]);
 
-                    $delScoresStmt = $pdo->prepare('DELETE FROM team_scores WHERE team_event_matchup_id = ?');
+                    $delScoresStmt = $db->prepare('DELETE FROM team_scores WHERE team_event_matchup_id = ?');
                     $delScoresStmt->execute([$temId]);
 
-                    $subStmt = $pdo->prepare(
+                    $subStmt = $db->prepare(
                         'SELECT id FROM team_event_matchups WHERE event_id = ? AND series_id = ? AND game_number > 1'
                     );
                     $subStmt->execute([$nextEventId, $pair['series_id']]);
@@ -311,23 +311,23 @@ class TeamPlayoffService {
                     if (!empty($subMatchupIds)) {
                         $placeholders = implode(',', array_fill(0, count($subMatchupIds), '?'));
 
-                        $delSubScores = $pdo->prepare("DELETE FROM team_scores WHERE team_event_matchup_id IN ($placeholders)");
+                        $delSubScores = $db->prepare("DELETE FROM team_scores WHERE team_event_matchup_id IN ($placeholders)");
                         $delSubScores->execute($subMatchupIds);
 
-                        $delSubMatchups = $pdo->prepare("DELETE FROM team_matchups WHERE team_event_matchup_id IN ($placeholders)");
+                        $delSubMatchups = $db->prepare("DELETE FROM team_matchups WHERE team_event_matchup_id IN ($placeholders)");
                         $delSubMatchups->execute($subMatchupIds);
 
-                        $delSubTems = $pdo->prepare("DELETE FROM team_event_matchups WHERE id IN ($placeholders)");
+                        $delSubTems = $db->prepare("DELETE FROM team_event_matchups WHERE id IN ($placeholders)");
                         $delSubTems->execute($subMatchupIds);
                     }
                 }
             } else {
-                $stmt = $pdo->prepare(
+                $stmt = $db->prepare(
                     'INSERT INTO team_event_matchups (event_id, team1_id, team2_id, status, game_number, round_name, series_id)
                      VALUES (?, ?, ?, \'pending\', 1, ?, ?)'
                 );
                 $stmt->execute([$nextEventId, $pair['home'], $pair['away'], $nextRoundName, $pair['series_id']]);
-                $newTemId = (int)$pdo->lastInsertId();
+                $newTemId = (int)$db->lastInsertId();
 
                 $matchupMachineIds = $this->getMatchupMachinePool($leagueId, $allMachineIds);
                 $this->createTeamGameSlots($pdo, $newTemId, $nextEventId, $matchupMachineIds, $rounds, $pair['home'], $pair['away']);
@@ -339,7 +339,7 @@ class TeamPlayoffService {
      * Create team_matchup slots for a single game, with alternating pitcher/batter roles per half-inning.
      */
     private function createTeamGameSlots(
-        PDO $pdo,
+        DatabaseService $db,
         int $temId,
         int $eventId,
         array $machineIds,
@@ -368,9 +368,9 @@ class TeamPlayoffService {
      * Get target machine pool for a matchup, restricted to a single randomly picked location.
      */
     private function getMatchupMachinePool(int $leagueId, array $allMachineIds): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
-        $llStmt = $pdo->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
+        $llStmt = $db->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
         $llStmt->execute([$leagueId]);
         $assignedLocationIds = $llStmt->fetchAll(\PDO::FETCH_COLUMN);
 
@@ -378,7 +378,7 @@ class TeamPlayoffService {
             return $allMachineIds;
         }
 
-        $lmStmt = $pdo->query('SELECT location_id, machine_id FROM location_machines');
+        $lmStmt = $db->query('SELECT location_id, machine_id FROM location_machines');
         $machinesByLocation = [];
         foreach ($lmStmt->fetchAll() as $row) {
             $machinesByLocation[(int)$row['location_id']][] = (int)$row['machine_id'];

@@ -92,7 +92,7 @@ class EventService {
      * @return bool
      */
     public function deleteEvent(int $eventId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $inTx = $pdo->inTransaction();
         
         try {

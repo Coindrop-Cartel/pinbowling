@@ -80,7 +80,7 @@ function getDbConnection($mockPdo = null) {
     }
     if ($pdo === null) {
         if (isset($GLOBALS['container']) && $GLOBALS['container'] instanceof App\Includes\Container) {
-             $pdo = $GLOBALS['container']->get(App\Service\DatabaseService::class)->getPdo();
+             $pdo = $GLOBALS['container']->get(App\Service\DatabaseService::class);
         } else {
              $cfg = Configuration::getInstance();
              $db = $cfg->getDbConfig();

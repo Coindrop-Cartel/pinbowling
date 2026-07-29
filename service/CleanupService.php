@@ -42,7 +42,7 @@ class CleanupService {
             ];
         }
 
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         try {
             $pdo->beginTransaction();
@@ -106,7 +106,7 @@ class CleanupService {
      * @return array Result with count of deleted players
      */
     public function cleanupAbandonedPlayers(): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         try {
             $pdo->beginTransaction();

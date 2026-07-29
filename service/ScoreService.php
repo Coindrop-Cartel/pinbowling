@@ -115,7 +115,7 @@ class ScoreService
         ?int $player1Score = null,
         ?int $player2Score = null
     ): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         $stmt = $pdo->prepare('SELECT league_id, session_id FROM events WHERE id = ?');
         $stmt->execute([$eventId]);
@@ -186,7 +186,7 @@ class ScoreService
      */
     private function updateMatchupTotals(int $eventMatchupId, ?int $player1Score = null, ?int $player2Score = null): void
     {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         $stmt = $pdo->prepare('SELECT * FROM event_matchups WHERE id = ?');
         $stmt->execute([$eventMatchupId]);
@@ -469,7 +469,7 @@ class ScoreService
      */
     public function deleteScore(int $scoreId): bool
     {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('DELETE FROM scores WHERE id = ?');
         return $stmt->execute([$scoreId]);
     }
@@ -482,7 +482,7 @@ class ScoreService
      */
     public function deletePlayerScores(int $playerId): bool
     {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('DELETE FROM scores WHERE player_id = ?');
         return $stmt->execute([$playerId]);
     }
@@ -495,7 +495,7 @@ class ScoreService
      */
     public function deleteEventScores(int $eventId): bool
     {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('DELETE FROM scores WHERE event_id = ?');
         return $stmt->execute([$eventId]);
     }
@@ -509,7 +509,7 @@ class ScoreService
      */
     public function deletePlayerEventScores(int $eventId, int $playerId): bool
     {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('DELETE FROM scores WHERE event_id = ? AND player_id = ?');
         return $stmt->execute([$eventId, $playerId]);
     }

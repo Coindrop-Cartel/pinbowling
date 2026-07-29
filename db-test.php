@@ -8,7 +8,7 @@
 require_once __DIR__ . '/includes/config.php';
 
 try {
-    $pdo = $GLOBALS['container']->get(\App\Service\DatabaseService::class)->getPdo();
+    $pdo = $GLOBALS['container']->get(\App\Service\DatabaseService::class);
 
     $stmt = $pdo->query('SELECT DATABASE() AS dbname, @@hostname AS hostname');
     $info = $stmt->fetch(PDO::FETCH_ASSOC);

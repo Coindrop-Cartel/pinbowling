@@ -43,7 +43,7 @@ class MatchupGenerator {
      * Insert rows into the `team_matchups` table for one team event matchup,
      * and populate default/machine target_scores for the event.
      *
-     * @param PDO   $pdo              Active PDO connection (already in a transaction).
+     * @param DatabaseService $db   Database service instance.
      * @param int   $teamEventMatchupId   The team_event_matchup ID these rows belong to.
      * @param array $machineIds       Machine IDs to assign to each half-inning.
      * @param int|null $eventId      Event ID for target_scores (optional).
@@ -53,7 +53,7 @@ class MatchupGenerator {
      * @param int    $startOrder     Starting order number (default 1).
      */
     public static function createTeamMatchups(
-        PDO $pdo,
+        DatabaseService $db,
         int $teamEventMatchupId,
         array $machineIds,
         ?int $eventId = null,
@@ -62,12 +62,12 @@ class MatchupGenerator {
         ?int $team2Id = null,
         int $startOrder = 1
     ): void {
-        $stmt = $pdo->prepare(
+        $stmt = $db->prepare(
             'INSERT INTO team_matchups (team_event_matchup_id, order_number, machine_id, team1_id, team2_id)
              VALUES (?, ?, ?, ?, ?)'
         );
 
-        $tsStmt = $pdo->prepare(
+        $tsStmt = $db->prepare(
             'INSERT INTO target_scores
                 (event_id, machine_id, order_number, value1, value2,
                  score1, score2, score3, score4, score5,
@@ -90,7 +90,7 @@ class MatchupGenerator {
 
             if ($eventId) {
                 $format = 'baseball';
-                $targetScores = TargetResolver::resolveTarget($pdo, $machineId, $format, 'medium', $locationId);
+                $targetScores = TargetResolver::resolveTarget($db, $machineId, $format, 'medium', $locationId);
                 $value1 = $targetScores['value1'] ?? 5000000;
                 $value2 = $targetScores['value2'] ?? 1.5;
 
@@ -109,7 +109,7 @@ class MatchupGenerator {
     }
 
     public static function createMatchupSlots(
-        PDO $pdo,
+        DatabaseService $db,
         int $eventMatchupId,
         int $rounds,
         int $matchupsPerRound,
@@ -122,7 +122,7 @@ class MatchupGenerator {
         $machineSlots = self::selectMachines($allMachineIds, $totalSlots);
 
         // Fetch event_id, location_id, scoring_format, and player IDs from event_matchups
-        $stmt = $pdo->prepare(
+        $stmt = $db->prepare(
             'SELECT e.id as event_id, e.location_id, e.scoring_format as event_format, l.scoring_format as league_format
              FROM event_matchups em
              JOIN events e ON em.event_id = e.id
@@ -136,12 +136,12 @@ class MatchupGenerator {
         $eventLocationId = !empty($eventRow['location_id']) ? (int)$eventRow['location_id'] : null;
         $format = !empty($eventRow['event_format']) ? $eventRow['event_format'] : (!empty($eventRow['league_format']) ? $eventRow['league_format'] : 'baseball');
 
-        $stmt = $pdo->prepare(
+        $stmt = $db->prepare(
             'INSERT INTO matchups (event_matchup_id, order_number, machine_id, player1_id, player2_id)
              VALUES (?, ?, ?, ?, ?)'
         );
 
-        $tsStmt = $pdo->prepare(
+        $tsStmt = $db->prepare(
             'INSERT INTO target_scores
                 (event_id, machine_id, order_number, value1, value2,
                  score1, score2, score3, score4, score5,
@@ -166,7 +166,7 @@ class MatchupGenerator {
             $stmt->execute([$eventMatchupId, $orderNum, $machineId, $p1Id, $p2Id]);
 
             if ($eventId) {
-                $targetScores = TargetResolver::resolveTarget($pdo, $machineId, $format, 'medium', $eventLocationId);
+                $targetScores = TargetResolver::resolveTarget($db, $machineId, $format, 'medium', $eventLocationId);
                 $value1 = $targetScores['value1'] ?? 5000000;
                 $value2 = $targetScores['value2'] ?? 1.5;
 

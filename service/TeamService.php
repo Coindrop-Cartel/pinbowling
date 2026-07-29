@@ -18,7 +18,7 @@ class TeamService {
      * @return array
      */
     public function getAllTeams(): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         $stmt = $pdo->query('SELECT * FROM teams ORDER BY name ASC');
         $teams = $stmt->fetchAll();
@@ -48,7 +48,7 @@ class TeamService {
      * @return array|false
      */
     public function getTeam(int $teamId) {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         $stmt = $pdo->prepare('SELECT * FROM teams WHERE id = ?');
         $stmt->execute([$teamId]);
@@ -78,7 +78,7 @@ class TeamService {
      * @return array Created team
      */
     public function createTeam(string $name, ?string $city = null, ?string $state = null): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         $stmt = $pdo->prepare('INSERT INTO teams (name, city, state) VALUES (?, ?, ?)');
         $stmt->execute([$name, $city, $state]);
@@ -96,7 +96,7 @@ class TeamService {
      * @return array Updated team
      */
     public function updateTeam(int $teamId, ?string $name = null, ?string $city = null, ?string $state = null): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         $fields = [];
         $params = [];
@@ -131,7 +131,7 @@ class TeamService {
      * @return bool
      */
     public function deleteTeam(int $teamId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         try {
             $pdo->beginTransaction();
@@ -166,7 +166,7 @@ class TeamService {
      * @return bool
      */
     public function addPlayerToTeam(int $teamId, int $playerId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('INSERT IGNORE INTO team_members (team_id, player_id) VALUES (?, ?)');
         return $stmt->execute([$teamId, $playerId]);
     }
@@ -179,7 +179,7 @@ class TeamService {
      * @return bool
      */
     public function removePlayerFromTeam(int $teamId, int $playerId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('DELETE FROM team_members WHERE team_id = ? AND player_id = ?');
         return $stmt->execute([$teamId, $playerId]);
     }
@@ -192,7 +192,7 @@ class TeamService {
      * @return bool
      */
     public function addTeamToLeague(int $leagueId, int $teamId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('INSERT IGNORE INTO league_teams (league_id, team_id) VALUES (?, ?)');
         return $stmt->execute([$leagueId, $teamId]);
     }
@@ -205,7 +205,7 @@ class TeamService {
      * @return bool
      */
     public function removeTeamFromLeague(int $leagueId, int $teamId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('DELETE FROM league_teams WHERE league_id = ? AND team_id = ?');
         return $stmt->execute([$leagueId, $teamId]);
     }

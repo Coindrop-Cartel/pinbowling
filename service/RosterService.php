@@ -24,7 +24,7 @@ class RosterService {
      * @throws \Exception If the league uses team participation
      */
     public function addPlayerToLeague(int $leagueId, int $playerId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         $stmt = $pdo->prepare('SELECT participation_type FROM leagues WHERE id = ?');
         $stmt->execute([$leagueId]);
@@ -46,7 +46,7 @@ class RosterService {
      * @return bool Success
      */
     public function removePlayerFromLeague(int $leagueId, int $playerId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         $pdo->prepare('DELETE FROM scores WHERE player_id = ? AND event_id IN (SELECT id FROM events WHERE league_id = ?)')
             ->execute([$playerId, $leagueId]);
@@ -84,7 +84,7 @@ class RosterService {
      * @return int
      */
     public function getLeaguePlayerCount(int $leagueId): int {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         $stmt = $pdo->prepare('SELECT participation_type FROM leagues WHERE id = ?');
         $stmt->execute([$leagueId]);

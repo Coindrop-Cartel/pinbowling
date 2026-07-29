@@ -56,7 +56,7 @@ class AuthService {
      */
     public function register(string $username, string $password, string $playerName, ?string $email = null, bool $confirmClaim = false): array {
         try {
-            $pdo = $this->db->getPdo();
+            $pdo = $this->db;
             $pdo->beginTransaction();
 
             // Check if username already exists
@@ -117,7 +117,7 @@ class AuthService {
      */
     public function resetPassword(int $userId, string $newPassword): bool {
         $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT);
-        $stmt = $this->db->getPdo()->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+        $stmt = $this->db->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
         return $stmt->execute([$passwordHash, $userId]);
     }
 
@@ -165,7 +165,7 @@ class AuthService {
      * @return bool
      */
     public function forgotPassword(string $email, string $baseUrl): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
@@ -209,7 +209,7 @@ class AuthService {
      * @return bool Success
      */
     public function resetWithToken(string $token, string $password): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $now = date('Y-m-d H:i:s');
         $stmt = $pdo->prepare("SELECT id FROM users WHERE reset_token = ? AND reset_token_expires > ?");
         $stmt->execute([$token, $now]);

@@ -68,7 +68,7 @@ class PlayerService {
      * @throws \PDOException on duplicate name (error code 1062)
      */
     public function createPlayer(string $playerName, ?string $ifpaId = null, ?string $matchplayId = null): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare("INSERT INTO players (player_name, ifpa_id, matchplay_id) VALUES (?, ?, ?)");
         $stmt->execute([$playerName, $ifpaId, $matchplayId]);
         $id = (int)$pdo->lastInsertId();
@@ -121,7 +121,7 @@ class PlayerService {
 
         $params[] = $playerId;
         $sql = "UPDATE players SET " . implode(", ", $fields) . " WHERE id = ?";
-        $stmt = $this->db->getPdo()->prepare($sql);
+        $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
 
         return $this->getPlayer($playerId);
@@ -135,7 +135,7 @@ class PlayerService {
      * @return bool Success
      */
     public function deletePlayer(int $playerId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         try {
             $pdo->beginTransaction();
@@ -182,7 +182,7 @@ class PlayerService {
             throw new \InvalidArgumentException("Invalid role: $role");
         }
         
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE id = ?");
         return $stmt->execute([$role, $userId]);
     }
@@ -200,7 +200,7 @@ class PlayerService {
             throw new \InvalidArgumentException("Username cannot be empty");
         }
         
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         // Check if username already exists for a different user
         $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
         $stmt->execute([$username, $userId]);
@@ -225,7 +225,7 @@ class PlayerService {
             $email = null;
         }
         
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         if ($email !== null) {
             // Check if email already exists for a different user
             $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
@@ -251,7 +251,7 @@ class PlayerService {
             throw new \InvalidArgumentException("Cannot merge a player into themselves.");
         }
 
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         try {
             $pdo->beginTransaction();
 

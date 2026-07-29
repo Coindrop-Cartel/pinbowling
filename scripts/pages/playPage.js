@@ -82,7 +82,7 @@ export async function initPlayPage() {
       const matches = (session.events || []).filter(e => e.eventDate === today);
       matches.forEach(event => {
         const format = ScoringFormats.resolve(event.scoringFormat || session.scoringFormat);
-        todayEvents.push({ ...event, sessionId: session.id, roster: session.players || [], scoringFormat: format });
+        todayEvents.push({ ...event, sessionId: session.id, roster: session.players || [], teams: session.teams || [], participationType: session.participationType || 'individual', scoringFormat: format });
       });
     });
 
@@ -94,12 +94,15 @@ export async function initPlayPage() {
     sessionsList.innerHTML = ''; // Clear previous results before re-rendering
     const nameQuery = nameInput.value.toLowerCase().trim();
     const locQuery = Number(locSelect.value);
+    const participationTypeSelect = document.getElementById('qp-participation-type');
+    const participationType = participationTypeSelect?.value || 'individual';
 
     const filtered = todayEvents.filter(e => {
       const matchesName = !nameQuery || e.eventName.toLowerCase().includes(nameQuery);
       const matchesLoc = !locQuery || Number(e.locationId) === locQuery;
       const matchesFormat = e.scoringFormat === currentSessionFormat;
-      return matchesName && matchesLoc && matchesFormat;
+      const matchesParticipation = e.participationType === participationType;
+      return matchesName && matchesLoc && matchesFormat && matchesParticipation;
     });
 
     if (filtered.length === 0) {
@@ -110,8 +113,11 @@ export async function initPlayPage() {
     filtered.forEach(event => {
       const engine = getScoringEngine(event.scoringFormat);
       const rosterSize = event.roster?.length || 0;
-      const spots = engine.availableSpots(rosterSize);
-      const showJoin = spots === Infinity || spots > 0;
+      const teamsSize = event.teams?.length || 0;
+      const isTeamSession = event.participationType === 'team';
+      const rosterLabel = isTeamSession ? `Teams: ${teamsSize}` : `Players: ${rosterSize}`;
+      const spots = engine.availableSpots(isTeamSession ? teamsSize : rosterSize);
+      const showJoin = !isTeamSession && (spots === Infinity || spots > 0);
 
       const row = createExpandableRow(sessionsList, {
         id: event.id,
@@ -123,7 +129,7 @@ export async function initPlayPage() {
               <strong>${escapeHTML(event.eventName)}</strong>
             </div>
             <div class="session-stats">
-              ${escapeHTML(event.locationName) || 'No Location'} | ${escapeHTML(event.eventDate)} | Players: ${rosterSize}
+              ${escapeHTML(event.locationName) || 'No Location'} | ${escapeHTML(event.eventDate)} | ${rosterLabel}
             </div>
             <div class="play-action-buttons">
               ${showJoin ? '<button class="join-btn primary btn-row">Join</button>' : ''}
@@ -146,6 +152,14 @@ export async function initPlayPage() {
           console.warn("Failed to fetch current user, likely not logged in:", err);
           return null;
         });
+
+        if (isTeamSession) {
+          if (navigateAfterJoin) {
+            loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, sessionId: event.sessionId, teamId: currentUser?.player_id, playerId: currentUser?.player_id }));
+          }
+          return;
+        }
+
         const joinedIds = new Set(event.roster.map(p => p.id));
         let selectedId = null;
 
@@ -247,6 +261,11 @@ export async function initPlayPage() {
   });
 
   if (nameInput) nameInput.oninput = () => renderExistingSessions();
+
+  const participationTypeSelect = document.getElementById('qp-participation-type');
+  if (participationTypeSelect) {
+    participationTypeSelect.addEventListener('change', () => renderExistingSessions());
+  }
 
   if (formatSelect) {
     formatSelect.addEventListener('change', updateRoundOptions);

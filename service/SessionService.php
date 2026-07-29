@@ -12,7 +12,7 @@ class SessionService {
     }
 
     public function getAllSessions(): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $sessions = $pdo->query('SELECT * FROM sessions ORDER BY created_at DESC')->fetchAll();
 
         $evtStmt = $pdo->query(
@@ -69,7 +69,7 @@ class SessionService {
     }
 
     public function getSession(int $id) {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('SELECT * FROM sessions WHERE id = ?');
         $stmt->execute([$id]);
         $session = $stmt->fetch();
@@ -162,7 +162,7 @@ class SessionService {
     }
 
     public function createSession(string $name, string $scoringFormat = 'bowling', string $competitionFormat = 'group', string $participationType = 'individual', int $teamSize = 1, ?int $roundsPerGame = null, ?int $matchupsPerRound = null, ?int $locationId = null, string $eventName = null, string $eventDate = null): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         try {
             $pdo->beginTransaction();
 
@@ -194,7 +194,7 @@ class SessionService {
     }
 
     public function deleteSession(int $id): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         try {
             $pdo->beginTransaction();
             $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
@@ -227,31 +227,31 @@ class SessionService {
     }
 
     public function addPlayerToSession(int $sessionId, int $playerId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('INSERT IGNORE INTO session_players (session_id, player_id) VALUES (?, ?)');
         return $stmt->execute([$sessionId, $playerId]);
     }
 
     public function removePlayerFromSession(int $sessionId, int $playerId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('DELETE FROM session_players WHERE session_id = ? AND player_id = ?');
         return $stmt->execute([$sessionId, $playerId]);
     }
 
     public function addTeamToSession(int $sessionId, int $teamId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('INSERT IGNORE INTO session_teams (session_id, team_id) VALUES (?, ?)');
         return $stmt->execute([$sessionId, $teamId]);
     }
 
     public function removeTeamFromSession(int $sessionId, int $teamId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('DELETE FROM session_teams WHERE session_id = ? AND team_id = ?');
         return $stmt->execute([$sessionId, $teamId]);
     }
 
     public function getSessionByEventId(int $eventId) {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('SELECT session_id FROM events WHERE id = ?');
         $stmt->execute([$eventId]);
         $sessionId = $stmt->fetchColumn();

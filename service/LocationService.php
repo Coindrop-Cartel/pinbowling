@@ -33,7 +33,7 @@ class LocationService {
      * @return array
      */
     public function getAllLocations(): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         $stmt = $pdo->query('SELECT * FROM locations ORDER BY name ASC');
         $locations = $stmt->fetchAll();
@@ -60,7 +60,7 @@ class LocationService {
      * @return array|false
      */
     public function getLocation(int $locationId) {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         $stmt = $pdo->prepare('SELECT * FROM locations WHERE id = ?');
         $stmt->execute([$locationId]);
@@ -84,7 +84,7 @@ class LocationService {
      * @return array
      */
     public function getLocationMachines(?int $locationId = null): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         if ($locationId) {
             $stmt = $pdo->prepare(self::MACHINE_JOIN_SQL . ' WHERE lm.location_id = ?');
@@ -106,7 +106,7 @@ class LocationService {
      * @return array Created location data
      */
     public function createLocation(string $name, ?string $city = null, ?string $state = null): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         $stmt = $pdo->prepare(
             'INSERT INTO locations (name, city, state) VALUES (?, ?, ?)'
@@ -124,7 +124,7 @@ class LocationService {
      * @return array Updated location
      */
     public function updateLocation(int $locationId, array $data): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $allowed = ['name', 'city', 'state'];
         
         $fields = [];
@@ -154,7 +154,7 @@ class LocationService {
      * @return bool
      */
     public function deleteLocation(int $locationId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         try {
             $pdo->beginTransaction();
@@ -186,7 +186,7 @@ class LocationService {
      * @return bool
      */
     public function addMachineToLocation(int $locationId, int $machineId, array $data = []): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         $sql = 'INSERT INTO location_machines (location_id, machine_id) VALUES (?, ?)';
         $stmt = $pdo->prepare($sql);
@@ -217,7 +217,7 @@ class LocationService {
      * @return bool
      */
     public function updateLocationMachine(int $locationId, int $machineId, array $data): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         // Upsert scores into location_machine_scores
         $format = $data['format'] ?? 'bowling';
@@ -248,7 +248,7 @@ class LocationService {
      * @return bool
      */
     public function removeMachineFromLocation(int $locationId, int $machineId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('DELETE FROM location_machines WHERE location_id = ? AND machine_id = ?');
         return $stmt->execute([$locationId, $machineId]);
     }

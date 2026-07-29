@@ -23,13 +23,13 @@ class SeasonService {
      * @return bool Success
      */
     public function startSeason(int $leagueId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         try {
-            $pdo->beginTransaction();
+            $db->beginTransaction();
             
             // 1. Fetch league details directly
-            $stmt = $pdo->prepare('SELECT status, start_date, weeks_in_season, rounds_per_game, matchups_per_round, participation_type FROM leagues WHERE id = ?');
+            $stmt = $db->prepare('SELECT status, start_date, weeks_in_season, rounds_per_game, matchups_per_round, participation_type FROM leagues WHERE id = ?');
             $stmt->execute([$leagueId]);
             $league = $stmt->fetch();
             if (!$league) {
@@ -54,14 +54,14 @@ class SeasonService {
             
             // Fetch roster / participants
             if ($isTeam) {
-                $stmt = $pdo->prepare(
+                $stmt = $db->prepare(
                     'SELECT t.id, t.name as player_name 
                      FROM teams t 
                      JOIN league_teams lt ON t.id = lt.team_id 
                      WHERE lt.league_id = ?'
                 );
             } else {
-                $stmt = $pdo->prepare(
+                $stmt = $db->prepare(
                     'SELECT p.id, p.player_name 
                      FROM players p 
                      JOIN league_players lp ON p.id = lp.player_id 
@@ -75,24 +75,24 @@ class SeasonService {
             }
             
             // Fetch assigned locations for the league (fallback to all active locations if none explicitly assigned)
-            $llStmt = $pdo->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
+            $llStmt = $db->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
             $llStmt->execute([$leagueId]);
             $assignedLocationIds = $llStmt->fetchAll(PDO::FETCH_COLUMN);
 
             if (empty($assignedLocationIds)) {
-                $allLocStmt = $pdo->query('SELECT id FROM locations');
+                $allLocStmt = $db->query('SELECT id FROM locations');
                 $assignedLocationIds = $allLocStmt->fetchAll(PDO::FETCH_COLUMN);
             }
 
             // Fetch machine IDs grouped by location
-            $lmStmt = $pdo->query('SELECT location_id, machine_id FROM location_machines');
+            $lmStmt = $db->query('SELECT location_id, machine_id FROM location_machines');
             $machinesByLocation = [];
             foreach ($lmStmt->fetchAll() as $row) {
                 $machinesByLocation[(int)$row['location_id']][] = (int)$row['machine_id'];
             }
 
             // 2. Fetch all available machines
-            $machinesStmt = $pdo->query('SELECT id FROM machines');
+            $machinesStmt = $db->query('SELECT id FROM machines');
             $allMachineIds = $machinesStmt->fetchAll(PDO::FETCH_COLUMN);
             if (empty($allMachineIds)) {
                 throw new \Exception("No machines found in database. Please register machines first.");
@@ -130,14 +130,14 @@ class SeasonService {
             }
             
             // 5. Update league status to active
-            $stmt = $pdo->prepare('UPDATE leagues SET status = \'active\' WHERE id = ?');
+            $stmt = $db->prepare('UPDATE leagues SET status = \'active\' WHERE id = ?');
             $stmt->execute([$leagueId]);
             
-            $pdo->commit();
+            $db->commit();
             return true;
         } catch (\Exception $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
+            if ($db->inTransaction()) {
+                $db->rollBack();
             }
             throw $e;
         }
@@ -146,12 +146,12 @@ class SeasonService {
     /**
      * Get ordered member IDs for a team.
      *
-     * @param PDO $pdo
+     * @param DatabaseService $db
      * @param int $teamId
      * @return array Array of ['id' => int] items
      */
-    private function getTeamMembers(PDO $pdo, int $teamId): array {
-        $stmt = $pdo->prepare(
+    private function getTeamMembers(DatabaseService $db, int $teamId): array {
+        $stmt = $db->prepare(
             'SELECT p.id FROM team_members tm
              JOIN players p ON tm.player_id = p.id
              WHERE tm.team_id = ?
@@ -211,7 +211,7 @@ class SeasonService {
      * Cycles through assigned location IDs to guarantee every location hosts matchups each week.
      */
     private function generateWeekMatchups(
-        PDO $pdo,
+        DatabaseService $db,
         int $eventId,
         array $assignedLocationIds,
         int $weekIndex,
@@ -245,7 +245,7 @@ class SeasonService {
             
             if ($awayPlayer === null) {
                 // BYE Week matchup
-                $stmt = $pdo->prepare(
+                $stmt = $db->prepare(
                     "INSERT INTO event_matchups (event_id, location_id, player1_id, player2_id, player1_score, player2_score, player_winner_id, status, game_number)
                      VALUES (?, ?, ?, NULL, 0, 0, NULL, 'completed', 1)"
                 );
@@ -257,12 +257,12 @@ class SeasonService {
                     $awayTeamMembers = $this->getTeamMembers($pdo, $awayPlayer['id']);
 
                     // Create 1 game-level temId
-                    $temStmt = $pdo->prepare(
+                    $temStmt = $db->prepare(
                         'INSERT INTO team_event_matchups (event_id, location_id, team1_id, team2_id, status, game_number)
                          VALUES (?, ?, ?, ?, \'pending\', 1)'
                     );
                     $temStmt->execute([$eventId, $matchupLocId, $homePlayer['id'], $awayPlayer['id']]);
-                    $temId = (int)$pdo->lastInsertId();
+                    $temId = (int)$db->lastInsertId();
                     error_log("[PinBowling DEBUG] SeasonService::generateWeekMatchups — game temId=$temId home={$homePlayer['id']} away={$awayPlayer['id']}");
 
                     // Each inning has Top (away bats) and Bottom (home bats) = 2 half-innings
@@ -287,12 +287,12 @@ class SeasonService {
                     }
                 } else {
                     // Individual baseball: existing logic
-                    $stmt = $pdo->prepare(
+                    $stmt = $db->prepare(
                         'INSERT INTO event_matchups (event_id, location_id, player1_id, player2_id, status, game_number)
                          VALUES (?, ?, ?, ?, \'pending\', 1)'
                     );
                     $stmt->execute([$eventId, $matchupLocId, $homePlayer['id'], $awayPlayer['id']]);
-                    $eventMatchupId = (int)$pdo->lastInsertId();
+                    $eventMatchupId = (int)$db->lastInsertId();
 
                     MatchupGenerator::createMatchupSlots(
                         $pdo, $eventMatchupId,
@@ -311,13 +311,13 @@ class SeasonService {
      * @return bool Success
      */
     public function updateSeason(int $leagueId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         try {
-            $pdo->beginTransaction();
+            $db->beginTransaction();
             
             // 1. Fetch league details directly
-            $stmt = $pdo->prepare('SELECT status, rounds_per_game, matchups_per_round, participation_type FROM leagues WHERE id = ?');
+            $stmt = $db->prepare('SELECT status, rounds_per_game, matchups_per_round, participation_type FROM leagues WHERE id = ?');
             $stmt->execute([$leagueId]);
             $league = $stmt->fetch();
             if (!$league) {
@@ -334,7 +334,7 @@ class SeasonService {
             
             // Fetch roster / participants
             if ($isTeam) {
-                $stmt = $pdo->prepare(
+                $stmt = $db->prepare(
                     'SELECT t.id, t.name as player_name 
                      FROM teams t 
                      JOIN league_teams lt ON t.id = lt.team_id 
@@ -346,7 +346,7 @@ class SeasonService {
                     throw new \Exception("At least 2 teams are required to update a head-to-head season.");
                 }
             } else {
-                $stmt = $pdo->prepare(
+                $stmt = $db->prepare(
                     'SELECT DISTINCT p.id, p.player_name 
                      FROM players p 
                      JOIN league_players lp ON p.id = lp.player_id 
@@ -360,31 +360,31 @@ class SeasonService {
             }
             
             // Fetch assigned locations for the league (fallback to all active locations if none explicitly assigned)
-            $llStmt = $pdo->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
+            $llStmt = $db->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
             $llStmt->execute([$leagueId]);
             $assignedLocationIds = $llStmt->fetchAll(PDO::FETCH_COLUMN);
 
             if (empty($assignedLocationIds)) {
-                $allLocStmt = $pdo->query('SELECT id FROM locations');
+                $allLocStmt = $db->query('SELECT id FROM locations');
                 $assignedLocationIds = $allLocStmt->fetchAll(PDO::FETCH_COLUMN);
             }
 
             // Fetch machine IDs grouped by location
-            $lmStmt = $pdo->query('SELECT location_id, machine_id FROM location_machines');
+            $lmStmt = $db->query('SELECT location_id, machine_id FROM location_machines');
             $machinesByLocation = [];
             foreach ($lmStmt->fetchAll() as $row) {
                 $machinesByLocation[(int)$row['location_id']][] = (int)$row['machine_id'];
             }
 
             // Fetch all available machines
-            $machinesStmt = $pdo->query('SELECT id FROM machines');
+            $machinesStmt = $db->query('SELECT id FROM machines');
             $allMachineIds = $machinesStmt->fetchAll(PDO::FETCH_COLUMN);
             if (empty($allMachineIds)) {
                 throw new \Exception("No machines found in database. Please register machines first.");
             }
             
             // 2. Classify events as played (has scores or completed non-BYE matchups) or unplayed
-            $stmt = $pdo->prepare('SELECT id, event_name, event_date FROM events WHERE league_id = ?');
+            $stmt = $db->prepare('SELECT id, event_name, event_date FROM events WHERE league_id = ?');
             $stmt->execute([$leagueId]);
             $events = $stmt->fetchAll();
             
@@ -402,11 +402,11 @@ class SeasonService {
             foreach ($regSeasonEvents as $event) {
                 $eventId = (int)$event['id'];
                 
-                $scoreStmt = $pdo->prepare('SELECT COUNT(*) FROM scores WHERE event_id = ?');
+                $scoreStmt = $db->prepare('SELECT COUNT(*) FROM scores WHERE event_id = ?');
                 $scoreStmt->execute([$eventId]);
                 $scoreCount = (int)$scoreStmt->fetchColumn();
 
-                $checkStmt = $pdo->prepare(
+                $checkStmt = $db->prepare(
                     "SELECT COUNT(*) FROM event_matchups 
                      WHERE event_id = ? AND status = 'completed' AND player2_id IS NOT NULL"
                 );
@@ -425,7 +425,7 @@ class SeasonService {
                 }
             }
             if (!$hasUnplayed) {
-                $pdo->commit();
+                $db->commit();
                 return true;
             }
             
@@ -454,13 +454,13 @@ class SeasonService {
                 }
                 
                 // Delete existing matchups for this unplayed week
-                $pdo->prepare('DELETE FROM matchups WHERE event_matchup_id IN (SELECT id FROM event_matchups WHERE event_id = ?)')->execute([$eventId]);
-                $pdo->prepare('DELETE FROM event_matchups WHERE event_id = ?')->execute([$eventId]);
+                $db->prepare('DELETE FROM matchups WHERE event_matchup_id IN (SELECT id FROM event_matchups WHERE event_id = ?)')->execute([$eventId]);
+                $db->prepare('DELETE FROM event_matchups WHERE event_id = ?')->execute([$eventId]);
 
                 // Primary location for the weekly event header
                 $primaryLocId = !empty($assignedLocationIds) ? (int)$assignedLocationIds[($weekNum - 1) % count($assignedLocationIds)] : null;
                 if ($primaryLocId) {
-                    $pdo->prepare('UPDATE events SET location_id = ? WHERE id = ?')->execute([$primaryLocId, $eventId]);
+                    $db->prepare('UPDATE events SET location_id = ? WHERE id = ?')->execute([$primaryLocId, $eventId]);
                 }
                 
                 $pairings = $pairingsByRound[($weekNum - 1) % $roundsCount];
@@ -470,11 +470,11 @@ class SeasonService {
                 );
             }
 
-            $pdo->commit();
+            $db->commit();
             return true;
         } catch (\Exception $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
+            if ($db->inTransaction()) {
+                $db->rollBack();
             }
             throw $e;
         }

@@ -47,7 +47,7 @@ class TargetResolver {
     /**
      * Resolves the target score baseline and multiplier for a machine.
      *
-     * @param PDO         $pdo        Active PDO connection.
+     * @param DatabaseService $db  Database service instance.
      * @param int         $machineId  ID of the machine.
      * @param string      $format     Scoring format ('baseball', 'golf', 'bowling').
      * @param string      $difficulty Difficulty level ('easy', 'medium', 'hard').
@@ -55,7 +55,7 @@ class TargetResolver {
      * @return array      ['value1' => int, 'value2' => float]
      */
     public static function resolveTarget(
-        PDO $pdo,
+        DatabaseService $db,
         int $machineId,
         string $format = 'bowling',
         string $difficulty = 'medium',
@@ -76,7 +76,7 @@ class TargetResolver {
             $locSql .= " AND lm.location_id = ?";
             $params[] = $locationId;
         }
-        $stmt = $pdo->prepare($locSql);
+        $stmt = $db->prepare($locSql);
         $stmt->execute($params);
         $locRows = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
@@ -86,7 +86,7 @@ class TargetResolver {
         }
 
         // 2. Fetch machine_scores
-        $stmt = $pdo->prepare("SELECT format, {$columnName} as score FROM machine_scores WHERE machine_id = ?");
+        $stmt = $db->prepare("SELECT format, {$columnName} as score FROM machine_scores WHERE machine_id = ?");
         $stmt->execute([$machineId]);
         $masterRows = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {

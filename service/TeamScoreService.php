@@ -28,7 +28,7 @@ class TeamScoreService
         ?int $team1Score = null,
         ?int $team2Score = null
     ): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         $stmt = $pdo->prepare('SELECT league_id FROM events WHERE id = ?');
         $stmt->execute([$eventId]);

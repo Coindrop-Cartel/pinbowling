@@ -120,7 +120,7 @@ class MatchupService {
      * @return bool
      */
     public function saveMatchups(array $matchups): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         try {
             $pdo->beginTransaction();
@@ -160,7 +160,7 @@ class MatchupService {
      * @return bool
      */
     public function deleteMatchup(int $matchupId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('DELETE FROM matchups WHERE id = ?');
         return $stmt->execute([$matchupId]);
     }
@@ -172,7 +172,7 @@ class MatchupService {
      * @return bool
      */
     public function deleteEventMatchups(int $eventId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('DELETE FROM matchups WHERE event_matchup_id IN (SELECT id FROM event_matchups WHERE event_id = ?)');
         return $stmt->execute([$eventId]);
     }

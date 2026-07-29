@@ -25,7 +25,7 @@ class PlayoffService {
      * @return bool Success
      */
     public function startPlayoffs(int $leagueId, array $seeds, int $seriesLength): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         try {
             $pdo->beginTransaction();
@@ -250,7 +250,7 @@ class PlayoffService {
             $matchupMachineIds = $this->getMatchupMachinePool($leagueId, $allMachineIds);
 
             MatchupGenerator::createMatchupSlots(
-                $this->db->getPdo(), $nextEventMatchupId,
+                $this->db, $nextEventMatchupId,
                 $rounds, $matchupsPerRound, $matchupMachineIds
             );
         }
@@ -261,7 +261,7 @@ class PlayoffService {
      */
     private function advanceToPlayoffRound(int $leagueId, string $nextRoundName, array $pairings, int $rounds, int $matchupsPerRound, int $seriesLength): void
     {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         // 1. Check if the playoffs event for nextRoundName already exists
         $stmt = $pdo->prepare('SELECT id FROM events WHERE league_id = ? AND event_name = ?');
@@ -346,7 +346,7 @@ class PlayoffService {
      */
     private function getMatchupMachinePool(int $leagueId, array $allMachineIds): array
     {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         $llStmt = $pdo->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
         $llStmt->execute([$leagueId]);

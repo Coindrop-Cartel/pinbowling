@@ -44,7 +44,7 @@ class TeamScoreController extends ApiController {
 
                 $isTD = $currentUser && in_array($currentUser['role'] ?? '', ['admin', 'td']);
                 if (!$isTD) {
-                    $pdo = $this->container->get(\App\Service\DatabaseService::class)->getPdo();
+                    $pdo = $this->container->get(\App\Service\DatabaseService::class);
                     $stmt = $pdo->prepare(
                         'SELECT 1 FROM team_members tm WHERE tm.team_id = ? AND tm.player_id = ?'
                     );

@@ -11,7 +11,7 @@
 require_once __DIR__ . '/../includes/bootstrap.php';
 
 try {
-    $pdo = $container->get(\App\Service\DatabaseService::class)->getPdo();
+    $pdo = $container->get(\App\Service\DatabaseService::class);
 
     echo "Scanning scores table to reconstruct league rosters...\n";
 

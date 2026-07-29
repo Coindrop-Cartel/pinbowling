@@ -18,7 +18,7 @@ class MachineService {
      * @return array
      */
     public function getAllMachines(): array {
-        $stmt = $this->db->getPdo()->query(
+        $stmt = $this->db->query(
             'SELECT m.id, m.machine_name, m.year, m.manufacturer, ms.format, ms.target_easy, ms.target_med, ms.target_hard
              FROM machines m
              LEFT JOIN machine_scores ms ON ms.machine_id = m.id
@@ -51,7 +51,7 @@ class MachineService {
      * @param array $scores
      */
     public function saveMachineScores(int $machineId, array $scores): void {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         foreach ($scores as $format => $targets) {
             $easy = (int)($targets['targetEasy'] ?? $targets['target_easy'] ?? 0);
             $med = (int)($targets['targetMed'] ?? $targets['target_med'] ?? 0);
@@ -76,7 +76,7 @@ class MachineService {
      * @return array Created machine
      */
     public function createMachine(string $machineName, ?int $year = null, ?string $manufacturer = null, ?array $scores = null): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         $stmt = $pdo->prepare(
             'INSERT INTO machines (machine_name, year, manufacturer) VALUES (?, ?, ?)'
@@ -102,7 +102,7 @@ class MachineService {
      * @return array Updated machine
      */
     public function updateMachine(int $machineId, ?string $machineName = null, ?int $year = null, ?string $manufacturer = null, ?array $scores = null): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         $fields = [];
         $params = [];
@@ -141,7 +141,7 @@ class MachineService {
      * @return bool
      */
     public function deleteMachine(int $machineId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         try {
             $pdo->beginTransaction();
@@ -217,7 +217,7 @@ class MachineService {
      * @return bool
      */
     public function saveTargetScores(int $eventId, array $targets): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         // Support a single target object or a batch array
         if (isset($targets['machineId'])) {
@@ -286,7 +286,7 @@ class MachineService {
             return true;
         }
 
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         
         try {
             $pdo->beginTransaction();
@@ -334,7 +334,7 @@ class MachineService {
      * @return bool
      */
     public function deleteEventTargetScores(int $eventId): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('DELETE FROM target_scores WHERE event_id = ?');
         return $stmt->execute([$eventId]);
     }

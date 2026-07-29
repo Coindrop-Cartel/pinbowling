@@ -57,7 +57,7 @@ class TeamMatchupService {
     }
 
     public function deleteEventTeamMatchups(int $eventId): void {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare('SELECT id FROM team_event_matchups WHERE event_id = ?');
         $stmt->execute([$eventId]);
         $ids = $stmt->fetchAll(\PDO::FETCH_COLUMN);
@@ -69,7 +69,7 @@ class TeamMatchupService {
     }
 
     public function createTeamEventMatchup(int $eventId, ?int $team1Id, ?int $team2Id, string $status = 'pending', int $gameNumber = 1): int {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $stmt = $pdo->prepare(
             'INSERT INTO team_event_matchups (event_id, team1_id, team2_id, status, game_number)
              VALUES (?, ?, ?, ?, ?)'
@@ -79,7 +79,7 @@ class TeamMatchupService {
     }
 
     public function saveTeamEventMatchups(array $matchups): array {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
         $createdTemIds = [];
 
         try {
@@ -139,7 +139,7 @@ class TeamMatchupService {
     }
 
     public function saveTeamMatchups(array $matchups): bool {
-        $pdo = $this->db->getPdo();
+        $pdo = $this->db;
 
         try {
             $pdo->beginTransaction();
