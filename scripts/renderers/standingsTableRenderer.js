@@ -55,6 +55,8 @@ export function renderStandingsTable({
   supportsMatchups,
   head2headRecordsMap = null,
   allTeamsData = [],
+  teamResultMap = {},
+  matchupScoreMap = {},
   tvModeManager = null,
   lastScoreState = new Map(),
   currentScoreState = new Map()
@@ -64,8 +66,8 @@ export function renderStandingsTable({
 
   if (isSummary) {
     // --- SEASON SUMMARY RENDER PATHS ---
-    if (supportsMatchups && !isTeamLeague) {
-      // 1. Head-to-Head Season Summary (Individual)
+    if (supportsMatchups) {
+      // 1. Head-to-Head Season Summary
       if (headerEl) {
         headerEl.innerHTML = `
           <tr>
@@ -80,7 +82,7 @@ export function renderStandingsTable({
       }
       if (bodyEl) {
         bodyEl.innerHTML = rows.map((res, idx) => {
-          const entityName = escapeHTML(res.entity.playerName);
+          const entityName = isTeamLeague ? escapeHTML(res.entity.name) : escapeHTML(res.entity.playerName);
           const rec = res.record || { wins: 0, losses: 0, ties: 0, runDiff: 0, winRate: 0 };
           const diffSign = rec.runDiff > 0 ? '+' : '';
           const winPct = rec.winRate.toFixed(3);
@@ -150,15 +152,24 @@ export function renderStandingsTable({
   } else {
     // --- EVENT SCOREBOARD RENDER PATHS ---
     if (headerEl) {
-      if (supportsMatchups && !isTeamLeague) {
-        // Head-to-head scoreboard: Result, W-L, Total Runs
+      if (isTeamLeague && supportsMatchups) {
         headerEl.innerHTML = `
           <tr>
             <th class="text-center">#</th>
             <th class="text-center">${playerLabel}</th>
             <th class="text-center">Result</th>
+            <th class="text-center">Score</th>
             <th class="text-center">W-L</th>
-            <th class="text-center">Total</th>
+          </tr>
+        `;
+      } else if (supportsMatchups && !isTeamLeague) {
+        headerEl.innerHTML = `
+          <tr>
+            <th class="text-center">#</th>
+            <th class="text-center">${playerLabel}</th>
+            <th class="text-center">Result</th>
+            <th class="text-center">Score</th>
+            <th class="text-center">W-L</th>
           </tr>
         `;
       } else {
@@ -187,33 +198,50 @@ export function renderStandingsTable({
           return { team, teamMembers, teamTotal };
         }).sort((a, b) => engine.compareScores(a.teamTotal, b.teamTotal));
 
-        const colspan = columns.length + (supportsMatchups ? 2 : 1);
-        bodyEl.innerHTML = teamResults.map((tr, idx) => {
+        if (supportsMatchups) {
+          bodyEl.innerHTML = teamResults.map((tr, idx) => {
+            const rec = head2headRecordsMap?.[tr.team.id];
+            const recordStr = rec ? `${rec.wins}-${rec.losses}${rec.ties > 0 ? `-${rec.ties}` : ''}` : '-';
+            const resultDisplay = teamResultMap?.[tr.team.id] || '-';
+            const scoreDisplay = matchupScoreMap[tr.team.id] || '-';
           return `
-            <tr class="team-header">
-              <td class="text-center">${idx + 1}</td>
-              <td colspan="${colspan}">${escapeHTML(tr.team.name)}</td>
-              <td class="standings-total">${engine.formatTotalScore(tr.teamTotal)}</td>
-            </tr>
-          `;
-        }).join('');
+              <tr class="team-header">
+                <td class="text-center">${idx + 1}</td>
+                <td class="player-name-cell">${escapeHTML(tr.team.name)}</td>
+                <td class="text-center">${resultDisplay}</td>
+                <td class="standings-total text-center">${scoreDisplay}</td>
+                <td class="text-center">${recordStr}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          const colspan = columns.length + 1;
+          bodyEl.innerHTML = teamResults.map((tr, idx) => {
+            return `
+              <tr class="team-header">
+                <td class="text-center">${idx + 1}</td>
+                <td colspan="${colspan}">${escapeHTML(tr.team.name)}</td>
+                <td class="standings-total">${engine.formatTotalScore(tr.teamTotal)}</td>
+              </tr>
+            `;
+          }).join('');
+        }
       } else if (supportsMatchups) {
-        // 4a. Head-to-head scoreboard: Result, W-L (season), Total Runs (season)
         const sortedRows = engine.sortStandings(rows, { head2headRecordsMap });
 
         bodyEl.innerHTML = sortedRows.map((res, idx) => {
           const rec = head2headRecordsMap?.[res.player.id];
-          const totalRuns = rec ? rec.totalRuns : res.total;
           const recordStr = rec ? `${rec.wins}-${rec.losses}${rec.ties > 0 ? `-${rec.ties}` : ''}` : '-';
           const resultDisplay = res.result || '-';
+          const scoreDisplay = matchupScoreMap[res.player.id] || '-';
 
           return `
             <tr>
               <td class="text-center">${idx + 1}</td>
               <td class="player-name-cell">${escapeHTML(res.player.playerName)}</td>
               <td class="text-center">${resultDisplay}</td>
+              <td class="standings-total text-center">${scoreDisplay}</td>
               <td class="text-center">${recordStr}</td>
-              <td class="standings-total">${engine.formatTotalScore(totalRuns)}</td>
             </tr>
           `;
         }).join('');

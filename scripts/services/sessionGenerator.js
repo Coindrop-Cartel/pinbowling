@@ -2,9 +2,7 @@
  * Small helpers for Quick-Play session generation.
  */
 
-import { getTargetScoreForDifficulty as resolveTarget, FORMAT_DEFAULTS } from './targetResolver.js';
-
-export { FORMAT_DEFAULTS };
+import { getTargetScoreForDifficulty as resolveTarget } from './targetResolver.js';
 
 /**
  * Build a session name from optional custom name, location, date, and time.

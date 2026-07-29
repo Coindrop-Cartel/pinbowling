@@ -89,27 +89,6 @@ class MatchupService {
     }
 
     /**
-     * Get a specific matchup detail row.
-     *
-     * @param int $matchupId
-     * @return array|false
-     */
-    public function getMatchup(int $matchupId) {
-        $stmt = $this->db->query(
-            'SELECT m.*, mac.machine_name,
-                    p1.player_name as player1_name,
-                    p2.player_name as player2_name
-             FROM matchups m
-             JOIN machines mac ON m.machine_id = mac.id
-             LEFT JOIN players p1 ON m.player1_id = p1.id
-             LEFT JOIN players p2 ON m.player2_id = p2.id
-             WHERE m.id = ?',
-            [$matchupId]
-        );
-        return $stmt->fetch();
-    }
-
-    /**
      * Save or update multiple matchups.
      *
      * Each matchup row represents a machine assigned to a half-inning slot:
@@ -151,18 +130,6 @@ class MatchupService {
             }
             throw $e;
         }
-    }
-
-    /**
-     * Delete a matchup.
-     *
-     * @param int $matchupId
-     * @return bool
-     */
-    public function deleteMatchup(int $matchupId): bool {
-        $pdo = $this->db;
-        $stmt = $pdo->prepare('DELETE FROM matchups WHERE id = ?');
-        return $stmt->execute([$matchupId]);
     }
 
     /**

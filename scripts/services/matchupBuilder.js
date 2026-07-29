@@ -82,50 +82,6 @@ export function buildTeamRoundRobinMatchups(matchupWrapper, awayTeamMembers, hom
 }
 
 /**
- * Resolve the inning role for a team member on a specific matchup entry.
- *
- * For team baseball, each event_matchup is a half-inning (via roundName like "Top 1").
- * Matchup entries have player_id (the batter assigned by rotation).
- *
- * @param {number|string} playerId The current player's ID.
- * @param {number|string} orderNumber The matchup entry's order number.
- * @param {Array} eventMatchups The event matchup wrappers.
- * @param {Object} [teamContext] Optional team context {allPlayersCache, activeLeague}.
- * @returns {{ matchup: object|null, isPlayer1: boolean, isTop: boolean, opponentName: string, displayRoundNumber: string }}
- */
-export function resolveTeamMatchupRole(playerId, orderNumber, eventMatchups, teamContext) {
-  const entries = flattenMatchupEntries(eventMatchups);
-  if (!entries || entries.length === 0) {
-    return { matchup: null, isPlayer1: true, isTop: true, opponentName: '', displayRoundNumber: '' };
-  }
-
-  const targetEntry = entries.find(m =>
-    Number(m.orderNumber ?? m.order_number) === Number(orderNumber)
-  ) || entries[Number(orderNumber) - 1] || null;
-
-  if (!targetEntry) {
-    return { matchup: null, isPlayer1: true, isTop: true, opponentName: '', displayRoundNumber: '' };
-  }
-
-  const targetMatchup = eventMatchups.find(em => {
-    const emId = Number(em.id ?? em.eventMatchupId ?? em.event_matchup_id);
-    const entryEmId = Number(targetEntry.eventMatchupId ?? targetEntry.event_matchup_id);
-    return emId === entryEmId;
-  }) || eventMatchups[0];
-
-  const isTop = (Number(orderNumber) % 2 !== 0);
-  const inningNumber = Math.ceil(Number(orderNumber) / 2);
-  const displayRoundNumber = `${isTop ? 'Top' : 'Bottom'} ${inningNumber}`;
-
-  const homeTeamId = Number(targetMatchup?.team1Id ?? 0);
-  const selectedTeamId = Number(playerId);
-  const isPlayer1 = selectedTeamId === homeTeamId;
-  const opponentName = '';
-
-  return { matchup: targetEntry, isPlayer1, isTop, opponentName, displayRoundNumber };
-}
-
-/**
  * Build a round‑robin matchup payload for a baseball session.
  *
  * @param {Array<{id: number, playerName?: string}>} players
@@ -262,6 +218,47 @@ export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups, tea
 
 
 /**
+ * Resolve the inning role for a team member on a specific matchup entry.
+ *
+ * @param {number|string} playerId The current player's ID.
+ * @param {number|string} orderNumber The matchup entry's order number.
+ * @param {Array} eventMatchups The event matchup wrappers.
+ * @param {Object} [teamContext] Optional team context {allPlayersCache, activeLeague}.
+ * @returns {{ matchup: object|null, isPlayer1: boolean, isTop: boolean, opponentName: string, displayRoundNumber: string }}
+ */
+export function resolveTeamMatchupRole(playerId, orderNumber, eventMatchups, teamContext) {
+  const entries = flattenMatchupEntries(eventMatchups);
+  if (!entries || entries.length === 0) {
+    return { matchup: null, isPlayer1: true, isTop: true, opponentName: '', displayRoundNumber: '' };
+  }
+
+  const targetEntry = entries.find(m =>
+    Number(m.orderNumber ?? m.order_number) === Number(orderNumber)
+  ) || entries[Number(orderNumber) - 1] || null;
+
+  if (!targetEntry) {
+    return { matchup: null, isPlayer1: true, isTop: true, opponentName: '', displayRoundNumber: '' };
+  }
+
+  const targetMatchup = eventMatchups.find(em => {
+    const emId = Number(em.id ?? em.eventMatchupId ?? em.event_matchup_id);
+    const entryEmId = Number(targetEntry.eventMatchupId ?? targetEntry.event_matchup_id);
+    return emId === entryEmId;
+  }) || eventMatchups[0];
+
+  const isTop = (Number(orderNumber) % 2 !== 0);
+  const inningNumber = Math.ceil(Number(orderNumber) / 2);
+  const displayRoundNumber = `${isTop ? 'Top' : 'Bottom'} ${inningNumber}`;
+
+  const homeTeamId = Number(targetMatchup?.team1Id ?? 0);
+  const selectedTeamId = Number(playerId);
+  const isPlayer1 = selectedTeamId === homeTeamId;
+  const opponentName = '';
+
+  return { matchup: targetEntry, isPlayer1, isTop, opponentName, displayRoundNumber };
+}
+
+/**
  * Enrich server-created matchup entries with player info for team baseball.
  *
  * Server-created entries now include player_id and player_name (the batter
@@ -320,6 +317,21 @@ export function enrichTeamMatchupEntries(entries, matchupWrapper, awayTeamMember
 }
 
 /**
+ * Resolves the player for a specific ball index from a team's rotation sequence.
+ *
+ * @param {Array<{id: number, playerName: string}>} rotationSequence Ordered list of team players.
+ * @param {number} ballIndex 0-indexed ball number (0 = Ball 1, 1 = Ball 2, etc.).
+ * @returns {{ id: number, playerName: string }} Player object for the given ball.
+ */
+export function resolvePlayerForBall(rotationSequence = [], ballIndex = 0) {
+  if (!rotationSequence || rotationSequence.length === 0) {
+    return { id: 0, playerName: 'Unassigned Player' };
+  }
+  const idx = Math.abs(ballIndex) % rotationSequence.length;
+  return rotationSequence[idx];
+}
+
+/**
  * Validates that role assignments are equally distributed across team members.
  *
  * @param {Array<{id: number, playerName: string}>} members Team members.
@@ -357,18 +369,3 @@ export function validateRoleWorkload(members = [], roleAssignments = {}, roleNam
 
 /** Alias for validateRoleWorkload */
 export const validatePitcherWorkload = validateRoleWorkload;
-
-/**
- * Resolves the player for a specific ball index from a team's rotation sequence.
- *
- * @param {Array<{id: number, playerName: string}>} rotationSequence Ordered list of team players.
- * @param {number} ballIndex 0-indexed ball number (0 = Ball 1, 1 = Ball 2, etc.).
- * @returns {{ id: number, playerName: string }} Player object for the given ball.
- */
-export function resolvePlayerForBall(rotationSequence = [], ballIndex = 0) {
-  if (!rotationSequence || rotationSequence.length === 0) {
-    return { id: 0, playerName: 'Unassigned Player' };
-  }
-  const idx = Math.abs(ballIndex) % rotationSequence.length;
-  return rotationSequence[idx];
-}

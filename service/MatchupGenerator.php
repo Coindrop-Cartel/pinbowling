@@ -89,21 +89,7 @@ class MatchupGenerator {
             $stmt->execute([$teamEventMatchupId, $orderNum, $machineId, $team1Id, $team2Id]);
 
             if ($eventId) {
-                $format = 'baseball';
-                $targetScores = TargetResolver::resolveTarget($db, $machineId, $format, 'medium', $locationId);
-                $value1 = $targetScores['value1'] ?? 5000000;
-                $value2 = $targetScores['value2'] ?? 1.5;
-
-                $scoreValues = [];
-                for ($rank = 1; $rank <= 10; $rank++) {
-                    $scoreValues[$rank] = (int)round($value1 * pow($value2, $rank - 1));
-                }
-
-                $tsStmt->execute([
-                    $eventId, $machineId, $orderNum, $value1, $value2,
-                    $scoreValues[1], $scoreValues[2], $scoreValues[3], $scoreValues[4], $scoreValues[5],
-                    $scoreValues[6], $scoreValues[7], $scoreValues[8], $scoreValues[9], $scoreValues[10]
-                ]);
+                self::insertTargetScore($tsStmt, $db, $machineId, $eventId, $orderNum, 'baseball', $locationId);
             }
         }
     }
@@ -158,7 +144,34 @@ class MatchupGenerator {
                 score9 = VALUES(score9),  score10 = VALUES(score10)'
         );
 
-        foreach ($machineSlots as $i => $machineId) {
+    }
+
+    private static function insertTargetScore(
+        \PDOStatement $tsStmt,
+        DatabaseService $db,
+        int $machineId,
+        int $eventId,
+        int $orderNum,
+        string $format,
+        ?int $locationId
+    ): void {
+        $targetScores = TargetResolver::resolveTarget($db, $machineId, $format, 'medium', $locationId);
+        $value1 = $targetScores['value1'] ?? 5000000;
+        $value2 = $targetScores['value2'] ?? 1.5;
+
+        $scoreValues = [];
+        for ($rank = 1; $rank <= 10; $rank++) {
+            $scoreValues[$rank] = (int)round($value1 * pow($value2, $rank - 1));
+        }
+
+        $tsStmt->execute([
+            $eventId, $machineId, $orderNum, $value1, $value2,
+            $scoreValues[1], $scoreValues[2], $scoreValues[3], $scoreValues[4], $scoreValues[5],
+            $scoreValues[6], $scoreValues[7], $scoreValues[8], $scoreValues[9], $scoreValues[10]
+        ]);
+    }
+
+    public static function createMatchupSlots(
             $orderNum = $i + 1;
             $playerId = !empty($playerIds) ? ($playerIds[$i % count($playerIds)] ?? null) : null;
             $p1Id = !empty($player1Ids) ? ($player1Ids[$i % count($player1Ids)] ?? null) : $playerId;
@@ -166,21 +179,7 @@ class MatchupGenerator {
             $stmt->execute([$eventMatchupId, $orderNum, $machineId, $p1Id, $p2Id]);
 
             if ($eventId) {
-                $targetScores = TargetResolver::resolveTarget($db, $machineId, $format, 'medium', $eventLocationId);
-                $value1 = $targetScores['value1'] ?? 5000000;
-                $value2 = $targetScores['value2'] ?? 1.5;
-
-                // Compute full 1-10 values map from baseline and multiplier
-                $scoreValues = [];
-                for ($rank = 1; $rank <= 10; $rank++) {
-                    $scoreValues[$rank] = (int)round($value1 * pow($value2, $rank - 1));
-                }
-
-                $tsStmt->execute([
-                    $eventId, $machineId, $orderNum, $value1, $value2,
-                    $scoreValues[1], $scoreValues[2], $scoreValues[3], $scoreValues[4], $scoreValues[5],
-                    $scoreValues[6], $scoreValues[7], $scoreValues[8], $scoreValues[9], $scoreValues[10]
-                ]);
+                self::insertTargetScore($tsStmt, $db, $machineId, $eventId, $orderNum, $format, $eventLocationId);
             }
         }
     }

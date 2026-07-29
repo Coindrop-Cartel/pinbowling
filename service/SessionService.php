@@ -250,12 +250,4 @@ class SessionService {
         return $stmt->execute([$sessionId, $teamId]);
     }
 
-    public function getSessionByEventId(int $eventId) {
-        $pdo = $this->db;
-        $stmt = $pdo->prepare('SELECT session_id FROM events WHERE id = ?');
-        $stmt->execute([$eventId]);
-        $sessionId = $stmt->fetchColumn();
-        if (!$sessionId) return false;
-        return $this->getSession((int)$sessionId);
-    }
 }

@@ -163,6 +163,7 @@ export async function initStandingsPage() {
         columns: events,
         engine,
         supportsMatchups: !!engine.getMatchupDescription(1),
+        head2headRecordsMap: result.head2headRecords,
         tvModeManager
       });
 
@@ -405,6 +406,31 @@ export async function initStandingsPage() {
     if (window.PB_DEBUG_MODE) {
       console.log('[StandingsPage] Loaded data for eventId=' + eventId + ' teamMode=' + isTeamMode + ' rawScores=' + (rawScores?.length ?? 0) + ' eventMatchups=', JSON.stringify(eventMatchups?.slice(0, 20)));
     }
+
+    const matchupScoreMap = {};
+    const teamResultMap = {};
+    if (eventMatchups) {
+      eventMatchups.forEach(m => {
+        if (m.status !== 'completed') return;
+        if (isTeamMode) {
+          const homeId = Number(m.team1Id ?? m.team1_id);
+          const awayId = Number(m.team2Id ?? m.team2_id);
+          const homeScore = Number(m.team1Score ?? m.team1_score ?? 0);
+          const awayScore = Number(m.team2Score ?? m.team2_score ?? 0);
+          teamResultMap[homeId] = homeScore > awayScore ? 'Win' : (homeScore < awayScore ? 'Loss' : 'Tie');
+          teamResultMap[awayId] = awayScore > homeScore ? 'Win' : (awayScore < homeScore ? 'Loss' : 'Tie');
+          matchupScoreMap[homeId] = `${homeScore}-${awayScore}`;
+          matchupScoreMap[awayId] = `${awayScore}-${homeScore}`;
+        } else {
+          const p1Id = Number(m.player1Id ?? m.player1_id);
+          const p2Id = Number(m.player2Id ?? m.player2_id);
+          const p1Score = Number(m.player1Score ?? m.player1_score ?? 0);
+          const p2Score = Number(m.player2Score ?? m.player2_score ?? 0);
+          matchupScoreMap[p1Id] = `${p1Score}-${p2Score}`;
+          matchupScoreMap[p2Id] = `${p2Score}-${p1Score}`;
+        }
+      });
+    }
     
     const allEventScores = normalizeScores(rawScores);
     const machines = normalizeTargets(rawMachines);
@@ -484,14 +510,18 @@ export async function initStandingsPage() {
       supportsMatchups,
       head2headRecordsMap: (supportsMatchups && eventMatchups.length > 0)
         ? (() => {
-            const playersForRecords = filteredPlayers.map(p => ({ id: p.id }));
+            const entities = isTeamMode
+              ? (league.teams || []).map(t => ({ id: t.id }))
+              : filteredPlayers.map(p => ({ id: p.id }));
             const matchupsByEvent = { [eventId]: eventMatchups };
             const scoresByEvent = { [eventId]: scoresByPlayer };
             const singleEventTargets = { [eventId]: machines };
-            return calculateHead2HeadRecords(playersForRecords, [{ id: eventId }], matchupsByEvent, scoresByEvent, singleEventTargets, Engine);
+            return calculateHead2HeadRecords(entities, [{ id: eventId }], matchupsByEvent, scoresByEvent, singleEventTargets, Engine);
           })()
         : null,
       allTeamsData,
+      teamResultMap,
+      matchupScoreMap,
       tvModeManager,
       lastScoreState,
       currentScoreState

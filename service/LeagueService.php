@@ -33,18 +33,6 @@ class LeagueService {
     }
 
     /**
-     * Get all leagues.
-     * NOTE: This is used internally by getAllLeaguesWithDetails(). External callers
-     * should prefer that method to get events, players, and teams in a single pass.
-     *
-     * @return array
-     */
-    public function getAllLeagues(): array {
-        $pdo = $this->db;
-        return $pdo->query('SELECT * FROM leagues ORDER BY start_date DESC')->fetchAll();
-    }
-
-    /**
      * Get a complete league with events, players, and teams.
      *
      * @param int $leagueId
@@ -294,19 +282,6 @@ class LeagueService {
     }
 
     /**
-     * Get the scoring_format and participation_type of a league.
-     *
-     * @param int $leagueId
-     * @return array|false or false
-     */
-    public function getLeagueMeta(int $leagueId) {
-        $pdo = $this->db;
-        $stmt = $pdo->prepare('SELECT scoring_format, participation_type FROM leagues WHERE id = ?');
-        $stmt->execute([$leagueId]);
-        return $stmt->fetch();
-    }
-
-    /**
      * Create a new league.
      *
      * @param string $name
@@ -464,19 +439,6 @@ class LeagueService {
         $pdo = $this->db;
         $stmt = $pdo->prepare('UPDATE leagues SET status = ? WHERE id = ?');
         $stmt->execute([$status, $leagueId]);
-    }
-
-    /**
-     * Get assigned location IDs for a league.
-     *
-     * @param int $leagueId
-     * @return array
-     */
-    public function getLeagueLocations(int $leagueId): array {
-        $pdo = $this->db;
-        $stmt = $pdo->prepare('SELECT location_id FROM league_locations WHERE league_id = ?');
-        $stmt->execute([$leagueId]);
-        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
     }
 
     /**
