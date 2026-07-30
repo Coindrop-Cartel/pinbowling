@@ -194,6 +194,17 @@ export function renderLeagueList(container, filteredLeagues, {
       }
     }
 
+    let seasonActionHtml = '';
+    if (isAuthorized && isH2H) {
+      if (league.status === 'setup') {
+        seasonActionHtml = '<button class="season-action-btn primary btn-row">Start Season</button>';
+      } else if (showStartPlayoffsBtn) {
+        seasonActionHtml = '<button class="season-action-btn primary btn-row">Start Playoffs</button>';
+      } else if (league.status === 'active') {
+        seasonActionHtml = '<button class="season-action-btn primary btn-row">Update Season</button>';
+      }
+    }
+
     const headerHtml = `
       <div class="league-header">
         <h3 class="section-heading">${escapeHTML(league.name)}</h3>
@@ -218,13 +229,11 @@ export function renderLeagueList(container, filteredLeagues, {
         <div class="notice league-participants-empty hidden">No ${participantMeta.emptyLabel} assigned to this league.</div>
       </div>
       <div class="action-buttons">
-        ${isAuthorized && isH2H && league.status === 'setup' ? '<button class="start-season-btn primary btn-row">Start Season</button>' : ''}
-        ${isAuthorized && showStartPlayoffsBtn ? `<button class="start-playoffs-btn primary btn-row" data-league-id="${league.id}">Start Playoffs</button>` : ''}
-        ${isAuthorized && isH2H && league.status === 'active' ? `<button class="update-season-btn primary btn-row" data-league-id="${league.id}">Update Season</button>` : ''}
-        ${isAuthorized ? `<button class="print-season-results-btn secondary btn-row" data-league-id="${league.id}">Print Season Results</button>` : ''}
-        ${isAuthorized ? '<button class="edit-league-btn secondary btn-row">Edit League</button>' : ''}
+        ${seasonActionHtml}
+        ${isAuthorized ? '<button class="edit-league-btn secondary btn-row">Edit</button>' : ''}
         ${isAuthorized ? `<button class="archive-league-btn btn-row">${league.status === 'archived' ? 'Unarchive' : 'Archive'}</button>` : ''}
-        ${isAuthorized ? '<button class="delete-league-btn btn-row">Delete League</button>' : ''}
+        ${isAuthorized ? '<button class="delete-league-btn btn-row">Delete</button>' : ''}
+        ${isAuthorized ? `<button class="print-season-results-btn secondary btn-row" data-league-id="${league.id}">Print Results</button>` : ''}
       </div>
     `;
 
@@ -249,39 +258,32 @@ export function renderLeagueList(container, filteredLeagues, {
       row.querySelector('.archive-league-btn').onclick = (e) => { e.stopPropagation(); if (onArchiveLeague) onArchiveLeague(league); };
       row.querySelector('.delete-league-btn').onclick = () => onDeleteLeague(league.id, league.name);
       
-      const startSeasonBtn = row.querySelector('.start-season-btn');
-      if (startSeasonBtn) {
-        startSeasonBtn.onclick = async () => {
-          const confirmed = await showConfirm(
-            `Are you sure you want to start the season for "${league.name}"? This will generate the round-robin weekly matchups and lock the rosters.`,
-            'Start Season'
-          );
-          if (confirmed) {
-            try {
-              startSeasonBtn.disabled = true;
-              startSeasonBtn.textContent = 'Starting...';
-              await PB_API.leagues.startSeason(league.id);
-              loadPage(ROUTE_PATHS.LEAGUES());
-            } catch (err) {
-              showAlert(`Failed to start season: ${err.message}`, 'Start Season');
-              startSeasonBtn.disabled = false;
-              startSeasonBtn.textContent = 'Start Season';
+      const seasonActionBtn = row.querySelector('.season-action-btn');
+      if (seasonActionBtn) {
+        seasonActionBtn.onclick = async () => {
+          const text = seasonActionBtn.textContent;
+          if (text === 'Start Season') {
+            const confirmed = await showConfirm(
+              `Are you sure you want to start the season for "${league.name}"? This will generate the round-robin weekly matchups and lock the rosters.`,
+              'Start Season'
+            );
+            if (confirmed) {
+              try {
+                seasonActionBtn.disabled = true;
+                seasonActionBtn.textContent = 'Starting...';
+                await PB_API.leagues.startSeason(league.id);
+                loadPage(ROUTE_PATHS.LEAGUES());
+              } catch (err) {
+                showAlert(`Failed to start season: ${err.message}`, 'Start Season');
+                seasonActionBtn.disabled = false;
+                seasonActionBtn.textContent = 'Start Season';
+              }
             }
+          } else if (text === 'Start Playoffs') {
+            if (onStartPlayoffs) onStartPlayoffs(league.id);
+          } else if (text === 'Update Season') {
+            if (onUpdateSeason) onUpdateSeason(league.id);
           }
-        };
-      }
-
-      const startPlayoffsBtn = row.querySelector('.start-playoffs-btn');
-      if (startPlayoffsBtn) {
-        startPlayoffsBtn.onclick = () => {
-          if (onStartPlayoffs) onStartPlayoffs(league.id);
-        };
-      }
-
-      const updateSeasonBtn = row.querySelector('.update-season-btn');
-      if (updateSeasonBtn) {
-        updateSeasonBtn.onclick = () => {
-          if (onUpdateSeason) onUpdateSeason(league.id);
         };
       }
 

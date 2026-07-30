@@ -896,27 +896,25 @@ export class BaseballEngine extends ScoringEngine {
     let isWalkOff = false;
 
     if (!isTopInning && isLastMachineInList) {
-      // Calculate running totals prior to this half-inning
       let priorHomeScore = 0;
       let priorAwayScore = 0;
       const allScores = context?.allEventScores || [];
-      const scoreMapByOrder = {};
+      const scoreMapByEntity = {};
       allScores.forEach(s => {
-        const teamId = Number(s.teamId ?? 0);
+        const entityId = Number(s.teamId ?? s.playerId ?? 0);
         const orderNum = Number(s.orderNumber ?? 0);
-        if (teamId > 0 && orderNum > 0) {
-          scoreMapByOrder[teamId] = scoreMapByOrder[teamId] || {};
-          scoreMapByOrder[teamId][orderNum] = s;
+        if (entityId > 0 && orderNum > 0) {
+          scoreMapByEntity[entityId] = scoreMapByEntity[entityId] || {};
+          scoreMapByEntity[entityId][orderNum] = s;
         }
       });
 
       for (let i = 0; i < allRoundsList.length - 1; i++) {
         const r = allRoundsList[i];
         const rIsTop = (r.isTop !== undefined) ? Boolean(r.isTop) : ((r.orderNumber ?? 1) % 2 !== 0);
-        const rBattingTeamId = rIsTop ? awayTeamId : homeTeamId;
-        const rPitchingTeamId = rIsTop ? homeTeamId : awayTeamId;
+        const rBattingId = rIsTop ? awayTeamId : homeTeamId;
         const target = r.value1 ? { value1: r.value1, value2: r.value2 } : { value1: 5000000, value2: 1.5 };
-        const bEntry = scoreMapByOrder[rBattingTeamId]?.[r.orderNumber];
+        const bEntry = scoreMapByEntity[rBattingId]?.[r.orderNumber];
         if (bEntry && (bEntry.ball1 || bEntry.ball2 || bEntry.ball3)) {
           const turn = this.getInningData(r, bEntry, { ball1: 0, ball2: 0, ball3: 0 }, true, true);
           const runs = turn.score;
@@ -940,8 +938,8 @@ export class BaseballEngine extends ScoringEngine {
       role: isPitcherActive ? 'pitcher' : 'batter',
       opponentName: isPlayer1 ? awayTeamName : homeTeamName,
       isWalkOff,
-      isDisabled: isWalkOff,
-      walkOffNotice: isWalkOff ? '🔒 Walk-off: Home team is leading in the bottom of the last inning. DO NOT PLAY EXTRA BALLS.' : null
+      isDisabled: false,
+      walkOffNotice: isWalkOff ? 'Walk-off: Home team is leading in the bottom of the last inning. No need to play extra balls. Save this round to complete the game.' : null
     };
   }
 

@@ -78,10 +78,10 @@
     </section>
  
     <section class="card" data-testid="leagues-list-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="leagues-header-row">
         <h2 style="margin:0;">Leagues</h2>
-        <label id="show-archived-label" style="cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
-          <input type="checkbox" id="show-archived-leagues" style="margin:0;vertical-align:middle;"> Show Archived
+        <label id="show-archived-label" class="leagues-archived-toggle">
+          <input type="checkbox" id="show-archived-leagues">Show Archived
         </label>
       </div>
       <div id="leagues-list-empty" data-testid="leagues-list-empty-notice" class="notice">No leagues created yet.</div>

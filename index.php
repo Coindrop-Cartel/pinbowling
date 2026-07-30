@@ -30,7 +30,10 @@ $router = new Router($baseUrl, $uiVersion);
 // 3. Resolve Route
 $routeInfo = $router->resolve($path, $query);
 
-// 4. Handle Route Outcome
+// 4. Determine if this is the home page (for hamburger menu conditional)
+$isHomePage = $routeInfo['type'] === 'default';
+
+// 5. Handle Route Outcome
 switch ($routeInfo['type']) {
     case 'error':
         http_response_code($routeInfo['code']);
@@ -73,6 +76,7 @@ switch ($routeInfo['type']) {
     default:
         // Fallback for safety
         $targetFile = __DIR__ . '/includes/pages/home.php';
+        $isHomePage = true;
         break;
 }
 

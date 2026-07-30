@@ -23,7 +23,7 @@ class SeasonService {
      * @return bool Success
      */
     public function startSeason(int $leagueId): bool {
-        $pdo = $this->db;
+        $db = $this->db;
         
         try {
             $db->beginTransaction();
@@ -124,7 +124,7 @@ class SeasonService {
                 error_log("[PinBowling DEBUG] SeasonService::startSeason — week #$w: eventId=$eventId date=$eventDate locId=$primaryLocId pairings=" . json_encode($pairings));
 
                 $this->generateWeekMatchups(
-                    $pdo, $eventId, $assignedLocationIds, ($w - 1), $pairings,
+                    $db, $eventId, $assignedLocationIds, ($w - 1), $pairings,
                     $isTeam, $rounds, $matchupsPerRound, $allMachineIds, $machinesByLocation
                 );
             }
@@ -253,8 +253,8 @@ class SeasonService {
             } else {
                 if ($isTeam) {
                     // Team baseball: 1 team_event_matchup per game (team1=home, team2=away)
-                    $homeTeamMembers = $this->getTeamMembers($pdo, $homePlayer['id']);
-                    $awayTeamMembers = $this->getTeamMembers($pdo, $awayPlayer['id']);
+                    $homeTeamMembers = $this->getTeamMembers($db, $homePlayer['id']);
+                    $awayTeamMembers = $this->getTeamMembers($db, $awayPlayer['id']);
 
                     // Create 1 game-level temId
                     $temStmt = $db->prepare(
@@ -281,7 +281,7 @@ class SeasonService {
                         error_log("[PinBowling DEBUG] SeasonService::generateWeekMatchups — orderNum=$orderNum " . ($isTop ? 'Top' : 'Bottom') . " $inning: pitcher=$pitcherTeamId batter=$batterTeamId machine=" . $machines[0]);
 
                         MatchupGenerator::createTeamMatchups(
-                            $pdo, $temId, $machines, $eventId, $matchupLocId,
+                            $db, $temId, $machines, $eventId, $matchupLocId,
                             $pitcherTeamId, $batterTeamId, $orderNum
                         );
                     }
@@ -295,7 +295,7 @@ class SeasonService {
                     $eventMatchupId = (int)$db->lastInsertId();
 
                     MatchupGenerator::createMatchupSlots(
-                        $pdo, $eventMatchupId,
+                        $db, $eventMatchupId,
                         $rounds, $matchupsPerRound, $matchupMachineIds
                     );
                 }
@@ -311,7 +311,7 @@ class SeasonService {
      * @return bool Success
      */
     public function updateSeason(int $leagueId): bool {
-        $pdo = $this->db;
+        $db = $this->db;
         
         try {
             $db->beginTransaction();
@@ -465,7 +465,7 @@ class SeasonService {
                 
                 $pairings = $pairingsByRound[($weekNum - 1) % $roundsCount];
                 $this->generateWeekMatchups(
-                    $pdo, $eventId, $assignedLocationIds, ($weekNum - 1), $pairings,
+                    $db, $eventId, $assignedLocationIds, ($weekNum - 1), $pairings,
                     $isTeam, $rounds, $matchupsPerRound, $allMachineIds, $machinesByLocation
                 );
             }

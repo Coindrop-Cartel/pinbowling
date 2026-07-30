@@ -100,9 +100,12 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   const opponentAccessDenied = true;
   let statusMsg = msg;
 
-  if (rowContext?.isDisabled || rowContext?.isWalkOff) {
+  if (rowContext?.isWalkOff) {
+    effectiveAccessDenied = false;
+    statusMsg = rowContext.walkOffNotice || 'Walk-off: Home team is leading. Save this round to complete the game.';
+  } else if (rowContext?.isDisabled) {
     effectiveAccessDenied = true;
-    statusMsg = rowContext.walkOffNotice || '🔒 Walk-off: Home team is leading in the bottom of the last inning. DO NOT PLAY EXTRA BALLS.';
+    statusMsg = 'This round is locked.';
   } else if (isTDOrAdmin) {
     effectiveAccessDenied = false;
   } else {
@@ -146,7 +149,7 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
       ${sectionsHtml}
       <button class="save-round-button btn-mgmt" ${effectiveAccessDenied ? 'hidden' : ''} disabled>Save</button>
     </div>
-    ${effectiveAccessDenied ? `
+    ${effectiveAccessDenied || rowContext?.isWalkOff ? `
       <div class="round-status-bar">
         <span class="round-msg">${escapeHTML(statusMsg)}</span>
       </div>
@@ -154,6 +157,9 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   `;
 
   const saveBtn = row.querySelector('.save-round-button');
+  if (rowContext?.isWalkOff) {
+    saveBtn.disabled = false;
+  }
 
   row.querySelector('.round-info').addEventListener('click', () => {
     row.querySelector('.target-details').classList.toggle('hidden');

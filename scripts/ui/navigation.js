@@ -8,16 +8,29 @@ import { loadPage } from '@scripts/utils.js';
  * @param {string} [containerSelector='.nav-container'] - CSS selector for the navigation container.
  * @returns {void}
  */
+let _initialized = false;
+
 export const initNavigation = (containerSelector = '.nav-container') => {
   const container = document.querySelector(containerSelector);
   if (!container) return;
+  if (_initialized) return;
+  _initialized = true;
+
+  const hamburgerBtn = container.querySelector('.hamburger-btn');
+  const navCollapse = container.querySelector('.nav-collapse');
 
   /**
-   * Centralized helper to forcefully collapse the mobile taskbar and all dropdowns.
+   * Centralized helper to forcefully collapse the mobile taskbar, all dropdowns, and hamburger menu.
    */
   const collapseAll = () => {
     if (window.PB_DEBUG_MODE) console.log('[Navigation] Executing collapseAll');
     
+    if (navCollapse) navCollapse.classList.remove('nav-menu-open');
+    if (hamburgerBtn) {
+      hamburgerBtn.classList.remove('is-active');
+      hamburgerBtn.setAttribute('aria-expanded', 'false');
+    }
+
     container.querySelectorAll('.nav-item.dropdown').forEach(item => {
       item.classList.remove('is-open');
       item.querySelector('.dropbtn')?.setAttribute('aria-expanded', 'false');
@@ -107,7 +120,17 @@ export const initNavigation = (containerSelector = '.nav-container') => {
       loadPage(targetHref);
     }
 
-    // 2. Handle Dropdown Toggles (Mobile View)
+    // 2. Handle Hamburger Menu Toggle
+    const hamburgerTarget = e.target.closest('.hamburger-btn');
+    if (hamburgerTarget) {
+      e.stopPropagation();
+      const isOpen = navCollapse.classList.toggle('nav-menu-open');
+      hamburgerTarget.classList.toggle('is-active', isOpen);
+      hamburgerTarget.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      return;
+    }
+
+    // 3. Handle Dropdown Toggles (Mobile View)
     if (dropbtn && window.innerWidth <= 768) {
       const dropdown = dropbtn.closest('.nav-item.dropdown');
       if (dropdown) {
@@ -135,6 +158,15 @@ export const initNavigation = (containerSelector = '.nav-container') => {
     }
   });
   
+  // Close hamburger menu when clicking outside the navbar
+  document.addEventListener('click', (e) => {
+    if (!hamburgerBtn || !navCollapse) return;
+    if (!navCollapse.classList.contains('nav-menu-open')) return;
+    if (!container.contains(e.target)) {
+      collapseAll();
+    }
+  });
+
   document.addEventListener('pb:pageChanged', updateActiveState);
   updateActiveState();
   collapseAll();

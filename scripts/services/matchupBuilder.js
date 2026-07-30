@@ -169,9 +169,10 @@ export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups, tea
 
   const { allPlayersCache = [], activeLeague } = teamContext;
   const leagues = activeLeague ? [activeLeague] : [];
+  const isTeamMode = activeLeague?.participationType === 'team' || (targetMatchup.team1Id !== undefined && targetMatchup.team1Id !== null);
 
-  const p1Players = resolvePlayersForMatchupParticipant(p1Id, targetMatchup.player1Name, allPlayersCache, leagues);
-  const p2Players = resolvePlayersForMatchupParticipant(p2Id, targetMatchup.player2Name, allPlayersCache, leagues);
+  const p1Players = resolvePlayersForMatchupParticipant(p1Id, targetMatchup.player1Name, allPlayersCache, leagues, isTeamMode);
+  const p2Players = resolvePlayersForMatchupParticipant(p2Id, targetMatchup.player2Name, allPlayersCache, leagues, isTeamMode);
 
   const isInP1 = p1Players.some(p => String(p.id) === String(playerId)) || String(playerId) === String(p1Id);
   const isInP2 = p2Players.some(p => String(p.id) === String(playerId)) || String(playerId) === String(p2Id);

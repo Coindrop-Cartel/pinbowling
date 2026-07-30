@@ -144,6 +144,17 @@ class MatchupGenerator {
                 score9 = VALUES(score9),  score10 = VALUES(score10)'
         );
 
+        foreach ($machineSlots as $i => $machineId) {
+            $orderNum = $i + 1;
+            $playerId = !empty($playerIds) ? ($playerIds[$i % count($playerIds)] ?? null) : null;
+            $p1Id = !empty($player1Ids) ? ($player1Ids[$i % count($player1Ids)] ?? null) : $playerId;
+            $p2Id = !empty($player2Ids) ? ($player2Ids[$i % count($player2Ids)] ?? null) : null;
+            $stmt->execute([$eventMatchupId, $orderNum, $machineId, $p1Id, $p2Id]);
+
+            if ($eventId) {
+                self::insertTargetScore($tsStmt, $db, $machineId, $eventId, $orderNum, $format, $eventLocationId);
+            }
+        }
     }
 
     private static function insertTargetScore(
@@ -171,17 +182,5 @@ class MatchupGenerator {
         ]);
     }
 
-    public static function createMatchupSlots(
-            $orderNum = $i + 1;
-            $playerId = !empty($playerIds) ? ($playerIds[$i % count($playerIds)] ?? null) : null;
-            $p1Id = !empty($player1Ids) ? ($player1Ids[$i % count($player1Ids)] ?? null) : $playerId;
-            $p2Id = !empty($player2Ids) ? ($player2Ids[$i % count($player2Ids)] ?? null) : null;
-            $stmt->execute([$eventMatchupId, $orderNum, $machineId, $p1Id, $p2Id]);
-
-            if ($eventId) {
-                self::insertTargetScore($tsStmt, $db, $machineId, $eventId, $orderNum, $format, $eventLocationId);
-            }
-        }
-    }
 }
 

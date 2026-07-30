@@ -97,7 +97,7 @@ export async function finalizeSession(options) {
   let eventMatchupId = null;
   const matchupInfo = engine.getMatchupDescription(generatedFrames.length);
   if (matchupInfo) {
-    const sessionData = opponentId ? { players: [currentUser, { id: opponentId }] } : await PB_API.sessions.get(newSession.id);
+    const sessionData = opponentId ? { players: [{ id: currentUser.player_id }, { id: opponentId }] } : await PB_API.sessions.get(newSession.id);
     const finalRoster = sessionData?.players || [];
     if (finalRoster.length >= 2) {
       const inningCount = generatedFrames.length / engine.getMachinesPerRound();

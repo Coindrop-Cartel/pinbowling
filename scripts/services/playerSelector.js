@@ -3,30 +3,48 @@ import { filterPlayersForUser } from './auth.js';
 /**
  * Helper to resolve participant IDs (player or team ID) to actual player objects.
  */
-export function resolvePlayersForMatchupParticipant(participantId, participantName, allPlayers = [], allLeaguesCache = []) {
+export function resolvePlayersForMatchupParticipant(participantId, participantName, allPlayers = [], allLeaguesCache = [], isTeamMode = null) {
   if (!participantId) return [];
   const pIdStr = String(participantId);
 
-  // 1. Check team members across all leagues
-  for (const league of allLeaguesCache) {
-    const team = (league?.teams || []).find(t => String(t.id) === pIdStr);
-    if (team?.members?.length) {
-      return team.members;
+  // 1. If explicitly team mode (or if not specified, check team mode leagues first ONLY if no player matches in allPlayers)
+  if (isTeamMode === true) {
+    for (const league of allLeaguesCache) {
+      if (league?.participationType === 'team') {
+        const team = (league?.teams || []).find(t => String(t.id) === pIdStr);
+        if (team?.members?.length) {
+          return team.members;
+        }
+      }
     }
   }
 
-  // 2. Direct match in allPlayers
-  const directPlayer = allPlayers.find(p => String(p.id) === pIdStr);
-  if (directPlayer) return [directPlayer];
+  // 2. Direct match in allPlayers (for individual mode or when isTeamMode is false/unspecified)
+  if (isTeamMode !== true) {
+    const directPlayer = allPlayers.find(p => String(p.id) === pIdStr);
+    if (directPlayer) return [directPlayer];
+  }
 
-  // 3. Fallback to name match in allPlayers
+  // 3. Fallback: If isTeamMode was unspecified (null) and no direct player was found, check team leagues
+  if (isTeamMode === null) {
+    for (const league of allLeaguesCache) {
+      if (league?.participationType === 'team') {
+        const team = (league?.teams || []).find(t => String(t.id) === pIdStr);
+        if (team?.members?.length) {
+          return team.members;
+        }
+      }
+    }
+  }
+
+  // 4. Fallback to name match in allPlayers
   if (participantName) {
     const nameMatch = allPlayers.find(p => p.playerName?.toLowerCase() === participantName.toLowerCase());
     if (nameMatch) return [nameMatch];
   }
 
-  // 4. Return fallback object
-  return [{ id: participantId, playerName: participantName || `Participant ${participantId}` }];
+  // 5. Return fallback object
+  return [{ id: Number(participantId) || participantId, playerName: participantName || `Participant ${participantId}` }];
 }
 
 /**
@@ -62,23 +80,32 @@ export function getSelectableTeams(params) {
 /**
  * Helper to check if a player ID is a participant (directly or via team membership) in a matchup.
  */
-export function isPlayerInMatchup(playerId, matchup, allLeaguesCache = []) {
+export function isPlayerInMatchup(playerId, matchup, allLeaguesCache = [], isTeamMode = null) {
   if (!matchup || !playerId) return false;
-  const p1Id = String(matchup.team1Id ?? matchup.player1Id ?? '');
-  const p2Id = String(matchup.team2Id ?? matchup.player2Id ?? '');
   const curId = String(playerId);
 
-  if (p1Id === curId || p2Id === curId) return true;
+  const isTeam = isTeamMode !== null
+    ? isTeamMode
+    : (matchup.team1Id !== undefined && matchup.team1Id !== null) || (matchup.team2Id !== undefined && matchup.team2Id !== null);
 
-  // Check team membership
-  for (const league of allLeaguesCache) {
-    const t1 = (league?.teams || []).find(t => String(t.id) === p1Id);
-    if (t1?.members?.some(m => String(m.id) === curId)) return true;
-    const t2 = (league?.teams || []).find(t => String(t.id) === p2Id);
-    if (t2?.members?.some(m => String(m.id) === curId)) return true;
+  if (isTeam) {
+    const t1Id = String(matchup.team1Id ?? matchup.player1Id ?? '');
+    const t2Id = String(matchup.team2Id ?? matchup.player2Id ?? '');
+
+    for (const league of allLeaguesCache) {
+      if (league?.participationType === 'team') {
+        const t1 = (league?.teams || []).find(t => String(t.id) === t1Id);
+        if (t1?.members?.some(m => String(m.id) === curId)) return true;
+        const t2 = (league?.teams || []).find(t => String(t.id) === t2Id);
+        if (t2?.members?.some(m => String(m.id) === curId)) return true;
+      }
+    }
+    return false;
+  } else {
+    const p1Id = String(matchup.player1Id ?? matchup.team1Id ?? '');
+    const p2Id = String(matchup.player2Id ?? matchup.team2Id ?? '');
+    return p1Id === curId || p2Id === curId;
   }
-
-  return false;
 }
 
 /**
@@ -105,23 +132,47 @@ export function getSelectablePlayers(params) {
   if (isMatchupContext) {
     const matchup = eventMatchups[0];
     if (matchup) {
-      const p2Id = matchup.team2Id ?? matchup.player2Id;
-      if (p2Id) {
-        const awayPlayers = resolvePlayersForMatchupParticipant(p2Id, matchup.team2Name ?? matchup.player2Name, allPlayers, allLeaguesCache);
-        awayPlayers.forEach(p => {
-          if (!selectablePlayers.some(sp => String(sp.id) === String(p.id))) {
-            selectablePlayers.push(p);
-          }
-        });
-      }
-      const p1Id = matchup.team1Id ?? matchup.player1Id;
-      if (p1Id) {
-        const homePlayers = resolvePlayersForMatchupParticipant(p1Id, matchup.team1Name ?? matchup.player1Name, allPlayers, allLeaguesCache);
-        homePlayers.forEach(p => {
-          if (!selectablePlayers.some(sp => String(sp.id) === String(p.id))) {
-            selectablePlayers.push(p);
-          }
-        });
+      const activeLeague = allLeaguesCache.find(l => String(l.id) === String(leagueId));
+      const isTeamMode = activeLeague?.participationType === 'team' || (matchup.team1Id !== undefined && matchup.team1Id !== null);
+
+      if (isTeamMode) {
+        const p2Id = matchup.team2Id ?? matchup.player2Id;
+        if (p2Id) {
+          const awayPlayers = resolvePlayersForMatchupParticipant(p2Id, matchup.team2Name ?? matchup.player2Name, allPlayers, allLeaguesCache, true);
+          awayPlayers.forEach(p => {
+            if (!selectablePlayers.some(sp => String(sp.id) === String(p.id))) {
+              selectablePlayers.push(p);
+            }
+          });
+        }
+        const p1Id = matchup.team1Id ?? matchup.player1Id;
+        if (p1Id) {
+          const homePlayers = resolvePlayersForMatchupParticipant(p1Id, matchup.team1Name ?? matchup.player1Name, allPlayers, allLeaguesCache, true);
+          homePlayers.forEach(p => {
+            if (!selectablePlayers.some(sp => String(sp.id) === String(p.id))) {
+              selectablePlayers.push(p);
+            }
+          });
+        }
+      } else {
+        const p2Id = matchup.player2Id;
+        if (p2Id) {
+          const awayPlayers = resolvePlayersForMatchupParticipant(p2Id, matchup.player2Name, allPlayers, allLeaguesCache, false);
+          awayPlayers.forEach(p => {
+            if (!selectablePlayers.some(sp => String(sp.id) === String(p.id))) {
+              selectablePlayers.push(p);
+            }
+          });
+        }
+        const p1Id = matchup.player1Id;
+        if (p1Id) {
+          const homePlayers = resolvePlayersForMatchupParticipant(p1Id, matchup.player1Name, allPlayers, allLeaguesCache, false);
+          homePlayers.forEach(p => {
+            if (!selectablePlayers.some(sp => String(sp.id) === String(p.id))) {
+              selectablePlayers.push(p);
+            }
+          });
+        }
       }
     }
   } else if (sessionPlayers) {
@@ -167,15 +218,19 @@ export function getAutoSelectedPlayerId(params) {
     activeMatchupId,
     eventMatchups = [],
     selectablePlayers = [],
-    allLeaguesCache = []
+    allLeaguesCache = [],
+    leagueId
   } = params;
 
   if (activePlayerId) return activePlayerId;
 
+  const activeLeague = allLeaguesCache.find(l => String(l.id) === String(leagueId));
+  const isTeamMode = activeLeague?.participationType === 'team' || (eventMatchups[0]?.team1Id !== undefined && eventMatchups[0]?.team1Id !== null);
+
   if (currentUser?.player_id) {
     const isInSelectable = selectablePlayers.some(p => String(p.id) === String(currentUser.player_id));
     const isInRoster = allPlayersCache.some(p => String(p.id) === String(currentUser.player_id));
-    const isMatchupParticipant = activeMatchupId && eventMatchups[0] && isPlayerInMatchup(currentUser.player_id, eventMatchups[0], allLeaguesCache);
+    const isMatchupParticipant = activeMatchupId && eventMatchups[0] && isPlayerInMatchup(currentUser.player_id, eventMatchups[0], allLeaguesCache, isTeamMode);
     if (isInSelectable && isInRoster && (!activeMatchupId || isMatchupParticipant)) {
       return String(currentUser.player_id);
     }
@@ -216,8 +271,6 @@ export function getAutoSelectedTeamId({ currentUser, selectableTeams = [], activ
   return userTeam ? String(userTeam.id) : null;
 }
 
-
-
 /**
  * Determines if the current view is in spectator mode and if the selected player is editable.
  *
@@ -232,11 +285,14 @@ export function getSpectatorStatus(params) {
     currentUser,
     allPlayersCache = [],
     allLeaguesCache = [],
-    isTD
+    isTD,
+    leagueId
   } = params;
 
   const matchup = eventMatchups[0];
-  const isParticipant = matchup && currentUser && isPlayerInMatchup(currentUser.player_id, matchup, allLeaguesCache);
+  const activeLeague = allLeaguesCache.find(l => String(l.id) === String(leagueId));
+  const isTeamMode = activeLeague?.participationType === 'team' || (matchup?.team1Id !== undefined && matchup?.team1Id !== null);
+  const isParticipant = matchup && currentUser && isPlayerInMatchup(currentUser.player_id, matchup, allLeaguesCache, isTeamMode);
 
   const isSpectator = !!(activeMatchupId && !isParticipant);
 

@@ -495,6 +495,30 @@
   font-style: italic;
 }
 
+/* Leagues page header row with show-archived toggle */
+.leagues-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.leagues-archived-toggle {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.leagues-archived-toggle input[type="checkbox"] {
+  margin: 0;
+  width: auto;
+  max-width: none;
+}
+
 /* Mobile Responsiveness for Pages and scoring */
 @media (max-width: 768px) {
   .summary-box {
@@ -542,6 +566,15 @@
   .row-header {
     flex-wrap: wrap;
     gap: 10px;
+  }
+
+  .card {
+    padding: 15px;
+  }
+
+  .leagues-header-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .round-row {

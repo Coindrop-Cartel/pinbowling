@@ -43,13 +43,19 @@
   display: block;
 }
 
+.nav-collapse {
+  display: flex;
+  flex: 1;
+  align-items: center;
+}
+
 .nav-links {
   list-style: none;
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
   gap: 10px;
-  margin: 0;
+  margin: 0 auto;
   padding: 0;
   align-items: center;
   overflow: visible !important;
@@ -502,6 +508,133 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
     justify-content: center;
   }
 
+}
+
+/* Hamburger Menu - Mobile Navigation */
+.hamburger-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--pb-header-text, #fff);
+  font-size: 2rem;
+  cursor: pointer;
+  padding: 8px;
+  line-height: 1;
+  margin: 0 0 0 auto;
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+  align-items: center;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.hamburger-btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.hamburger-btn.is-active {
+  background: rgba(255,255,255,0.15);
+}
+
+@media (max-width: 768px) {
+  .navbar .nav-container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0;
+    padding: 10px 15px;
+    min-height: 60px;
+  }
+
+  .navbar .nav-logo {
+    min-width: unset;
+    font-size: 1rem;
+  }
+
+  .navbar .nav-logo img {
+    height: 44px;
+  }
+
+  .navbar .hamburger-btn {
+    display: flex;
+    order: 1;
+  }
+
+  .navbar .nav-collapse {
+    display: none;
+    width: 100%;
+    order: 2;
+    flex-direction: column;
+    padding: 15px 0 5px 0;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    margin-top: 10px;
+  }
+
+  .navbar .nav-collapse.nav-menu-open {
+    display: flex;
+  }
+
+  .navbar .nav-links {
+    width: 100%;
+    order: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0;
+    margin: 0;
+  }
+
+  .navbar .nav-links .nav-item {
+    width: 100%;
+  }
+
+  .navbar .nav-links .nav-link {
+    padding: 12px 20px;
+    font-size: 1rem;
+    display: block;
+  }
+
+  .navbar .dropdown-content {
+    position: static;
+    transform: none;
+    width: 100%;
+    min-width: unset;
+    box-shadow: none;
+    border: none;
+    border-left: 3px solid rgba(255,255,255,0.2);
+    margin-left: 20px;
+    background: transparent;
+  }
+
+  .navbar .dropdown-content a {
+    color: var(--pb-header-text, #fff) !important;
+    padding: 10px 20px;
+    font-size: 0.9rem;
+    border-bottom: none;
+  }
+
+  .navbar .dropdown-content a:hover {
+    background: rgba(255,255,255,0.1) !important;
+  }
+
+  .navbar .dropdown.is-open .dropdown-content {
+    display: block;
+  }
+
+  .navbar #auth-header-container {
+    width: 100%;
+    order: 3;
+    justify-content: flex-start;
+    padding: 12px 20px 0 20px;
+    min-width: unset;
+  }
+
+  .dropbtn::after {
+    content: none;
+  }
 }
 
 /* Accordion Component - Collapsible Sections */

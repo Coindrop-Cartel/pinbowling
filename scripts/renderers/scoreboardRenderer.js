@@ -79,8 +79,9 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
   const p2Id = Number(wrapper.player2Id);
 
   const leagues = activeLeague ? [activeLeague] : [];
-  const p1Players = resolvePlayersForMatchupParticipant(p1Id, wrapper.player1Name, allPlayersCache, leagues);
-  const p2Players = resolvePlayersForMatchupParticipant(p2Id, wrapper.player2Name, allPlayersCache, leagues);
+  const isTeamModeContext = isTeamMode || activeLeague?.participationType === 'team' || (wrapper.team1Id !== undefined && wrapper.team1Id !== null);
+  const p1Players = resolvePlayersForMatchupParticipant(p1Id, wrapper.player1Name, allPlayersCache, leagues, isTeamModeContext);
+  const p2Players = resolvePlayersForMatchupParticipant(p2Id, wrapper.player2Name, allPlayersCache, leagues, isTeamModeContext);
 
   const p1Player = p1Players[0];
   const p2Player = p2Players[0];

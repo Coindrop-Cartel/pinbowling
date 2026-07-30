@@ -495,6 +495,28 @@ function alignTableColumns($pdo) {
                 $pdo->exec($sql);
             }
         }
+
+        // Clean slate: drop old matchups table if it has legacy columns from
+        // previous schema versions (no active data to preserve). It will be
+        // recreated with the current schema by initializeDatabaseSchema on
+        // next deploy, or right here for immediate compatibility.
+        $hasLegacyCol = $pdo->query("SHOW COLUMNS FROM `matchups` LIKE 'event_id'")->fetch();
+        if ($hasLegacyCol) {
+            $pdo->exec("DROP TABLE IF EXISTS `matchups`");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `matchups` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `event_matchup_id` INT DEFAULT NULL,
+                `order_number` INT NOT NULL,
+                `machine_id` INT NOT NULL,
+                `player1_id` INT DEFAULT NULL,
+                `player2_id` INT DEFAULT NULL,
+                `player3_id` INT DEFAULT NULL,
+                `player4_id` INT DEFAULT NULL,
+                UNIQUE KEY `unique_matchup_round` (`event_matchup_id`, `order_number`),
+                CONSTRAINT `fk_matchup_event_matchup` FOREIGN KEY (`event_matchup_id`) REFERENCES `event_matchups` (`id`) ON DELETE CASCADE,
+                CONSTRAINT `fk_matchup_machine` FOREIGN KEY (`machine_id`) REFERENCES `machines` (`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+        }
     }
 
     // --- event_matchups ---

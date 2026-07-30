@@ -16,12 +16,21 @@
 /* Forms & Inputs */
 input, select {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 12px;
   border: 2px solid var(--pb-primary) !important;
   font-family: inherit;
   font-size: 1rem;
   margin-bottom: 10px;
   background: white;
+}
+
+input[type="checkbox"] {
+  width: auto;
+  max-width: none;
+  min-width: auto;
 }
 
 input:focus, select:focus {
@@ -141,6 +150,7 @@ button:disabled {
 
 .action-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
