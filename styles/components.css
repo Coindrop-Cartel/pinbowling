@@ -33,6 +33,12 @@ input[type="checkbox"] {
   min-width: auto;
 }
 
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+
 input:focus, select:focus {
   outline: none;
   border-color: var(--pb-accent);
@@ -308,6 +314,18 @@ td {
   box-shadow: 0 10px 25px rgba(0,0,0,0.5);
 }
 
+.multi-select-dialog {
+  min-width: 280px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.multi-select-dialog input[type="text"] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .modal-actions {
   margin-top: 30px;
   display: flex;
@@ -372,6 +390,13 @@ td {
 @media (max-width: 768px) {
   .modal-card {
     width: 95%;
+    max-width: 100%;
     margin: 10px;
+  }
+}
+
+@media (max-width: 400px) {
+  .multi-select-dialog {
+    min-width: 0;
   }
 }

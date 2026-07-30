@@ -312,7 +312,7 @@ export async function showMultiSelectDialog({ title, message = '', items, select
   const selectedSet = new Set(selected.map(String));
 
   const customElement = document.createElement('div');
-  customElement.style.minWidth = '350px';
+  customElement.className = 'multi-select-dialog';
   customElement.innerHTML = `
     ${message ? `<p class="small-hint mb-10">${message}</p>` : ''}
     <input type="text" class="modal-input" id="multi-select-search" placeholder="${searchPlaceholder}" style="width: 100%; margin-bottom: 10px; box-sizing: border-box;">
