@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { initNavigation } from '@ui/navigation.js';
+import { initNavigation, resetNavigationState } from '@ui/navigation.js';
 
 // Mock ROUTES with simple string-builders for testing
 vi.mock('@scripts/routes.js', () => {
@@ -32,6 +32,7 @@ import { loadPage } from '@scripts/utils.js';
 
 describe('Navigation Utility (navigation.js)', () => {
   beforeEach(() => {
+    resetNavigationState();
     document.body.innerHTML = `
       <nav class="nav-container">
         <div class="nav-links">

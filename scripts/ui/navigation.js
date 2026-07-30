@@ -10,6 +10,10 @@ import { loadPage } from '@scripts/utils.js';
  */
 let _initialized = false;
 
+export const resetNavigationState = () => {
+  _initialized = false;
+};
+
 export const initNavigation = (containerSelector = '.nav-container') => {
   const container = document.querySelector(containerSelector);
   if (!container) return;

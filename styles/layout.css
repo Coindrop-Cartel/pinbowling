@@ -369,84 +369,103 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
 .content-muted-col { font-size: 0.85rem; color: #666; display: flex; flex-direction: column; gap: 4px; }
 
 @media (max-width: 1100px) {
-  .nav-container {
-    flex-direction: column;
-    align-items: center;
-    min-height: auto;
-    padding: 15px;
-    gap: 12px;
-  }
-
-  .nav-logo {
+  .navbar .nav-container {
     display: flex;
-    justify-content: center;
-    order: 1;
-    font-size: 1.2rem;
-    min-width: unset;
-  }
-
-  .nav-logo img {
-    height: 56px;
-  }
-
-  .nav-logo span {
-    display: none;
-  }
-
-  #auth-header-container {
-    order: 2;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.8rem;
-    white-space: nowrap;
-    min-width: unset;
-    width: 100%;
-  }
-
-  #header-logout-btn, #header-login-btn {
-    padding: 6px 10px;
-    font-size: 0.75rem;
-  }
-
-  .nav-links {
-    width: 100%;
-    order: 3;
-    display: flex;
-    justify-content: center;
+    flex-direction: row;
     flex-wrap: wrap;
-    gap: 10px;
-    padding: 0 0 8px 0;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0;
+    padding: 10px 15px;
+    min-height: 60px;
+  }
+
+  .navbar .nav-logo {
+    min-width: unset;
+    font-size: 1rem;
+  }
+
+  .navbar .nav-logo img {
+    height: 44px;
+  }
+
+  .navbar .hamburger-btn {
+    display: flex;
+    order: 1;
+  }
+
+  .navbar .nav-collapse {
+    display: none;
+    width: 100%;
+    flex: none;
+    order: 2;
+    flex-direction: column;
+    padding: 15px 0 5px 0;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    margin-top: 10px;
+  }
+
+  .navbar .nav-collapse.nav-menu-open {
+    display: flex;
+  }
+
+  .navbar .nav-links {
+    width: 100%;
+    order: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0;
     margin: 0;
   }
 
-  .dropdown-content {
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 200px;
-    min-width: 200px;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.4);
-    border: 1px solid var(--pb-gray);
-    background-color: var(--pb-white);
-    z-index: 1001;
+  .navbar .nav-links .nav-item {
+    width: 100%;
   }
 
-  .dropdown-content a {
-    white-space: normal;
-    padding: 15px 20px;
-    border-bottom: 1px solid var(--pb-gray);
+  .navbar .nav-links .nav-link {
+    padding: 12px 20px;
+    font-size: 1rem;
+    display: block;
   }
 
-  .nav-links::-webkit-scrollbar {
-    display: none;
+  .navbar .dropdown-content {
+    position: static;
+    transform: none;
+    width: 100%;
+    min-width: unset;
+    box-shadow: none;
+    border: none;
+    border-left: 3px solid rgba(255,255,255,0.2);
+    margin-left: 20px;
+    background: transparent;
   }
 
-  .nav-link {
-    padding: 10px 15px;
+  .navbar .dropdown-content a {
+    color: var(--pb-header-text, #fff) !important;
+    padding: 10px 20px;
     font-size: 0.9rem;
+    border-bottom: none;
+  }
+
+  .navbar .dropdown-content a:hover {
+    background: rgba(255,255,255,0.1) !important;
+  }
+
+  .navbar .dropdown.is-open .dropdown-content {
+    display: block;
+  }
+
+  .navbar #auth-header-container {
+    width: 100%;
+    order: 3;
+    justify-content: flex-start;
+    padding: 12px 20px 0 20px;
+    min-width: unset;
+  }
+
+  .dropbtn::after {
+    content: none;
   }
 
   .page-container {
@@ -535,106 +554,6 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
 
 .hamburger-btn.is-active {
   background: rgba(255,255,255,0.15);
-}
-
-@media (max-width: 768px) {
-  .navbar .nav-container {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 0;
-    padding: 10px 15px;
-    min-height: 60px;
-  }
-
-  .navbar .nav-logo {
-    min-width: unset;
-    font-size: 1rem;
-  }
-
-  .navbar .nav-logo img {
-    height: 44px;
-  }
-
-  .navbar .hamburger-btn {
-    display: flex;
-    order: 1;
-  }
-
-  .navbar .nav-collapse {
-    display: none;
-    width: 100%;
-    order: 2;
-    flex-direction: column;
-    padding: 15px 0 5px 0;
-    border-top: 1px solid rgba(255,255,255,0.15);
-    margin-top: 10px;
-  }
-
-  .navbar .nav-collapse.nav-menu-open {
-    display: flex;
-  }
-
-  .navbar .nav-links {
-    width: 100%;
-    order: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 0;
-    margin: 0;
-  }
-
-  .navbar .nav-links .nav-item {
-    width: 100%;
-  }
-
-  .navbar .nav-links .nav-link {
-    padding: 12px 20px;
-    font-size: 1rem;
-    display: block;
-  }
-
-  .navbar .dropdown-content {
-    position: static;
-    transform: none;
-    width: 100%;
-    min-width: unset;
-    box-shadow: none;
-    border: none;
-    border-left: 3px solid rgba(255,255,255,0.2);
-    margin-left: 20px;
-    background: transparent;
-  }
-
-  .navbar .dropdown-content a {
-    color: var(--pb-header-text, #fff) !important;
-    padding: 10px 20px;
-    font-size: 0.9rem;
-    border-bottom: none;
-  }
-
-  .navbar .dropdown-content a:hover {
-    background: rgba(255,255,255,0.1) !important;
-  }
-
-  .navbar .dropdown.is-open .dropdown-content {
-    display: block;
-  }
-
-  .navbar #auth-header-container {
-    width: 100%;
-    order: 3;
-    justify-content: flex-start;
-    padding: 12px 20px 0 20px;
-    min-width: unset;
-  }
-
-  .dropbtn::after {
-    content: none;
-  }
 }
 
 /* Accordion Component - Collapsible Sections */

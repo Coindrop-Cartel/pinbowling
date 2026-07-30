@@ -77,8 +77,9 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, is
       const p1Id = isTeamMode ? g.team1Id : g.player1Id;
       const p2Id = isTeamMode ? g.team2Id : g.player2Id;
       if (g.status === 'completed') {
-        if (g.winnerId === p1Id) homeWins++;
-        else if (g.winnerId === p2Id) awayWins++;
+        const wid = g.winnerId ?? g.teamWinnerId;
+        if (wid === p1Id) homeWins++;
+        else if (wid === p2Id) awayWins++;
       }
     });
     
@@ -91,8 +92,9 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, is
       const p2Score = isTeamMode
         ? Number(g.team2Score ?? 0)
         : Number(g.player2Score ?? 0);
-      const winnerHome = g.status === 'completed' && g.winnerId === p1Id;
-      const winnerAway = g.status === 'completed' && g.winnerId === p2Id;
+      const wid = g.winnerId ?? g.teamWinnerId;
+      const winnerHome = g.status === 'completed' && wid === p1Id;
+      const winnerAway = g.status === 'completed' && wid === p2Id;
       
       return `
         <div class="playoff-game-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-top: 6px; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #2196f3;">

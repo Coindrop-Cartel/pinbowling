@@ -1,6 +1,6 @@
 {
   "name": "pinbowling",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "type": "module",
   "description": "This app now uses a PHP backend for MySQL persistence.",
   "main": "index.js",

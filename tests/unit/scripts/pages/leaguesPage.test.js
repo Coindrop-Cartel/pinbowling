@@ -730,7 +730,7 @@ describe('Leagues Page (leaguesPage.js)', () => {
 
     await initLeaguesPage();
 
-    const updateBtn = document.querySelector('.update-season-btn');
+    const updateBtn = document.querySelector('.season-action-btn');
     expect(updateBtn).not.toBeNull();
     updateBtn.click();
 

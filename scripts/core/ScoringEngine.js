@@ -611,36 +611,7 @@ export class ScoringEngine {
    */
   getMaxOrder() { return this.config?.maxOrder ?? 0; }
 
-  /**
-   * Builds an entire round row for the UI.
-   *
-   * @param {Object}   round         Machine config (orderNumber, machineName, values…)
-   * @param {Object|null} turnValues Existing scores from the DB (or null)
-   * @param {boolean} isLastRound  Is this frame 10?
-   * @param {Object|null} targetPlayer Player being scored
-   * @param {Object} roundContext Engine‑specific data from getRoundRowContext()
-   * @returns {HTMLElement}
-   */
-  async renderRoundRow(round, turnValues, isLastRound, targetPlayer, roundContext) {
-    const row = document.createElement('div');
-    row.className = 'round-row';
-    row.dataset.orderNumber = round?.orderNumber || 0;
 
-    const displayRoundNumber = roundContext?.displayRoundNumber ?? round?.orderNumber ?? '';
-    const displayRoundLabel = roundContext?.displayRoundLabel ?? this.getRoundLabel();
-    const machineName = round?.machineName || '';
-
-    row.innerHTML = `
-      <div class="round-info">
-        <div class="round-label"><b>${escapeHTML(displayRoundLabel)} ${displayRoundNumber}:</b> ${escapeHTML(machineName)}</div>
-        ${roundContext?.roleHtml ?? ''}
-      </div>
-      <div class="round-actions">
-        <div class="round-inputs-container"></div>
-      </div>
-    `;
-    return row;
-  }
   
   /**
    * Returns the header logo image.

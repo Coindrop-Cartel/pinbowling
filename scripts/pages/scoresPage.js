@@ -96,7 +96,7 @@ export async function initScoresPage() {
   let activeFormat = ScoringFormats.DEFAULT;
   let eventMatchups = [];
   let allEventScores = [];
-  let lastCalcResult = null;
+
   let activeEvent = null;
   let summaryTitle = '';
   let rosterOrdersByTeam = {};
@@ -322,9 +322,12 @@ export async function initScoresPage() {
           // Use the per-half-inning eventMatchupId from the round entry,
           // NOT the URL-level activeEventMatchupId which always points to the first half-inning.
           const rowEventMatchupId = round.eventMatchupId || getActiveEventMatchupId();
-          const totals = !isTeamMode && lastCalcResult
-            ? { home: lastCalcResult.homeScore, away: lastCalcResult.awayScore }
-            : null;
+          // Compute fresh totals from current DOM values instead of stale lastCalcResult
+          let totals = null;
+          if (!isTeamMode) {
+            const freshResult = Engine.calculateTurnResults(machines, getScoreMapFromInputs());
+            totals = { home: freshResult.homeScore, away: freshResult.awayScore };
+          }
 
           if (isTeamMode) {
             const selectedTeamId = Number(getCurrentPlayerId());
@@ -359,9 +362,6 @@ export async function initScoresPage() {
               teamEventMatchupId: gameTemId,
             });
           } else {
-            if (window.PB_DEBUG_MODE) {
-              console.log('[ScoresPage] Individual save — lastCalcResult:', lastCalcResult, 'totals:', totals, 'scoreData:', scoreData);
-            }
             await PB_API.scores.save({
               playerId: scoreData.playerId,
               orderNumber: scoreData.orderNumber,
@@ -741,7 +741,6 @@ export async function initScoresPage() {
     } else {
       calcResult = Engine.calculateTurnResults(machines, scoreMap);
     }
-    lastCalcResult = calcResult;
 
     if (Engine?.hasHead2HeadScoring?.()) {
       renderHead2HeadScoreboard(calcResult, machines, engineContext, {

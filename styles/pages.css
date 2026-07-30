@@ -589,7 +589,8 @@
   }
 
   .round-inputs-container,
-  .opponent-inputs-container {
+  .opponent-inputs-container,
+  .inputs-row {
     flex-direction: column;
     width: 100%;
     gap: 12px;

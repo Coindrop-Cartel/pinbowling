@@ -376,11 +376,7 @@ describe('ScoringEngine (Base Class)', () => {
       expect(e2.isLastRound(9)).toBe(false);
     });
 
-    it('renderRoundRow should return a div element', async () => {
-      const row = await engine.renderRoundRow({}, null, false, null, {});
-      expect(row).toBeInstanceOf(HTMLElement);
-      expect(row.tagName).toBe('DIV');
-    });
+
 
     it('renderResults should construct standard HTML table rows', () => {
       const mockTable = { classList: { remove: vi.fn() } };

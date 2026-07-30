@@ -326,8 +326,9 @@ export async function initStandingsPage() {
 
               games.forEach(g => {
                 if (g.status === 'completed') {
-                  if (g.winnerId === g.player1Id) homeWins++;
-                  else if (g.winnerId === g.player2Id) awayWins++;
+                  const wid = g.winnerId ?? g.teamWinnerId;
+                  if (wid === g.player1Id) homeWins++;
+                  else if (wid === g.player2Id) awayWins++;
                 }
               });
             }
