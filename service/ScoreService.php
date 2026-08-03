@@ -203,11 +203,23 @@ class ScoreService
         $stmt->execute([$eventMatchupId]);
         $matchupRows = $stmt->fetchAll();
 
-        // Use pre-computed totals when provided (single source of truth from JS engine)
+        // Resolve scoring format so we can branch baseball (inning/walk-off) semantics
+        // from shared-round formats (bowling/golf).
+        $formatStmt = $pdo->prepare(
+            'SELECT COALESCE(e.scoring_format, l.scoring_format, \'bowling\') as fmt
+             FROM events e
+             LEFT JOIN leagues l ON e.league_id = l.id
+             WHERE e.id = ?'
+        );
+        $formatStmt->execute([$matchup['event_id']]);
+        $format = $formatStmt->fetchColumn() ?: 'bowling';
+        $isBaseball = ($format === 'baseball');
+
+        // Use pre-computed data when provided (single source of truth from JS engine)
         if ($player1Score !== null && $player2Score !== null) {
             $hasScores = ($player1Score > 0 || $player2Score > 0);
 
-            error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH A (pre-computed) matchupId=$eventMatchupId player1Score=$player1Score player2Score=$player2Score hasScores=" . ($hasScores ? 'yes' : 'no'));
+            error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH A (pre-computed) matchupId=$eventMatchupId format=$format player1Score=$player1Score player2Score=$player2Score hasScores=" . ($hasScores ? 'yes' : 'no'));
 
             $status = 'pending';
             $winnerId = null;
@@ -220,41 +232,54 @@ class ScoreService
                     $scoreMap[$idKey][(int) $s['order_number']] = $s;
                 }
 
-                $roundsCount = max(1, (int) (count($matchupRows) / 2));
-                $isWalkoff = false;
-                $allPlayed = true;
-                for ($round = 1; $round <= $roundsCount; $round++) {
-                    $topOrderNum    = ($round - 1) * 2 + 1;
-                    $bottomOrderNum = ($round - 1) * 2 + 2;
+                if ($isBaseball) {
+                    $roundsCount = max(1, (int) (count($matchupRows) / 2));
+                    $isWalkoff = false;
+                    $allPlayed = true;
+                    for ($round = 1; $round <= $roundsCount; $round++) {
+                        $topOrderNum    = ($round - 1) * 2 + 1;
+                        $bottomOrderNum = ($round - 1) * 2 + 2;
 
-                    $isLastRound = ($round === $roundsCount);
-                    $topPlayed = (isset($scoreMap[$player1Id][$topOrderNum]) && isset($scoreMap[$player2Id][$topOrderNum]));
-                    $bottomPlayed = (isset($scoreMap[$player1Id][$bottomOrderNum]) && isset($scoreMap[$player2Id][$bottomOrderNum]));
+                        $isLastRound = ($round === $roundsCount);
+                        $topPlayed = (isset($scoreMap[$player1Id][$topOrderNum]) && isset($scoreMap[$player2Id][$topOrderNum]));
+                        $bottomPlayed = (isset($scoreMap[$player1Id][$bottomOrderNum]) && isset($scoreMap[$player2Id][$bottomOrderNum]));
 
-                    if ($isLastRound && $topPlayed && !$bottomPlayed && $player1Score > $player2Score) {
-                        $isWalkoff = true;
-                        break;
+                        if ($isLastRound && $topPlayed && !$bottomPlayed && $player1Score > $player2Score) {
+                            $isWalkoff = true;
+                            break;
+                        }
+
+                        if (!$topPlayed || (!$bottomPlayed && !$isWalkoff)) {
+                            $allPlayed = false;
+                            break;
+                        }
                     }
 
-                    if (!$topPlayed || (!$bottomPlayed && !$isWalkoff)) {
-                        $allPlayed = false;
-                        break;
-                    }
-                }
-
-                if ($allPlayed) {
-                    $status = 'completed';
-                    if ($player1Score > $player2Score) {
+                    if ($allPlayed) {
+                        $status = 'completed';
+                        $winnerId = $this->resolveWinner($format, $player1Id, $player2Id, $player1Score, $player2Score);
+                    } elseif ($isWalkoff) {
+                        $status = 'completed';
                         $winnerId = $player1Id;
-                    } elseif ($player2Score > $player1Score) {
-                        $winnerId = $player2Id;
                     }
-                } elseif ($isWalkoff) {
-                    $status = 'completed';
-                    $winnerId = $player1Id;
+                } else {
+                    // Bowling/Golf: completed only once BOTH players have recorded a
+                    // score for every shared round (frame/hole). Winner by engine semantics.
+                    $fullyPlayed = true;
+                    foreach ($matchupRows as $row) {
+                        $orderNum = (int) $row['order_number'];
+                        if (!isset($scoreMap[$player1Id][$orderNum]) || !isset($scoreMap[$player2Id][$orderNum])) {
+                            $fullyPlayed = false;
+                            break;
+                        }
+                    }
+                    if ($fullyPlayed && $hasScores) {
+                        $status = 'completed';
+                        $winnerId = $this->resolveWinner($format, $player1Id, $player2Id, $player1Score, $player2Score);
+                    }
                 }
 
-                error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH A results: allPlayed=" . ($allPlayed ? 'yes' : 'no') . " isWalkoff=" . ($isWalkoff ? 'yes' : 'no') . " winnerId=$winnerId status=$status");
+                error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH A results: format=$format status=$status winnerId=$winnerId");
             }
 
             $stmt = $pdo->prepare(
@@ -404,6 +429,23 @@ class ScoreService
         if ($status === 'completed') {
             $this->playoffService->handlePlayoffAdvancement($eventMatchupId);
         }
+    }
+
+    /**
+     * Determine which participant won based on the scoring format's comparison rules.
+     * Bowling: higher total wins. Golf: lower total wins. Returns null on a tie.
+     */
+    private function resolveWinner(string $format, int $id1, int $id2, int $score1, int $score2): ?int
+    {
+        if ($format === 'golf') {
+            if ($score1 < $score2) return $id1;
+            if ($score2 < $score1) return $id2;
+            return null;
+        }
+        // bowling (and any default "higher wins" format)
+        if ($score1 > $score2) return $id1;
+        if ($score2 > $score1) return $id2;
+        return null;
     }
 
     /**

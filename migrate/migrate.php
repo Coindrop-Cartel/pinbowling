@@ -71,7 +71,7 @@ function initializeDatabaseSchema($pdo) {
         `participation_type` ENUM('individual', 'team') DEFAULT 'individual',
         `team_size` INT DEFAULT 1,
         `start_date` DATE DEFAULT NULL,
-        `scoring_format` VARCHAR(50) DEFAULT 'bowling',
+        `scoring_format` VARCHAR(50) NOT NULL DEFAULT 'bowling',
         `season_scoring` ENUM('cumulative', 'weekly') DEFAULT 'weekly',
         `drop_lowest_weeks` INT DEFAULT 0,
         `drop_lowest_player_scores` INT DEFAULT 0,
@@ -140,7 +140,7 @@ function initializeDatabaseSchema($pdo) {
     $pdo->exec("CREATE TABLE IF NOT EXISTS `sessions` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(255) NOT NULL,
-        `scoring_format` VARCHAR(50) DEFAULT 'bowling',
+        `scoring_format` VARCHAR(50) NOT NULL DEFAULT 'bowling',
         `competition_format` ENUM('group', 'head2head') DEFAULT 'group',
         `participation_type` ENUM('individual', 'team') DEFAULT 'individual',
         `team_size` INT DEFAULT 1,
@@ -182,7 +182,7 @@ function initializeDatabaseSchema($pdo) {
         `location_id` INT DEFAULT NULL,
         `event_name` VARCHAR(255) NOT NULL,
         `event_date` DATE DEFAULT NULL,
-        `scoring_format` VARCHAR(50) DEFAULT 'bowling',
+        `scoring_format` VARCHAR(50) NOT NULL DEFAULT 'bowling',
         CONSTRAINT `fk_events_league` FOREIGN KEY (`league_id`) REFERENCES `leagues` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_events_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`id`) ON DELETE CASCADE,
         CONSTRAINT `fk_events_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL
@@ -633,7 +633,7 @@ function alignTableColumns($pdo) {
         $pdo->exec("CREATE TABLE IF NOT EXISTS `sessions` (
             `id` INT AUTO_INCREMENT PRIMARY KEY,
             `name` VARCHAR(255) NOT NULL,
-            `scoring_format` VARCHAR(50) DEFAULT 'bowling',
+            `scoring_format` VARCHAR(50) NOT NULL DEFAULT 'bowling',
             `competition_format` ENUM('group', 'head2head') DEFAULT 'group',
             `participation_type` ENUM('individual', 'team') DEFAULT 'individual',
             `team_size` INT DEFAULT 1,
@@ -1325,6 +1325,48 @@ try {
         echo "✓ Migration 14 — added participation_type, team_size to sessions, created session_teams table.\n";
     } else {
         echo "Session team support already applied.\n";
+    }
+
+    // -----------------------------------------------------------------------
+    // Migration 15: enforce NOT NULL scoring_format (leagues, sessions, events)
+    // Backfills any NULL/empty values first so the constraint can be applied.
+    // -----------------------------------------------------------------------
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'enforce_not_null_scoring_format'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+
+        foreach (['leagues', 'sessions', 'events'] as $table) {
+            $tableExists = $pdo->query("SHOW TABLES LIKE '$table'")->fetch();
+            if (!$tableExists) continue;
+
+            // Skip if the column doesn't exist yet (older schema variants).
+            $colExists = $pdo->query("SHOW COLUMNS FROM `$table` LIKE 'scoring_format'")->fetch();
+
+            // TARGET doesn't exist: add it directly as NOT NULL so every row
+            // is required to carry a scoring format from this point on.
+            if (!$colExists) {
+                $pdo->exec(
+                    "ALTER TABLE `$table` ADD COLUMN `scoring_format` VARCHAR(50) NOT NULL DEFAULT 'bowling'"
+                );
+                continue;
+            }
+
+            // Normalize any NULL/empty/whitespace values to the bowling default.
+            $pdo->exec(
+                "UPDATE `$table` SET `scoring_format` = 'bowling' " .
+                "WHERE `scoring_format` IS NULL OR TRIM(`scoring_format`) = ''"
+            );
+
+            // TARGET exists but wasn't NOT NULL: backfill done above, now enforce it.
+            $pdo->exec(
+                "ALTER TABLE `$table` MODIFY COLUMN `scoring_format` VARCHAR(50) NOT NULL DEFAULT 'bowling'"
+            );
+        }
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('enforce_not_null_scoring_format')")->execute();
+        echo "✓ Migration 15 — enforced NOT NULL scoring_format on leagues, sessions, events.\n";
+    } else {
+        echo "NOT NULL scoring_format already applied.\n";
     }
 
     echo "\n✓ All migrations complete.\n";

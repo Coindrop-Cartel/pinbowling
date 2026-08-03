@@ -550,11 +550,11 @@ export class BaseballEngine extends ScoringEngine {
    * Baseball-specific target summary for the printable blank score sheet.
    * Shows the Baseline Score and Multiplier for the inning.
    */
-  getPrintTargetSummaryHtml(machine, _isLastRound, formatNumberFn) {
-    return `
-        <span>Baseline: <strong>${formatNumberFn(machine.value1)}</strong></span>
-        <span class="ml-15">Multiplier: <strong>${machine.value2}</strong></span>
-      `;
+  getPrintTargetSummaryData(machine, _isLastRound) {
+    return [
+      { label: 'Baseline', value: machine.value1, format: true },
+      { label: 'Multiplier', value: machine.value2, format: false }
+    ];
   }
 
   // --- Score Map & Results Rendering Overrides ---

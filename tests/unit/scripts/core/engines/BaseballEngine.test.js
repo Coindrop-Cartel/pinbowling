@@ -555,14 +555,14 @@ describe('BaseballEngine', () => {
     expect(matchups[1].machineId).toBe(202);
   });
 
-  // ── getPrintTargetSummaryHtml ────────────────────────────────────────
-  test('getPrintTargetSummaryHtml - shows baseline and multiplier', () => {
+  // ── getPrintTargetSummaryData ────────────────────────────────────────
+  test('getPrintTargetSummaryData - shows baseline and multiplier data', () => {
     const machine = { value1: 5000000, value2: 1.5 };
-    const html = engine.getPrintTargetSummaryHtml(machine, false, (n) => Number(n).toLocaleString());
-    expect(html).toContain('Baseline:');
-    expect(html).toContain('5,000,000');
-    expect(html).toContain('Multiplier:');
-    expect(html).toContain('1.5');
+    const data = engine.getPrintTargetSummaryData(machine, false);
+    expect(data).toEqual([
+      { label: 'Baseline', value: 5000000, format: true },
+      { label: 'Multiplier', value: 1.5, format: false }
+    ]);
   });
 
   // ── enrichScoreMap ───────────────────────────────────────────────────

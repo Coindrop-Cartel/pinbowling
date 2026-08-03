@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
 import { 
+  BaseAssignmentStrategy,
   IndividualAssignmentStrategy, 
   TeamAssignmentStrategy, 
   getPlayerAssignmentStrategy 
@@ -20,6 +20,19 @@ describe('PlayerAssignmentStrategy', () => {
     expect(getPlayerAssignmentStrategy('team')).toBeInstanceOf(TeamAssignmentStrategy);
   });
 
+  describe('BaseAssignmentStrategy', () => {
+    const strategy = new BaseAssignmentStrategy();
+
+    it('throws error on calculateEntityEventScore', () => {
+      expect(() => strategy.calculateEntityEventScore()).toThrow('calculateEntityEventScore must be implemented by subclass');
+    });
+
+    it('resolveSlotPlayer returns entity', () => {
+      const entity = { id: 1 };
+      expect(strategy.resolveSlotPlayer(entity, 0)).toBe(entity);
+    });
+  });
+
   describe('IndividualAssignmentStrategy', () => {
     const strategy = new IndividualAssignmentStrategy();
 
@@ -34,6 +47,11 @@ describe('PlayerAssignmentStrategy', () => {
       expect(result.hasData).toBe(true);
       expect(result.memberTotals.length).toBe(1);
       expect(result.droppedMemberIds).toEqual([]);
+    });
+
+    it('resolveSlotPlayer returns entity', () => {
+      const player = { id: 1 };
+      expect(strategy.resolveSlotPlayer(player)).toBe(player);
     });
   });
 
@@ -101,6 +119,17 @@ describe('PlayerAssignmentStrategy', () => {
       expect(strategy.resolveSlotPlayer(baseballTeam, 1, 2).id).toBe(201);
       expect(strategy.resolveSlotPlayer(baseballTeam, 2, 2).id).toBe(202); // Inning 2 (Top/Bottom = index 2, 3)
       expect(strategy.resolveSlotPlayer(baseballTeam, 3, 2).id).toBe(202);
+    });
+
+    it('returns empty results when team has no members', () => {
+      const emptyTeam = { id: 10, members: [] };
+      const result = strategy.calculateEntityEventScore(emptyTeam, golfTargets, {}, golfEngine);
+      expect(result).toEqual({ total: 0, turnResults: [], hasData: false, memberTotals: [], droppedMemberIds: [] });
+    });
+
+    it('returns empty results when event targets is empty', () => {
+      const result = strategy.calculateEntityEventScore(team, [], {}, golfEngine);
+      expect(result).toEqual({ total: 0, turnResults: [], hasData: false, memberTotals: [], droppedMemberIds: [] });
     });
   });
 });

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { calculateSeasonSummary } from '@services/seasonCalculator.js';
+import { calculateSeasonSummary, fetchSeasonData } from '@services/seasonCalculator.js';
 
 // ── Mock Engine ──────────────────────────────────────────────────────
 // Provides a controllable engine for testing seasonCalculator logic
@@ -950,6 +950,55 @@ describe('calculateSeasonSummary', () => {
       expect(row.eventTotals[101].isDropped).toBe(true);
       expect(row.eventTotals[102].isDropped).toBe(true);
       expect(row.totalSeasonPoints).toBe(150);
+    });
+  });
+
+  describe('fetchSeasonData', () => {
+    let mockAPI;
+
+    beforeEach(() => {
+      mockAPI = {
+        scores: { get: vi.fn().mockResolvedValue([]) },
+        machines: { getTargets: vi.fn().mockResolvedValue([]) },
+        matchups: { get: vi.fn().mockResolvedValue([]) },
+        teamMatchups: { get: vi.fn().mockResolvedValue([]) }
+      };
+    });
+
+    it('fetches and normalizes data for individual league without matchups', async () => {
+      const engineWithoutMatchups = createMockEngine({ getMatchupDescription: () => null });
+      const events = [{ id: 101 }];
+
+      const result = await fetchSeasonData(1, events, mockAPI, engineWithoutMatchups, false);
+
+      expect(mockAPI.scores.get).toHaveBeenCalledWith(null, null, 1);
+      expect(mockAPI.machines.getTargets).toHaveBeenCalledWith(null, 1);
+      expect(mockAPI.matchups.get).not.toHaveBeenCalled();
+      expect(result).toHaveProperty('targetsByEvent');
+      expect(result).toHaveProperty('scoresByEventAndPlayer');
+      expect(result).toHaveProperty('matchupsByEvent', {});
+    });
+
+    it('fetches matchups for individual league when matchups are enabled', async () => {
+      const engineWithMatchups = createMockEngine({ getMatchupDescription: () => 'Match' });
+      const events = [{ id: 101 }];
+      mockAPI.matchups.get.mockResolvedValue([{ eventId: 101, playerId: 1, opponentId: 2, orderNumber: 1 }]);
+
+      const result = await fetchSeasonData(1, events, mockAPI, engineWithMatchups, false);
+
+      expect(mockAPI.matchups.get).toHaveBeenCalledWith(101);
+      expect(result.matchupsByEvent).toHaveProperty('101');
+    });
+
+    it('fetches team matchups for team league when matchups are enabled', async () => {
+      const engineWithMatchups = createMockEngine({ getMatchupDescription: () => 'Match' });
+      const events = [{ id: 101 }];
+      mockAPI.teamMatchups.get.mockResolvedValue([{ eventId: 101, teamId: 1, opponentTeamId: 2, orderNumber: 1 }]);
+
+      const result = await fetchSeasonData(1, events, mockAPI, engineWithMatchups, true);
+
+      expect(mockAPI.teamMatchups.get).toHaveBeenCalledWith(101);
+      expect(result.matchupsByEvent).toHaveProperty('101');
     });
   });
 });

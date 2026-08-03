@@ -20,7 +20,8 @@ export function createEventFormController(elements, options) {
     const formatSelect = document.getElementById('event-scoring-format');
     if (formatSelect) {
       formatSelect.innerHTML = SCORING_FORMATS.map(f => `<option value="${f.value}">${f.label}</option>`).join('');
-      const format = ScoringFormats.resolve(event?.scoringFormat || getCookie('pb_preferred_format'));
+      const leagueFormat = options.getLeagueScoringFormat ? options.getLeagueScoringFormat(leagueId) : null;
+      const format = ScoringFormats.resolve(event?.scoringFormat || leagueFormat || getCookie('pb_preferred_format'));
       formatSelect.value = format;
       applyPreferredTheme(format);
     }

@@ -37,5 +37,38 @@
  * @property {function(Object): Promise<any>} getLeagues
  */
 
+/**
+ * @typedef {Object} Machine
+ * @property {number} id
+ * @property {string} machineName
+ * @property {number} orderNumber
+ * @property {Object<string|number, number>} [values]
+ * @property {number} [value1]
+ * @property {number} [value2]
+ */
+
+/**
+ * @typedef {Object} League
+ * @property {number} id
+ * @property {string} name
+ * @property {string} [startDate]
+ * @property {string} participationType
+ * @property {string} competitionFormat
+ * @property {string} scoringFormat
+ * @property {string} seasonScoring
+ * @property {number} [dropLowestWeeks]
+ * @property {Array<Object>} [players]
+ * @property {Array<Object>} [events]
+ */
+
+/**
+ * @typedef {Object} Event
+ * @property {number} id
+ * @property {string} eventName
+ * @property {string} [eventDate]
+ * @property {number} [locationId]
+ * @property {string} [scoringFormat]
+ */
+
 // Force the file to be treated as a module so JSDoc imports work correctly.
 export {};

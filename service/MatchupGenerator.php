@@ -166,7 +166,11 @@ class MatchupGenerator {
         string $format,
         ?int $locationId
     ): void {
-        $targetScores = TargetResolver::resolveTarget($db, $machineId, $format, 'medium', $locationId);
+        // Randomly assign a per-frame difficulty so generated rounds vary
+        // instead of defaulting every machine to the same "medium" baseline.
+        $difficulty = ['easy', 'medium', 'hard'][random_int(0, 2)];
+
+        $targetScores = TargetResolver::resolveTarget($db, $machineId, $format, $difficulty, $locationId);
         $value1 = $targetScores['value1'] ?? 5000000;
         $value2 = $targetScores['value2'] ?? 1.5;
 

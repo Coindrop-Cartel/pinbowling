@@ -29,7 +29,7 @@ class SeasonService {
             $db->beginTransaction();
             
             // 1. Fetch league details directly
-            $stmt = $db->prepare('SELECT status, start_date, weeks_in_season, rounds_per_game, matchups_per_round, participation_type FROM leagues WHERE id = ?');
+            $stmt = $db->prepare('SELECT status, start_date, weeks_in_season, rounds_per_game, matchups_per_round, participation_type, scoring_format FROM leagues WHERE id = ?');
             $stmt->execute([$leagueId]);
             $league = $stmt->fetch();
             if (!$league) {
@@ -105,7 +105,7 @@ class SeasonService {
             
             // 4. Generate Weeks (Events) and Matchups
             $startDate = $league['start_date'] ?: date('Y-m-d');
-            $leagueFormat = !empty($league['scoring_format']) ? $league['scoring_format'] : 'baseball';
+            $leagueFormat = $league['scoring_format'] ?? 'bowling';
 
             for ($w = 1; $w <= $weeksInSeason; $w++) {
                 // Calculate week date (7 days per week)

@@ -241,6 +241,23 @@ abstract class BasePlayoffService
         } else {
             $nextGameNumber = $gameNumber + 1;
 
+            // Safety: never create a game beyond the series length.
+            if ($nextGameNumber > $seriesLength) {
+                return;
+            }
+
+            // Guard against duplicate game creation. handlePlayoffAdvancement can run
+            // more than once for the same game (e.g. score edits), which would otherwise
+            // insert another copy of the next game every time.
+            $existsStmt = $this->db->prepare(
+                "SELECT id FROM {$this->entryTable}
+                 WHERE event_id = ? AND round_name = ? AND series_id = ? AND game_number = ?"
+            );
+            $existsStmt->execute([$eventId, $roundName, $seriesId, $nextGameNumber]);
+            if ($existsStmt->fetchColumn()) {
+                return;
+            }
+
             if ($this->alternateHomeAway()) {
                 $nextHomeId = ($nextGameNumber % 2 === 0) ? $awayId : $homeId;
                 $nextAwayId = ($nextGameNumber % 2 === 0) ? $homeId : $awayId;

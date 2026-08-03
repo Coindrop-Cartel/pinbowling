@@ -241,18 +241,23 @@ describe('GolfEngine', () => {
     expect(engine.getMarkFormatting(10, 3)).toBe('golf-triple-bogey');
   });
 
-  // ── formatMark ───────────────────────────────────────────────────────
-  test('formatMark - wraps mark in span with formatting class', () => {
+  // ── formatMark & getMarkStyleClass ───────────────────────────────────
+  test('formatMark - returns plain text mark representation', () => {
     const turn = { score: 2, mark: '2' };
-    const result = engine.formatMark(turn, 3);
-    expect(result).toContain('golf-birdie');
-    expect(result).toContain('>2<');
+    const result = engine.formatMark(turn);
+    expect(result).toBe('2');
   });
 
-  test('formatMark - par has no special class', () => {
+  test('getMarkStyleClass - returns correct formatting class for birdie', () => {
+    const turn = { score: 2, mark: '2' };
+    const style = engine.getMarkStyleClass(turn, 3);
+    expect(style).toBe('golf-birdie');
+  });
+
+  test('getMarkStyleClass - par has no special class', () => {
     const turn = { score: 3, mark: '3' };
-    const result = engine.formatMark(turn, 3);
-    expect(result).toContain('class=""');
+    const style = engine.getMarkStyleClass(turn, 3);
+    expect(style).toBe('');
   });
 
   // ── getThresholdSort ─────────────────────────────────────────────────
@@ -277,13 +282,15 @@ describe('GolfEngine', () => {
     expect(result.value2).toBe(3);
   });
 
-  // ── getPrintTargetSummaryHtml ────────────────────────────────────────
-  test('getPrintTargetSummaryHtml - returns target score for ball 3 and par', () => {
+  // ── getPrintTargetSummaryData ────────────────────────────────────────
+  test('getPrintTargetSummaryData - returns target score for ball 3 and par data', () => {
     const hole = mockHole(1, 10000000, 4);
-    const html = engine.getPrintTargetSummaryHtml(hole, false, (n) => Number(n).toLocaleString());
+    const data = engine.getPrintTargetSummaryData(hole, false);
     const expectedTarget = hole.values[3];
-    expect(html).toContain(`Target Score: <strong>${expectedTarget.toLocaleString()}</strong>`);
-    expect(html).toContain('Par: <strong>4</strong>');
+    expect(data).toEqual([
+      { label: 'Target Score', value: expectedTarget, format: true },
+      { label: 'Par', value: 4, format: false }
+    ]);
   });
 
   // ── getThresholdRowClass ─────────────────────────────────────────────

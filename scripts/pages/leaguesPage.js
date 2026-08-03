@@ -128,6 +128,10 @@ export async function initLeaguesPage() {
       const league = allLeagues.find(l => String(l.id) === String(leagueId));
       return (league?.locationIds || []).map(String);
     },
+    getLeagueScoringFormat: (leagueId) => {
+      const league = allLeagues.find(l => String(l.id) === String(leagueId));
+      return league?.scoringFormat;
+    },
     onSaveSuccess: async (leagueId, eventId, payload) => {
       const league = allLeagues.find(l => String(l.id) === String(leagueId));
       if (league) {

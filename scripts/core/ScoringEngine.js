@@ -1,6 +1,6 @@
 import { escapeHTML } from '../utils.js';
-import { getPlayerAssignmentStrategy } from './PlayerAssignmentStrategy.js';
-import { getCompetitionFormatStrategy } from './CompetitionFormatStrategy.js';
+import { getPlayerAssignmentStrategy, BaseAssignmentStrategy } from './PlayerAssignmentStrategy.js';
+import { getCompetitionFormatStrategy, BaseCompetitionStrategy } from './CompetitionFormatStrategy.js';
 import { FormatBranding } from '../services/scoringFormatBranding.js';
 
 /**
@@ -46,7 +46,7 @@ export class ScoringEngine {
    * @param {Array} eventTargets - Machine targets for the event.
    * @param {Object} scoresByPlayer - Map of playerId -> score rows array.
    * @param {Object} [options] - Additional strategy options (e.g. dropLowestPlayer).
-   * @returns {{ total: number, memberTotals: Array, droppedMemberIds: Array, hasData: boolean }}
+   * @returns {{ total: number, turnResults?: Array, hasData: boolean, memberTotals: Array, droppedMemberIds: Array, keptMembers?: Array }}
    */
   calculateEntityEventScore(entity, eventTargets, scoresByPlayer, options = {}) {
     return this._assignmentStrategy.calculateEntityEventScore(
@@ -126,9 +126,10 @@ export class ScoringEngine {
 
   /**
    * Returns configuration for bonus target values (e.g. Strike/Spare).
+   * @param {Object} [_machine] The machine definition.
    * @returns {{t1: number, t2: number}}
    */
-  getBonusTargets() { return { t1: 0, t2: 0 }; }
+  getBonusTargets(_machine) { return { t1: 0, t2: 0 }; }
 
   /**
    * Returns generic team setup action configurations for UI buttons and modals.
@@ -152,17 +153,15 @@ export class ScoringEngine {
 
 
   /**
-   * Returns the HTML summary of target information for a single round/machine
-   * on the printable blank score sheet. Each engine format controls its own
-   * display so the UI does not branch on format.
+   * Returns structured data summary of target information for a single round/machine
+   * on the printable blank score sheet.
    *
    * @param {import('@scripts/types.js').Machine} machine The machine/round data.
    * @param {boolean} isLastRound Whether this is the last round.
-   * @param {Function} formatNumber Function to format numeric values for display.
-   * @returns {string} HTML string for the targets summary line.
+   * @returns {Array<{label: string, value: number, format: boolean}>} Target summary data.
    */
-  getPrintTargetSummaryHtml(machine, isLastRound, formatNumber) {
-    return '';
+  getPrintTargetSummaryData(machine, isLastRound) {
+    return [];
   }
 
   /**
@@ -301,6 +300,10 @@ export class ScoringEngine {
   /**
    * Returns CSS class string for a threshold display element.
    * Default implementation returns a class based on whether it's a major threshold.
+   * @param {string|number} rank The rank threshold level.
+   * @param {number} _value1 Parameter 1 value.
+   * @param {number} _value2 Parameter 2 value.
+   * @returns {string} The CSS class name.
    */
   getThresholdRowClass(rank, _value1, _value2) {
     const r = Number(rank);
@@ -406,7 +409,14 @@ export class ScoringEngine {
    *   Example: { eventMatchups: api.matchups.get(eventId), allEventScores: api.scores.get(null, eventId) }
    */
   getRequiredEventData(eventId, api) {
-    return {};
+    if (!eventId) return {};
+    // Load event matchups and all scores so a head-to-head matchup can be
+    // resolved by the selected player without requiring a deep-link ID.
+    // Group-format engines simply ignore these when _isHeadToHead() is false.
+    return {
+      eventMatchups: api.matchups.get(eventId).catch(() => []),
+      allEventScores: api.scores.get(null, eventId).catch(() => [])
+    };
   }
 
   // --- Score Map & Results Rendering Hooks ---
@@ -429,7 +439,64 @@ export class ScoringEngine {
    * @returns {Object} The enriched score map.
    */
   enrichScoreMap(scoreMap, context) {
+    if (!context || !this._isHeadToHead(context)) return scoreMap;
+    this._attachOpponentScores(scoreMap, context);
     return scoreMap;
+  }
+
+  /**
+   * True when the context describes a head-to-head matchup (two participants
+   * sharing the same rounds). Applies to any format via generic two-participant UI.
+   */
+  _isHeadToHead(context) {
+    const fmt = String(context?.activeLeague?.competitionFormat || context?.competitionFormat || '').toLowerCase();
+    return fmt === 'head_to_head' || fmt === 'head2head' || fmt === 'h2h';
+  }
+
+  /**
+   * Resolves the active matchup for the current context.
+   * Prefers the matchup containing the selected player; falls back to the first
+   * matchup (e.g. a deep-linked single matchup or an admin without a selected player).
+   * @returns {Object|null}
+   */
+  _resolveActiveMatchup(context) {
+    const matchups = context?.eventMatchups || [];
+    const currentId = Number(context?.getCurrentPlayerId?.());
+    return matchups.find(m => {
+      const a = Number(m.player1Id ?? m.player1_id);
+      const b = Number(m.player2Id ?? m.player2_id);
+      return currentId === a || currentId === b;
+    }) || matchups[0] || null;
+  }
+
+  /**
+   * Attaches the opponent's saved per-round scores to the map under `scoreMap.opponent`.
+   * The opponent is the other participant in the selected player's matchup.
+   */
+  _attachOpponentScores(scoreMap, context) {
+    const scoresByPlayer = context?.groupScoresByPlayer?.(context?.normalizeScores?.(context?.allEventScores || []) || []) || {};
+
+    const currentId = Number(context?.getCurrentPlayerId?.());
+    const matchup = this._resolveActiveMatchup(context);
+    if (!matchup || !currentId) return;
+
+    const p1 = Number(matchup.player1Id ?? matchup.player1_id);
+    const p2 = Number(matchup.player2Id ?? matchup.player2_id);
+    const opponentId = currentId === p1 ? p2 : currentId === p2 ? p1 : null;
+    if (opponentId === null) return;
+
+    const oScores = scoresByPlayer[opponentId] || scoresByPlayer[String(opponentId)] || [];
+    const opponent = {};
+    oScores.forEach(s => {
+      const order = s?.orderNumber ?? s?.order_number;
+      if (order === undefined) return;
+      opponent[String(order)] = {
+        ball1: Number(s?.ball1 || 0),
+        ball2: Number(s?.ball2 || 0),
+        ball3: Number(s?.ball3 || 0)
+      };
+    });
+    scoreMap.opponent = opponent;
   }
 
   /**
@@ -447,12 +514,48 @@ export class ScoringEngine {
    */
   getRoundRowContext(round, context) {
     if (!round || Object.keys(round).length === 0) return {};
-    return {
+
+    const base = {
       displayRoundNumber: round?.orderNumber || 1,
       displayRoundLabel: this.getRoundLabel(),
       matchup: null,
       sections: []
     };
+
+    if (context && this._isHeadToHead(context)) {
+      const sections = this._buildSharedH2hSections(context);
+      if (sections?.length) {
+        return {
+          ...base,
+          matchup: this._resolveActiveMatchup(context),
+          sections
+        };
+      }
+    }
+
+    return base;
+  }
+
+  /**
+   * Builds two participant sections (selected player editable, opponent readonly)
+   * that share the same round. Used generically for H2H bowling/golf and extensible
+   * to per-round comparison (e.g. golf skins) later.
+   * @returns {Array<{key: string, roleLabel: string, displayName: string, isActiveParticipant: boolean}>}
+   */
+  _buildSharedH2hSections(context) {
+    const matchup = this._resolveActiveMatchup(context);
+    const currentId = Number(context?.getCurrentPlayerId?.());
+    if (!matchup) return null;
+
+    const p1 = Number(matchup.player1Id ?? matchup.player1_id);
+    const p2 = Number(matchup.player2Id ?? matchup.player2_id);
+    const name1 = matchup.player1Name || matchup.player1_name || this.getRoundLabel() + ' 1';
+    const name2 = matchup.player2Name || matchup.player2_name || this.getRoundLabel() + ' 2';
+
+    return [
+      { key: 'h2h-1', roleLabel: '', displayName: name1, isActiveParticipant: currentId === p1 },
+      { key: 'h2h-2', roleLabel: '', displayName: name2, isActiveParticipant: currentId === p2 }
+    ];
   }
 
   /**
@@ -468,7 +571,7 @@ export class ScoringEngine {
     };
   }
   getFormatDefaults() {
-    return this.constructor.getFormatDefaults ? this.constructor.getFormatDefaults() : ScoringEngine.getFormatDefaults();
+    return this.constructor['getFormatDefaults'] ? this.constructor['getFormatDefaults']() : ScoringEngine.getFormatDefaults();
   }
 
   /**
@@ -479,49 +582,49 @@ export class ScoringEngine {
     return false;
   }
   hasHead2HeadScoring() {
-    return this.constructor.hasHead2HeadScoring ? this.constructor.hasHead2HeadScoring() : false;
+    return this.constructor['hasHead2HeadScoring'] ? this.constructor['hasHead2HeadScoring']() : false;
   }
 
   static requiresHeadToHead() {
     return false;
   }
   requiresHeadToHead() {
-    return this.constructor.requiresHeadToHead ? this.constructor.requiresHeadToHead() : false;
+    return this.constructor['requiresHeadToHead'] ? this.constructor['requiresHeadToHead']() : false;
   }
 
   static getDefaultCompetitionFormat() {
     return 'group';
   }
   getDefaultCompetitionFormat() {
-    return this.constructor.getDefaultCompetitionFormat ? this.constructor.getDefaultCompetitionFormat() : 'group';
+    return this.constructor['getDefaultCompetitionFormat'] ? this.constructor['getDefaultCompetitionFormat']() : 'group';
   }
 
   static getDefaultRoundsPerGame(_totalFrames = 0) {
     return 2;
   }
   getDefaultRoundsPerGame(totalFrames = 0) {
-    return this.constructor.getDefaultRoundsPerGame ? this.constructor.getDefaultRoundsPerGame(totalFrames) : 2;
+    return this.constructor['getDefaultRoundsPerGame'] ? this.constructor['getDefaultRoundsPerGame'](totalFrames) : 2;
   }
 
   static getDefaultMatchupsPerRound() {
     return null;
   }
   getDefaultMatchupsPerRound() {
-    return this.constructor.getDefaultMatchupsPerRound ? this.constructor.getDefaultMatchupsPerRound() : null;
+    return this.constructor['getDefaultMatchupsPerRound'] ? this.constructor['getDefaultMatchupsPerRound']() : null;
   }
 
   static getDefaultQuickFillTargets() {
     return null;
   }
   getDefaultQuickFillTargets() {
-    return this.constructor.getDefaultQuickFillTargets ? this.constructor.getDefaultQuickFillTargets() : null;
+    return this.constructor['getDefaultQuickFillTargets'] ? this.constructor['getDefaultQuickFillTargets']() : null;
   }
 
   static getDefaultFallbackTargetValues() {
     return { value1: 50000000, value2: 1, values: null };
   }
   getDefaultFallbackTargetValues() {
-    return this.constructor.getDefaultFallbackTargetValues ? this.constructor.getDefaultFallbackTargetValues() : { value1: 50000000, value2: 1, values: null };
+    return this.constructor['getDefaultFallbackTargetValues'] ? this.constructor['getDefaultFallbackTargetValues']() : { value1: 50000000, value2: 1, values: null };
   }
 
   static getDefaultTargetForDifficulty(difficulty = 'medium') {
@@ -531,7 +634,7 @@ export class ScoringEngine {
     return 50000000;
   }
   getDefaultTargetForDifficulty(difficulty = 'medium') {
-    return this.constructor.getDefaultTargetForDifficulty ? this.constructor.getDefaultTargetForDifficulty(difficulty) : 50000000;
+    return this.constructor['getDefaultTargetForDifficulty'] ? this.constructor['getDefaultTargetForDifficulty'](difficulty) : 50000000;
   }
 
   static getCrossFormatPreferenceOrder() {
@@ -542,7 +645,7 @@ export class ScoringEngine {
     ];
   }
   getCrossFormatPreferenceOrder() {
-    return this.constructor.getCrossFormatPreferenceOrder ? this.constructor.getCrossFormatPreferenceOrder() : [];
+    return this.constructor['getCrossFormatPreferenceOrder'] ? this.constructor['getCrossFormatPreferenceOrder']() : [];
   }
 
   /**
@@ -582,10 +685,10 @@ export class ScoringEngine {
    * Default implementation creates a basic {orderNumber: {ball1, ball2, ball3}} map.
    * Baseball overrides this to include opponent scores and role info.
    *
-   * @param {number|string} playerId The player ID.
+   * @param {number|string} _playerId The player ID.
    * @param {Array} playerScores The player's own score rows.
-   * @param {Object<number, Array>} allScoresByPlayer All scores grouped by player ID.
-   * @param {Array} matchups Matchup data for the event (empty for non-matchup formats).
+   * @param {Object<number, Array>} _allScoresByPlayer All scores grouped by player ID.
+   * @param {Array} _matchups Matchup data for the event (empty for non-matchup formats).
    * @returns {Object} Score map with ball scores per order number.
    */
   buildPlayerScoreMap(_playerId, playerScores, _allScoresByPlayer, _matchups) {
@@ -617,6 +720,6 @@ export class ScoringEngine {
    * Returns the header logo image.
    * @returns {string}
    */
-  getHeaderLogoImage() { return this.config.headerLogo || this.getLogoImage(); }
+  getHeaderLogoImage() { return this.config.headerLogo || this.getBranding().logoImage; }
 
 }

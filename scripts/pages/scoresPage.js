@@ -1089,6 +1089,7 @@ export async function initScoresPage() {
               matchupId,
               eventId: evId,
               isTeam: isTeamMode,
+              format,
               onSaved: () => {
                 loadPage(ROUTE_PATHS.SCORES({ leagueId: league.id, eventId: evId }));
               }

@@ -32,17 +32,29 @@ class TeamScoreService
     ): bool {
         $pdo = $this->db;
 
-        $stmt = $pdo->prepare('SELECT league_id FROM events WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT league_id, session_id FROM events WHERE id = ?');
         $stmt->execute([$eventId]);
-        $leagueId = $stmt->fetchColumn();
-        if (!$leagueId) {
+        $eventRow = $stmt->fetch();
+        if (!$eventRow) {
             throw new \Exception('Event not found.');
         }
+        $leagueId = $eventRow['league_id'];
+        $sessionId = $eventRow['session_id'];
 
-        $stmt = $pdo->prepare('SELECT 1 FROM league_teams WHERE league_id = ? AND team_id = ?');
-        $stmt->execute([$leagueId, $teamId]);
-        if (!$stmt->fetchColumn()) {
-            throw new \Exception('Team is not registered in this league.');
+        if ($sessionId) {
+            $stmt = $pdo->prepare('SELECT 1 FROM session_teams WHERE session_id = ? AND team_id = ?');
+            $stmt->execute([$sessionId, $teamId]);
+            if (!$stmt->fetchColumn()) {
+                throw new \Exception('Team is not registered in this session.');
+            }
+        } elseif ($leagueId) {
+            $stmt = $pdo->prepare('SELECT 1 FROM league_teams WHERE league_id = ? AND team_id = ?');
+            $stmt->execute([$leagueId, $teamId]);
+            if (!$stmt->fetchColumn()) {
+                throw new \Exception('Team is not registered in this league.');
+            }
+        } else {
+            throw new \Exception('Event not found.');
         }
 
         $existingId = null;

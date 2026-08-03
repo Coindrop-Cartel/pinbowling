@@ -4,7 +4,7 @@ import { printMachineScores, printBlankScoreSheet, printScoreSheet, printSeasonR
 
 vi.mock('@core/engine.js', () => ({
   getScoringEngine: vi.fn(() => ({
-    getPrintTargetSummaryHtml: () => '<div>Strike: <strong>10,000</strong></div>',
+    getPrintTargetSummaryData: () => [{ label: 'Strike', value: 10000, format: true }],
     filterThresholds: vi.fn(v => v),
     getScoringHint: () => '',
     getLastFrameHint: () => '',
@@ -186,7 +186,7 @@ describe('Printing Utilities (printing.js)', () => {
       const rawScores = [{ playerId: 1, eventId: 101, orderNumber: 1, ball1: 5000, ball2: 7500, ball3: 10000 }];
       const engine = {
         handlesSortCompletely: () => false,
-        getPrintTargetSummaryHtml: () => '<div>Strike: 10,000</div>',
+        getPrintTargetSummaryData: () => [{ label: 'Strike', value: 10000, format: true }],
         getRoundLabel: () => 'Frame',
         calculateTurnResults: () => ({ total: 100, turnResults: [{ orderNumber: 1, machineName: 'Addams Family', displayMark: 'Strike', displayRunningTotal: '100' }] }),
         compareScores: (a, b) => b - a,
@@ -246,8 +246,7 @@ describe('Printing Utilities (printing.js)', () => {
       const rawScores = [{ playerId: 1, eventId: 101, orderNumber: 1, ball1: 5000, ball2: 7500, ball3: 10000 }];
       const engine = {
         handlesSortCompletely: () => false,
-        handlesSortCompletely: () => false,
-        getPrintTargetSummaryHtml: () => '<div>Strike: 10,000</div>',
+        getPrintTargetSummaryData: () => [{ label: 'Strike', value: 10000, format: true }],
         getRoundLabel: () => 'Frame',
         calculateTurnResults: () => ({ total: 100, turnResults: [{ orderNumber: 1, machineName: 'Addams Family', displayMark: 'Strike', displayRunningTotal: '100' }] }),
         compareScores: (a, b) => b - a,

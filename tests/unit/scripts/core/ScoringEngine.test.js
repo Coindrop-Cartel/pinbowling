@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { ScoringEngine } from '@core/ScoringEngine.js';
 import { renderStandardScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
 import { FormatBranding } from '@services/scoringFormatBranding.js';
@@ -336,8 +336,15 @@ describe('ScoringEngine (Base Class)', () => {
       expect(engine.getMatchupDescription(5)).toBeNull();
     });
 
-    it('getRequiredEventData should return empty object by default', () => {
-      expect(engine.getRequiredEventData(123, {})).toEqual({});
+    it('getRequiredEventData should fetch event matchups and scores for H2H lookup', () => {
+      const api = {
+        matchups: { get: vi.fn().mockReturnValue(Promise.resolve([{ id: 1 }])) },
+        scores: { get: vi.fn().mockResolvedValue([{ id: 2 }]) }
+      };
+      const result = engine.getRequiredEventData(123, api);
+      expect(api.matchups.get).toHaveBeenCalledWith(123);
+      expect(api.scores.get).toHaveBeenCalledWith(null, 123);
+      expect(Object.keys(result)).toEqual(['eventMatchups', 'allEventScores']);
     });
 
     it('enrichScoreMap should pass through score map unchanged by default', () => {
@@ -436,8 +443,8 @@ describe('ScoringEngine (Base Class)', () => {
       expect(engine.getQuickFillValues({}, 'easy')).toBeNull();
     });
 
-    it('getPrintTargetSummaryHtml should return empty string by default', () => {
-      expect(engine.getPrintTargetSummaryHtml({}, false, (v) => v)).toBe('');
+    it('getPrintTargetSummaryData should return empty array by default', () => {
+      expect(engine.getPrintTargetSummaryData({}, false)).toEqual([]);
     });
   });
 });

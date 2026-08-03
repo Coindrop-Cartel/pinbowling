@@ -56,12 +56,12 @@ export class GolfEngine extends ScoringEngine {
    * Golf-specific target summary for the printable blank score sheet.
    * Shows the Target Score and Par for the hole.
    */
-  getPrintTargetSummaryHtml(machine, _isLastRound, formatNumberFn) {
+  getPrintTargetSummaryData(machine, _isLastRound) {
     const goal = machine.values?.[3] || machine.values?.['3'] || machine.value1 || 0;
-    return `
-        <span>Target Score: <strong>${formatNumberFn(goal)}</strong></span>
-        <span class="ml-15">Par: <strong>${machine.value2}</strong></span>
-      `;
+    return [
+      { label: 'Target Score', value: goal, format: true },
+      { label: 'Par', value: machine.value2 || 3, format: false }
+    ];
   }
 
   /**
@@ -100,14 +100,22 @@ export class GolfEngine extends ScoringEngine {
   }
 
   /**
-   * Converts turn data into a visual mark string, applying Golf-specific formatting.
+   * Converts turn data into a visual mark string.
+   * @param {Object} turn The calculated turn result.
+   * @returns {string}
+   */
+  formatMark(turn) {
+    return turn.mark || String(turn.score) || '';
+  }
+
+  /**
+   * Exposes structural class metadata for styling this mark relative to par.
    * @param {Object} turn The calculated turn result.
    * @param {number} parValue The par value for the current hole.
    * @returns {string}
    */
-  formatMark(turn, parValue) {
-    const formattingClass = this.getMarkFormatting(turn.score, parValue);
-    return `<span class="${formattingClass}">${turn.mark}</span>`;
+  getMarkStyleClass(turn, parValue) {
+    return this.getMarkFormatting(turn.score, parValue);
   }
 
   /**
@@ -181,18 +189,20 @@ export class GolfEngine extends ScoringEngine {
         playedMachines.push(machine);
         const par = Number(machine.value2) || 3;
         const diff = turn.score - par;
-        const formattedMark = this.formatMark(turn, machine.value2);
+        const styleClass = this.getMarkStyleClass(turn, machine.value2);
+        const formattedMark = this.formatMark(turn);
         return {
           ...turn,
           played: true,
           mark: turn.mark, // Keep numeric mark for logic if needed
           displayMark: formattedMark,
+          styleClass,
           displayRoundTotal: diff === 0 ? 'E' : (diff > 0 ? `+${diff}` : String(diff)),
           displayRunningTotal: this.formatTotalScore(runningTotal, playedMachines)
         };
       }
 
-      return { ...turn, played: false, displayMark: '−', displayRoundTotal: '', displayRunningTotal: '−' };
+      return { ...turn, played: false, displayMark: '−', displayRoundTotal: '', displayRunningTotal: '−', styleClass: '' };
     });
 
     return { turnResults: results, total: runningTotal, totalDisplay: this.formatTotalScore(runningTotal, playedMachines) };

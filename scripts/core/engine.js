@@ -1,6 +1,7 @@
 import { BowlingEngine } from '@core/engines/BowlingEngine.js';
 import { GolfEngine } from '@core/engines/GolfEngine.js';
 import { BaseballEngine } from '@core/engines/BaseballEngine.js';
+import { ScoringEngine } from '@core/ScoringEngine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 
 /**
@@ -17,27 +18,28 @@ export const SCORING_FORMATS = ScoringFormats.ALL.map(value => {
 
 /**
  * Factory function to retrieve the active scoring engine. 
- * Prioritizes an explicit format parameter, falling back to the user's 
- * cookie preference, and finally defaulting to Bowling.
  * 
  * @param {string|null} [format=null] - The format key ('bowling', 'golf', or 'baseball').
+ * @param {Object} [settings={}] - Terminology settings config map.
+ * @param {Object} [options={}] - Strategy configuration.
  * @returns {ScoringEngine} An instance of a class extending ScoringEngine.
  */
-export function getScoringEngine(format = null, options = {}) {
-  const match = document.cookie.match(new RegExp('(^| )pb_preferred_format=([^;]+)'));
-  const preferred = match ? match[2] : null;
+export function getScoringEngine(format = null, settings = null, options = {}) {
+  let preferred = null;
+  if (!format && typeof document !== 'undefined') {
+    const match = document.cookie.match(new RegExp('(^| )pb_preferred_format=([^;]+)'));
+    preferred = match ? match[2] : null;
+  }
   const activeFormat = ScoringFormats.resolve(format || preferred);
-  
-  // window.PB_SETTINGS is populated via js-config.php
-  const settings = window.PB_SETTINGS || {};
+  const resolvedSettings = settings || (typeof window !== 'undefined' ? window['PB_SETTINGS'] : {}) || {};
 
   switch (activeFormat) {
     case ScoringFormats.GOLF:
-      return new GolfEngine(settings.golf, options);
+      return new GolfEngine(resolvedSettings.golf, options);
     case ScoringFormats.BASEBALL:
-      return new BaseballEngine(settings.baseball, options);
+      return new BaseballEngine(resolvedSettings.baseball, options);
     case ScoringFormats.BOWLING:
     default:
-      return new BowlingEngine(settings.bowling, options);
+      return new BowlingEngine(resolvedSettings.bowling, options);
   }
 }

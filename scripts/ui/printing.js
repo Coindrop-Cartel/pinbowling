@@ -5,6 +5,13 @@ import { formatNumber, escapeHTML, renderThresholdGrid } from '@scripts/utils.js
 import { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer, buildScoreMapFromRows, groupScoresByPlayer } from '@services/normalizer.js';
 import { calculateSeasonSummary } from '@services/seasonCalculator.js';
 
+function formatPrintTargets(targets, formatNumberFn) {
+  return targets.map((t, index) => {
+    const val = t.format ? formatNumberFn(t.value) : t.value;
+    return `<span class="${index > 0 ? 'ml-15' : ''}">${t.label}: <strong>${val}</strong></span>`;
+  }).join('');
+}
+
 /**
  * Generates large printable signs showing target scores for each machine.
  * @param {Array<import('@scripts/types.js').Machine>} machines - The machines to print target scores for.
@@ -106,7 +113,7 @@ export function printBlankScoreSheet(machines, leagueName, eventName, format = S
   const machineSectionsHtml = machines.map((m) => {
     const isLast = m.orderNumber === maxOrder;
     const lfHint = isLast ? FormatBranding.get(format).lastFrameHint : null;
-    const targetSummary = Engine.getPrintTargetSummaryHtml(m, isLast, formatNumber);
+    const targetSummary = formatPrintTargets(Engine.getPrintTargetSummaryData(m, isLast), formatNumber);
 
     const thresholdsSection = showThresholds && m.values ? `
       <div class="thresholds-section">
@@ -219,7 +226,7 @@ export function printScoreSheet(machines, leagueName, eventName, format = Scorin
   const machineSectionsHtml = machines.map((m) => {
     const isLast = m.orderNumber === maxOrder;
     const lfHint = isLast ? FormatBranding.get(format).lastFrameHint : null;
-    let targetsHtml = Engine.getPrintTargetSummaryHtml(m, isLast, formatNumber);
+    let targetsHtml = formatPrintTargets(Engine.getPrintTargetSummaryData(m, isLast), formatNumber);
 
     const playerScores = scoreMap?.[String(m.orderNumber)] || {};
     const ball1Val = (playerScores.ball1 !== undefined && playerScores.ball1 !== null && playerScores.ball1 !== '') ? formatNumber(playerScores.ball1) : '';
@@ -582,7 +589,7 @@ export function printSeasonResults(league, players, events, locations, allLeague
       const machineSectionsHtml = eventMachinesNormalized.map((m) => {
         const isLast = m.orderNumber === eventMaxOrder;
         const lfHint = isLast ? FormatBranding.get(format).lastFrameHint : null;
-        let targetsHtml = engine.getPrintTargetSummaryHtml(m, isLast, formatNumber);
+        let targetsHtml = formatPrintTargets(engine.getPrintTargetSummaryData(m, isLast), formatNumber);
 
         const currentTurnScores = scoreMap?.[String(m.orderNumber)] || {};
         const ball1Val = (currentTurnScores.ball1 !== undefined && currentTurnScores.ball1 !== null && currentTurnScores.ball1 !== '') ? formatNumber(currentTurnScores.ball1) : '';

@@ -26,11 +26,14 @@ export function renderStandardScoreboard(calcResult, domRefs) {
 
   resultsBody.innerHTML = (turnResults || [])
     .map(result => {
+      const markHtml = result.styleClass
+        ? `<span class="${result.styleClass}">${result.displayMark}</span>`
+        : result.displayMark;
       return `
         <tr>
           <td>${result.orderNumber}</td>
           <td>${result.machineName}</td>
-          <td>${result.displayMark}</td>
+          <td>${markHtml}</td>
           <td>${result.displayRunningTotal}</td>
         </tr>
       `;

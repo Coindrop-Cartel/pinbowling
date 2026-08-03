@@ -54,16 +54,16 @@ export class BowlingEngine extends ScoringEngine {
    * Bowling-specific target summary for the printable blank score sheet.
    * Shows the Strike target, and bonus targets (Target 1 / Target 2) for the last frame.
    */
-  getPrintTargetSummaryHtml(machine, isLastRound, formatNumberFn) {
-    let html = `<span>Strike: <strong>${formatNumberFn(machine.values[10])}</strong></span>`;
+  getPrintTargetSummaryData(machine, isLastRound) {
+    const data = [{ label: 'Strike', value: machine.values?.[10] || machine.value1 || 0, format: true }];
     if (isLastRound) {
       const { t1, t2 } = this.getBonusTargets(machine);
-      html += `
-          <span class="ml-15">Target 1: <strong>${formatNumberFn(t1)}</strong></span>
-          <span class="ml-15">Target 2: <strong>${formatNumberFn(t2)}</strong></span>
-        `;
+      data.push(
+        { label: 'Target 1', value: t1, format: true },
+        { label: 'Target 2', value: t2, format: true }
+      );
     }
-    return html;
+    return data;
   }
 
   /**

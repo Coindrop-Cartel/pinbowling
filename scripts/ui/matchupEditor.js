@@ -1,6 +1,8 @@
 import { showDialog, showAlert } from '@ui/dialogs.js';
 import { PB_API } from '@services/api.js';
 import { escapeHTML } from '@scripts/utils.js';
+import { getScoringEngine } from '@core/engine.js';
+import { getTargetScoreForDifficulty } from '@services/targetResolver.js';
 
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 
@@ -24,7 +26,7 @@ function computeScoreValues(value1, value2) {
  * @param {boolean} options.isTeam - team mode vs individual
  * @param {Function} options.onSaved - called after successful save
  */
-export async function openMatchupEditor({ matchupId, eventId, isTeam, onSaved }) {
+export async function openMatchupEditor({ matchupId, eventId, isTeam, onSaved, format }) {
   const [entriesData, machineData, eventTargets] = await Promise.all([
     isTeam ? PB_API.teamMatchups.get(eventId, matchupId) : PB_API.matchups.get(eventId, matchupId),
     PB_API.machines.getAll(),
@@ -58,13 +60,18 @@ export async function openMatchupEditor({ matchupId, eventId, isTeam, onSaved })
 
   currentEntries.sort((a, b) => a.orderNumber - b.orderNumber);
 
+  const engine = getScoringEngine(format);
+  const diffDefaults = engine?.getFormatDefaults?.() || { easy: 25000000, medium: 50000000, hard: 100000000 };
+  const easyMedMid = (Number(diffDefaults.easy) + Number(diffDefaults.medium)) / 2;
+  const medHardMid = (Number(diffDefaults.medium) + Number(diffDefaults.hard)) / 2;
+
   for (const entry of currentEntries) {
     const key = `${entry.machineId}-${entry.orderNumber}`;
     const ts = targetsByKey[key];
     if (ts) {
-      const v1 = Number(ts.value1 ?? 5000000);
-      if (v1 <= 3500000) entry.difficulty = 'easy';
-      else if (v1 >= 7500000) entry.difficulty = 'hard';
+      const v1 = Number(ts.value1 ?? diffDefaults.medium);
+      if (v1 <= easyMedMid) entry.difficulty = 'easy';
+      else if (v1 >= medHardMid) entry.difficulty = 'hard';
       else entry.difficulty = 'medium';
     }
   }
@@ -180,21 +187,14 @@ export async function openMatchupEditor({ matchupId, eventId, isTeam, onSaved })
     }
 
     const targetUpdates = [];
+    const engine = getScoringEngine(format);
+    const multiplier = Number(engine?.getFormatDefaults?.().multiplier ?? 1.5);
     for (const entry of currentEntries) {
       const machine = allMachines.find(m => Number(m.id) === Number(entry.machineId));
-      let targetVal = 5000000;
-      const multiplier = 1.5;
-      if (entry.difficulty === 'easy') targetVal = 3000000;
-      else if (entry.difficulty === 'hard') targetVal = 10000000;
 
-      if (machine?.scores) {
-        const fmt = 'baseball';
-        const diffKey = entry.difficulty === 'easy' ? 'targetEasy' : (entry.difficulty === 'hard' ? 'targetHard' : 'targetMed');
-        const locScores = machine.locationScores || {};
-        const masterScores = machine.masterScores || machine.scores || {};
-        if (locScores[fmt]?.[diffKey] > 0) targetVal = Number(locScores[fmt][diffKey]);
-        else if (masterScores[fmt]?.[diffKey] > 0) targetVal = Number(masterScores[fmt][diffKey]);
-      }
+      // Resolve the baseline for the matchup's actual scoring format + difficulty,
+      // using per-machine data when available and carrying the engine's default base.
+      const targetVal = getTargetScoreForDifficulty(machine, format, entry.difficulty);
 
       const values = computeScoreValues(targetVal, multiplier);
       targetUpdates.push({

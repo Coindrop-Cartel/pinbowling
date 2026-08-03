@@ -13,9 +13,13 @@ function renderTurnCell(turn, scoreKey, lastScoreState, currentScoreState, isTvM
     classes.push('score-just-updated');
   }
 
+  const markHtml = turn.styleClass
+    ? `<span class="${turn.styleClass}">${turn.displayMark}</span>`
+    : turn.displayMark;
+
   return `
     <td class="${classes.join(' ')}">
-      <div class="standings-mark">${turn.displayMark}</div>
+      <div class="standings-mark">${markHtml}</div>
       <div class="standings-round-score">${turn.displayRoundTotal}</div>
     </td>
   `;

@@ -12,7 +12,7 @@ export class BaseAssignmentStrategy {
    * @param {Object} scoresByPlayer - Map of playerId -> score rows array.
    * @param {Object} engine - Active ScoringEngine instance.
    * @param {Object} [options] - Additional strategy options (e.g. dropLowestPlayer).
-   * @returns {{ total: number, memberTotals: Array, droppedMemberIds: Array }}
+   * @returns {{ total: number, turnResults?: Array, hasData: boolean, memberTotals: Array, droppedMemberIds: Array, keptMembers?: Array }}
    */
   calculateEntityEventScore(entity, eventTargets, scoresByPlayer, engine, options = {}) {
     throw new Error('calculateEntityEventScore must be implemented by subclass');
