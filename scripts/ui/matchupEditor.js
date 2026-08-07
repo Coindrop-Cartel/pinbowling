@@ -30,7 +30,7 @@ export async function openMatchupEditor({ matchupId, eventId, isTeam, onSaved, f
   const [entriesData, machineData, eventTargets] = await Promise.all([
     isTeam ? PB_API.teamMatchups.get(eventId, matchupId) : PB_API.matchups.get(eventId, matchupId),
     PB_API.machines.getAll(),
-    PB_API.machines.getTargets(eventId),
+    PB_API.machines.getTargets(eventId, null, null, matchupId),
   ]);
 
   const entries = entriesData?.entries || [];
@@ -208,7 +208,7 @@ export async function openMatchupEditor({ matchupId, eventId, isTeam, onSaved, f
     }
 
     if (targetUpdates.length > 0) {
-      await PB_API.machines.saveTarget(targetUpdates);
+      await PB_API.machines.saveTarget(targetUpdates, matchupId);
     }
 
     if (onSaved) onSaved();

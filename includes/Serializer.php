@@ -239,6 +239,7 @@ class Serializer {
         return [
             'id' => (int)$row['id'],
             'eventId' => (int)$row['event_id'],
+            'matchupRefId' => (int)($row['matchup_ref_id'] ?? 0),
             'machineId' => (int)$row['machine_id'],
             'machineName' => $row['machine_name'] ?? null,
             'orderNumber' => (int)$row['order_number'],

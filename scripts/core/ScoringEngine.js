@@ -1,6 +1,6 @@
-import { escapeHTML } from '../utils.js';
 import { getPlayerAssignmentStrategy, BaseAssignmentStrategy } from './PlayerAssignmentStrategy.js';
 import { getCompetitionFormatStrategy, BaseCompetitionStrategy } from './CompetitionFormatStrategy.js';
+import { FORMAT_TERMINOLOGY, isHead2Head } from '../services/scoringFormat.js';
 import { FormatBranding } from '../services/scoringFormatBranding.js';
 
 /**
@@ -19,6 +19,61 @@ export class ScoringEngine {
     this.config = config;
     this._assignmentStrategy = getPlayerAssignmentStrategy(options.participationType || 'individual');
     this._competitionStrategy = getCompetitionFormatStrategy(options.competitionFormat || 'group');
+  }
+
+  /**
+   * Returns presentational branding metadata for this engine format.
+   * @returns {Object}
+   */
+  getBranding() {
+    return FormatBranding.get(this.config?.format);
+  }
+
+  /**
+   * Returns human-readable labels for bonus targets.
+   * @param {Object} [_machine] The machine definition.
+   * @returns {{label1: string, label2: string}}
+   */
+  getBonusTargetLabels(_machine) {
+    return { label1: 'Bonus 1', label2: 'Bonus 2' };
+  }
+
+  /**
+   * Returns the round number corresponding to a turn index in a matchup scoreboard.
+   * Default: 1 turn per round.
+   * @param {number} turnIndex Zero-based turn index.
+   * @param {Array} [_machines] Machine list.
+   * @returns {number} 1-based round index.
+   */
+  getRoundIndexForTurn(turnIndex, _machines = []) {
+    return turnIndex + 1;
+  }
+
+  /**
+   * Returns formatted score string for a single turn in a head-to-head scoreboard cell.
+   * @param {Object} turn The turn object calculated by calculateTurnResults.
+   * @param {string} [existingScore] Any score previously recorded in this round cell.
+   * @returns {string}
+   */
+  formatMatchupScore(turn, existingScore) {
+    if (turn?.played) return String(turn.score);
+    return existingScore !== undefined ? existingScore : '-';
+  }
+
+  /**
+   * Internal helper to resolve terminology with precedence:
+   * 1. Explicitly configured property on this.config
+   * 2. Format default from FORMAT_TERMINOLOGY[this.config.format]
+   * 3. Static fallback parameter
+   * @protected
+   */
+  _getTerm(key, fallback) {
+    if (this.config && this.config[key] !== undefined) return this.config[key];
+    if (this.config && this.config.format && FORMAT_TERMINOLOGY[this.config.format]) {
+      const formatTerms = FORMAT_TERMINOLOGY[this.config.format];
+      if (formatTerms[key] !== undefined) return formatTerms[key];
+    }
+    return fallback;
   }
 
   /**
@@ -168,20 +223,23 @@ export class ScoringEngine {
    * Returns the terminology used for an individual round (e.g., "Round", "Frame", "Hole").
    * @returns {string}
    */
-  getRoundLabel() { return this.config.roundLabel || 'Round'; }
+  getRoundLabel() { return this._getTerm('roundLabel', 'Round'); }
+  getTurnHeaderPrefix() { return this._getTerm('turnHeaderPrefix', 'Round'); }
+  getPrimaryTargetLabel() { return this._getTerm('primaryTargetLabel', 'Target'); }
+  getValue1Label() { return this._getTerm('value1Label', 'Target Score'); }
+  getValue2Label() { return this._getTerm('value2Label', 'Base Score'); }
+  getThresholdPrefix() { return this._getTerm('thresholdPrefix', 'Score'); }
 
   /**
-   * Returns the terminology used for columns in summary tables.
-   * Useful for dynamic headers in the Scoreboard or Results list.
-   * @returns {string} e.g. "Frame" or "Hole".
+   * Determines if a given threshold rank corresponds to Par score.
+   * @param {string|number} rank
+   * @param {number} value1
+   * @param {number} value2
+   * @returns {boolean}
    */
-  getTurnHeaderPrefix() { return this.config.turnHeaderPrefix || 'Round'; }
-
-  /**
-   * Returns the label for the primary goal score (e.g., "Strike", "Target", "Par").
-   * @returns {string}
-   */
-  getPrimaryTargetLabel() { return this.config.primaryTargetLabel || 'Target'; }
+  isParThreshold(_rank, _value1, _value2) {
+    return false;
+  }
 
   /**
    * Comparator function for sorting player standings.
@@ -206,11 +264,74 @@ export class ScoringEngine {
   }
 
   /**
+   * Evaluates whether two standings rows are tied according to the competition strategy.
+   *
+   * @param {Object} a Standings row for participant A.
+   * @param {Object} b Standings row for participant B.
+   * @param {Object} [options] Options for tiebreaking.
+   * @returns {boolean} True if a and b are tied.
+   */
+  isTie(a, b, options = {}) {
+    return this._competitionStrategy.isTie(a, b, this, options);
+  }
+
+  /**
    * Whether this engine's sortStandings handles ALL sorting (including tiebreaking)
    * so the competition strategy should not re-sort by total score.
    * Override in engines that have sport-specific primary sort keys (e.g. parDiff in Golf).
    */
   handlesSortCompletely() { return false; }
+
+  /**
+   * Default implementation for team turn results (works for standard formats like Bowling and Golf).
+   * Aggregates individual member turn results, sorts members best-to-worst using
+   * this.compareScores(), optionally drops the worst N members, and sums the team total.
+   *
+   * @param {Array<Object>} machines Target definitions for the event.
+   * @param {Object<number|string, Object>} scoreMapByPlayer Dictionary of player scoreMaps keyed by playerId.
+   * @param {Array<Object>} members List of team member objects.
+   * @param {number} dropLowestCount Number of lowest member game totals to drop per game.
+   * @returns {Object}
+   */
+  calculateTeamTurnResults(machines, scoreMapByPlayer = {}, members = [], dropLowestCount = 0) {
+    const memberResults = {};
+    const memberGameTotals = [];
+
+    members.forEach(member => {
+      const pScores = scoreMapByPlayer[member.id] || {};
+      const res = this.calculateTurnResults(machines, pScores);
+      memberResults[member.id] = res;
+      memberGameTotals.push({
+        playerId: member.id,
+        playerName: member.playerName || member.name,
+        total: res.total,
+        totalDisplay: res.totalDisplay,
+        hasScores: res.turnResults.some(t => t.played)
+      });
+    });
+
+    // Best performing members first, worst at the end (so dropLowestCount slices off the tail)
+    memberGameTotals.sort((a, b) => this.compareScores(a.total, b.total));
+
+    let effectiveMemberTotals = memberGameTotals;
+    let droppedMemberTotals = [];
+
+    if (dropLowestCount > 0 && memberGameTotals.length > dropLowestCount) {
+      effectiveMemberTotals = memberGameTotals.slice(0, memberGameTotals.length - dropLowestCount);
+      droppedMemberTotals = memberGameTotals.slice(memberGameTotals.length - dropLowestCount);
+    }
+
+    const teamGameTotal = effectiveMemberTotals.reduce((sum, m) => sum + m.total, 0);
+
+    return {
+      memberResults,
+      memberGameTotals,
+      effectiveMemberTotals,
+      droppedMemberTotals,
+      total: teamGameTotal,
+      totalDisplay: this.formatTotalScore(teamGameTotal, machines)
+    };
+  }
 
   /**
    * Formats the total score for display (e.g., adds par relativity).
@@ -449,8 +570,8 @@ export class ScoringEngine {
    * sharing the same rounds). Applies to any format via generic two-participant UI.
    */
   _isHeadToHead(context) {
-    const fmt = String(context?.activeLeague?.competitionFormat || context?.competitionFormat || '').toLowerCase();
-    return fmt === 'head_to_head' || fmt === 'head2head' || fmt === 'h2h';
+    const fmt = context?.activeLeague?.competitionFormat || context?.competitionFormat;
+    return isHead2Head(fmt) || this.requiresHeadToHead();
   }
 
   /**
@@ -459,12 +580,23 @@ export class ScoringEngine {
    * matchup (e.g. a deep-linked single matchup or an admin without a selected player).
    * @returns {Object|null}
    */
+  _resolveActiveParticipantId(context) {
+    if (context?.activeParticipantId !== undefined && context?.activeParticipantId !== null) {
+      return Number(context.activeParticipantId);
+    }
+    const isTeamMode = context?.isTeamMode || context?.activeLeague?.participationType === 'team' || context?.activeSession?.participationType === 'team';
+    if (isTeamMode) {
+      return Number(context?.getActiveTeamId?.() || context?.getCurrentPlayerId?.() || 0);
+    }
+    return Number(context?.getCurrentPlayerId?.() || 0);
+  }
+
   _resolveActiveMatchup(context) {
     const matchups = context?.eventMatchups || [];
-    const currentId = Number(context?.getCurrentPlayerId?.());
+    const currentId = this._resolveActiveParticipantId(context);
     return matchups.find(m => {
-      const a = Number(m.player1Id ?? m.player1_id);
-      const b = Number(m.player2Id ?? m.player2_id);
+      const a = Number(m.team1Id ?? m.team1_id ?? m.player1Id ?? m.player1_id);
+      const b = Number(m.team2Id ?? m.team2_id ?? m.player2Id ?? m.player2_id);
       return currentId === a || currentId === b;
     }) || matchups[0] || null;
   }
@@ -476,12 +608,12 @@ export class ScoringEngine {
   _attachOpponentScores(scoreMap, context) {
     const scoresByPlayer = context?.groupScoresByPlayer?.(context?.normalizeScores?.(context?.allEventScores || []) || []) || {};
 
-    const currentId = Number(context?.getCurrentPlayerId?.());
+    const currentId = this._resolveActiveParticipantId(context);
     const matchup = this._resolveActiveMatchup(context);
     if (!matchup || !currentId) return;
 
-    const p1 = Number(matchup.player1Id ?? matchup.player1_id);
-    const p2 = Number(matchup.player2Id ?? matchup.player2_id);
+    const p1 = Number(matchup.team1Id ?? matchup.team1_id ?? matchup.player1Id ?? matchup.player1_id);
+    const p2 = Number(matchup.team2Id ?? matchup.team2_id ?? matchup.player2Id ?? matchup.player2_id);
     const opponentId = currentId === p1 ? p2 : currentId === p2 ? p1 : null;
     if (opponentId === null) return;
 
@@ -571,7 +703,7 @@ export class ScoringEngine {
     };
   }
   getFormatDefaults() {
-    return this.constructor['getFormatDefaults'] ? this.constructor['getFormatDefaults']() : ScoringEngine.getFormatDefaults();
+    return this.constructor.getFormatDefaults();
   }
 
   /**
@@ -582,49 +714,49 @@ export class ScoringEngine {
     return false;
   }
   hasHead2HeadScoring() {
-    return this.constructor['hasHead2HeadScoring'] ? this.constructor['hasHead2HeadScoring']() : false;
+    return this.constructor.hasHead2HeadScoring();
   }
 
   static requiresHeadToHead() {
     return false;
   }
   requiresHeadToHead() {
-    return this.constructor['requiresHeadToHead'] ? this.constructor['requiresHeadToHead']() : false;
+    return this.constructor.requiresHeadToHead();
   }
 
   static getDefaultCompetitionFormat() {
     return 'group';
   }
   getDefaultCompetitionFormat() {
-    return this.constructor['getDefaultCompetitionFormat'] ? this.constructor['getDefaultCompetitionFormat']() : 'group';
+    return this.constructor.getDefaultCompetitionFormat();
   }
 
   static getDefaultRoundsPerGame(_totalFrames = 0) {
     return 2;
   }
   getDefaultRoundsPerGame(totalFrames = 0) {
-    return this.constructor['getDefaultRoundsPerGame'] ? this.constructor['getDefaultRoundsPerGame'](totalFrames) : 2;
+    return this.constructor.getDefaultRoundsPerGame(totalFrames);
   }
 
   static getDefaultMatchupsPerRound() {
     return null;
   }
   getDefaultMatchupsPerRound() {
-    return this.constructor['getDefaultMatchupsPerRound'] ? this.constructor['getDefaultMatchupsPerRound']() : null;
+    return this.constructor.getDefaultMatchupsPerRound();
   }
 
   static getDefaultQuickFillTargets() {
     return null;
   }
   getDefaultQuickFillTargets() {
-    return this.constructor['getDefaultQuickFillTargets'] ? this.constructor['getDefaultQuickFillTargets']() : null;
+    return this.constructor.getDefaultQuickFillTargets();
   }
 
   static getDefaultFallbackTargetValues() {
     return { value1: 50000000, value2: 1, values: null };
   }
   getDefaultFallbackTargetValues() {
-    return this.constructor['getDefaultFallbackTargetValues'] ? this.constructor['getDefaultFallbackTargetValues']() : { value1: 50000000, value2: 1, values: null };
+    return this.constructor.getDefaultFallbackTargetValues();
   }
 
   static getDefaultTargetForDifficulty(difficulty = 'medium') {
@@ -634,7 +766,7 @@ export class ScoringEngine {
     return 50000000;
   }
   getDefaultTargetForDifficulty(difficulty = 'medium') {
-    return this.constructor['getDefaultTargetForDifficulty'] ? this.constructor['getDefaultTargetForDifficulty'](difficulty) : 50000000;
+    return this.constructor.getDefaultTargetForDifficulty(difficulty);
   }
 
   static getCrossFormatPreferenceOrder() {
@@ -645,31 +777,7 @@ export class ScoringEngine {
     ];
   }
   getCrossFormatPreferenceOrder() {
-    return this.constructor['getCrossFormatPreferenceOrder'] ? this.constructor['getCrossFormatPreferenceOrder']() : [];
-  }
-
-  /**
-   * Returns presentational branding metadata for this engine format.
-   * @returns {Object}
-   */
-  getBranding() {
-    return FormatBranding.get(this.config?.format || 'bowling');
-  }
-
-  /**
-   * Returns the hint message for the last round/frame.
-   * @returns {string}
-   */
-  getLastFrameHint() {
-    return this.getBranding().lastFrameHint || '';
-  }
-
-  /**
-   * Returns the main scoring hint message for players.
-   * @returns {string}
-   */
-  getScoringHint() {
-    return this.getBranding().scoringHint || '';
+    return this.constructor.getCrossFormatPreferenceOrder();
   }
 
   /**
@@ -715,11 +823,5 @@ export class ScoringEngine {
   getMaxOrder() { return this.config?.maxOrder ?? 0; }
 
 
-  
-  /**
-   * Returns the header logo image.
-   * @returns {string}
-   */
-  getHeaderLogoImage() { return this.config.headerLogo || this.getBranding().logoImage; }
 
 }

@@ -1,7 +1,7 @@
 import { PB_API } from '@services/api.js';
 import { isManagementAuthorized, runAuthorizedLeagueAction } from '@services/auth.js';
 import { getCookie, getActiveLeagueId, setActiveLeagueId, setActiveEventId, setActiveLeagueIdSilent, setActiveEventIdSilent, loadPage, escapeHTML } from '@scripts/utils.js';
-import { ScoringFormats } from '@services/scoringFormat.js';
+import { ScoringFormats, isHead2Head } from '@services/scoringFormat.js';
 import { applyPreferredTheme } from '@ui/branding.js';
 import { setupLiveFilter, createSkeletonLoader } from '@ui/selectors.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
@@ -76,7 +76,7 @@ export async function initLeaguesPage() {
 
   const getParticipantMeta = (league) => {
     if (league?.participationType === 'team') return { mode: 'Team', countLabel: 'Teams', count: league.teams?.length || 0, listLabel: 'Teams', emptyLabel: 'teams' };
-    if (league?.competitionFormat === 'head2head') return { mode: 'Head-to-head', countLabel: 'Players', count: league.players?.length || 0, listLabel: 'Roster', emptyLabel: 'players' };
+    if (isHead2Head(league?.competitionFormat)) return { mode: 'Head-to-head', countLabel: 'Players', count: league.players?.length || 0, listLabel: 'Roster', emptyLabel: 'players' };
     return { mode: 'Individual', countLabel: 'Players', count: league?.players?.length || 0, listLabel: 'Roster', emptyLabel: 'players' };
   };
 

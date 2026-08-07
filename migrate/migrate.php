@@ -1369,6 +1369,64 @@ try {
         echo "NOT NULL scoring_format already applied.\n";
     }
 
+    // -----------------------------------------------------------------------
+    // Migration 16: add_matchup_ref_id_to_target_scores
+    // In H2H seasons, multiple matchups share the same event_id per week.
+    // The old unique key (event_id, order_number) caused later matchups to
+    // overwrite earlier ones.  Adding matchup_ref_id scopes target scores
+    // to each individual matchup (event_matchup_id for individual, or
+    // team_event_matchup_id for team).  Non-H2H rows default to 0.
+    // -----------------------------------------------------------------------
+    $stmt = $pdo->prepare("SELECT 1 FROM schema_migrations WHERE migration_name = 'add_matchup_ref_id_to_target_scores'");
+    $stmt->execute();
+    if (!$stmt->fetch()) {
+        // 1. Add the column
+        $colCheck = $pdo->query("SHOW COLUMNS FROM `target_scores` LIKE 'matchup_ref_id'")->fetch();
+        if (!$colCheck) {
+            $pdo->exec("ALTER TABLE `target_scores` ADD COLUMN `matchup_ref_id` INT NOT NULL DEFAULT 0 AFTER `event_id`");
+        }
+
+        // 2. Add the new unique key FIRST so InnoDB has a supporting index for foreign key fk_ts_event (which requires an index starting with event_id)
+        $newKeys = $pdo->query("SHOW INDEX FROM `target_scores` WHERE Key_name = 'unique_event_matchup_round'")->fetchAll();
+        if (empty($newKeys)) {
+            $pdo->exec("ALTER TABLE `target_scores` ADD UNIQUE KEY `unique_event_matchup_round` (`event_id`, `matchup_ref_id`, `order_number`)");
+        }
+
+        // 3. Drop old unique key (now safe because unique_event_matchup_round supports fk_ts_event)
+        $keys = $pdo->query("SHOW INDEX FROM `target_scores` WHERE Key_name = 'unique_event_round'")->fetchAll();
+        if (!empty($keys)) {
+            $pdo->exec("ALTER TABLE `target_scores` DROP INDEX `unique_event_round`");
+        }
+
+        // 3. Best-effort backfill: set matchup_ref_id for existing H2H individual rows
+        //    by joining through matchups → event_matchups on event_id + order_number
+        $pdo->exec("
+            UPDATE target_scores ts
+            JOIN matchups mu ON mu.order_number = ts.order_number
+            JOIN event_matchups em ON mu.event_matchup_id = em.id AND em.event_id = ts.event_id
+            SET ts.matchup_ref_id = em.id
+            WHERE ts.matchup_ref_id = 0
+        ");
+
+        // 4. Best-effort backfill: set matchup_ref_id for existing H2H team rows
+        //    by joining through team_matchups → team_event_matchups on event_id + order_number
+        $temCheck = $pdo->query("SHOW TABLES LIKE 'team_event_matchups'")->fetch();
+        if ($temCheck) {
+            $pdo->exec("
+                UPDATE target_scores ts
+                JOIN team_matchups tm ON tm.order_number = ts.order_number
+                JOIN team_event_matchups tem ON tm.team_event_matchup_id = tem.id AND tem.event_id = ts.event_id
+                SET ts.matchup_ref_id = tem.id
+                WHERE ts.matchup_ref_id = 0
+            ");
+        }
+
+        $pdo->prepare("INSERT INTO schema_migrations (migration_name) VALUES ('add_matchup_ref_id_to_target_scores')")->execute();
+        echo "✓ Migration 16 — added matchup_ref_id to target_scores for H2H scoping.\n";
+    } else {
+        echo "matchup_ref_id already added to target_scores.\n";
+    }
+
     echo "\n✓ All migrations complete.\n";
 } catch (PDOException $e) {
     echo "\n✗ Migration failed: " . $e->getMessage() . "\n";

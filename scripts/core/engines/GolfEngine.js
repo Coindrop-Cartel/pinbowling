@@ -6,6 +6,9 @@ import { formatNumber } from '../../utils.js';
  * Scoring is based on strokes relative to par.
  */
 export class GolfEngine extends ScoringEngine {
+  constructor(config = {}, options = {}) {
+    super({ format: 'golf', ...config }, options);
+  }
   /**
    * Overridden for Golf: Anchors the input 'target' at the 'par' rank.
    * Scores for fewer strokes (ranks < par) are calculated above the target,
@@ -23,6 +26,23 @@ export class GolfEngine extends ScoringEngine {
     // Golf: target is the anchor at parRank, ascending order (1 is the high score requirement).
     // Anchor at par means reaching the target score at the Par stroke (e.g. Stroke 3).
     return this.calculateInterpolatedValues(target, floor, parRank, scalingType, 'asc');
+  }
+
+  /**
+   * Overridden for Golf: Only thresholds 3-10 are used for display and evaluation.
+   * Scores of 1 and 2 are achieved by hitting the Target Score (Rank 3) on Ball 1 or Ball 2.
+   * @param {Object} values 
+   * @returns {Object}
+   */
+  filterThresholds(values) {
+    if (!values) return {};
+    const filtered = {};
+    for (const [rank, val] of Object.entries(values)) {
+      if (Number(rank) >= 3) {
+        filtered[rank] = val;
+      }
+    }
+    return filtered;
   }
 
   /**
@@ -79,6 +99,13 @@ export class GolfEngine extends ScoringEngine {
       return 'threshold-highlight';
     }
     return '';
+  }
+
+  /**
+   * Determines if a given threshold rank corresponds to Par score in Golf.
+   */
+  isParThreshold(rank, _value1, value2) {
+    return Number(rank) === Number(value2);
   }
 
   /**
@@ -209,57 +236,6 @@ export class GolfEngine extends ScoringEngine {
   }
 
   /**
-   * Calculates team totals across all team members for a full game in Golf,
-   * applying drop_lowest_player_scores logic (dropping worst/highest total game stroke scores per player).
-   *
-   * @param {Array<Object>} machines Target definitions for the event.
-   * @param {Object<number|string, Object>} scoreMapByPlayer Dictionary of player scoreMaps keyed by playerId.
-   * @param {Array<Object>} members List of team member objects.
-   * @param {number} dropLowestCount Number of lowest member game totals to drop per game.
-   * @returns {Object}
-   */
-  calculateTeamTurnResults(machines, scoreMapByPlayer = {}, members = [], dropLowestCount = 0) {
-    const memberResults = {};
-    const memberGameTotals = [];
-
-    members.forEach(member => {
-      const pScores = scoreMapByPlayer[member.id] || {};
-      const res = this.calculateTurnResults(machines, pScores);
-      memberResults[member.id] = res;
-      memberGameTotals.push({
-        playerId: member.id,
-        playerName: member.playerName || member.name,
-        total: res.total,
-        totalDisplay: res.totalDisplay,
-        hasScores: res.turnResults.some(t => t.played)
-      });
-    });
-
-    // In Golf, lower score is better -> sort ascending (lowest to highest total)
-    // Worst game score is the highest total stroke count
-    memberGameTotals.sort((a, b) => a.total - b.total);
-
-    let effectiveMemberTotals = memberGameTotals;
-    let droppedMemberTotals = [];
-
-    if (dropLowestCount > 0 && memberGameTotals.length > dropLowestCount) {
-      effectiveMemberTotals = memberGameTotals.slice(0, memberGameTotals.length - dropLowestCount);
-      droppedMemberTotals = memberGameTotals.slice(memberGameTotals.length - dropLowestCount);
-    }
-
-    const teamGameTotal = effectiveMemberTotals.reduce((sum, m) => sum + m.total, 0);
-
-    return {
-      memberResults,
-      memberGameTotals,
-      effectiveMemberTotals,
-      droppedMemberTotals,
-      total: teamGameTotal,
-      totalDisplay: this.formatTotalScore(teamGameTotal, machines)
-    };
-  }
-
-  /**
    * Comparator for player standings. Low score wins in Golf.
    */
   compareScores(a, b) { return a - b; } // Low score wins
@@ -294,20 +270,9 @@ export class GolfEngine extends ScoringEngine {
    */
   getRoundCountOptions() { return [3, 6, 9, 18]; }
 
-  /** @returns {string} Label for a single round (e.g. "Hole"). */
-  getRoundLabel() { return this.config.roundLabel || 'Hole'; }
 
-  /** @returns {string} Prefix for turn headers. */
-  getTurnHeaderPrefix() { return this.config.turnHeaderPrefix || 'Hole'; }
 
-  /** @returns {string} Label for the main goal (e.g. "Par"). */
-  getPrimaryTargetLabel() { return this.config.primaryTargetLabel || 'Par'; }
 
-  /** @returns {string} Label for the value 1 (Target Score) requirement. */
-  getValue1Label() { return this.config.value1Label || 'Target Score'; }
-
-  /** @returns {string} Label for the value 2 (Par) baseline. */
-  getValue2Label() { return this.config.value2Label || 'Par'; }
 
   /**
    * Formats the total score, including relative-to-par display (e.g. "24 (+2)").

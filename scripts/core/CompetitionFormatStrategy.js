@@ -3,6 +3,8 @@
  * Handles Competition Format evaluations (Group vs Head-to-Head) for Entities (Individuals or Teams).
  */
 
+import { isHead2Head } from '@services/scoringFormat.js';
+
 export class BaseCompetitionStrategy {
   /**
    * Sorts standings rows based on competition format and engine score comparison.
@@ -14,6 +16,24 @@ export class BaseCompetitionStrategy {
    */
   sortStandings(rows, engine, options = {}) {
     throw new Error('sortStandings must be implemented by subclass');
+  }
+
+  /**
+   * Evaluates whether two standings rows are tied according to the competition strategy.
+   *
+   * @param {Object} a Standings row for participant A.
+   * @param {Object} b Standings row for participant B.
+   * @param {Object} engine Active ScoringEngine instance.
+   * @param {Object} [options] Additional options.
+   * @returns {boolean} True if a and b are tied.
+   */
+  isTie(a, b, engine, options = {}) {
+    if (a.hasScores !== undefined && b.hasScores !== undefined && a.hasScores !== b.hasScores) {
+      return false;
+    }
+    const scoreA = a.totalSeasonPoints ?? a.total ?? 0;
+    const scoreB = b.totalSeasonPoints ?? b.total ?? 0;
+    return engine.compareScores(scoreA, scoreB) === 0;
   }
 
   /**
@@ -44,6 +64,26 @@ export class GroupCompetitionStrategy extends BaseCompetitionStrategy {
 
 export class HeadToHeadCompetitionStrategy extends BaseCompetitionStrategy {
   /**
+   * Evaluates whether two H2H standings rows are tied across all tiebreakers.
+   */
+  isTie(a, b, engine, options = {}) {
+    const recA = a.record || {};
+    const recB = b.record || {};
+    if (Math.abs((recA.winRate ?? 0) - (recB.winRate ?? 0)) >= 0.001) return false;
+    const aAgainstB = recA.headToHead ? recA.headToHead[b.entity?.id] : null;
+    const aWins = aAgainstB ? aAgainstB.wins : 0;
+    const bAgainstA = recB.headToHead ? recB.headToHead[a.entity?.id] : null;
+    const bWins = bAgainstA ? bAgainstA.wins : 0;
+    if (aWins !== bWins) return false;
+    const diffA = recA.scoreDiff ?? 0;
+    const diffB = recB.scoreDiff ?? 0;
+    if (diffA !== diffB) return false;
+    const scoreA = recA.totalScore ?? 0;
+    const scoreB = recB.totalScore ?? 0;
+    return scoreA === scoreB;
+  }
+
+  /**
    * Calculates head-to-head win/loss records for matchup-based formats.
    * Handles entities (Individual Players or Teams).
    *
@@ -52,7 +92,7 @@ export class HeadToHeadCompetitionStrategy extends BaseCompetitionStrategy {
    * @param {Object} matchupsByEvent - Matchups keyed by event ID.
    * @param {Object} entityEventTotals - Map of eventId -> entityId -> score total.
    * @param {Object} engine - Active ScoringEngine instance.
-   * @returns {Object<number, {wins: number, losses: number, ties: number, winRate: number, scoreDiff: number, runDiff: number, totalScore: number, totalRuns: number, headToHead: Object}>}
+   * @returns {Object<number, {wins: number, losses: number, ties: number, winRate: number, scoreDiff: number, totalScore: number, headToHead: Object}>}
    */
   calculateMatchupRecords(entities, events, matchupsByEvent, entityEventTotals, engine, options = {}) {
     const records = {};
@@ -63,9 +103,7 @@ export class HeadToHeadCompetitionStrategy extends BaseCompetitionStrategy {
         ties: 0,
         winRate: 0,
         scoreDiff: 0,
-        runDiff: 0,
         totalScore: 0,
-        totalRuns: 0,
         headToHead: {}
       };
     });
@@ -74,36 +112,38 @@ export class HeadToHeadCompetitionStrategy extends BaseCompetitionStrategy {
       const matchups = matchupsByEvent[event.id] || [];
       const isTeamMode = options?.participationType === 'team' || (matchups.length > 0 && matchups[0].team1Id !== null && matchups[0].team1Id !== undefined);
       matchups.forEach(m => {
-        if (m.status !== 'completed') return;
-
         const e1Id = isTeamMode
-          ? Number(m.team1Id)
-          : Number(m.player1Id);
+          ? Number(m.team1Id ?? m.team1_id)
+          : Number(m.player1Id ?? m.player1_id);
         const e2Id = isTeamMode
-          ? Number(m.team2Id)
-          : Number(m.player2Id);
+          ? Number(m.team2Id ?? m.team2_id)
+          : Number(m.player2Id ?? m.player2_id);
 
         if (!e1Id || !e2Id) return; // Bye week
 
-        // Read direct matchup scores
-        const r1 = isTeamMode
-          ? Number(m.team1Score ?? 0)
-          : Number(m.player1Score ?? 0);
-        const r2 = isTeamMode
-          ? Number(m.team2Score ?? 0)
-          : Number(m.player2Score ?? 0);
+        const score1 = isTeamMode
+          ? Number(m.team1Score ?? m.team1_score ?? 0)
+          : Number(m.player1Score ?? m.player1_score ?? 0);
+        const score2 = isTeamMode
+          ? Number(m.team2Score ?? m.team2_score ?? 0)
+          : Number(m.player2Score ?? m.player2_score ?? 0);
+
+        const eventScore1 = entityEventTotals?.[event.id]?.[e1Id] !== undefined ? Number(entityEventTotals[event.id][e1Id]) : null;
+        const eventScore2 = entityEventTotals?.[event.id]?.[e2Id] !== undefined ? Number(entityEventTotals[event.id][e2Id]) : null;
+
+        const r1 = (score1 > 0 || score2 > 0 || eventScore1 === null) ? score1 : eventScore1;
+        const r2 = (score1 > 0 || score2 > 0 || eventScore2 === null) ? score2 : eventScore2;
+
+        const isMatchupDone = m.status === 'completed' || m.winnerId || m.teamWinnerId || score1 > 0 || score2 > 0 || (eventScore1 !== null && eventScore2 !== null);
+        if (!isMatchupDone) return;
 
         if (records[e1Id]) {
           records[e1Id].totalScore += r1;
-          records[e1Id].totalRuns += r1;
           records[e1Id].scoreDiff += (r1 - r2);
-          records[e1Id].runDiff += (r1 - r2);
         }
         if (records[e2Id]) {
           records[e2Id].totalScore += r2;
-          records[e2Id].totalRuns += r2;
           records[e2Id].scoreDiff += (r2 - r1);
-          records[e2Id].runDiff += (r2 - r1);
         }
 
         // Determine winner using engine.compareScores(r1, r2)
@@ -159,31 +199,39 @@ export class HeadToHeadCompetitionStrategy extends BaseCompetitionStrategy {
   }
 
   sortStandings(rows, engine, options = {}) {
+    const map = options.head2headRecordsMap;
     return [...rows].sort((a, b) => {
+      const entityAId = a.entity?.id ?? a.player?.id ?? a.id;
+      const entityBId = b.entity?.id ?? b.player?.id ?? b.id;
+      const recA = a.record || (map ? map[entityAId] : null);
+      const recB = b.record || (map ? map[entityBId] : null);
+
       // 1. Sort by Win Rate
-      if (a.record && b.record) {
-        const rateDiff = b.record.winRate - a.record.winRate;
+      if (recA && recB) {
+        const rateDiff = recB.winRate - recA.winRate;
         if (Math.abs(rateDiff) > 0.001) return rateDiff;
 
         // 2. Direct H2H tiebreaker
-        const aAgainstB = a.record.headToHead[b.entity.id];
+        const aAgainstB = recA.headToHead ? recA.headToHead[entityBId] : null;
         const aWins = aAgainstB ? aAgainstB.wins : 0;
-        const bAgainstA = b.record.headToHead[a.entity.id];
+        const bAgainstA = recB.headToHead ? recB.headToHead[entityAId] : null;
         const bWins = bAgainstA ? bAgainstA.wins : 0;
         if (aWins !== bWins) {
           return bWins - aWins;
         }
 
-        // 3. Score differential (higher scoreDiff / runDiff is better)
-        const scoreDiffDiff = (b.record.scoreDiff ?? b.record.runDiff ?? 0) - (a.record.scoreDiff ?? a.record.runDiff ?? 0);
+        // 3. Score differential (higher scoreDiff is better)
+        const scoreDiffDiff = (recB.scoreDiff ?? 0) - (recA.scoreDiff ?? 0);
         if (scoreDiffDiff !== 0) return scoreDiffDiff;
 
         // 4. Total score (higher total score)
-        const totalRunsDiff = (b.record.totalRuns ?? b.record.totalScore ?? 0) - (a.record.totalRuns ?? a.record.totalScore ?? 0);
-        if (totalRunsDiff !== 0) return totalRunsDiff;
+        const totalScoreDiff = (recB.totalScore ?? 0) - (recA.totalScore ?? 0);
+        if (totalScoreDiff !== 0) return totalScoreDiff;
       }
 
-      if (a.hasScores !== b.hasScores) return a.hasScores ? -1 : 1;
+      if (a.hasScores !== undefined && b.hasScores !== undefined && a.hasScores !== b.hasScores) {
+        return a.hasScores ? -1 : 1;
+      }
       const scoreA = a.totalSeasonPoints ?? a.total ?? 0;
       const scoreB = b.totalSeasonPoints ?? b.total ?? 0;
       if (options.seasonScoring === 'weekly') {
@@ -201,7 +249,7 @@ export class HeadToHeadCompetitionStrategy extends BaseCompetitionStrategy {
  * @returns {BaseCompetitionStrategy}
  */
 export function getCompetitionFormatStrategy(competitionFormat = 'group') {
-  if (competitionFormat === 'head_to_head' || competitionFormat === 'head2head') {
+  if (isHead2Head(competitionFormat)) {
     return new HeadToHeadCompetitionStrategy();
   }
   return new GroupCompetitionStrategy();

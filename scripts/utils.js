@@ -53,9 +53,6 @@ export function getCookie(name) {
  * @param {string|null} value 
  */
 function setUrlParam(key, value) {
-  // Using .href is the industry standard as it explicitly returns the 
-  // string representation of the Location object, satisfying type checkers
-  // and providing better semantic clarity than .toString().
   const url = new URL(window.location.href);
   
   if (value) url.searchParams.set(key, value);
@@ -76,8 +73,6 @@ export function setActiveLeagueId(id) {
 
 /**
  * Sets the active league ID in the URL without dispatching pb:pageChanged.
- * Use this when the caller is already inside the target page and does not
- * need the full app re-initialization that pb:pageChanged triggers.
  * @param {string|null} id
  */
 export function setActiveLeagueIdSilent(id) {
@@ -97,8 +92,6 @@ export function setActiveEventId(id) {
 
 /**
  * Sets the active event ID in the URL without dispatching pb:pageChanged.
- * Use this when the caller is already inside the target page and does not
- * need the full app re-initialization that pb:pageChanged triggers.
  * @param {string|null} id
  */
 export function setActiveEventIdSilent(id) {
@@ -127,8 +120,6 @@ export function setActiveTeamIdSilent(teamId) {
 
 /**
  * Sets the active player ID in the URL without dispatching pb:pageChanged.
- * Use this when the caller is already inside the target page and does not
- * need the full app re-initialization that pb:pageChanged triggers.
  * @param {string|null} playerId
  */
 export function setCurrentPlayerIdSilent(playerId) {
@@ -148,7 +139,21 @@ export const getActiveTeamEventMatchupId = () => getUrlParam('teamEventMatchupId
 export function setActiveEventMatchupIdSilent(id) {
   const url = new URL(window.location.href);
   if (id) url.searchParams.set('eventMatchupId', id);
-  else url.searchParams.delete('eventMatchupId');
+  else {
+    url.searchParams.delete('eventMatchupId');
+    url.searchParams.delete('teamEventMatchupId');
+  }
+  window.history.replaceState({}, '', url);
+}
+
+/** Sets the active team event matchup ID in the URL silently. */
+export function setActiveTeamEventMatchupIdSilent(id) {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set('teamEventMatchupId', id);
+  else {
+    url.searchParams.delete('eventMatchupId');
+    url.searchParams.delete('teamEventMatchupId');
+  }
   window.history.replaceState({}, '', url);
 }
 
@@ -173,9 +178,6 @@ export function applyScoreFormatting(input) {
   input.type = 'text';
   input.inputMode = 'numeric';
   input.addEventListener('input', (e) => {
-    // selectionStart can be null if the input type doesn't support it 
-    // or if the element is not focused. We default to 0 to ensure 
-    // arithmetic operations don't fail.
     const cursor = input.selectionStart ?? 0;
     const originalValue = input.value;
     const allowDecimal = input.dataset.allowDecimal === 'true';
@@ -229,8 +231,6 @@ export async function loadPage(url, pushState = true) {
     if (!response.ok) throw new Error('Partial load failed');
     const html = await response.text();
 
-    // Parse the HTML to extract the inner content of the <main> tag if it exists.
-    // This avoids nested <main> elements.
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     const newMain = doc.querySelector('main.page-container');
@@ -305,19 +305,27 @@ export function renderThresholdGrid(values, formatFn = (v) => v, engine = undefi
   if (!values || Object.keys(values).length === 0) return '<div class="notice">Enter scores to see thresholds.</div>';
   const prefix = engine ? engine.getThresholdPrefix() : '';
 
-  const ranksToDisplay = (engine ? engine.getThresholdRange() : Array.from({ length: 10 }, (_, i) => 10 - i)) // Default to Bowling if no engine
-    .filter(rank => values[rank] !== undefined);
+  const activeValues = engine?.filterThresholds ? engine.filterThresholds(values) : values;
+  const entries = Object.entries(activeValues);
+  if (engine?.getThresholdSort) {
+    entries.sort(engine.getThresholdSort());
+  } else {
+    entries.sort((a, b) => Number(b[0]) - Number(a[0])); // Default descending (10 down to 1)
+  }
 
   return `
     <div class="threshold-grid-container">
       ${prefix ? `<div class="threshold-prefix">${prefix}:</div>` : ''}
       <div class="threshold-grid">
-        ${ranksToDisplay
-          .map(rank => {
-            const val = values[rank]; // Get value from the full 1-10 map
-            const label = engine ? engine.getThresholdLabel(rank, value1, value2) : rank; // Use engine's label for special cases
+        ${entries
+          .map(([rankStr, val]) => {
+            const rank = Number(rankStr);
+            const label = engine ? engine.getThresholdLabel(rank, value1, value2) : rank;
             const rowClass = engine ? engine.getThresholdRowClass(rank, value1, value2) : '';
-            return `<div class="threshold-row ${rowClass}"><strong>${label}:</strong> ${formatFn(val)}</div>`;
+            const valFormatted = formatFn(val);
+            const isPar = engine?.isParThreshold ? engine.isParThreshold(rank, value1, value2) : false;
+            const displayVal = isPar ? `<u>${valFormatted}</u>` : valFormatted;
+            return `<div class="threshold-row ${rowClass}"><strong>${label}:</strong> ${displayVal}</div>`;
           })
           .join('')
         }
@@ -340,7 +348,6 @@ export function detectScalingFromValues(values) {
   const ranks = Object.keys(values).map(Number).sort((a, b) => a - b);
   if (ranks.length < 3) return 'flat';
 
-  // Calculate gaps between consecutive ranks
   const gapStart = Math.abs(values[ranks[1]] - values[ranks[0]]);
   const gapEnd = Math.abs(values[ranks[ranks.length - 1]] - values[ranks[ranks.length - 2]]);
 

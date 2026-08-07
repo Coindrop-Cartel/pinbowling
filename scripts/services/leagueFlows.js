@@ -1,6 +1,6 @@
 import { PB_API } from '@services/api.js';
 import { runAuthorizedLeagueAction } from '@services/auth.js';
-import { ScoringFormats } from '@services/scoringFormat.js';
+import { ScoringFormats, isHead2Head } from '@services/scoringFormat.js';
 import { showDialog, showConfirm, showPlayerSelectionDialog } from '@ui/dialogs.js';
 import { createSkeletonLoader } from '@ui/selectors.js';
 
@@ -76,29 +76,29 @@ export async function startPlayoffsFlow({ leagueId, allLeagues, loaderParent, on
   
   const loader = createSkeletonLoader(loaderParent, { count: 3 });
   try {
-    const [rawScores, allLeagueTargets] = await Promise.all([
-      PB_API.scores.get(null, null, leagueId),
-      PB_API.machines.getTargets(null, leagueId)
-    ]);
-    
     const { getScoringEngine } = await import('@core/engine.js');
-    const { normalizeTargets, normalizeScores, groupTargetsByEvent, groupScoresByEventAndPlayer } = await import('@services/normalizer.js');
-    const { calculateSeasonSummary } = await import('@services/seasonCalculator.js');
+    const { calculateSeasonSummary, fetchSeasonData } = await import('@services/seasonCalculator.js');
     
     const format = ScoringFormats.resolve(league.scoringFormat);
-    const engine = getScoringEngine(format);
-    const players = league.players || [];
-    const events = league.events || [];
-    
-    const matchupsByEvent = {};
-    events.forEach(e => {
-      matchupsByEvent[e.id] = e.matchups || [];
+    const engine = getScoringEngine(format, {
+      participationType: league.participationType,
+      competitionFormat: league.competitionFormat
     });
     
-    const normalizedLeagueTargets = normalizeTargets(allLeagueTargets);
-    const targetsByEvent = groupTargetsByEvent(normalizedLeagueTargets);
-    const normalizedScores = normalizeScores(rawScores);
-    const scoresByEventAndPlayer = groupScoresByEventAndPlayer(normalizedScores);
+    let players = league.players || [];
+    if (isTeam) {
+      const memberMap = new Map();
+      (league.teams || []).forEach(t => {
+        (t.members || []).forEach(m => memberMap.set(String(m.id), { ...m, id: Number(m.id) }));
+      });
+      players = Array.from(memberMap.values());
+    }
+
+    const events = league.events || [];
+    
+    const { targetsByEvent, scoresByEventAndPlayer, matchupsByEvent } = await fetchSeasonData(
+      leagueId, events, PB_API, engine, isTeam
+    );
     
     const summary = calculateSeasonSummary({
       league,
@@ -230,7 +230,7 @@ export async function addPlayerToLeague({ leagueId, leagueName, allLeagues, allP
   const league = allLeagues.find(l => l.id === leagueId);
   if (!league) return;
   
-  if (league.competitionFormat === 'head2head' && league.status === 'active') {
+  if (isHead2Head(league.competitionFormat) && league.status === 'active') {
     const weeksInSeason = league.weeksInSeason || 8;
     const midpoint = Math.ceil(weeksInSeason / 2);
     

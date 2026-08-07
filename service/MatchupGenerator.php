@@ -23,12 +23,15 @@ class MatchupGenerator {
      * @return array               Ordered list of machine IDs, length === $count.
      */
     public static function selectMachines(array $allMachineIds, int $count): array {
-        $selected = [];
-        $shuffled  = $allMachineIds;
-        shuffle($shuffled);
+        if (empty($allMachineIds) || $count <= 0) {
+            return [];
+        }
 
+        $selected = [];
         while (count($selected) < $count) {
-            foreach ($shuffled as $machineId) {
+            $pool = $allMachineIds;
+            shuffle($pool);
+            foreach ($pool as $machineId) {
                 $selected[] = $machineId;
                 if (count($selected) >= $count) {
                     break;
@@ -69,10 +72,10 @@ class MatchupGenerator {
 
         $tsStmt = $db->prepare(
             'INSERT INTO target_scores
-                (event_id, machine_id, order_number, value1, value2,
+                (event_id, matchup_ref_id, machine_id, order_number, value1, value2,
                  score1, score2, score3, score4, score5,
                  score6, score7, score8, score9, score10)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 machine_id = VALUES(machine_id),
                 value1 = VALUES(value1),
@@ -89,7 +92,7 @@ class MatchupGenerator {
             $stmt->execute([$teamEventMatchupId, $orderNum, $machineId, $team1Id, $team2Id]);
 
             if ($eventId) {
-                self::insertTargetScore($tsStmt, $db, $machineId, $eventId, $orderNum, 'baseball', $locationId);
+                self::insertTargetScore($tsStmt, $db, $machineId, $eventId, $orderNum, 'baseball', $locationId, $teamEventMatchupId);
             }
         }
     }
@@ -129,10 +132,10 @@ class MatchupGenerator {
 
         $tsStmt = $db->prepare(
             'INSERT INTO target_scores
-                (event_id, machine_id, order_number, value1, value2,
+                (event_id, matchup_ref_id, machine_id, order_number, value1, value2,
                  score1, score2, score3, score4, score5,
                  score6, score7, score8, score9, score10)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 machine_id = VALUES(machine_id),
                 value1 = VALUES(value1),
@@ -152,7 +155,7 @@ class MatchupGenerator {
             $stmt->execute([$eventMatchupId, $orderNum, $machineId, $p1Id, $p2Id]);
 
             if ($eventId) {
-                self::insertTargetScore($tsStmt, $db, $machineId, $eventId, $orderNum, $format, $eventLocationId);
+                self::insertTargetScore($tsStmt, $db, $machineId, $eventId, $orderNum, $format, $eventLocationId, $eventMatchupId);
             }
         }
     }
@@ -164,11 +167,11 @@ class MatchupGenerator {
         int $eventId,
         int $orderNum,
         string $format,
-        ?int $locationId
+        ?int $locationId,
+        int $matchupRefId = 0
     ): void {
-        // Randomly assign a per-frame difficulty so generated rounds vary
-        // instead of defaulting every machine to the same "medium" baseline.
-        $difficulty = ['easy', 'medium', 'hard'][random_int(0, 2)];
+        // Default to medium difficulty scores when generating head-to-head matchups
+        $difficulty = 'medium';
 
         $targetScores = TargetResolver::resolveTarget($db, $machineId, $format, $difficulty, $locationId);
         $value1 = $targetScores['value1'] ?? 5000000;
@@ -180,7 +183,7 @@ class MatchupGenerator {
         }
 
         $tsStmt->execute([
-            $eventId, $machineId, $orderNum, $value1, $value2,
+            $eventId, $matchupRefId, $machineId, $orderNum, $value1, $value2,
             $scoreValues[1], $scoreValues[2], $scoreValues[3], $scoreValues[4], $scoreValues[5],
             $scoreValues[6], $scoreValues[7], $scoreValues[8], $scoreValues[9], $scoreValues[10]
         ]);

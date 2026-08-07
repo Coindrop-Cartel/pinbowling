@@ -1,6 +1,28 @@
 import { escapeHTML, formatNumber } from '../utils.js';
 
 /**
+ * Helper to compute standard competition rank numbers for sorted rows.
+ * Tied entries share rank numbers, and subsequent ranks skip accordingly (e.g. 1, 2, 2, 4).
+ */
+export function computeRanks(items, isTie) {
+  const ranks = [];
+  let currentRank = 1;
+  for (let i = 0; i < items.length; i++) {
+    if (i > 0) {
+      if (isTie(items[i], items[i - 1])) {
+        ranks.push(currentRank);
+      } else {
+        currentRank = i + 1;
+        ranks.push(currentRank);
+      }
+    } else {
+      ranks.push(1);
+    }
+  }
+  return ranks;
+}
+
+/**
  * Standardized turn-cell HTML builder with TV-mode change detection pulse.
  */
 function renderTurnCell(turn, scoreKey, lastScoreState, currentScoreState, isTvMode) {
@@ -27,24 +49,6 @@ function renderTurnCell(turn, scoreKey, lastScoreState, currentScoreState, isTvM
 
 /**
  * Renders a standings/scoreboard table into header and body elements.
- * Handles event scoreboards (team and individual) and season summaries (standard and baseball).
- *
- * @param {Object} options
- * @param {HTMLElement} options.headerEl - Header element to render columns into
- * @param {HTMLElement} options.bodyEl - Body element to render rows into
- * @param {boolean} options.isSummary - True if rendering season summary, false if event scoreboard
- * @param {Object} options.league - Active league configuration
- * @param {Object} options.event - Active event configuration (optional)
- * @param {boolean} options.isTeamLeague - True if league participates as teams
- * @param {Array} options.rows - Processed player result rows
- * @param {Array} options.columns - Event columns (for summary) or machine targets (for event scoreboard)
- * @param {Object} options.engine - Scoring engine instance
- * @param {boolean} options.supportsMatchups - True if the format supports head-to-head matchups
- * @param {Object} [options.head2headRecordsMap] - Pre-calculated records map (for head-to-head formats)
- * @param {Array} [options.allTeamsData] - All teams database records (for team-based leagues)
- * @param {Object} [options.tvModeManager] - TV Mode Manager instance for display state checks
- * @param {Map} [options.lastScoreState] - Previous score state for change pulse animation
- * @param {Map} [options.currentScoreState] - Current score state for change pulse animation
  */
 export function renderStandingsTable({
   headerEl,
@@ -57,21 +61,23 @@ export function renderStandingsTable({
   columns,
   engine,
   supportsMatchups,
-  head2headRecordsMap = null,
+  head2headRecordsMap = {},
   allTeamsData = [],
-  teamResultMap = {},
   matchupScoreMap = {},
+  teamResultMap = {},
   tvModeManager = null,
   lastScoreState = new Map(),
   currentScoreState = new Map()
 }) {
-  const isTvMode = tvModeManager?.isTvMode === true;
   const playerLabel = isTeamLeague ? 'Team' : 'Player';
+  const isTvMode = tvModeManager?.isTvMode === true || (tvModeManager && typeof tvModeManager.isTvModeActive === 'function' ? tvModeManager.isTvModeActive() : false);
+  const finalMatchupScoreMap = (matchupScoreMap && Object.keys(matchupScoreMap).length > 0) ? matchupScoreMap : (event?.matchupScoreMap || {});
+  const finalTeamResultMap = (teamResultMap && Object.keys(teamResultMap).length > 0) ? teamResultMap : (event?.teamResultMap || {});
 
   if (isSummary) {
     // --- SEASON SUMMARY RENDER PATHS ---
     if (supportsMatchups) {
-      // 1. Head-to-Head Season Summary
+      // 1. Head-to-Head / Baseball Season Summary
       if (headerEl) {
         headerEl.innerHTML = `
           <tr>
@@ -85,11 +91,14 @@ export function renderStandingsTable({
         `;
       }
       if (bodyEl) {
+        const ranks = computeRanks(rows, (a, b) => engine.isTie(a, b));
+
         bodyEl.innerHTML = rows.map((res, idx) => {
           const entityName = isTeamLeague ? escapeHTML(res.entity.name) : escapeHTML(res.entity.playerName);
-          const rec = res.record || { wins: 0, losses: 0, ties: 0, runDiff: 0, winRate: 0 };
-          const diffSign = rec.runDiff > 0 ? '+' : '';
-          const winPct = rec.winRate.toFixed(3);
+          const rec = res.record || { wins: 0, losses: 0, ties: 0, scoreDiff: 0, winRate: 0 };
+          const diffVal = rec.scoreDiff ?? 0;
+          const diffSign = diffVal > 0 ? '+' : '';
+          const winPct = (rec.winRate ?? 0).toFixed(3);
 
           const eventsHtml = columns.map(e => {
             const eventData = res.eventTotals[e.id];
@@ -99,11 +108,11 @@ export function renderStandingsTable({
 
           return `
             <tr>
-              <td class="text-center">${idx + 1}</td>
+              <td class="text-center">${ranks[idx]}</td>
               <td class="player-name-cell">${entityName}</td>
               ${eventsHtml}
               <td class="text-center">${rec.wins}-${rec.losses}${rec.ties > 0 ? `-${rec.ties}` : ''}</td>
-              <td class="text-center">${diffSign}${rec.runDiff}</td>
+              <td class="text-center">${diffSign}${diffVal}</td>
               <td class="standings-total text-center">${winPct}</td>
             </tr>
           `;
@@ -123,6 +132,9 @@ export function renderStandingsTable({
         `;
       }
       if (bodyEl) {
+        const isSeasonTie = (a, b) => (a.totalSeasonPoints ?? 0) === (b.totalSeasonPoints ?? 0);
+        const ranks = computeRanks(rows, isSeasonTie);
+
         bodyEl.innerHTML = rows.map((res, idx) => {
           const entityName = isTeamLeague ? escapeHTML(res.entity.name) : escapeHTML(res.entity.playerName);
 
@@ -143,7 +155,7 @@ export function renderStandingsTable({
 
           return `
             <tr>
-              <td>${idx + 1}</td>
+              <td class="text-center">${ranks[idx]}</td>
               <td class="player-name-cell">${entityName}</td>
               ${eventsHtml}
               ${recordCell}
@@ -156,17 +168,7 @@ export function renderStandingsTable({
   } else {
     // --- EVENT SCOREBOARD RENDER PATHS ---
     if (headerEl) {
-      if (isTeamLeague && supportsMatchups) {
-        headerEl.innerHTML = `
-          <tr>
-            <th class="text-center">#</th>
-            <th class="text-center">${playerLabel}</th>
-            <th class="text-center">Result</th>
-            <th class="text-center">Score</th>
-            <th class="text-center">W-L</th>
-          </tr>
-        `;
-      } else if (supportsMatchups && !isTeamLeague) {
+      if (supportsMatchups) {
         headerEl.innerHTML = `
           <tr>
             <th class="text-center">#</th>
@@ -202,15 +204,18 @@ export function renderStandingsTable({
           return { team, teamMembers, teamTotal };
         }).sort((a, b) => engine.compareScores(a.teamTotal, b.teamTotal));
 
+        const isTeamTie = (a, b) => engine.compareScores(a.teamTotal, b.teamTotal) === 0;
+        const ranks = computeRanks(teamResults, isTeamTie);
+
         if (supportsMatchups) {
           bodyEl.innerHTML = teamResults.map((tr, idx) => {
             const rec = head2headRecordsMap?.[tr.team.id];
             const recordStr = rec ? `${rec.wins}-${rec.losses}${rec.ties > 0 ? `-${rec.ties}` : ''}` : '-';
-            const resultDisplay = teamResultMap?.[tr.team.id] || '-';
-            const scoreDisplay = matchupScoreMap[tr.team.id] || '-';
+            const resultDisplay = finalTeamResultMap?.[tr.team.id] || '-';
+            const scoreDisplay = finalMatchupScoreMap[tr.team.id] || '-';
           return `
               <tr class="team-header">
-                <td class="text-center">${idx + 1}</td>
+                <td class="text-center">${ranks[idx]}</td>
                 <td class="player-name-cell">${escapeHTML(tr.team.name)}</td>
                 <td class="text-center">${resultDisplay}</td>
                 <td class="standings-total text-center">${scoreDisplay}</td>
@@ -223,7 +228,7 @@ export function renderStandingsTable({
           bodyEl.innerHTML = teamResults.map((tr, idx) => {
             return `
               <tr class="team-header">
-                <td class="text-center">${idx + 1}</td>
+                <td class="text-center">${ranks[idx]}</td>
                 <td colspan="${colspan}">${escapeHTML(tr.team.name)}</td>
                 <td class="standings-total">${engine.formatTotalScore(tr.teamTotal)}</td>
               </tr>
@@ -232,16 +237,17 @@ export function renderStandingsTable({
         }
       } else if (supportsMatchups) {
         const sortedRows = engine.sortStandings(rows, { head2headRecordsMap });
+        const ranks = computeRanks(sortedRows, (a, b) => engine.isTie(a, b, { head2headRecordsMap }));
 
         bodyEl.innerHTML = sortedRows.map((res, idx) => {
           const rec = head2headRecordsMap?.[res.player.id];
           const recordStr = rec ? `${rec.wins}-${rec.losses}${rec.ties > 0 ? `-${rec.ties}` : ''}` : '-';
           const resultDisplay = res.result || '-';
-          const scoreDisplay = matchupScoreMap[res.player.id] || '-';
+          const scoreDisplay = finalMatchupScoreMap[res.player.id] || (res.total !== undefined && res.total !== null ? String(res.total) : '-');
 
           return `
             <tr>
-              <td class="text-center">${idx + 1}</td>
+              <td class="text-center">${ranks[idx]}</td>
               <td class="player-name-cell">${escapeHTML(res.player.playerName)}</td>
               <td class="text-center">${resultDisplay}</td>
               <td class="standings-total text-center">${scoreDisplay}</td>
@@ -252,6 +258,12 @@ export function renderStandingsTable({
       } else {
         // 4b. Standard individual scoreboard
         const sortedRows = engine.sortStandings(rows, { head2headRecordsMap });
+        const isEventTie = (a, b) => {
+          if (a.hasScores !== b.hasScores) return false;
+          if (!a.hasScores && !b.hasScores) return true;
+          return engine.compareScores(a.total, b.total) === 0;
+        };
+        const ranks = computeRanks(sortedRows, isEventTie);
 
         bodyEl.innerHTML = sortedRows.map((res, idx) => {
           let rowHasUpdate = false;
@@ -271,7 +283,7 @@ export function renderStandingsTable({
 
           return `
             <tr>
-              <td>${idx + 1}</td>
+              <td class="text-center">${ranks[idx]}</td>
               <td class="player-name-cell">${escapeHTML(res.player.playerName)}</td>
               ${turnsHtml}
               ${recordCell}

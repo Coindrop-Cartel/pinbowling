@@ -77,10 +77,11 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   let bonusHtml = '';
   const bonusTargets = engine.getBonusTargets(round);
   if (isLastRound && bonusTargets && bonusTargets.t1) {
+    const bonusLabels = engine.getBonusTargetLabels ? engine.getBonusTargetLabels(round) : { label1: 'XX', label2: 'XXX' };
     bonusHtml = `
       <div class="bonus-targets">
-        <div><b>XX:</b> ${formatNumber(bonusTargets.t1)}</div>
-        <div><b>XXX:</b> ${formatNumber(bonusTargets.t2)}</div>
+        <div><b>${escapeHTML(bonusLabels.label1)}:</b> ${formatNumber(bonusTargets.t1)}</div>
+        <div><b>${escapeHTML(bonusLabels.label2)}:</b> ${formatNumber(bonusTargets.t2)}</div>
       </div>
     `;
   }
@@ -91,10 +92,12 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   const sections = rowContext.sections || [];
   const hasMatchup = sections.length > 0;
 
-  const isTDOrAdmin = (engineContext?.isTDOrAdmin || currentUser?.role === 'admin' || currentUser?.role === 'td') ?? false;
+  const isLoggedIn = !!currentUser;
+  const isTDOrAdmin = isLoggedIn && ((engineContext?.isTDOrAdmin || currentUser?.role === 'admin' || currentUser?.role === 'td') ?? false);
   const isTeamMode = engineContext?.isTeamMode;
   const activeMembers = engineContext?.activeTeamMembers || [];
-  const isTeamMember = isTeamMode && currentUser && activeMembers.some(m => String(m.id) === String(currentUser.player_id));
+  const isTeamMember = isTeamMode && isLoggedIn && activeMembers.some(m => String(m.id) === String(currentUser.player_id));
+  const hasUnlinkedGuestMember = isTeamMode && isLoggedIn && activeMembers.some(m => !m.userId);
 
   let effectiveAccessDenied = false;
   const opponentAccessDenied = true;
@@ -106,10 +109,17 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   } else if (rowContext?.isDisabled) {
     effectiveAccessDenied = true;
     statusMsg = 'This round is locked.';
-  } else if (isTDOrAdmin) {
+  } else if (isTDOrAdmin || (isTeamMode && (isTeamMember || hasUnlinkedGuestMember))) {
     effectiveAccessDenied = false;
   } else {
-    effectiveAccessDenied = isAccessDenied || (isTeamMode && !isTeamMember);
+    effectiveAccessDenied = isAccessDenied || !isLoggedIn || (isTeamMode && !isTeamMember);
+    if (!statusMsg) {
+      if (!isLoggedIn) {
+        statusMsg = 'Login required to record scores.';
+      } else if (isTeamMode && !isTeamMember) {
+        statusMsg = 'Spectator Mode: Only team members can record scores.';
+      }
+    }
   }
 
   const roundTitle = displayRoundLabel ? `${escapeHTML(displayRoundLabel)} ${displayRoundNumber}` : `${displayRoundNumber}`;
@@ -147,7 +157,7 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
     </div>
     <div class="round-actions">
       ${sectionsHtml}
-      <button class="save-round-button btn-mgmt" ${effectiveAccessDenied ? 'hidden' : ''} disabled>Save</button>
+      <button type="button" class="save-round-button btn-mgmt" ${effectiveAccessDenied ? 'hidden' : ''} disabled>Save</button>
     </div>
     ${effectiveAccessDenied || rowContext?.isWalkOff ? `
       <div class="round-status-bar">
@@ -246,8 +256,9 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
     }
   }
 
-  saveBtn.addEventListener('click', async () => {
-    const currentPlayerId = getCurrentPlayerId();
+  saveBtn.addEventListener('click', async (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    const currentPlayerId = getCurrentPlayerId() || (typeof engineContext?.getActiveTeamId === 'function' ? engineContext.getActiveTeamId() : null);
     if (!currentPlayerId) return;
 
     const activeSec = sections.find(s => s.isActiveParticipant);

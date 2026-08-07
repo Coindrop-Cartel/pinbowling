@@ -6,8 +6,8 @@ import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
 import { showMultiSelectDialog } from '@ui/dialogs.js';
 import { renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { filterLeaguesForUser } from '@services/auth.js';
-import { normalizeTargets, normalizeScores, groupScoresByPlayer } from '@services/normalizer.js';
-import { calculateSeasonSummary, calculateHead2HeadRecords, fetchSeasonData } from '@services/seasonCalculator.js';
+import { normalizeTargets, normalizeScores, groupScoresByPlayer, groupMatchupsByEvent } from '@services/normalizer.js';
+import { calculateSeasonSummary, fetchSeasonData } from '@services/seasonCalculator.js';
 import { TvModeManager } from '@ui/tvMode.js';
 import { renderStandingsTable } from '@scripts/renderers/standingsTableRenderer.js';
 
@@ -268,6 +268,7 @@ export async function initStandingsPage() {
 
     if (eventId === 'summary') return renderLeagueSummary(leagueId);
 
+    const isTeamLeague = league?.participationType === 'team';
     const isPlayoffs = event?.eventName && event.eventName.startsWith('Playoffs:');
     const standingsTable = document.getElementById('standings-table') || standingsWrapper?.querySelector('table');
     let playoffBracketContainer = document.getElementById('playoff-bracket-container');
@@ -321,36 +322,75 @@ export async function initStandingsPage() {
 
             if (games.length > 0) {
               const firstGame = games[0];
-              awayName = firstGame.player2Name || 'BYE';
-              homeName = firstGame.player1Name || 'TBD';
+              awayName = isTeamLeague ? (firstGame.team2Name || 'BYE') : (firstGame.player2Name || 'BYE');
+              homeName = isTeamLeague ? (firstGame.team1Name || 'TBD') : (firstGame.player1Name || 'TBD');
 
               games.forEach(g => {
                 if (g.status === 'completed') {
                   const wid = g.winnerId ?? g.teamWinnerId;
-                  if (wid === g.player1Id) homeWins++;
-                  else if (wid === g.player2Id) awayWins++;
+                  const p1Id = isTeamLeague ? g.team1Id : g.player1Id;
+                  const p2Id = isTeamLeague ? g.team2Id : g.player2Id;
+                  if (wid === p1Id) homeWins++;
+                  else if (wid === p2Id) awayWins++;
                 }
               });
             }
 
-            const clinchCount = Math.ceil((league.playoffSeriesLength || 1) / 2);
+            const seriesLength = Number(league?.playoffSeriesLength || league?.playoff_series_length || event?.playoffSeriesLength || event?.playoff_series_length || 3);
+            const clinchCount = Math.ceil(seriesLength / 2);
             const finished = (homeWins >= clinchCount || awayWins >= clinchCount);
             const homeClinched = homeWins >= clinchCount;
             const awayClinched = awayWins >= clinchCount;
 
-            cardsHtml.push(`
-              <div class="bracket-series-card" style="padding: 12px; margin: 10px 0; border: 1px solid ${finished ? '#2e7d32' : (games.length > 0 ? '#2196f3' : '#ccc')}; border-radius: 6px; background: ${games.length > 0 ? '#fff' : '#f5f5f5'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-width: 180px;">
-                <div style="font-size: 0.8em; font-weight: bold; color: ${games.length > 0 ? '#1976d2' : '#888'}; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px;">
-                  Series ${sId}
+            let runningHomeWins = 0;
+            let runningAwayWins = 0;
+
+            const gamesSummaryHtml = games.map(g => {
+              const p1Id = isTeamLeague ? g.team1Id : g.player1Id;
+              const p2Id = isTeamLeague ? g.team2Id : g.player2Id;
+              const p1Score = isTeamLeague ? Number(g.team1Score ?? 0) : Number(g.player1Score ?? 0);
+              const p2Score = isTeamLeague ? Number(g.team2Score ?? 0) : Number(g.player2Score ?? 0);
+              const wid = g.winnerId ?? g.teamWinnerId;
+
+              const isUnnecessary = (runningHomeWins >= clinchCount || runningAwayWins >= clinchCount);
+
+              if (g.status === 'completed') {
+                if (wid === p1Id) runningHomeWins++;
+                else if (wid === p2Id) runningAwayWins++;
+              }
+
+              if (isUnnecessary) {
+                return `
+                  <div style="display: flex; justify-content: space-between; font-size: 0.8em; padding: 2px 4px; margin-top: 2px; background: #eee; border-radius: 3px; opacity: 0.5; color: #777;">
+                    <span>Game ${g.gameNumber}</span>
+                    <span>Not Needed</span>
+                  </div>
+                `;
+              }
+
+              return `
+                <div style="display: flex; justify-content: space-between; font-size: 0.8em; padding: 2px 4px; margin-top: 2px; background: #f9f9f9; border-radius: 3px;">
+                  <span>Game ${g.gameNumber}</span>
+                  <span>${g.status === 'completed' ? `${p2Score} - ${p1Score}` : 'Pending'}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 4px; ${awayClinched ? 'font-weight: bold; color: #2e7d32;' : ''}">
+              `;
+            }).join('');
+
+            cardsHtml.push(`
+              <div class="bracket-series-card" style="padding: 12px; margin: 10px 0; border: 1px solid ${finished ? '#2e7d32' : (games.length > 0 ? '#2196f3' : '#ccc')}; border-radius: 6px; background: ${games.length > 0 ? '#fff' : '#f5f5f5'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-width: 200px;">
+                <div style="font-size: 0.85em; font-weight: bold; color: ${finished ? '#2e7d32' : (games.length > 0 ? '#1976d2' : '#888')}; margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
+                  <span>Series ${sId}</span>
+                  ${finished ? '<span style="font-size: 0.8em; background: #e8f5e9; color: #2e7d32; padding: 1px 6px; border-radius: 3px; font-weight: bold;">✓ Final</span>' : ''}
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 3px; ${awayClinched ? 'font-weight: bold; color: #2e7d32;' : ''}">
                   <span style="${games.length === 0 ? 'color: #888;' : ''}">${escapeHTML(awayName)}</span>
                   <span>${games.length > 0 ? awayWins : '-'}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.9em; ${homeClinched ? 'font-weight: bold; color: #2e7d32;' : ''}">
+                <div style="display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 6px; ${homeClinched ? 'font-weight: bold; color: #2e7d32;' : ''}">
                   <span style="${games.length === 0 ? 'color: #888;' : ''}">${escapeHTML(homeName)}</span>
                   <span>${games.length > 0 ? homeWins : '-'}</span>
                 </div>
+                ${games.length > 0 ? `<div class="bracket-game-breakdown" style="border-top: 1px dashed #eee; padding-top: 4px;">${gamesSummaryHtml}</div>` : ''}
               </div>
             `);
           }
@@ -395,14 +435,25 @@ export async function initStandingsPage() {
 
     const rawMachines = await PB_API.machines.getTargets(eventId);
     const isTeamMode = league?.participationType === 'team';
-    const fetchMatchups = isTeamMode
-      ? PB_API.teamMatchups.get(eventId).catch(() => [])
-      : PB_API.matchups.get(eventId).catch(() => []);
-    const [rawScores, allTeamsData, eventMatchups] = await Promise.all([
+    const supportsMatchups = !!Engine.getMatchupDescription(1);
+    const allEvents = league?.events || [];
+
+    const fetchMatchupsForEvent = isTeamMode
+      ? e => PB_API.teamMatchups.get(e.id).catch(() => [])
+      : e => PB_API.matchups.get(e.id).catch(() => []);
+
+    const [rawScores, allTeamsData, allLeagueMatchupsResults] = await Promise.all([
       PB_API.scores.get(null, Number(eventId)),
       PB_API.teams.getAll(),
-      Engine.getMatchupDescription(1) ? fetchMatchups : Promise.resolve([])
+      supportsMatchups
+        ? (allEvents.length > 0
+            ? Promise.all(allEvents.map(fetchMatchupsForEvent))
+            : fetchMatchupsForEvent({ id: eventId }).then(res => [res]))
+        : Promise.resolve([])
     ]);
+
+    const seasonMatchupsByEvent = supportsMatchups ? groupMatchupsByEvent(allLeagueMatchupsResults.flat()) : {};
+    const eventMatchups = seasonMatchupsByEvent[eventId] || [];
 
     if (window.PB_DEBUG_MODE) {
       console.log('[StandingsPage] Loaded data for eventId=' + eventId + ' teamMode=' + isTeamMode + ' rawScores=' + (rawScores?.length ?? 0) + ' eventMatchups=', JSON.stringify(eventMatchups?.slice(0, 20)));
@@ -452,8 +503,6 @@ export async function initStandingsPage() {
     renderFilterUI(players);
 
     const filteredPlayers = selectedPlayerIds.length > 0 ? players.filter(p => selectedPlayerIds.includes(String(p.id))) : players;
-    const isTeamLeague = league?.participationType === 'team';
-    const supportsMatchups = !!Engine.getMatchupDescription(1);
 
     const rows = filteredPlayers.map(player => {
       const scores = scoresByPlayer[player.id] || [];
@@ -477,6 +526,7 @@ export async function initStandingsPage() {
 
       // Determine weekly result for matchup-based formats
       let result = null;
+      let weeklyTotal = total;
       if (supportsMatchups) {
         const playerMatchup = eventMatchups.find(m => {
           if (m.status !== 'completed') return false;
@@ -486,16 +536,33 @@ export async function initStandingsPage() {
         });
         if (playerMatchup) {
           const p1Id = Number(playerMatchup.player1Id ?? playerMatchup.player1_id);
-          const r1 = Number(playerMatchup.player1Score ?? playerMatchup.player1_score ?? 0);
-          const r2 = Number(playerMatchup.player2Score ?? playerMatchup.player2_score ?? 0);
-          const isPlayer1 = p1Id === player.id;
-          const pScore = isPlayer1 ? r1 : r2;
-          const oScore = isPlayer1 ? r2 : r1;
-          result = pScore > oScore ? 'Win' : (pScore < oScore ? 'Loss' : 'Tie');
+          const p2Id = Number(playerMatchup.player2Id ?? playerMatchup.player2_id);
+          if (!p1Id || !p2Id) {
+            result = 'BYE';
+          } else {
+            const r1 = Number(playerMatchup.player1Score ?? playerMatchup.player1_score ?? 0);
+            const r2 = Number(playerMatchup.player2Score ?? playerMatchup.player2_score ?? 0);
+            const isPlayer1 = p1Id === player.id;
+            const pScore = isPlayer1 ? r1 : r2;
+            const oScore = isPlayer1 ? r2 : r1;
+            result = pScore > oScore ? 'Win' : (pScore < oScore ? 'Loss' : 'Tie');
+            if (playedTurns.length === 0) {
+              weeklyTotal = pScore;
+            }
+          }
         }
       }
 
-      return { player, turnResults, total, totalDisplay, ordersWithScores, parDiff, hasScores: playedTurns.length > 0, result };
+      return {
+        player,
+        turnResults,
+        total: playedTurns.length > 0 ? total : weeklyTotal,
+        totalDisplay: playedTurns.length > 0 ? totalDisplay : (weeklyTotal ? String(weeklyTotal) : '0'),
+        ordersWithScores,
+        parDiff,
+        hasScores: playedTurns.length > 0 || result !== null,
+        result
+      };
     });
 
     renderStandingsTable({
@@ -509,15 +576,14 @@ export async function initStandingsPage() {
       columns: machines,
       engine: Engine,
       supportsMatchups,
-      head2headRecordsMap: (supportsMatchups && eventMatchups.length > 0)
+      head2headRecordsMap: supportsMatchups
         ? (() => {
             const entities = isTeamMode
               ? (league.teams || []).map(t => ({ id: t.id }))
               : filteredPlayers.map(p => ({ id: p.id }));
-            const matchupsByEvent = { [eventId]: eventMatchups };
-            const scoresByEvent = { [eventId]: scoresByPlayer };
-            const singleEventTargets = { [eventId]: machines };
-            return calculateHead2HeadRecords(entities, [{ id: eventId }], matchupsByEvent, scoresByEvent, singleEventTargets, Engine);
+            const currentEventIdx = allEvents.findIndex(e => String(e.id) === String(eventId));
+            const eventList = currentEventIdx !== -1 ? allEvents.slice(0, currentEventIdx + 1) : (allEvents.length > 0 ? allEvents : [{ id: eventId }]);
+            return Engine.getCompetitionStrategy().calculateMatchupRecords(entities, eventList, seasonMatchupsByEvent, {}, Engine, { participationType: isTeamMode ? 'team' : 'individual' });
           })()
         : null,
       allTeamsData,

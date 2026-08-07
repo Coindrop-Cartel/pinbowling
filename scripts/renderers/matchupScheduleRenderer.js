@@ -71,6 +71,8 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, is
     const homeName = escapeHTML(p1Name || 'Home');
     const awayName = escapeHTML(p2Name || 'Away');
     
+    const seriesLength = Number(event?.playoffSeriesLength || event?.playoff_series_length || firstGame?.playoffSeriesLength || firstGame?.playoff_series_length || 3);
+    const clinchWins = Math.ceil(seriesLength / 2);
     let homeWins = 0;
     let awayWins = 0;
     games.forEach(g => {
@@ -82,6 +84,12 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, is
         else if (wid === p2Id) awayWins++;
       }
     });
+
+    const isClinched = homeWins >= clinchWins || awayWins >= clinchWins;
+    const seriesWinnerName = homeWins >= clinchWins ? homeName : (awayWins >= clinchWins ? awayName : null);
+
+    let runningHomeWins = 0;
+    let runningAwayWins = 0;
     
     const gamesHtml = games.map(g => {
       const p1Id = isTeamMode ? g.team1Id : g.player1Id;
@@ -95,6 +103,29 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, is
       const wid = g.winnerId ?? g.teamWinnerId;
       const winnerHome = g.status === 'completed' && wid === p1Id;
       const winnerAway = g.status === 'completed' && wid === p2Id;
+
+      const isUnnecessary = (runningHomeWins >= clinchWins || runningAwayWins >= clinchWins);
+
+      if (g.status === 'completed') {
+        if (wid === p1Id) runningHomeWins++;
+        else if (wid === p2Id) runningAwayWins++;
+      }
+
+      if (isUnnecessary) {
+        return `
+          <div class="playoff-game-row unnecessary" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-top: 6px; background: #f0f0f0; border-radius: 4px; border-left: 3px solid #9e9e9e; opacity: 0.5;">
+            <span class="meta-strong" style="font-size: 0.9em; color: #757575;">Game ${g.gameNumber}</span>
+            <div class="game-score" style="font-size: 0.9em;">
+              <span class="badge" style="background: #e0e0e0; color: #616161; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">Not Needed</span>
+            </div>
+            <div class="game-actions" style="display: flex; gap: 6px;">
+              <button class="btn-row btn-small" disabled style="padding: 2px 8px; font-size: 0.85em; background: #ccc; color: #666; cursor: not-allowed; pointer-events: none;">
+                Play
+              </button>
+            </div>
+          </div>
+        `;
+      }
       
       return `
         <div class="playoff-game-row" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; margin-top: 6px; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #2196f3;">
@@ -117,14 +148,20 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, is
         </div>
       `;
     }).join('');
+
+    const headerBadge = isClinched
+      ? `<span class="badge completed font-bold" style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">
+           ✓ ${seriesWinnerName} won series (${awayName}: ${awayWins}, ${homeName}: ${homeWins})
+         </span>`
+      : `<span class="badge completed font-bold" style="background: #e3f2fd; color: #0d47a1; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">
+           ${awayName} (${awayWins}) vs ${homeName} (${homeWins})
+         </span>`;
     
     return `
-      <li class="list-item-row playoff-series-card" style="display: block; padding: 15px; margin-bottom: 12px; border: 1px solid #2196f3; border-radius: 6px; background: #fff;">
+      <li class="list-item-row playoff-series-card" style="display: block; padding: 15px; margin-bottom: 12px; border: 1px solid ${isClinched ? '#2e7d32' : '#2196f3'}; border-radius: 6px; background: #fff;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #ddd; padding-bottom: 8px; margin-bottom: 8px;">
-          <span class="meta-strong" style="color: #1976d2; font-size: 1.05em;">Series ${sId} - ${escapeHTML(event.eventName.replace('Playoffs: ', ''))}</span>
-          <span class="badge completed font-bold" style="background: #e3f2fd; color: #0d47a1; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">
-            ${awayName} (${awayWins}) vs ${homeName} (${homeWins})
-          </span>
+          <span class="meta-strong" style="color: ${isClinched ? '#2e7d32' : '#1976d2'}; font-size: 1.05em;">Series ${sId} - ${escapeHTML(event.eventName.replace('Playoffs: ', ''))}</span>
+          ${headerBadge}
         </div>
         <div class="series-games-list">
           ${gamesHtml}

@@ -1,5 +1,5 @@
 import { ScoringEngine } from '../ScoringEngine.js';
-import { formatNumber, escapeHTML } from '../../utils.js';
+import { formatNumber } from '../../utils.js';
 import { buildRoundRobinMatchups, resolveMatchupRole, buildTeamRoundRobinMatchups, resolvePlayerForBall } from '../../services/matchupBuilder.js';
 import { resolvePlayersForMatchupParticipant } from '../../services/playerSelector.js';
 
@@ -8,6 +8,9 @@ import { resolvePlayersForMatchupParticipant } from '../../services/playerSelect
  * Head-to-head format where players alternate roles as pitcher and batter.
  */
 export class BaseballEngine extends ScoringEngine {
+  constructor(config = {}, options = {}) {
+    super({ format: 'baseball', ...config }, { competitionFormat: 'head_to_head', ...options });
+  }
   /**
    * Overridden for Baseball:
    * Returns a map of rank (1-10) to target score using exponential scaling.
@@ -31,7 +34,7 @@ export class BaseballEngine extends ScoringEngine {
 
   getThresholdStart() { return 1; }
   getThresholdEnd() { return 10; }
-  getThresholdPrefix() { return 'Runs'; }
+
 
   getThresholdSort() {
     return (a, b) => Number(a[0]) - Number(b[0]);
@@ -39,6 +42,28 @@ export class BaseballEngine extends ScoringEngine {
 
   getThresholdLabel(rank, _value1, _value2) {
     return `${rank} R`;
+  }
+
+  /**
+   * Overridden for Baseball: 2 turns (top and bottom) per inning.
+   */
+  getRoundIndexForTurn(turnIndex, _machines = []) {
+    return Math.floor(turnIndex / 2) + 1;
+  }
+
+  /**
+   * Overridden for Baseball: Formats score string for batter / walk-off / non-batter.
+   */
+  formatMatchupScore(turn, existingScore) {
+    if (turn?.isWalkOff) {
+      if (turn.isBatter || existingScore === undefined) return 'X';
+    } else if (turn?.played) {
+      if (turn.isBatter) return String(turn.score);
+      if (existingScore === undefined) return '0';
+    } else {
+      if (existingScore === undefined) return '-';
+    }
+    return existingScore ?? '-';
   }
 
   /**
@@ -425,37 +450,12 @@ export class BaseballEngine extends ScoringEngine {
     return b - a; // High score wins (total runs)
   }
 
-  /**
-   * Sorts head-to-head standings by win rate, then run diff, then total runs.
-   */
-  sortStandings(rows, { head2headRecordsMap } = {}) {
-    return [...rows].sort((a, b) => {
-      if (a.hasScores !== b.hasScores) return a.hasScores ? -1 : 1;
 
-      if (head2headRecordsMap) {
-        const recA = head2headRecordsMap[a.player.id];
-        const recB = head2headRecordsMap[b.player.id];
-        if (recA && recB) {
-          const rateDiff = recB.winRate - recA.winRate;
-          if (Math.abs(rateDiff) > 0.001) return rateDiff;
-          const diffDiff = recB.runDiff - recA.runDiff;
-          if (diffDiff !== 0) return diffDiff;
-        }
-      }
-
-      return this.compareScores(a.total, b.total);
-    });
-  }
 
   getRoundCountOptions() {
     return [2, 4, 6, 9];
   }
 
-  getRoundLabel() { return this.config.roundLabel || 'Round'; }
-  getTurnHeaderPrefix() { return this.config.turnHeaderPrefix || 'Round'; }
-  getPrimaryTargetLabel() { return this.config.primaryTargetLabel || 'Run Baseline'; }
-  getValue1Label() { return this.config.value1Label || 'Baseline Score'; }
-  getValue2Label() { return this.config.value2Label || 'Multiplier'; }
   getValue2AllowsDecimal() { return true; }
 
   /** Baseball uses 2 machines per inning (top and bottom). */
@@ -479,11 +479,11 @@ export class BaseballEngine extends ScoringEngine {
   /**
    * Returns matchup description for the baseball head-to-head format.
    * @param {number} roundCount Number of innings in the session.
+   * @param {boolean|Object} [isTeamMode=false] True if team mode, or context object containing isTeamMode.
    * @returns {{ description: string, details: Array<{ label: string, value: string }> }}
    */
-  getMatchupDescription(roundCount) {
-    // Check if team mode is available from the last context
-    const isTeam = this._lastContext?.isTeamMode;
+  getMatchupDescription(roundCount, isTeamMode = false) {
+    const isTeam = typeof isTeamMode === 'object' ? Boolean(isTeamMode?.isTeamMode || isTeamMode?.isTeam) : Boolean(isTeamMode);
     if (isTeam) {
       return {
         description: `Two teams compete head-to-head across ${roundCount} innings. Each inning has 4 matchups (2 per half-inning). Team members rotate as pitcher and batter.`,
@@ -502,15 +502,8 @@ export class BaseballEngine extends ScoringEngine {
     };
   }
 
-  /**
-   * Returns baseball-specific preview row data for the session generator.
-   */
-  getPreviewRowData(frame) {
-    return {
-      value1: frame.value1,
-      value2: frame.value2
-    };
-  }
+
+
 
   /**
    * Generates matchup payload objects for a baseball session.
@@ -572,11 +565,21 @@ export class BaseballEngine extends ScoringEngine {
    * @param {Function} context.groupScoresByPlayer Groups scores by player ID.
    * @returns {Object} The enriched score map with opponent data.
    */
+  _resolveActiveParticipantId(context, isTeamMode) {
+    if (context?.activeParticipantId !== undefined && context?.activeParticipantId !== null) {
+      return context.activeParticipantId;
+    }
+    if (isTeamMode) {
+      return context?.getActiveTeamId?.() || context?.getCurrentPlayerId?.() || '';
+    }
+    return context?.getCurrentPlayerId?.() ?? '';
+  }
+
   enrichScoreMap(scoreMap, context) {
     const { allEventScores, eventMatchups, getCurrentPlayerId, getActiveTeamId, normalizeScores, groupScoresByPlayer, activeLeague, activeSession, enrichedEntries } = context;
     const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
     const isTeamMode = activeLeague?.participationType === 'team' || activeSession?.participationType === 'team';
-    const selectedPlayerId = isTeamMode ? (getActiveTeamId?.() ?? getCurrentPlayerId()) : getCurrentPlayerId();
+    const selectedPlayerId = this._resolveActiveParticipantId(context, isTeamMode);
 
     if (isTeamMode) {
       const normalized = normalizeScores(allEventScores || []);
@@ -752,56 +755,36 @@ export class BaseballEngine extends ScoringEngine {
    * @param {Object} context Head-to-head context.
    * @returns {Object} { matchup, displayRoundNumber, displayRoundLabel, sections }
    */
-  getRoundRowContext(round, context) {
-    const { eventMatchups, getCurrentPlayerId, getActiveTeamId, allPlayersCache, activeLeague, activeSession, enrichedEntries } = context;
+  /**
+   * Format helper: Converts an 1-based orderNumber to Baseball inning notation.
+   * e.g., orderNumber 1 -> "Top 1", orderNumber 2 -> "Bottom 1", orderNumber 3 -> "Top 2".
+   *
+   * @param {number} orderNumber
+   * @returns {string}
+   */
+  getInningDisplayNumber(orderNumber) {
+    const orderNum = Number(orderNumber || 1);
+    const isTop = orderNum % 2 === 1;
+    const inningNumber = Math.floor((orderNum - 1) / 2) + 1;
+    return `${isTop ? 'Top' : 'Bottom'} ${inningNumber}`;
+  }
+
+  /**
+   * Resolves defending (pitcher) and batting (batter) team/player details for a round.
+   * @private
+   */
+  _resolveParticipantRoles(round, context, isPlayer1, isTopInning) {
+    const { getCurrentPlayerId, getActiveTeamId, activeLeague, activeSession, enrichedEntries } = context;
     const roleAssignmentsByTeam = context.roleAssignmentsByTeam || context.pitcherAssignmentsByTeam;
     const rosterOrdersByTeam = context.rosterOrdersByTeam || context.battingOrdersByTeam;
     const isTeamMode = activeLeague?.participationType === 'team' || activeSession?.participationType === 'team';
-    const currentPlayerId = Number(isTeamMode ? (getActiveTeamId?.() ?? getCurrentPlayerId()) : getCurrentPlayerId());
+    const currentPlayerId = Number(this._resolveActiveParticipantId(context, isTeamMode));
 
-    let result;
-    if (isTeamMode) {
-      const matchupW = eventMatchups?.[0] || {};
-      const homeTeamId = Number(matchupW.team1Id ?? matchupW.player1Id ?? 0);
-      const isPlayer1 = homeTeamId === currentPlayerId;
-      const orderNum = Number(round.orderNumber ?? round.order_number ?? 1);
-      const isTop = orderNum % 2 === 1;
-      const inningNumber = Math.floor((orderNum - 1) / 2) + 1;
-      const displayRoundNumber = (isTop ? 'Top' : 'Bottom') + ' ' + inningNumber;
-      result = { matchup: round, isPlayer1, isTop, opponentName: '', displayRoundNumber };
-    } else {
-      result = resolveMatchupRole(
-        currentPlayerId,
-        round.machineId,
-        eventMatchups,
-        { allPlayersCache, activeLeague }
-      );
-    }
-
-    const { matchup, isPlayer1, isTop, displayRoundNumber } = result;
-    const roundNumber = round.orderNumber ?? 1;
-    const finalDisplayRoundNumber = matchup ? displayRoundNumber : roundNumber;
-
-    if (!matchup) {
-      return {
-        matchup: null,
-        displayRoundNumber: finalDisplayRoundNumber,
-        displayRoundLabel: 'Round',
-        sections: [],
-        isPlayer1: true,
-        isPitcher: true,
-        role: 'pitcher',
-        opponentName: ''
-      };
-    }
-
-    const matchupW = eventMatchups?.[0] || {};
+    const matchupW = context.eventMatchups?.[0] || {};
     const homeTeamId = Number(matchupW.team1Id ?? matchupW.player1Id ?? 0);
     const awayTeamId = Number(matchupW.team2Id ?? matchupW.player2Id ?? 0);
     const homeTeamName = matchupW.team1Name || matchupW.player1Name || 'Home';
     const awayTeamName = matchupW.team2Name || matchupW.player2Name || 'Away';
-
-    const isTopInning = (isTop !== undefined && isTop !== null) ? Boolean(isTop) : (round.isTop !== undefined ? Boolean(round.isTop) : (Number(round.team1Id ?? 0) ? (Number(round.team1Id) === homeTeamId) : ((round.orderNumber ?? 1) % 2 !== 0)));
 
     const defendingTeamId = Number(round.team1Id ?? (isTopInning ? homeTeamId : awayTeamId));
     const battingTeamId = Number(round.team2Id ?? (isTopInning ? awayTeamId : homeTeamId));
@@ -832,16 +815,8 @@ export class BaseballEngine extends ScoringEngine {
 
     const pitcherPlayerName = defendingPitcherObj?.playerName || defendingPitcherObj?.name || (isTopInning ? homeTeamName : awayTeamName);
 
-    let pitcherDisplayName = '';
-    let batterDisplayName = '';
-
-    if (isTeamMode) {
-      pitcherDisplayName = pitcherPlayerName;
-      batterDisplayName = isTopInning ? awayTeamName : homeTeamName;
-    } else {
-      pitcherDisplayName = isTopInning ? homeTeamName : awayTeamName;
-      batterDisplayName = isTopInning ? awayTeamName : homeTeamName;
-    }
+    const pitcherDisplayName = isTeamMode ? pitcherPlayerName : (isTopInning ? homeTeamName : awayTeamName);
+    const batterDisplayName = isTeamMode ? '' : (isTopInning ? awayTeamName : homeTeamName);
 
     // Per-ball player rotation for team mode
     const playerPerBall = [];
@@ -874,59 +849,128 @@ export class BaseballEngine extends ScoringEngine {
 
     const isPitcherActive = isPlayer1 ? isTopInning : !isTopInning;
 
+    return {
+      pitcherDisplayName,
+      batterDisplayName,
+      isPitcherActive,
+      playerPerBall,
+      awayTeamName,
+      homeTeamName
+    };
+  }
+
+  /**
+   * Checks if walk-off condition applies for the given round.
+   * @private
+   */
+  _checkWalkOffStatus(round, context, isTopInning, awayTeamId, homeTeamId) {
+    const allRoundsList = context?.enrichedEntries || [];
+    const isLastMachineInList = allRoundsList.length > 0 && round.orderNumber === allRoundsList[allRoundsList.length - 1].orderNumber;
+    if (isTopInning || !isLastMachineInList) return false;
+
+    let priorHomeScore = 0;
+    let priorAwayScore = 0;
+    const allScores = context?.allEventScores || [];
+    const scoreMapByEntity = {};
+    allScores.forEach(s => {
+      const entityId = Number(s.teamId ?? s.playerId ?? 0);
+      const orderNum = Number(s.orderNumber ?? 0);
+      if (entityId > 0 && orderNum > 0) {
+        scoreMapByEntity[entityId] = scoreMapByEntity[entityId] || {};
+        scoreMapByEntity[entityId][orderNum] = s;
+      }
+    });
+
+    for (let i = 0; i < allRoundsList.length - 1; i++) {
+      const r = allRoundsList[i];
+      const rIsTop = (r.isTop !== undefined) ? Boolean(r.isTop) : ((r.orderNumber ?? 1) % 2 !== 0);
+      const rBattingId = rIsTop ? awayTeamId : homeTeamId;
+      const bEntry = scoreMapByEntity[rBattingId]?.[r.orderNumber];
+      if (bEntry && (bEntry.ball1 || bEntry.ball2 || bEntry.ball3)) {
+        const turn = this.getInningData(r, bEntry, { ball1: 0, ball2: 0, ball3: 0 }, true, true);
+        const runs = turn.score;
+        if (rIsTop) priorAwayScore += runs;
+        else priorHomeScore += runs;
+      }
+    }
+
+    return priorHomeScore > priorAwayScore;
+  }
+
+  /**
+   * Returns head-to-head context for a round row in the scoring form.
+   * Formats engine-specific baseball rules (innings, roles, walkoff) into
+   * generic section structures for the roundRowRenderer.
+   *
+   * @param {Object} round The machine configuration for this round.
+   * @param {Object} context Head-to-head context.
+   * @returns {Object} { matchup, displayRoundNumber, displayRoundLabel, sections, ... }
+   */
+  getRoundRowContext(round, context) {
+    const { eventMatchups, getCurrentPlayerId, getActiveTeamId, allPlayersCache, activeLeague, activeSession } = context;
+    const isTeamMode = activeLeague?.participationType === 'team' || activeSession?.participationType === 'team';
+    const currentPlayerId = Number(this._resolveActiveParticipantId(context, isTeamMode));
+
+    let result;
+    if (isTeamMode) {
+      const matchupW = eventMatchups?.[0] || {};
+      const homeTeamId = Number(matchupW.team1Id ?? matchupW.player1Id ?? 0);
+      const isPlayer1 = homeTeamId === currentPlayerId;
+      const orderNum = Number(round.orderNumber ?? round.order_number ?? 1);
+      const isTop = orderNum % 2 === 1;
+      const displayRoundNumber = this.getInningDisplayNumber(orderNum);
+      result = { matchup: round, isPlayer1, isTop, opponentName: '', displayRoundNumber };
+    } else {
+      result = resolveMatchupRole(
+        currentPlayerId,
+        round.machineId,
+        eventMatchups,
+        { allPlayersCache, activeLeague }
+      );
+    }
+
+    const { matchup, isPlayer1, isTop, displayRoundNumber } = result;
+    const roundNumber = round.orderNumber ?? 1;
+    const finalDisplayRoundNumber = matchup ? displayRoundNumber : roundNumber;
+
+    if (!matchup) {
+      return {
+        matchup: null,
+        displayRoundNumber: finalDisplayRoundNumber,
+        displayRoundLabel: 'Round',
+        sections: [],
+        isPlayer1: true,
+        isPitcher: true,
+        role: 'pitcher',
+        opponentName: ''
+      };
+    }
+
+    const matchupW = eventMatchups?.[0] || {};
+    const homeTeamId = Number(matchupW.team1Id ?? matchupW.player1Id ?? 0);
+    const awayTeamId = Number(matchupW.team2Id ?? matchupW.player2Id ?? 0);
+
+    const isTopInning = (isTop !== undefined && isTop !== null) ? Boolean(isTop) : (round.isTop !== undefined ? Boolean(round.isTop) : (Number(round.team1Id ?? 0) ? (Number(round.team1Id) === homeTeamId) : ((round.orderNumber ?? 1) % 2 !== 0)));
+
+    const roles = this._resolveParticipantRoles(round, context, isPlayer1, isTopInning);
+    const isWalkOff = this._checkWalkOffStatus(round, context, isTopInning, awayTeamId, homeTeamId);
+
     const sections = [
       {
         key: 'player1',
         roleLabel: 'Pitcher',
-        displayName: pitcherDisplayName,
-        isActiveParticipant: isPitcherActive,
+        displayName: roles.pitcherDisplayName,
+        isActiveParticipant: roles.isPitcherActive,
         perBallPlayers: []
       },
       {
         key: 'player2',
         roleLabel: 'Batter',
-        displayName: isTeamMode ? '' : batterDisplayName,
-        isActiveParticipant: !isPitcherActive,
-        perBallPlayers: playerPerBall
+        displayName: roles.batterDisplayName,
+        isActiveParticipant: !roles.isPitcherActive,
+        perBallPlayers: roles.playerPerBall
       }
     ];
-
-    const allRoundsList = enrichedEntries || [];
-    const isLastMachineInList = allRoundsList.length > 0 && round.orderNumber === allRoundsList[allRoundsList.length - 1].orderNumber;
-    let isWalkOff = false;
-
-    if (!isTopInning && isLastMachineInList) {
-      let priorHomeScore = 0;
-      let priorAwayScore = 0;
-      const allScores = context?.allEventScores || [];
-      const scoreMapByEntity = {};
-      allScores.forEach(s => {
-        const entityId = Number(s.teamId ?? s.playerId ?? 0);
-        const orderNum = Number(s.orderNumber ?? 0);
-        if (entityId > 0 && orderNum > 0) {
-          scoreMapByEntity[entityId] = scoreMapByEntity[entityId] || {};
-          scoreMapByEntity[entityId][orderNum] = s;
-        }
-      });
-
-      for (let i = 0; i < allRoundsList.length - 1; i++) {
-        const r = allRoundsList[i];
-        const rIsTop = (r.isTop !== undefined) ? Boolean(r.isTop) : ((r.orderNumber ?? 1) % 2 !== 0);
-        const rBattingId = rIsTop ? awayTeamId : homeTeamId;
-        const target = r.value1 ? { value1: r.value1, value2: r.value2 } : { value1: 5000000, value2: 1.5 };
-        const bEntry = scoreMapByEntity[rBattingId]?.[r.orderNumber];
-        if (bEntry && (bEntry.ball1 || bEntry.ball2 || bEntry.ball3)) {
-          const turn = this.getInningData(r, bEntry, { ball1: 0, ball2: 0, ball3: 0 }, true, true);
-          const runs = turn.score;
-          if (rIsTop) priorAwayScore += runs;
-          else priorHomeScore += runs;
-        }
-      }
-
-      if (priorHomeScore > priorAwayScore) {
-        isWalkOff = true;
-      }
-    }
 
     return {
       matchup,
@@ -934,9 +978,9 @@ export class BaseballEngine extends ScoringEngine {
       displayRoundLabel: '',
       sections,
       isPlayer1,
-      isPitcher: isPitcherActive,
-      role: isPitcherActive ? 'pitcher' : 'batter',
-      opponentName: isPlayer1 ? awayTeamName : homeTeamName,
+      isPitcher: roles.isPitcherActive,
+      role: roles.isPitcherActive ? 'pitcher' : 'batter',
+      opponentName: isPlayer1 ? roles.awayTeamName : roles.homeTeamName,
       isWalkOff,
       isDisabled: false,
       walkOffNotice: isWalkOff ? 'Walk-off: Home team is leading in the bottom of the last inning. No need to play extra balls. Save this round to complete the game.' : null
@@ -948,7 +992,7 @@ export class BaseballEngine extends ScoringEngine {
     const isTeamMode = activeLeague?.participationType === 'team' || activeSession?.participationType === 'team';
     if (!isTeamMode) return [];
 
-    const teamIdStr = String(getActiveTeamId?.() ?? getCurrentPlayerId?.() ?? '');
+    const teamIdStr = this._resolveActiveParticipantId(context, isTeamMode);
     const matchup = eventMatchups?.[0] || {};
     const homeTeamId = String(matchup?.team1Id ?? matchup?.player1Id ?? '');
     const awayTeamId = String(matchup?.team2Id ?? matchup?.player2Id ?? '');

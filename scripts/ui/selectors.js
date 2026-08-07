@@ -2,6 +2,7 @@ import { PB_API } from '@services/api.js';
 import { getActiveEventId, getActiveLeagueId, setActiveEventId, setActiveLeagueId } from '@scripts/utils.js';
 import { getFormatBadgeHtml } from '@ui/branding.js';
 import { filterLeaguesForUser } from '@services/auth.js';
+import { isHead2Head } from '@services/scoringFormat.js';
 
 /**
  * Searchable selects, tournament selectors, expandable rows, and sortable lists.
@@ -219,7 +220,7 @@ export async function initTournamentSelector(container, { onRefresh, showEvents 
   const populateEvents = (leagueId, selectedEventId) => {
     const isStandingsPage = !!document.getElementById('standings-body');
     const league = allLeagues.find(l => String(l.id) === String(leagueId));
-    const isH2H = league?.competitionFormat === 'head2head';
+    const isH2H = isHead2Head(league?.competitionFormat);
     
     const labelEl = eventWrapper.querySelector('label');
     if (labelEl) {

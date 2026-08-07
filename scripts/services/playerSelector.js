@@ -61,7 +61,7 @@ export function getSelectableTeams(params) {
   if (teamsPool.length === 0) return [];
 
   if (activeMatchupId && eventMatchups.length > 0) {
-    const matchup = eventMatchups[0];
+    const matchup = eventMatchups.find(m => String(m.id) === String(activeMatchupId)) || eventMatchups[0];
     const awayId = String(matchup.team2Id ?? '');
     const homeId = String(matchup.team1Id ?? '');
 
@@ -130,7 +130,7 @@ export function getSelectablePlayers(params) {
   const isMatchupContext = !!activeMatchupId;
 
   if (isMatchupContext) {
-    const matchup = eventMatchups[0];
+    const matchup = eventMatchups.find(m => String(m.id) === String(activeMatchupId)) || eventMatchups[0];
     if (matchup) {
       const activeLeague = allLeaguesCache.find(l => String(l.id) === String(leagueId));
       const isTeamMode = activeLeague?.participationType === 'team' || (matchup.team1Id !== undefined && matchup.team1Id !== null);
@@ -225,12 +225,13 @@ export function getAutoSelectedPlayerId(params) {
   if (activePlayerId) return activePlayerId;
 
   const activeLeague = allLeaguesCache.find(l => String(l.id) === String(leagueId));
-  const isTeamMode = activeLeague?.participationType === 'team' || (eventMatchups[0]?.team1Id !== undefined && eventMatchups[0]?.team1Id !== null);
+  const activeMatchup = eventMatchups.find(m => String(m.id) === String(activeMatchupId)) || eventMatchups[0];
+  const isTeamMode = activeLeague?.participationType === 'team' || (activeMatchup?.team1Id !== undefined && activeMatchup?.team1Id !== null);
 
   if (currentUser?.player_id) {
     const isInSelectable = selectablePlayers.some(p => String(p.id) === String(currentUser.player_id));
     const isInRoster = allPlayersCache.some(p => String(p.id) === String(currentUser.player_id));
-    const isMatchupParticipant = activeMatchupId && eventMatchups[0] && isPlayerInMatchup(currentUser.player_id, eventMatchups[0], allLeaguesCache, isTeamMode);
+    const isMatchupParticipant = activeMatchupId && activeMatchup && isPlayerInMatchup(currentUser.player_id, activeMatchup, allLeaguesCache, isTeamMode);
     if (isInSelectable && isInRoster && (!activeMatchupId || isMatchupParticipant)) {
       return String(currentUser.player_id);
     }
@@ -289,7 +290,7 @@ export function getSpectatorStatus(params) {
     leagueId
   } = params;
 
-  const matchup = eventMatchups[0];
+  const matchup = eventMatchups.find(m => String(m.id) === String(activeMatchupId)) || eventMatchups[0];
   const activeLeague = allLeaguesCache.find(l => String(l.id) === String(leagueId));
   const isTeamMode = activeLeague?.participationType === 'team' || (matchup?.team1Id !== undefined && matchup?.team1Id !== null);
   const isParticipant = matchup && currentUser && isPlayerInMatchup(currentUser.player_id, matchup, allLeaguesCache, isTeamMode);

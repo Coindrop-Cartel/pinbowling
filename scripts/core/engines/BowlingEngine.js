@@ -13,7 +13,7 @@ export class BowlingEngine extends ScoringEngine {
    * @param {string} [options.competitionFormat='group'] - 'group', 'head_to_head', or 'head2head'.
    */
   constructor(config = {}, options = {}) {
-    super(config, options);
+    super({ format: 'bowling', ...config }, options);
   }
 
   /**
@@ -46,6 +46,10 @@ export class BowlingEngine extends ScoringEngine {
     const t1 = Math.round(s10 * 1.5);
     const t2 = Math.round(t1 * 1.5);
     return { t1, t2 };
+  }
+
+  getBonusTargetLabels(_machine) {
+    return { label1: 'XX', label2: 'XXX' };
   }
 
 
@@ -227,56 +231,7 @@ export class BowlingEngine extends ScoringEngine {
     return this._createTurnData(round, 'open', String(p3), p2, Math.max(0, p3 - p2), 0, p3);
   }
 
-  /**
-   * Calculates team totals across all team members for a full game in Bowling,
-   * applying drop_lowest_player_scores logic (dropping worst/lowest total game scores per player).
-   *
-   * @param {Array<Object>} machines Target definitions for the event.
-   * @param {Object<number|string, Object>} scoreMapByPlayer Dictionary of player scoreMaps keyed by playerId.
-   * @param {Array<Object>} members List of team member objects.
-   * @param {number} dropLowestCount Number of lowest member game totals to drop per game.
-   * @returns {Object}
-   */
-  calculateTeamTurnResults(machines, scoreMapByPlayer = {}, members = [], dropLowestCount = 0) {
-    const memberResults = {};
-    const memberGameTotals = [];
 
-    members.forEach(member => {
-      const pScores = scoreMapByPlayer[member.id] || {};
-      const res = this.calculateTurnResults(machines, pScores);
-      memberResults[member.id] = res;
-      memberGameTotals.push({
-        playerId: member.id,
-        playerName: member.playerName || member.name,
-        total: res.total,
-        totalDisplay: res.totalDisplay,
-        hasScores: res.turnResults.some(t => t.played)
-      });
-    });
-
-    // In Bowling, higher score is better -> sort descending (highest to lowest total)
-    // Worst game scores are at the bottom of the array
-    memberGameTotals.sort((a, b) => b.total - a.total);
-
-    let effectiveMemberTotals = memberGameTotals;
-    let droppedMemberTotals = [];
-
-    if (dropLowestCount > 0 && memberGameTotals.length > dropLowestCount) {
-      effectiveMemberTotals = memberGameTotals.slice(0, memberGameTotals.length - dropLowestCount);
-      droppedMemberTotals = memberGameTotals.slice(memberGameTotals.length - dropLowestCount);
-    }
-
-    const teamGameTotal = effectiveMemberTotals.reduce((sum, m) => sum + m.total, 0);
-
-    return {
-      memberResults,
-      memberGameTotals,
-      effectiveMemberTotals,
-      droppedMemberTotals,
-      total: teamGameTotal,
-      totalDisplay: formatNumber(teamGameTotal)
-    };
-  }
 
   /**
    * Look-ahead helper for standard bowling math.
@@ -297,26 +252,9 @@ export class BowlingEngine extends ScoringEngine {
     return values.slice(0, count);
   }
 
-  /** @returns {string} Label for a single round (e.g. "Frame"). */
-  getRoundLabel() { return this.config.roundLabel || 'Frame'; }
 
-  /** @returns {string} Prefix for turn headers. */
-  getTurnHeaderPrefix() { return this.config.turnHeaderPrefix || 'Frame'; }
 
-  /** @returns {string} Label for the main goal (e.g. "Strike"). */
-  getPrimaryTargetLabel() { return this.config.primaryTargetLabel || 'Strike'; }
 
-  /** @returns {string} Label for the value 1 (Strike) requirement. */
-  getValue1Label() { return this.config.value1Label || 'Target Score'; }
-
-  /** @returns {string} Label for the value 2 (1-Pin) baseline. */
-  getValue2Label() { return this.config.value2Label || 'Base Score'; }
-
-  getThresholdPrefix() { return 'Pins'; }
-
-  // Explicitly define for Bowling, even if they match the base defaults
-  getThresholdStart() { return this.config.thresholdStart ?? 10; }
-  getThresholdEnd() { return this.config.thresholdEnd ?? 1; }
 
   /**
    * Converts turn data into a visual mark string.
@@ -372,18 +310,7 @@ export class BowlingEngine extends ScoringEngine {
     return { turnResults: results, total, totalDisplay: this.formatTotalScore(total) };
   }
 
-  /**
-   * Generates a 1-to-10 pin mapping based on a Target (10) and Base (1) score.
-   * 
-   * @param {number} score10 The strike target.
-   * @param {number} score1 The 1-pin baseline.
-   * @param {string} scalingType 'flat' for linear, 'curved' for exponential.
-   * @returns {Object|null} Map of rank -> raw score.
-   */
-  buildRoundValues(score10, score1, scalingType) {
-    // Bowling: score10 is the anchor at rank 10, descending order (10 is the high score requirement).
-    return this.calculateInterpolatedValues(score10, score1, 10, scalingType, 'desc');
-  }
+
 
   /**
    * Standardized round options for Bowling.

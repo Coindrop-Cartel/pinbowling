@@ -3,7 +3,7 @@ import { can, PERMISSIONS } from '@services/auth.js';
 import { getSelectablePlayers, getSelectableTeams, getAutoSelectedPlayerId, getAutoSelectedTeamId, getSpectatorStatus } from '@services/playerSelector.js';
 import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActiveEventIdSilent, formatNumber, setCurrentPlayerIdSilent, getCurrentPlayerId, getActiveTeamId, setActiveTeamIdSilent, escapeHTML, getActiveEventMatchupId, getActiveTeamEventMatchupId, setActiveEventMatchupIdSilent, loadPage, getUrlParam } from '@scripts/utils.js';
 import { getScoringEngine } from '@core/engine.js';
-import { ScoringFormats } from '@services/scoringFormat.js';
+import { ScoringFormats, isHead2Head } from '@services/scoringFormat.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
 import { showDialog, showRosterOrderDialog, showRoleAssignmentDialog } from '@ui/dialogs.js';
 import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
@@ -241,10 +241,12 @@ export async function initScoresPage() {
             labelKey: 'playerName',
             placeholder: placeholderText,
             onSelect: async (val) => {
-              if (!val) {
+              if (isTeamMode) {
+                setActiveTeamIdSilent(val || '');
                 setCurrentPlayerIdSilent('');
               } else {
-                setCurrentPlayerIdSilent(val);
+                setCurrentPlayerIdSilent(val || '');
+                setActiveTeamIdSilent('');
               }
               await refreshPlayerSelection();
             }
@@ -330,11 +332,11 @@ export async function initScoresPage() {
           }
 
           if (isTeamMode) {
-            const selectedTeamId = Number(getCurrentPlayerId());
-            // Use the game-level teamEventMatchupId from the first eventMatchup
-            const gameTemId = eventMatchups?.[0]?.id
-              ? Number(eventMatchups[0].id)
-              : (round.teamEventMatchupId ? Number(round.teamEventMatchupId) : null);
+            const selectedTeamId = Number(getActiveTeamId() || getCurrentPlayerId());
+            const activeTemId = getActiveTeamEventMatchupId();
+            const gameTemId = activeTemId
+              ? Number(activeTemId)
+              : (round.teamEventMatchupId ? Number(round.teamEventMatchupId) : (eventMatchups?.[0]?.id ? Number(eventMatchups[0].id) : null));
 
             if (window.PB_DEBUG_MODE) {
               console.log('[ScoresPage] Team save:', {
@@ -381,11 +383,14 @@ export async function initScoresPage() {
           const isTeamMode = (isSessionMode() ? activeSession?.participationType : activeLeague?.participationType) === 'team';
           try {
             if (isTeamMode) {
-              allEventScores = await PB_API.teamScores.get(Number(getActiveEventId()));
+              const activeMatchupId = getActiveTeamEventMatchupId();
+              allEventScores = activeMatchupId
+                ? await PB_API.teamScores.get({ teamEventMatchupId: Number(activeMatchupId) })
+                : await PB_API.teamScores.get({ eventId: Number(getActiveEventId()) });
             } else if (getActiveEventMatchupId()) {
-              allEventScores = await PB_API.scores.get(null, null, null, Number(getActiveEventMatchupId()));
+              allEventScores = await PB_API.scores.get({ eventMatchupId: Number(getActiveEventMatchupId()) });
             } else {
-              allEventScores = await PB_API.scores.get(null, Number(getActiveEventId()));
+              allEventScores = await PB_API.scores.get({ eventId: Number(getActiveEventId()) });
             }
           } catch (e) {
             console.warn('[ScoresPage] Failed to refresh allEventScores after save:', e);
@@ -404,7 +409,7 @@ export async function initScoresPage() {
     rows.forEach((row, index) => {
       const isLastRound = (index === rows.length - 1);
       if (isLastRound) {
-        const branding = FormatBranding.get(activeFormat);
+        const branding = Engine?.getBranding ? Engine.getBranding() : FormatBranding.get(activeFormat);
         const lfHint = branding.lastFrameHint;
         if (lfHint) {
           const hintDiv = document.createElement('div');
@@ -434,7 +439,7 @@ export async function initScoresPage() {
       // Populate selectablePlayers before auto-select so team lookup works
       await renderPlayerSelect();
 
-      let activeTeamId = getCurrentPlayerId();
+      let activeTeamId = getActiveTeamId() || getCurrentPlayerId();
 
       // Auto-select the team the current user belongs to
       const autoTeamId = getAutoSelectedTeamId({
@@ -445,7 +450,7 @@ export async function initScoresPage() {
 
       if (autoTeamId && autoTeamId !== activeTeamId) {
         activeTeamId = autoTeamId;
-        setCurrentPlayerIdSilent(activeTeamId);
+        setActiveTeamIdSilent(activeTeamId);
         if (playerSelect) playerSelect.value = activeTeamId;
         const search = document.getElementById('player-search');
         const teamEntry = selectablePlayers.find(p => String(p.id) === activeTeamId);
@@ -468,8 +473,11 @@ export async function initScoresPage() {
 
       const loader = skipSkeleton ? null : createSkeletonLoader(roundsInput, { count: 5 });
       try {
-        // Fetch all scores for this event (event-wide across all half-innings in Team mode)
-        const scores = await PB_API.teamScores.get(Number(getActiveEventId()));
+        // Fetch scores for this specific matchup (or event if no matchup) in Team mode
+        const activeMatchupId = getActiveTeamEventMatchupId();
+        const scores = activeMatchupId
+          ? await PB_API.teamScores.get({ teamEventMatchupId: Number(activeMatchupId) })
+          : await PB_API.teamScores.get({ eventId: Number(getActiveEventId()) });
         allEventScores = scores;
 
         // Pass the team as a pseudo-player so loadScoresIntoForm can render rows
@@ -499,22 +507,46 @@ export async function initScoresPage() {
           teamBar.style.cssText = 'background: #e3f2fd; border: 1px solid #90caf9; border-radius: 6px;';
           scoringCard.insertBefore(teamBar, scoringCard.firstChild);
         }
+        // Check Team Setup permission: TD/Admin, active team member, or logged-in user when team has unregistered members
+        const isLoggedIn = !!currentUser;
+        const isTDOrAdmin = isLoggedIn && (currentUser?.role === 'admin' || currentUser?.role === 'td');
+        const teamMembers = selectedTeam.members || [];
+        const isTeamMember = isLoggedIn && teamMembers.some(m => String(m.id) === String(currentUser?.player_id));
+        const hasUnregisteredMembers = isLoggedIn && teamMembers.some(m => !m.userId);
+        const canManageTeamSetup = isTDOrAdmin || isTeamMember || hasUnregisteredMembers;
+
+        let lockReason = '';
+        if (teamHasScores) {
+          lockReason = '🔒 Locked (Scores Entered)';
+        } else if (!isLoggedIn) {
+          lockReason = '🔒 Locked (Login Required)';
+        } else if (!canManageTeamSetup) {
+          lockReason = '🔒 Locked (Spectator Mode)';
+        }
+
+        const isSetupDisabled = teamHasScores || !canManageTeamSetup;
+
         const setupActions = Engine?.getTeamSetupActions ? Engine.getTeamSetupActions() : [];
-        const actionsHtml = setupActions.map(act => `
-          <button type="button" id="btn-${act.id}" class="btn-row secondary" ${teamHasScores ? 'disabled title="' + escapeHTML(act.label) + ' is locked because scores have been entered for this team."' : ''}>${escapeHTML(act.label)}</button>
-        `).join('');
+        const actionsHtml = setupActions.map(act => {
+          let disabledReason = '';
+          if (teamHasScores) disabledReason = `${act.label} is locked because scores have been entered for this team.`;
+          else if (!isLoggedIn) disabledReason = `Login required to configure ${act.label}.`;
+          else if (!canManageTeamSetup) disabledReason = `Only team members or TDs can configure ${act.label}.`;
+
+          return `<button type="button" id="btn-${act.id}" class="btn-row secondary" ${isSetupDisabled ? 'disabled title="' + escapeHTML(disabledReason) + '"' : ''}>${escapeHTML(act.label)}</button>`;
+        }).join('');
 
         teamBar.innerHTML = `
           <div>
             <strong style="color: #1565c0;">Team Setup: ${escapeHTML(selectedTeam.name)}</strong>
-            ${teamHasScores ? '<span class="ml-8" style="font-size: 0.85em; color: #c62828; font-weight: bold;">🔒 Locked (Scores Entered)</span>' : ''}
+            ${lockReason ? `<span class="ml-8" style="font-size: 0.85em; color: #c62828; font-weight: bold;">${lockReason}</span>` : ''}
           </div>
           <div class="flex gap-8">
             ${actionsHtml}
           </div>
         `;
 
-        if (!teamHasScores) {
+        if (!isSetupDisabled) {
           setupActions.forEach(act => {
             const btn = teamBar.querySelector(`#btn-${act.id}`);
             if (!btn) return;
@@ -597,9 +629,10 @@ export async function initScoresPage() {
 
     const loader = createSkeletonLoader(roundsInput, { count: 5 });
     try {
-      const scores = activeEventMatchupId 
-        ? await PB_API.scores.get(Number(activePlayerId), null, null, Number(activeEventMatchupId))
-        : await PB_API.scores.get(Number(activePlayerId), Number(getActiveEventId()));
+      const activeMatchupId = activeEventMatchupId || getActiveEventMatchupId();
+      const scores = activeMatchupId 
+        ? await PB_API.scores.get({ playerId: Number(activePlayerId), eventMatchupId: Number(activeMatchupId) })
+        : await PB_API.scores.get({ playerId: Number(activePlayerId), eventId: Number(getActiveEventId()) });
       await loadScoresIntoForm(scores, player);
 
       const isTD = await can(PERMISSIONS.UPDATE_ANY_SCORE);
@@ -625,7 +658,8 @@ export async function initScoresPage() {
           { text: 'Change', onclick: handlePlayerChange }
         ]);
         
-        const matchup = eventMatchups[0];
+        const activeMatchupIdVal = activeEventMatchupId || getActiveTeamEventMatchupId() || getActiveEventMatchupId();
+        const matchup = eventMatchups.find(m => String(m.id) === String(activeMatchupIdVal)) || eventMatchups[0];
         const isTeamMode = activeLeague?.participationType === 'team';
         const awayName = isTeamMode ? (matchup?.team2Name || 'BYE') : (matchup?.player2Name || 'BYE');
         const homeName = isTeamMode ? (matchup?.team1Name || 'Unknown') : (matchup?.player1Name || 'Unknown');
@@ -676,9 +710,9 @@ export async function initScoresPage() {
    */
   function getEngineContext() {
     const isTeamMode = (isSessionMode() ? activeSession?.participationType : activeLeague?.participationType) === 'team';
-    const activeId = isTeamMode ? getActiveTeamId() : getCurrentPlayerId();
+    const activeParticipantId = isTeamMode ? (getActiveTeamId() || getCurrentPlayerId()) : getCurrentPlayerId();
     const teamsPool = isSessionMode() ? (activeSession?.teams || []) : (activeLeague?.teams || []);
-    const selectedTeam = isTeamMode ? teamsPool.find(t => String(t.id) === String(activeId)) : null;
+    const selectedTeam = isTeamMode ? teamsPool.find(t => String(t.id) === String(activeParticipantId)) : null;
     const selectedTeamIdStr = selectedTeam ? String(selectedTeam.id) : null;
 
     const teamRosterOrder = selectedTeamIdStr && rosterOrdersByTeam[selectedTeamIdStr]
@@ -692,6 +726,7 @@ export async function initScoresPage() {
     const isTDOrAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'td');
 
     return {
+      activeParticipantId,
       allEventScores,
       eventMatchups,
       allPlayersCache,
@@ -827,9 +862,11 @@ export async function initScoresPage() {
     }
 
     // Fetch leagues, machine targets, and master machines in parallel. User is already fetched at init.
+    // For H2H matchups, scope the target scores to the specific matchup (not the whole event)
+    const matchupRefId = activeTeamEventMatchupId || activeEventMatchupId || 0;
     const [leagues, eventTargets, allMasterMachines] = await Promise.all([
       PB_API.leagues.getAll(),
-      PB_API.machines.getTargets(eventId),
+      PB_API.machines.getTargets(eventId, null, null, matchupRefId ? Number(matchupRefId) : 0),
       PB_API.machines?.getAll ? PB_API.machines.getAll().catch(() => []) : Promise.resolve([])
     ]);
     allLeaguesCache = leagues; // Update the cache with fresh data
@@ -893,16 +930,17 @@ export async function initScoresPage() {
     const requiredData = Engine.getRequiredEventData(eventId, PB_API) || {};
     const isTeamMode = (isSessionMode() ? activeSession?.participationType : league?.participationType) === 'team';
     if (activeEventMatchupId || activeTeamEventMatchupId || isTeamMode) {
+      const matchupId = activeTeamEventMatchupId || getActiveTeamEventMatchupId();
       if (isTeamMode) {
-        if (activeTeamEventMatchupId) {
-          requiredData.eventMatchups = PB_API.teamMatchups.get(null, Number(activeTeamEventMatchupId)).then(m => m ? [m] : []).catch(() => []);
-          requiredData.allEventScores = PB_API.teamScores.get(null, Number(activeTeamEventMatchupId)).catch(() => []);
+        if (matchupId) {
+          requiredData.eventMatchups = PB_API.teamMatchups.get(null, Number(matchupId)).then(m => Array.isArray(m) ? m : (m ? [m] : [])).catch(() => []);
+          requiredData.allEventScores = PB_API.teamScores.get(null, Number(matchupId)).catch(() => []);
         } else {
           requiredData.eventMatchups = PB_API.teamMatchups.get(eventId).catch(() => []);
           requiredData.allEventScores = PB_API.teamScores.get(eventId).catch(() => []);
         }
       } else if (activeEventMatchupId) {
-        requiredData.eventMatchups = PB_API.matchups.get(null, Number(activeEventMatchupId)).then(m => [m]);
+        requiredData.eventMatchups = PB_API.matchups.get(null, Number(activeEventMatchupId)).then(m => Array.isArray(m) ? m : (m ? [m] : []));
         requiredData.allEventScores = PB_API.scores.get(null, null, null, Number(activeEventMatchupId));
       }
     }
@@ -954,7 +992,7 @@ export async function initScoresPage() {
         });
         if (autoTeamId) {
           currentId = autoTeamId;
-          setCurrentPlayerIdSilent(currentId);
+          setActiveTeamIdSilent(currentId);
         }
       }
 
@@ -1003,8 +1041,9 @@ export async function initScoresPage() {
         });
       }
     } else if (activeEventMatchupId && eventMatchups.length > 0) {
-        // Individual mode: use first matchup's entries
-        const matchupDetails = eventMatchups[0];
+        // Individual mode: find matching active matchup
+        const activeMatchupIdVal = activeEventMatchupId || getActiveEventMatchupId();
+        const matchupDetails = eventMatchups.find(m => String(m.id) === String(activeMatchupIdVal)) || eventMatchups[0];
         machinesNormalized = (matchupDetails.entries || []).map((entry, i) => {
           const sequentialOrderNumber = i + 1;
           const { value1, value2, values: rawValues } = resolveTargetVal(entry, sequentialOrderNumber);
@@ -1029,7 +1068,8 @@ export async function initScoresPage() {
     activeEvent = event;
 
     if ((activeEventMatchupId || activeTeamEventMatchupId) && eventMatchups.length > 0) {
-      const matchup = eventMatchups[0];
+      const activeMatchupIdVal = activeTeamEventMatchupId || activeEventMatchupId || getActiveTeamEventMatchupId() || getActiveEventMatchupId();
+      const matchup = eventMatchups.find(m => String(m.id) === String(activeMatchupIdVal)) || eventMatchups[0];
       const sessionLabel = isSessionMode() ? '' : `<div class="meta-strong">League: ${escapeHTML(league?.name || 'Unknown')}</div>`;
       summaryTitle = `
         ${sessionLabel}
@@ -1046,7 +1086,7 @@ export async function initScoresPage() {
     updateTournamentSummary();
 
     applyPreferredTheme(format);
-    const branding = FormatBranding.get(format);
+    const branding = Engine?.getBranding ? Engine.getBranding() : FormatBranding.get(format);
 
     // Update the scoring section title using the Engine's specific terminology (Frame vs Hole)
     const scoringHeader = scoringCard.querySelector('h2');
@@ -1062,10 +1102,10 @@ export async function initScoresPage() {
 
     machines = machinesNormalized;
 
-    const isH2H = !isSessionMode() && league?.competitionFormat === 'head2head';
+    const isH2H = !isSessionMode() && isHead2Head(league?.competitionFormat);
     const scheduleContainer = document.getElementById('matchups-schedule-container');
     
-    if (isH2H && !activeEventMatchupId) {
+    if (isH2H && !activeEventMatchupId && !activeTeamEventMatchupId) {
       playerSelectionCard.classList.add('hidden');
       scoringCard.classList.add('hidden');
       resultsCard.classList.add('hidden');
@@ -1080,7 +1120,10 @@ export async function initScoresPage() {
           onPlayMatchup: (matchupId, evId) => {
             setActiveLeagueIdSilent(league.id);
             setActiveEventIdSilent(evId);
-            const navParams = { eventId: evId, eventMatchupId: matchupId, leagueId: league.id };
+            const isTeamMode = league?.participationType === 'team';
+            const navParams = isTeamMode
+              ? { eventId: evId, teamEventMatchupId: matchupId, leagueId: league.id }
+              : { eventId: evId, eventMatchupId: matchupId, leagueId: league.id };
             loadPage(ROUTE_PATHS.SCORES(navParams));
           },
           isAdmin,
@@ -1091,7 +1134,10 @@ export async function initScoresPage() {
               isTeam: isTeamMode,
               format,
               onSaved: () => {
-                loadPage(ROUTE_PATHS.SCORES({ leagueId: league.id, eventId: evId }));
+                const navParams = isTeamMode
+                  ? { leagueId: league.id, eventId: evId, teamEventMatchupId: matchupId }
+                  : { leagueId: league.id, eventId: evId, eventMatchupId: matchupId };
+                loadPage(ROUTE_PATHS.SCORES(navParams));
               }
             });
           } : undefined

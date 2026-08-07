@@ -165,10 +165,8 @@ class ScoreService
 
         $stmt->execute([$eventId, $eventMatchupId, $playerId, $machineId, $orderNumber, $ball1, $ball2, $ball3]);
 
-        error_log("[PinBowling DEBUG] ScoreService::saveScore — INSERT id=$eventId order=$orderNumber player=$playerId machine=$machineId balls=$ball1/$ball2/$ball3 matchupId=$eventMatchupId");
 
         if ($eventMatchupId !== null) {
-            error_log("[PinBowling DEBUG] ScoreService::saveScore — calling updateMatchupTotals for matchupId=$eventMatchupId player1Score=$player1Score player2Score=$player2Score");
             $this->updateMatchupTotals($eventMatchupId, $player1Score, $player2Score);
         }
 
@@ -219,7 +217,6 @@ class ScoreService
         if ($player1Score !== null && $player2Score !== null) {
             $hasScores = ($player1Score > 0 || $player2Score > 0);
 
-            error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH A (pre-computed) matchupId=$eventMatchupId format=$format player1Score=$player1Score player2Score=$player2Score hasScores=" . ($hasScores ? 'yes' : 'no'));
 
             $status = 'pending';
             $winnerId = null;
@@ -241,8 +238,8 @@ class ScoreService
                         $bottomOrderNum = ($round - 1) * 2 + 2;
 
                         $isLastRound = ($round === $roundsCount);
-                        $topPlayed = (isset($scoreMap[$player1Id][$topOrderNum]) && isset($scoreMap[$player2Id][$topOrderNum]));
-                        $bottomPlayed = (isset($scoreMap[$player1Id][$bottomOrderNum]) && isset($scoreMap[$player2Id][$bottomOrderNum]));
+                        $topPlayed = (isset($scoreMap[$player1Id][$topOrderNum]) || isset($scoreMap[$player2Id][$topOrderNum]));
+                        $bottomPlayed = (isset($scoreMap[$player1Id][$bottomOrderNum]) || isset($scoreMap[$player2Id][$bottomOrderNum]));
 
                         if ($isLastRound && $topPlayed && !$bottomPlayed && $player1Score > $player2Score) {
                             $isWalkoff = true;
@@ -279,7 +276,6 @@ class ScoreService
                     }
                 }
 
-                error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH A results: format=$format status=$status winnerId=$winnerId");
             }
 
             $stmt = $pdo->prepare(
@@ -289,7 +285,6 @@ class ScoreService
             );
             $stmt->execute([$player1Score, $player2Score, $winnerId, $status, $eventMatchupId]);
 
-            error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH A executed UPDATE event_matchups SET player1_score=$player1Score player2_score=$player2Score winner=$winnerId status=$status WHERE id=$eventMatchupId");
 
             if ($status === 'completed') {
                 $this->playoffService->handlePlayoffAdvancement($eventMatchupId);
@@ -299,29 +294,32 @@ class ScoreService
 
         // Fallback: server-side calculation when no pre-computed totals provided
         if (!$player1Id || !$player2Id) {
-            error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH B aborted: missing player IDs (p1Id=$player1Id p2Id=$player2Id)");
             return;
         }
 
         $scores = $this->getMatchupScores($eventMatchupId);
 
-        error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH B (fallback) matchupId=$eventMatchupId p1Id=$player1Id p2Id=$player2Id scoresCount=" . count($scores) . " matchupRowsCount=" . count($matchupRows));
 
         $scoreMap = [];
         foreach ($scores as $s) {
             $idKey = (int) ($s['player_id'] ?? 0);
             $scoreMap[$idKey][(int) $s['order_number']] = $s;
-            error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — scoreMap[player=$idKey][order={$s['order_number']}] = ball1={$s['ball1']} ball2={$s['ball2']} ball3={$s['ball3']}");
         }
 
         $stmt = $pdo->prepare(
             'SELECT ts.*, m.machine_name 
              FROM target_scores ts 
              JOIN machines m ON ts.machine_id = m.id
-             WHERE ts.event_id = ?'
+             WHERE ts.event_id = ? AND ts.matchup_ref_id = ?'
         );
-        $stmt->execute([$matchup['event_id']]);
+        $stmt->execute([$matchup['event_id'], $eventMatchupId]);
         $machines = $stmt->fetchAll();
+
+        // Fallback: if no matchup-scoped rows exist, try legacy rows (matchup_ref_id = 0)
+        if (empty($machines)) {
+            $stmt->execute([$matchup['event_id'], 0]);
+            $machines = $stmt->fetchAll();
+        }
         $machineMap = [];
         foreach ($machines as $mac) {
             $machineMap[(int) $mac['order_number']] = $mac;
@@ -374,7 +372,6 @@ class ScoreService
             }
         }
 
-        error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH B computed: player1Score=$player1Score player2Score=$player2Score hasScores=" . ($hasScores ? 'yes' : 'no') . " isWalkoff=" . ($isWalkoff ? 'yes' : 'no') . " roundsCount=$roundsCount");
 
         $fullyPlayed = true;
         for ($round = 1; $round <= $roundsCount; $round++) {
@@ -417,7 +414,6 @@ class ScoreService
             }
         }
 
-        error_log("[PinBowling DEBUG] ScoreService::updateMatchupTotals — PATH B final: UPDATE event_matchups SET p1Score=$player1Score p2Score=$player2Score winner=$winnerId status=$status fullyPlayed=" . ($fullyPlayed ? 'yes' : 'no') . " WHERE id=$eventMatchupId");
 
         $stmt = $pdo->prepare(
             'UPDATE event_matchups 

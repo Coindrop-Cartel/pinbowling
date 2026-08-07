@@ -102,9 +102,6 @@ class LeagueService {
             );
             $temStmt->execute([$leagueId]);
             $allTems = $temStmt->fetchAll();
-            error_log("[PinBowling DEBUG] LeagueService::getLeague — leagueId=$leagueId fetched " . count($allTems) . " team_event_matchups: " . json_encode(array_map(function($t) {
-                return ['id' => $t['id'], 'eventId' => $t['event_id'], 'team1Id' => $t['team1_id'], 'team2Id' => $t['team2_id'], 'team1Score' => $t['team1_score'], 'team2Score' => $t['team2_score'], 'status' => $t['status']];
-            }, $allTems)));
             foreach ($allTems as $tem) {
                 $matchupsByEvent[(int)$tem['event_id']][] = $tem;
             }

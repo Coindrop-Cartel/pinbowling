@@ -1,6 +1,34 @@
-/* print.css - Print utility definitions, rank-cards, page breaks, and score sheet print templates */
+/* print.css - Core print layout definitions, machine score target signs, score sheets, and booklet templates */
 
-/* Core Print Layout Elements */
+/* Scope print window body styles to dedicated print popups so they do NOT pollute the main web application UI */
+body.print-window-body {
+  font-family: sans-serif;
+  padding: 10px 20px;
+  line-height: 1.1;
+  font-size: 13px;
+  background: #ffffff;
+  color: #000000;
+}
+
+.print-window-body h1,
+.print-window-body h2,
+.print-window-body h3 {
+  margin: 0;
+}
+
+/* Flex layout utility helpers for print windows */
+.print-window-body .flex { display: flex; }
+.print-window-body .flex-1 { flex: 1; }
+.print-window-body .flex-between { display: flex; justify-content: space-between; }
+.print-window-body .gap-15 { gap: 15px; }
+.print-window-body .muted { opacity: 0.7; }
+.print-window-body .small { font-size: 0.75rem; }
+.print-window-body .text-right { text-align: right; }
+.print-window-body .text-center { text-align: center; }
+.print-window-body .align-center { align-items: center; }
+.print-window-body .ml-15 { margin-left: 15px; }
+
+/* Machine Target Sign Print Layout (printMachineScores) */
 .print-page {
   height: 100vh;
   display: flex;
@@ -74,7 +102,6 @@
   white-space: nowrap;
 }
 
-/* Print Helpers */
 .print-extra-targets {
   margin-top: 40px;
   font-size: 2.2rem;
@@ -84,32 +111,106 @@
   width: 100%;
 }
 
-.print-block {
-  border: 2px solid #000;
+/* Score Sheet Print Blocks & Layout (printScoreSheet / printBlankScoreSheet) */
+.print-meta {
+  border-bottom: 2px solid #000;
   margin-bottom: 8px;
-  padding: 8px 12px;
+  padding-bottom: 4px;
+}
+
+.print-block {
+  border: 1px solid #ccc;
+  padding: 5px 10px;
+  margin-bottom: 4px;
+  border-radius: 4px;
   page-break-inside: avoid;
 }
 
-.ml-15 {
-  margin-left: 15px;
+.print-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+  padding-bottom: 3px;
+  border-bottom: 1px dashed #eee;
+}
+
+.targets-summary span {
+  font-size: 0.85rem;
 }
 
 .score-line {
-  border-bottom: 1px solid #000;
-  height: 20px;
+  border-bottom: 1.5pt solid #000;
+  height: 1.3em;
+  margin-top: 2px;
 }
 
-.print-meta {
-  border-bottom: 2px solid #000;
-  margin-bottom: 12px;
-  padding-bottom: 6px;
+.filled-score {
+  display: flex;
+  align-items: flex-end;
+  padding-left: 5px;
+  font-weight: bold;
+  font-size: 1.1rem;
 }
 
-/* Print-specific layout parameters */
+.threshold-row { margin: 2px 0; }
 .print-mb-4 { margin-bottom: 4px; }
 .print-mb-5 { margin-bottom: 5px; }
 .print-mt-0 { margin: 0; }
 .print-font-lg { font-size: 1.2rem; }
 .print-instructions { font-size: 0.9rem; line-height: 1.4; }
-.print-hint-italic { margin-bottom: 4px; font-style: italic; }
+.print-hint-italic { margin-bottom: 3px; font-style: italic; }
+.page-break { page-break-before: always; }
+
+/* Threshold Score Grid (Compact 1-Line Layout) */
+.thresholds-section {
+  padding: 3px 0;
+  font-size: 0.72rem;
+  border-bottom: 1px dashed #ccc;
+  margin-bottom: 4px;
+}
+
+.thresholds-section .threshold-grid-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thresholds-section .threshold-prefix {
+  font-weight: bold;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.thresholds-section .threshold-grid {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px 8px;
+}
+
+.thresholds-section .threshold-grid .threshold-row {
+  margin: 0;
+  white-space: nowrap;
+  font-size: 0.72rem;
+}
+
+/* Results Formatting & Standings Tables */
+.results-page { padding: 10px 0; }
+.results-content { margin-top: 15px; }
+
+/* Baseball Scoreboard Grid */
+.scoreboard-grid { display: table; width: 100%; border-collapse: collapse; font-size: 0.9em; margin-top: 15px; }
+.scoreboard-row { display: table-row; }
+.scoreboard-row.header { font-weight: bold; background: #0a2d48; color: #ffffff; }
+.scoreboard-row.header > span, .scoreboard-row.player-row > span { display: table-cell; padding: 8px 10px; text-align: center; border: 1px solid #ccc; }
+.scoreboard-row.player-row.top-row { background: #ffffff; }
+.scoreboard-row.player-row.bot-row { background: #f2f2f2; font-size: 0.85em; }
+.scoreboard-row .player-name.half-label { font-weight: 400; font-size: 0.8em; padding-left: 1.5em; color: #666; }
+.scoreboard-row .player-col { text-align: left; }
+.scoreboard-row .player-name { text-align: left; font-weight: 600; white-space: nowrap; }
+.scoreboard-row .round-header { min-width: 48px; font-size: 0.8em; }
+.scoreboard-row .round-score { min-width: 36px; }
+.scoreboard-row .total-header, .scoreboard-row .total-score { font-weight: bold; min-width: 48px; border-left: 2px solid #0a2d48; }
+.home-away-label { font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.3em; }
+.away-label { color: #0a2d48; font-weight: 700; text-transform: uppercase; font-size: 0.85em; }
+.home-label { color: #0a2d48; font-weight: 700; text-transform: uppercase; font-size: 0.85em; }

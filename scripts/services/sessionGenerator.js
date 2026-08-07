@@ -3,6 +3,7 @@
  */
 
 import { getTargetScoreForDifficulty as resolveTarget } from './targetResolver.js';
+import { ScoringFormats } from './scoringFormat.js';
 
 /**
  * Build a session name from optional custom name, location, date, and time.
@@ -26,10 +27,24 @@ export function generateSessionName(rawName, locationName, date, time) {
  * @returns {Array} Selected machines (may contain duplicates if pool < count)
  */
 export function selectRandomMachines(machines, count) {
-    const shuffled = [...machines].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, count);
+    if (!machines || machines.length === 0 || count <= 0) return [];
+
+    const shuffle = (arr) => {
+        const pool = [...arr];
+        for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        return pool;
+    };
+
+    const selected = [];
     while (selected.length < count) {
-        selected.push(machines[Math.floor(Math.random() * machines.length)]);
+        const pass = shuffle(machines);
+        for (const m of pass) {
+            selected.push(m);
+            if (selected.length >= count) break;
+        }
     }
     return selected;
 }
@@ -46,7 +61,7 @@ export function selectRandomMachines(machines, count) {
  * @returns {number} Resolved target score
  */
 export function getTargetScoreForDifficulty(machine, param2 = 'med', param3 = 'bowling') {
-    const isParam2Format = ['bowling', 'golf', 'baseball'].includes(String(param2).toLowerCase());
+    const isParam2Format = ScoringFormats.isValid(param2);
     const format = isParam2Format ? param2 : param3;
     const difficulty = isParam2Format ? param3 : param2;
     return resolveTarget(machine, format, difficulty);

@@ -37,11 +37,11 @@ export async function finalizeSession(options) {
   const newSession = await PB_API.sessions.create({
     name: eventName,
     scoringFormat: currentSessionFormat,
-    competitionFormat: engine?.getDefaultCompetitionFormat?.() || (currentSessionFormat === 'baseball' ? 'head2head' : 'group'),
+    competitionFormat: engine?.getDefaultCompetitionFormat?.() ?? 'group',
     participationType,
     teamSize: 1,
-    roundsPerGame: engine?.getDefaultRoundsPerGame?.(generatedFrames.length) ?? (currentSessionFormat === 'baseball' ? Math.ceil(generatedFrames.length / 2) : 2),
-    matchupsPerRound: engine?.getDefaultMatchupsPerRound?.() ?? (currentSessionFormat === 'baseball' ? 2 : null),
+    roundsPerGame: engine?.getDefaultRoundsPerGame?.(generatedFrames.length) ?? 2,
+    matchupsPerRound: engine?.getDefaultMatchupsPerRound?.() ?? null,
     locationId: locId,
     eventName,
     eventDate: now.toISOString().split('T')[0]

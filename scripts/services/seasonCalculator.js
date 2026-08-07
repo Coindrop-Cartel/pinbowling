@@ -9,103 +9,7 @@ import {
 } from '@services/normalizer.js';
 import { getPlayerAssignmentStrategy } from '../core/PlayerAssignmentStrategy.js';
 import { getCompetitionFormatStrategy } from '../core/CompetitionFormatStrategy.js';
-
-/**
- * Calculate head-to-head win/loss records for matchup-based formats.
- * For each matchup, compares the total runs scored by each player to determine the winner.
- *
- * @param {Object[]} players - Array of player objects (each with `id`).
- * @param {Object[]} events - Array of event objects (each with `id`).
- * @param {Object<number, Object[]>} matchupsByEvent - Matchups keyed by event ID.
- * @param {Object<number, Object<number, Object[]>>} scoresByEventAndPlayer
- *   Nested map of `{ [eventId]: { [playerId]: score[] } }`.
- * @param {Object<number, Object[]>} targetsByEvent - Map of `{ [eventId]: target[] }`.
- * @param {Object} engine - ScoringEngine instance with `calculateTurnResults` and `compareScores`.
- * @returns {Object<number, {wins: number, losses: number, ties: number, winRate: number}>}
- *   Map of playerId to their W-L record and win rate.
- */
-export function calculateHead2HeadRecords(players, events, matchupsByEvent, scoresByEventAndPlayer, targetsByEvent, engine) {
-  const records = {};
-  players.forEach(p => { 
-    records[p.id] = { 
-      wins: 0, 
-      losses: 0, 
-      ties: 0, 
-      winRate: 0,
-      runDiff: 0,
-      totalRuns: 0,
-      headToHead: {}
-    }; 
-  });
-
-  events.forEach(event => {
-    const matchups = matchupsByEvent[event.id] || [];
-    matchups.forEach(m => {
-      if (m.status !== 'completed') return;
-
-      const p1Id = Number(m.team1Id ?? m.player1Id);
-      const p2Id = Number(m.team2Id ?? m.player2Id);
-
-      // If it's a bye week, ignore for records calculation
-      if (!p1Id || !p2Id) return;
-
-      const r1 = Number(m.team1Score ?? m.player1Score ?? 0);
-      const r2 = Number(m.team2Score ?? m.player2Score ?? 0);
-
-      if (records[p1Id]) {
-        records[p1Id].totalRuns += r1;
-        records[p1Id].runDiff += (r1 - r2);
-      }
-      if (records[p2Id]) {
-        records[p2Id].totalRuns += r2;
-        records[p2Id].runDiff += (r2 - r1);
-      }
-
-      if (r1 > r2) {
-        if (records[p1Id]) {
-          records[p1Id].wins++;
-          records[p1Id].headToHead[p2Id] = records[p1Id].headToHead[p2Id] || { wins: 0, losses: 0, ties: 0 };
-          records[p1Id].headToHead[p2Id].wins++;
-        }
-        if (records[p2Id]) {
-          records[p2Id].losses++;
-          records[p2Id].headToHead[p1Id] = records[p2Id].headToHead[p1Id] || { wins: 0, losses: 0, ties: 0 };
-          records[p2Id].headToHead[p1Id].losses++;
-        }
-      } else if (r2 > r1) {
-        if (records[p1Id]) {
-          records[p1Id].losses++;
-          records[p1Id].headToHead[p2Id] = records[p1Id].headToHead[p2Id] || { wins: 0, losses: 0, ties: 0 };
-          records[p1Id].headToHead[p2Id].losses++;
-        }
-        if (records[p2Id]) {
-          records[p2Id].wins++;
-          records[p2Id].headToHead[p1Id] = records[p2Id].headToHead[p1Id] || { wins: 0, losses: 0, ties: 0 };
-          records[p2Id].headToHead[p1Id].wins++;
-        }
-      } else {
-        if (records[p1Id]) {
-          records[p1Id].ties++;
-          records[p1Id].headToHead[p2Id] = records[p1Id].headToHead[p2Id] || { wins: 0, losses: 0, ties: 0 };
-          records[p1Id].headToHead[p2Id].ties++;
-        }
-        if (records[p2Id]) {
-          records[p2Id].ties++;
-          records[p2Id].headToHead[p1Id] = records[p2Id].headToHead[p1Id] || { wins: 0, losses: 0, ties: 0 };
-          records[p2Id].headToHead[p1Id].ties++;
-        }
-      }
-    });
-  });
-
-  // Calculate win rate
-  Object.values(records).forEach(r => {
-    const total = r.wins + r.losses + r.ties;
-    r.winRate = total > 0 ? (r.wins + r.ties * 0.5) / total : 0;
-  });
-
-  return records;
-}
+import { isHead2Head } from './scoringFormat.js';
 
 /**
  * Calculates season summary rows for a league.
@@ -129,7 +33,7 @@ export function calculateHead2HeadRecords(players, events, matchupsByEvent, scor
  */
 export function calculateSeasonSummary({ league, players, events, targetsByEvent, scoresByEventAndPlayer, matchupsByEvent = {}, engine, selectedPlayerIds = [] }) {
   const isTeamLeague = league?.participationType === 'team';
-  const isH2H = league?.competitionFormat === 'head_to_head' || league?.competitionFormat === 'head2head' || !!engine.getMatchupDescription(1);
+  const isH2H = isHead2Head(league?.competitionFormat) || engine?.requiresHeadToHead?.() === true;
 
   // Use engine's strategies if available, otherwise fall back to standalone strategies
   const assignmentStrategy = engine.calculateEntityEventScore
@@ -137,7 +41,7 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
     : getPlayerAssignmentStrategy(league?.participationType);
   const competitionStrategy = engine.getCompetitionStrategy
     ? null  // engine delegates internally
-    : getCompetitionFormatStrategy(isH2H ? 'head_to_head' : (league?.competitionFormat || 'group'));
+    : getCompetitionFormatStrategy(isH2H ? 'head2head' : (league?.competitionFormat || 'group'));
 
   // Helper to calculate entity score (engine method or standalone strategy)
   const calcEntityScore = (entity, eventTargets, playerScores, opts) => {
@@ -210,10 +114,26 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
   const normalizedTargetsFlat = Object.values(targetsByEvent).flat();
   const entityEventTotals = {};
 
+  // Pre-build per-event entity-to-matchup lookup map for O(1) access if H2H
+  const entityMatchupMapByEvent = {};
+  if (isH2H) {
+    events.forEach(e => {
+      const map = {};
+      const eventMatchups = matchupsByEvent[e.id] || [];
+      eventMatchups.forEach(m => {
+        const e1 = isTeamLeague ? Number(m.team1Id ?? m.team1_id) : Number(m.player1Id ?? m.player1_id);
+        const e2 = isTeamLeague ? Number(m.team2Id ?? m.team2_id) : Number(m.player2Id ?? m.player2_id);
+        if (e1) map[e1] = m;
+        if (e2) map[e2] = m;
+      });
+      entityMatchupMapByEvent[e.id] = map;
+    });
+  }
+
   const rows = entitiesToMap.map(entity => {
-    let totalSeasonPoints = 0;
     const eventTotals = {};
     const individualScores = [];
+    let totalSeasonPoints = 0;
 
     events.forEach(event => {
       const eventTargets = targetsByEvent[event.id] || [];
@@ -232,40 +152,42 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
         hasData = result.hasData;
       }
 
+      const entityMatchup = isH2H ? entityMatchupMapByEvent[event.id]?.[entity.id] : null;
+
+      if (entityMatchup && entityMatchup.status === 'completed') {
+        hasData = true;
+      }
+
       if (!entityEventTotals[event.id]) entityEventTotals[event.id] = {};
       entityEventTotals[event.id][entity.id] = scoreValue;
 
       if (hasData) {
         let displayValue;
         if (isH2H) {
-          const eventMatchups = matchupsByEvent[event.id] || [];
-          const isTeamMode = league?.participationType === 'team';
-          const entityMatchup = eventMatchups.find(m => {
-            if (m.status !== 'completed') return false;
-            const e1 = isTeamMode
-              ? Number(m.team1Id)
-              : Number(m.player1Id);
-            const e2 = isTeamMode
-              ? Number(m.team2Id)
-              : Number(m.player2Id);
-            return e1 === entity.id || e2 === entity.id;
-          });
-
           if (entityMatchup) {
-            const r1 = isTeamMode
-              ? Number(entityMatchup.team1Score ?? 0)
-              : Number(entityMatchup.player1Score ?? 0);
-            const r2 = isTeamMode
-              ? Number(entityMatchup.team2Score ?? 0)
-              : Number(entityMatchup.player2Score ?? 0);
-            const e1 = isTeamMode
-              ? Number(entityMatchup.team1Id)
-              : Number(entityMatchup.player1Id);
-            const isEntity1 = e1 === entity.id;
-            const scoreA = isEntity1 ? r1 : r2;
-            const scoreB = isEntity1 ? r2 : r1;
-            const cmp = engine.compareScores(scoreA, scoreB);
-            displayValue = cmp < 0 ? 'Win' : (cmp > 0 ? 'Loss' : 'Tie');
+            const e1 = isTeamLeague
+              ? Number(entityMatchup.team1Id ?? entityMatchup.team1_id)
+              : Number(entityMatchup.player1Id ?? entityMatchup.player1_id);
+            const e2 = isTeamLeague
+              ? Number(entityMatchup.team2Id ?? entityMatchup.team2_id)
+              : Number(entityMatchup.player2Id ?? entityMatchup.player2_id);
+
+            if (!e1 || !e2) {
+              displayValue = 'BYE';
+            } else {
+              const r1 = isTeamLeague
+                ? Number(entityMatchup.team1Score ?? entityMatchup.team1_score ?? 0)
+                : Number(entityMatchup.player1Score ?? entityMatchup.player1_score ?? 0);
+              const r2 = isTeamLeague
+                ? Number(entityMatchup.team2Score ?? entityMatchup.team2_score ?? 0)
+                : Number(entityMatchup.player2Score ?? entityMatchup.player2_score ?? 0);
+              const isEntity1 = e1 === entity.id;
+              const scoreA = isEntity1 ? r1 : r2;
+              const scoreB = isEntity1 ? r2 : r1;
+              const cmp = engine.compareScores(scoreA, scoreB);
+
+              displayValue = cmp < 0 ? 'W' : (cmp > 0 ? 'L' : 'T');
+            }
           } else {
             displayValue = '-';
           }
@@ -328,7 +250,7 @@ export function calculateSeasonSummary({ league, players, events, targetsByEvent
 
   // Sort standings via engine (which delegates to competition strategy, or use standalone)
   const sortedRows = engine.sortStandings
-    ? engine.sortStandings(rows, { seasonScoring: league?.seasonScoring })
+    ? engine.sortStandings(rows, { seasonScoring: league?.seasonScoring, head2headRecordsMap: head2headRecords })
     : compStrategy.sortStandings(rows, engine, { seasonScoring: league?.seasonScoring });
 
   return { rows: sortedRows, isTeamLeague, head2headRecords };

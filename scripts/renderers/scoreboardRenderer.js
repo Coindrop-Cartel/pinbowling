@@ -122,32 +122,22 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
     let currentTotal = 0;
     for (let i = 0; i < turnResults.length; i++) {
       const turn = turnResults[i];
-      const roundNumber = Math.floor(i / 2) + 1;
+      const roundNumber = engine?.getRoundIndexForTurn ? engine.getRoundIndexForTurn(i, machines) : (i + 1);
       const roundKey = String(roundNumber);
       if (!roundScores[roundKey]) roundScores[roundKey] = {};
 
-      if (turn.isWalkOff) {
-        if (turn.isBatter || roundScores[roundKey][playerIdNum] === undefined) {
-          roundScores[roundKey][playerIdNum] = 'X';
-        }
-      } else if (turn.played) {
+      if (turn.played) {
         currentTotal += turn.score;
-        if (turn.isBatter) {
-          roundScores[roundKey][playerIdNum] = String(turn.score);
-        } else if (roundScores[roundKey][playerIdNum] === undefined) {
-          roundScores[roundKey][playerIdNum] = '0';
-        }
-      } else {
-        if (roundScores[roundKey][playerIdNum] === undefined) {
-          roundScores[roundKey][playerIdNum] = '-';
-        }
       }
+      const existingScore = roundScores[roundKey][playerIdNum];
+      roundScores[roundKey][playerIdNum] = engine?.formatMatchupScore ? engine.formatMatchupScore(turn, existingScore) : (turn.played ? String(turn.score) : '-');
     }
     playerTotalScores[playerIdNum] = currentTotal;
   });
 
   const roundGroups = [];
-  const totalRounds = Math.ceil(machines.length / 2);
+  const maxTurnIndex = Math.max(0, machines.length - 1);
+  const totalRounds = engine?.getRoundIndexForTurn ? engine.getRoundIndexForTurn(maxTurnIndex, machines) : machines.length;
   for (let i = 1; i <= totalRounds; i++) {
     roundGroups.push({ roundNumber: i });
   }

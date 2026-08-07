@@ -173,17 +173,35 @@ class MachineService {
     }
 
     /**
-     * Get target scores for an event.
+     * Get target scores for an event, optionally scoped to a specific matchup.
      *
      * @param int $eventId
+     * @param int $matchupRefId  Optional matchup ref ID to scope to a specific H2H matchup.
      * @return array
      */
-    public function getEventTargetScores(int $eventId): array {
+    public function getEventTargetScores(int $eventId, int $matchupRefId = 0): array {
+        if ($matchupRefId > 0) {
+            $stmt = $this->db->query(
+                'SELECT ts.*, m.machine_name 
+                 FROM target_scores ts 
+                 JOIN machines m ON ts.machine_id = m.id 
+                 WHERE ts.event_id = ? AND ts.matchup_ref_id = ?
+                 ORDER BY ts.order_number ASC',
+                [$eventId, $matchupRefId]
+            );
+            $rows = $stmt->fetchAll();
+
+            // Fallback: if no matchup-scoped rows, try legacy rows (matchup_ref_id = 0)
+            if (!empty($rows)) {
+                return $rows;
+            }
+        }
+
         $stmt = $this->db->query(
             'SELECT ts.*, m.machine_name 
              FROM target_scores ts 
              JOIN machines m ON ts.machine_id = m.id 
-             WHERE ts.event_id = ? 
+             WHERE ts.event_id = ? AND ts.matchup_ref_id = 0
              ORDER BY ts.order_number ASC',
             [$eventId]
         );
@@ -214,9 +232,10 @@ class MachineService {
      *
      * @param int $eventId
      * @param array $targets Array of target score data
+     * @param int $matchupRefId  Optional matchup ref ID to scope to a specific H2H matchup.
      * @return bool
      */
-    public function saveTargetScores(int $eventId, array $targets): bool {
+    public function saveTargetScores(int $eventId, array $targets, int $matchupRefId = 0): bool {
         $pdo = $this->db;
 
         // Support a single target object or a batch array
@@ -229,10 +248,10 @@ class MachineService {
 
             $stmt = $pdo->prepare(
                 'INSERT INTO target_scores
-                    (event_id, machine_id, order_number, value1, value2,
+                    (event_id, matchup_ref_id, machine_id, order_number, value1, value2,
                      score1, score2, score3, score4, score5,
                      score6, score7, score8, score9, score10)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON DUPLICATE KEY UPDATE
                     machine_id   = VALUES(machine_id),
                     value1       = VALUES(value1),
@@ -245,9 +264,11 @@ class MachineService {
             );
 
             foreach ($targets as $target) {
+                $refId = (int)($target['matchupRefId'] ?? $matchupRefId);
                 $values = $target['values'] ?? [];
                 $stmt->execute([
                     $target['eventId']     ?? $eventId,
+                    $refId,
                     $target['machineId'],
                     $target['orderNumber'],
                     $target['value1']      ?? 0,

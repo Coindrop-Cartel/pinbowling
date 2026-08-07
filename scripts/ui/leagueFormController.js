@@ -1,5 +1,6 @@
 import { SCORING_FORMATS, getScoringEngine } from '../core/engine.js';
-import { ScoringFormats } from '../services/scoringFormat.js';
+import { ScoringFormats, isHead2Head } from '../services/scoringFormat.js';
+import { FormatBranding } from '../services/scoringFormatBranding.js';
 import { getCookie } from '../utils.js';
 import { showMultiSelectDialog, showAlert } from './dialogs.js';
 
@@ -117,7 +118,7 @@ export function createLeagueFormController(elements, options) {
   const handleSeasonScoringChange = () => {
     if (!leagueSeasonScoringInput) return;
     const isWeekly = leagueSeasonScoringInput.value === 'weekly';
-    const isH2H = leagueCompetitionInput?.value === 'head2head';
+    const isH2H = isHead2Head(leagueCompetitionInput?.value);
     if (isWeekly && !isH2H && dateRow && !dateRow.classList.contains('hidden')) {
       weeklyPointsRow?.classList.remove('hidden');
       pointSpreadRow?.classList.remove('hidden');
@@ -146,7 +147,7 @@ export function createLeagueFormController(elements, options) {
 
   const handleCompetitionChange = () => {
     if (!leagueCompetitionInput) return;
-    const isH2H = leagueCompetitionInput.value === 'head2head';
+    const isH2H = isHead2Head(leagueCompetitionInput.value);
     updateFormatOptions(isH2H);
     if (isH2H) {
       seasonScoringRow?.classList.add('hidden');
@@ -206,7 +207,7 @@ export function createLeagueFormController(elements, options) {
     if (leagueDateInput) leagueDateInput.value = league.startDate || '';
     if (leagueCompetitionInput) {
       const rawComp = league.competitionFormat || 'group';
-      leagueCompetitionInput.value = (rawComp === 'head_to_head' || rawComp === 'head2head') ? 'head2head' : rawComp;
+      leagueCompetitionInput.value = isHead2Head(rawComp) ? 'head2head' : rawComp;
     }
     if (leagueParticipantsInput) leagueParticipantsInput.value = league.participationType || 'individual';
     if (leagueSeasonScoringInput) leagueSeasonScoringInput.value = league.seasonScoring || 'weekly';
@@ -337,7 +338,7 @@ export function createLeagueFormController(elements, options) {
     createBtn.textContent = 'Saving...';
 
     if (selectedEngine?.requiresHeadToHead?.() && competitionFormat !== 'head2head' && competitionFormat !== 'head_to_head') {
-      const brandName = selectedEngine?.getBranding?.()?.brandName || 'Selected';
+      const brandName = FormatBranding.get(selectedEngine?.config?.format)?.brandName || 'Selected';
       showAlert(`${brandName} scoring format is only supported for head-to-head competitions.`);
       createBtn.disabled = false;
       createBtn.textContent = editingLeagueId ? 'Update League' : 'Save League';

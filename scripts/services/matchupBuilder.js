@@ -148,7 +148,12 @@ export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups, tea
     return { matchup: null, isPlayer1: true, isTop: true, opponentName: '', displayRoundNumber: '' };
   }
 
-  const targetMatchup = eventMatchups[0];
+  const targetMatchup = eventMatchups.find(m => {
+    const p1 = Number(m.player1Id ?? m.player1_id ?? m.team1Id ?? m.team1_id ?? 0);
+    const p2 = Number(m.player2Id ?? m.player2_id ?? m.team2Id ?? m.team2_id ?? 0);
+    const cur = Number(playerId);
+    return p1 === cur || p2 === cur;
+  }) || eventMatchups[0];
 
   let item = entries.find((m) =>
     Number(m.machineId ?? m.machine_id) === Number(roundIdentifier)

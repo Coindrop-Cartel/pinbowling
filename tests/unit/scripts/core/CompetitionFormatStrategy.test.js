@@ -74,5 +74,50 @@ describe('CompetitionFormatStrategy', () => {
       const sorted = strategy.sortStandings(rows, golfEngine);
       expect(sorted.map(r => r.entity.id)).toEqual([1, 2]);
     });
+
+    describe('isTie', () => {
+      it('returns true when two entities have identical winRate, H2H, scoreDiff, and totalScore', () => {
+        const a = {
+          entity: { id: 1 },
+          record: { winRate: 0.5, headToHead: { 2: { wins: 1, losses: 1, ties: 0 } }, scoreDiff: 5, totalScore: 20 },
+          totalSeasonPoints: 100
+        };
+        const b = {
+          entity: { id: 2 },
+          record: { winRate: 0.5, headToHead: { 1: { wins: 1, losses: 1, ties: 0 } }, scoreDiff: 5, totalScore: 20 },
+          totalSeasonPoints: 100
+        };
+
+        expect(strategy.isTie(a, b, bowlingEngine)).toBe(true);
+      });
+
+      it('returns false when winRate differs', () => {
+        const a = { entity: { id: 1 }, record: { winRate: 0.6, headToHead: {}, scoreDiff: 0, totalScore: 20 } };
+        const b = { entity: { id: 2 }, record: { winRate: 0.5, headToHead: {}, scoreDiff: 0, totalScore: 20 } };
+
+        expect(strategy.isTie(a, b, bowlingEngine)).toBe(false);
+      });
+
+      it('returns false when direct H2H wins differ', () => {
+        const a = { entity: { id: 1 }, record: { winRate: 0.5, headToHead: { 2: { wins: 2 } }, scoreDiff: 0, totalScore: 20 } };
+        const b = { entity: { id: 2 }, record: { winRate: 0.5, headToHead: { 1: { wins: 1 } }, scoreDiff: 0, totalScore: 20 } };
+
+        expect(strategy.isTie(a, b, bowlingEngine)).toBe(false);
+      });
+
+      it('returns false when scoreDiff differs', () => {
+        const a = { entity: { id: 1 }, record: { winRate: 0.5, headToHead: { 2: { wins: 1 } }, scoreDiff: 5, totalScore: 20 } };
+        const b = { entity: { id: 2 }, record: { winRate: 0.5, headToHead: { 1: { wins: 1 } }, scoreDiff: 2, totalScore: 20 } };
+
+        expect(strategy.isTie(a, b, bowlingEngine)).toBe(false);
+      });
+
+      it('returns false when totalScore differs', () => {
+        const a = { entity: { id: 1 }, record: { winRate: 0.5, headToHead: { 2: { wins: 1 } }, scoreDiff: 5, totalScore: 25 } };
+        const b = { entity: { id: 2 }, record: { winRate: 0.5, headToHead: { 1: { wins: 1 } }, scoreDiff: 5, totalScore: 20 } };
+
+        expect(strategy.isTie(a, b, bowlingEngine)).toBe(false);
+      });
+    });
   });
 });

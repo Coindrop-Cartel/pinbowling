@@ -4,6 +4,7 @@ import { PB_API } from '@services/api.js';
 import { showDialog, showConfirm, showAlert } from '@ui/dialogs.js';
 import { ROUTE_PATHS } from '@scripts/routes.js';
 import { updateLeagueHeaderStats } from '@scripts/renderers/leagueRegistryRenderer.js';
+import { isHead2Head } from '@services/scoringFormat.js';
 
 /**
  * Render the event list for a specific league card.
@@ -169,7 +170,7 @@ export function renderLeagueList(container, filteredLeagues, {
   filteredLeagues.forEach(league => {
     const shouldExpand = activeLeagueId && String(league.id) === String(activeLeagueId);
     const participantMeta = getParticipantMeta(league);
-    const isH2H = league.competitionFormat === 'head2head';
+    const isH2H = isHead2Head(league.competitionFormat);
     const isSeasonActive = isH2H && (league.status === 'active' || league.status === 'completed');
 
     let showStartPlayoffsBtn = false;

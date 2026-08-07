@@ -1063,4 +1063,33 @@ describe('BaseballEngine', () => {
 
     calculateTurnResultsSpy.mockRestore();
   });
+
+  test('getFirstPlayerRounds and enrichScoreMap handle team mode when getActiveTeamId returns empty string', () => {
+    const context = {
+      getCurrentPlayerId: () => '5',
+      getActiveTeamId: () => '',
+      activeSession: { participationType: 'team' },
+      eventMatchups: [
+        { team1Id: 5, team2Id: 8, team1Name: 'Pin Pals', team2Name: 'Opponents' }
+      ],
+      allEventScores: [],
+      normalizeScores: (s) => s,
+      groupScoresByPlayer: (s) => ({})
+    };
+
+    const machines = [
+      { orderNumber: 1, machineName: 'Machine 1' },
+      { orderNumber: 2, machineName: 'Machine 2' },
+      { orderNumber: 3, machineName: 'Machine 3' },
+      { orderNumber: 4, machineName: 'Machine 4' }
+    ];
+
+    const firstRounds = engine.getFirstPlayerRounds(machines, context);
+    expect(firstRounds.length).toBe(2);
+    expect(firstRounds.map(m => m.orderNumber)).toEqual([1, 3]);
+
+    const enriched = engine.enrichScoreMap({}, context);
+    expect(enriched.isPlayer1).toBe(true);
+    expect(enriched.isTeamMode).toBe(true);
+  });
 });

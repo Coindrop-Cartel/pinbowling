@@ -116,11 +116,12 @@ export const PB_API = {
     create: (machine) => fetchJSON('api/machine.php', { method: 'POST', body: JSON.stringify(machine) }),
     update: (id, machine) => fetchJSON(`api/machine.php?id=${id}`, { method: 'PUT', body: JSON.stringify(machine) }),
     delete: (id) => fetchJSON(`api/machine.php?id=${id}`, { method: 'DELETE' }),
-    getTargets: (eventId, leagueId, params) => 
-      fetchJSON(`api/machine.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}`, { params }),
-    saveTarget: (target) => {
+    getTargets: (eventId, leagueId, params, matchupRefId) => 
+      fetchJSON(`api/machine.php?${leagueId ? `leagueId=${leagueId}` : `eventId=${eventId}`}${matchupRefId ? `&matchupRefId=${matchupRefId}` : ''}`, { params }),
+    saveTarget: (target, matchupRefId) => {
       const eventId = Array.isArray(target) ? target[0]?.eventId : target?.eventId;
-      const url = eventId ? `api/machine.php?eventId=${eventId}` : 'api/machine.php';
+      const refParam = matchupRefId ? `&matchupRefId=${matchupRefId}` : '';
+      const url = eventId ? `api/machine.php?eventId=${eventId}${refParam}` : 'api/machine.php';
       return fetchJSON(url, { method: 'POST', body: JSON.stringify(target) });
     },
     deleteTarget: (id) => fetchJSON(`api/machine.php?id=${id}&task=threshold`, { method: 'DELETE' }),
@@ -128,12 +129,15 @@ export const PB_API = {
   },
 
   scores: {
-    get: (playerId, eventId, leagueId, eventMatchupId) => {
-      if (!eventId && !leagueId && !eventMatchupId) return [];
+    get: (playerIdOrOpts, eventId, leagueId, eventMatchupId) => {
+      const opts = (typeof playerIdOrOpts === 'object' && playerIdOrOpts !== null)
+        ? playerIdOrOpts
+        : { playerId: playerIdOrOpts, eventId, leagueId, eventMatchupId };
+      if (!opts.eventId && !opts.leagueId && !opts.eventMatchupId) return Promise.resolve([]);
       let url = 'api/score.php?';
-      if (eventMatchupId) url += `eventMatchupId=${eventMatchupId}`;
-      else if (leagueId) url += `leagueId=${leagueId}`;
-      else url += `eventId=${eventId}${playerId ? `&playerId=${playerId}` : ''}`;
+      if (opts.eventMatchupId) url += `eventMatchupId=${opts.eventMatchupId}`;
+      else if (opts.leagueId) url += `leagueId=${opts.leagueId}`;
+      else url += `eventId=${opts.eventId}${opts.playerId ? `&playerId=${opts.playerId}` : ''}`;
       return fetchJSON(url);
     },
     save: (score) => fetchJSON('api/score.php', { method: 'POST', body: JSON.stringify(score) }),
@@ -141,27 +145,38 @@ export const PB_API = {
   },
 
   matchups: {
-    get: (eventId, eventMatchupId) => {
-      if (eventMatchupId) return fetchJSON(`api/matchup.php?eventMatchupId=${eventMatchupId}`);
-      return fetchJSON(`api/matchup.php?eventId=${eventId}`);
+    get: (eventIdOrOpts, eventMatchupId) => {
+      const opts = (typeof eventIdOrOpts === 'object' && eventIdOrOpts !== null)
+        ? eventIdOrOpts
+        : { eventId: eventIdOrOpts, eventMatchupId };
+      if (opts.eventMatchupId) return fetchJSON(`api/matchup.php?eventMatchupId=${opts.eventMatchupId}`);
+      if (opts.eventId) return fetchJSON(`api/matchup.php?eventId=${opts.eventId}`);
+      return Promise.resolve([]);
     },
     save: (matchups) => fetchJSON('api/matchup.php', { method: 'POST', body: JSON.stringify(matchups) }),
     clear: (eventId) => fetchJSON(`api/matchup.php?eventId=${eventId}`, { method: 'DELETE' }),
   },
 
   teamScores: {
-    get: (eventId, teamEventMatchupId) => {
-      if (teamEventMatchupId) return fetchJSON(`api/team-score.php?teamEventMatchupId=${teamEventMatchupId}`);
-      if (eventId) return fetchJSON(`api/team-score.php?eventId=${eventId}`);
-      return [];
+    get: (eventIdOrOpts, teamEventMatchupId) => {
+      const opts = (typeof eventIdOrOpts === 'object' && eventIdOrOpts !== null)
+        ? eventIdOrOpts
+        : { eventId: eventIdOrOpts, teamEventMatchupId };
+      if (opts.teamEventMatchupId) return fetchJSON(`api/team-score.php?teamEventMatchupId=${opts.teamEventMatchupId}`);
+      if (opts.eventId) return fetchJSON(`api/team-score.php?eventId=${opts.eventId}`);
+      return Promise.resolve([]);
     },
     save: (score) => fetchJSON('api/team-score.php', { method: 'POST', body: JSON.stringify(score) }),
   },
 
   teamMatchups: {
-    get: (eventId, teamEventMatchupId) => {
-      if (teamEventMatchupId) return fetchJSON(`api/team-matchup.php?teamEventMatchupId=${teamEventMatchupId}`);
-      return fetchJSON(`api/team-matchup.php?eventId=${eventId}`);
+    get: (eventIdOrOpts, teamEventMatchupId) => {
+      const opts = (typeof eventIdOrOpts === 'object' && eventIdOrOpts !== null)
+        ? eventIdOrOpts
+        : { eventId: eventIdOrOpts, teamEventMatchupId };
+      if (opts.teamEventMatchupId) return fetchJSON(`api/team-matchup.php?teamEventMatchupId=${opts.teamEventMatchupId}`);
+      if (opts.eventId) return fetchJSON(`api/team-matchup.php?eventId=${opts.eventId}`);
+      return Promise.resolve([]);
     },
     save: (matchups) => fetchJSON('api/team-matchup.php', { method: 'POST', body: JSON.stringify(matchups) }),
     clear: (eventId) => fetchJSON(`api/team-matchup.php?eventId=${eventId}`, { method: 'DELETE' }),

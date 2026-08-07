@@ -7,6 +7,7 @@ import { calculateSeasonSummary, fetchSeasonData } from '@services/seasonCalcula
 function createMockEngine(overrides = {}) {
   return {
     handlesSortCompletely: () => false,
+    requiresHeadToHead: () => false,
     getMatchupDescription: vi.fn(() => null),
     buildPlayerScoreMap: vi.fn((_playerId, playerScores) => {
       const map = {};
@@ -879,7 +880,7 @@ describe('calculateSeasonSummary', () => {
 
   describe('baseball H2H tiebreakers', () => {
     it('should sort standings using head-to-head, run differential, and total runs in that priority', () => {
-      const league = makeLeague({ scoringFormat: 'baseball' });
+      const league = makeLeague({ scoringFormat: 'baseball', competitionFormat: 'head2head' });
       const players = [
         { id: 1, playerName: 'Player 1' },
         { id: 2, playerName: 'Player 2' },
@@ -900,6 +901,7 @@ describe('calculateSeasonSummary', () => {
       const targetsByEvent = {};
       const scoresByEventAndPlayer = {};
       const engine = createMockEngine({
+        requiresHeadToHead: () => true,
         getMatchupDescription: vi.fn(() => ({ description: 'head-to-head', details: [] })),
         buildPlayerScoreMap: vi.fn(() => ({ isPlayer1: true, opponent: {} }))
       });
@@ -921,8 +923,8 @@ describe('calculateSeasonSummary', () => {
 
       expect(result.rows[0].record.wins).toBe(1);
       expect(result.rows[0].record.losses).toBe(1);
-      expect(result.rows[0].record.runDiff).toBe(1);
-      expect(result.rows[0].record.totalRuns).toBe(9);
+      expect(result.rows[0].record.scoreDiff).toBe(1);
+      expect(result.rows[0].record.totalScore).toBe(9);
     });
   });
 

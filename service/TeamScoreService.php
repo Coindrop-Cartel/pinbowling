@@ -78,7 +78,6 @@ class TeamScoreService
             $stmt->execute([$teamEventMatchupId, $teamId, $machineId, $orderNumber, $ball1, $ball1PlayerId, $ball2, $ball2PlayerId, $ball3, $ball3PlayerId]);
         }
 
-        error_log("[PinBowling DEBUG] TeamScoreService::saveTeamScore — {$action} teamId=$teamId eventId=$eventId order=$orderNumber machine=$machineId balls=$ball1/$ball2/$ball3 ballPlayers=$ball1PlayerId/$ball2PlayerId/$ball3PlayerId temId=$teamEventMatchupId");
 
         if ($teamEventMatchupId !== null) {
             $this->updateTeamMatchupTotals($pdo, $teamEventMatchupId);
@@ -93,7 +92,6 @@ class TeamScoreService
         $stmt->execute([$teamEventMatchupId]);
         $game = $stmt->fetch();
         if (!$game) {
-            error_log("[PinBowling DEBUG] TeamScoreService::updateTeamMatchupTotals — temId=$teamEventMatchupId NOT FOUND, aborting");
             return;
         }
 
@@ -101,7 +99,6 @@ class TeamScoreService
         $homeTeamId = (int)$game['team1_id'];
         $awayTeamId = (int)$game['team2_id'];
 
-        error_log("[PinBowling DEBUG] TeamScoreService::updateTeamMatchupTotals — START temId=$teamEventMatchupId eventId=$eventId home=$homeTeamId away=$awayTeamId");
 
         // Load team_matchups entries in order_number sequence
         $stmt = $pdo->prepare(
@@ -110,13 +107,21 @@ class TeamScoreService
         $stmt->execute([$teamEventMatchupId]);
         $entries = $stmt->fetchAll();
 
-        // Load machine targets
+        // Load machine targets scoped to this matchup
         $stmt = $pdo->prepare(
-            'SELECT ts.*, m.machine_name FROM target_scores ts JOIN machines m ON ts.machine_id = m.id WHERE ts.event_id = ?'
+            'SELECT ts.*, m.machine_name FROM target_scores ts JOIN machines m ON ts.machine_id = m.id WHERE ts.event_id = ? AND ts.matchup_ref_id = ?'
         );
-        $stmt->execute([$eventId]);
+        $stmt->execute([$eventId, $teamEventMatchupId]);
+        $targetRows = $stmt->fetchAll();
+
+        // Fallback: if no matchup-scoped rows exist, try legacy rows (matchup_ref_id = 0)
+        if (empty($targetRows)) {
+            $stmt->execute([$eventId, 0]);
+            $targetRows = $stmt->fetchAll();
+        }
+
         $targetByMachine = [];
-        foreach ($stmt->fetchAll() as $mac) {
+        foreach ($targetRows as $mac) {
             $targetByMachine[(int)$mac['machine_id']] = $mac;
         }
 
@@ -135,7 +140,6 @@ class TeamScoreService
             }
         }
 
-        error_log("[PinBowling DEBUG] TeamScoreService::updateTeamMatchupTotals — entries=" . count($entries) . " teamScores=" . count($allTeamScores));
 
         $runningHomeRuns = 0;
         $runningAwayRuns = 0;
@@ -151,11 +155,9 @@ class TeamScoreService
             $pitchingTeamId = (int)$entry['team1_id'];
             $battingTeamId = (int)$entry['team2_id'];
 
-            error_log("[PinBowling DEBUG] TeamScoreService::updateTeamMatchupTotals — entry #$i: orderNum=$orderNum isTop=" . ($isTop ? 'yes' : 'no') . " pitcher=$pitchingTeamId batter=$battingTeamId lastEntry=" . ($isLastEntry ? 'yes' : 'no') . " runs: home=$runningHomeRuns away=$runningAwayRuns");
 
             // Walk-off: bottom of last inning when home already leads
             if (!$isTop && $isLastEntry && $runningHomeRuns > $runningAwayRuns) {
-                error_log("[PinBowling DEBUG] TeamScoreService::updateTeamMatchupTotals — WALK-OFF orderNum=$orderNum home already leading $runningHomeRuns-$runningAwayRuns");
                 continue;
             }
 
@@ -165,7 +167,6 @@ class TeamScoreService
             $pitcherKey = $pitchingTeamId . '_' . $orderNum;
             $pitcherScoreEntry = $scoresByTeamAndOrder[$pitcherKey] ?? null;
 
-            error_log("[PinBowling DEBUG] TeamScoreService::updateTeamMatchupTotals — batterKey=$batterKey found=" . ($scoreEntry ? 'yes' : 'no') . " pitcherKey=$pitcherKey found=" . ($pitcherScoreEntry ? 'yes' : 'no'));
 
             if ($scoreEntry && (
                 (int)($scoreEntry['ball1'] ?? 0) > 0 ||
@@ -192,7 +193,6 @@ class TeamScoreService
                 ] : ['ball1' => 0, 'ball2' => 0, 'ball3' => 0];
 
                 $runs = $this->calculateRunsForHalfRound($target, $batterScores, $pitcherScores);
-                error_log("[PinBowling DEBUG] TeamScoreService::updateTeamMatchupTotals — runs computed: $runs (batter=" . json_encode($batterScores) . " pitcher=" . json_encode($pitcherScores) . ")");
 
                 if ($battingTeamId === $homeTeamId) {
                     $runningHomeRuns += $runs;
@@ -200,7 +200,6 @@ class TeamScoreService
                     $runningAwayRuns += $runs;
                 }
             } else {
-                error_log("[PinBowling DEBUG] TeamScoreService::updateTeamMatchupTotals — no batting scores for orderNum=$orderNum");
             }
         }
 
@@ -217,7 +216,6 @@ class TeamScoreService
         );
         $status = ($runningHomeRuns > 0 || $runningAwayRuns > 0) ? 'completed' : 'pending';
         $stmt->execute([$runningHomeRuns, $runningAwayRuns, $winnerId, $status, $teamEventMatchupId]);
-        error_log("[PinBowling DEBUG] TeamScoreService::updateTeamMatchupTotals — FINAL: temId=$teamEventMatchupId home($homeTeamId)=$runningHomeRuns away($awayTeamId)=$runningAwayRuns winner=$winnerId status=$status");
 
         if ($status === 'completed') {
             $this->teamPlayoffService->handlePlayoffAdvancement($teamEventMatchupId);

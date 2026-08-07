@@ -21,6 +21,7 @@ class MachineController extends ApiController {
     protected function handle(): void {
         $eventId = isset($_GET['eventId']) ? (int)$_GET['eventId'] : 0;
         $leagueId = isset($_GET['leagueId']) ? (int)$_GET['leagueId'] : 0;
+        $matchupRefId = isset($_GET['matchupRefId']) ? (int)$_GET['matchupRefId'] : 0;
 
         switch ($this->method) {
             case 'GET':
@@ -29,8 +30,8 @@ class MachineController extends ApiController {
                     $targets = $this->machineService->getLeagueTargetScores($leagueId);
                     $this->sendJson(array_map([Serializer::class, 'targetScore'], $targets));
                 } else if ($eventId) {
-                    // Get target scores for event
-                    $targets = $this->machineService->getEventTargetScores($eventId);
+                    // Get target scores for event (optionally scoped to a specific matchup)
+                    $targets = $this->machineService->getEventTargetScores($eventId, $matchupRefId);
                     $this->sendJson(array_map([Serializer::class, 'targetScore'], $targets));
                 } else {
                     // Get master machine list
@@ -55,7 +56,7 @@ class MachineController extends ApiController {
                     $this->validateTDAccess();
                     
                     $saveInput = is_array($this->input) && isset($this->input[0]) ? $this->input : [$this->input];
-                    $this->machineService->saveTargetScores($eventId, $saveInput);
+                    $this->machineService->saveTargetScores($eventId, $saveInput, $matchupRefId);
                     $this->sendJson(['success' => true]);
                     
                 } else {

@@ -45,7 +45,7 @@ abstract class BasePlayoffService
         try {
             $db->beginTransaction();
 
-            $stmt = $db->prepare('SELECT status, rounds_per_game, matchups_per_round FROM leagues WHERE id = ?');
+            $stmt = $db->prepare('SELECT status, rounds_per_game, matchups_per_round, scoring_format, participation_type, competition_format FROM leagues WHERE id = ?');
             $stmt->execute([$leagueId]);
             $league = $stmt->fetch();
             if (!$league) {
@@ -70,7 +70,8 @@ abstract class BasePlayoffService
                 $roundName = 'Finals';
             }
 
-            $event = $this->eventService->createEvent($leagueId, 'Playoffs: ' . $roundName, null, null, 'baseball');
+            $format = !empty($league['scoring_format']) ? $league['scoring_format'] : (!empty($league['scoringFormat']) ? $league['scoringFormat'] : 'bowling');
+            $event = $this->eventService->createEvent($leagueId, 'Playoffs: ' . $roundName, null, null, $format);
             $eventId = (int)$event['id'];
 
             $machinesStmt = $db->query('SELECT id FROM machines');
@@ -298,7 +299,9 @@ abstract class BasePlayoffService
         if ($nextEventId) {
             $nextEventId = (int)$nextEventId;
         } else {
-            $event = $this->eventService->createEvent($leagueId, 'Playoffs: ' . $nextRoundName, null, null, 'baseball');
+            $league = $this->leagueService->getLeague($leagueId);
+            $format = !empty($league['scoring_format']) ? $league['scoring_format'] : (!empty($league['scoringFormat']) ? $league['scoringFormat'] : 'bowling');
+            $event = $this->eventService->createEvent($leagueId, 'Playoffs: ' . $nextRoundName, null, null, $format);
             $nextEventId = (int)$event['id'];
         }
 
