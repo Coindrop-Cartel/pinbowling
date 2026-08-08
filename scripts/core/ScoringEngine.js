@@ -229,6 +229,7 @@ export class ScoringEngine {
   getValue1Label() { return this._getTerm('value1Label', 'Target Score'); }
   getValue2Label() { return this._getTerm('value2Label', 'Base Score'); }
   getThresholdPrefix() { return this._getTerm('thresholdPrefix', 'Score'); }
+  getScoreColumnLabel() { return this._getTerm('scoreColumnLabel', 'Score'); }
 
   /**
    * Determines if a given threshold rank corresponds to Par score.
@@ -435,6 +436,15 @@ export class ScoringEngine {
 
 
   /**
+   * Returns the scaling divisor for calculating low score floor from target score.
+   * Subclasses override this (e.g. 1000 for Bowling, 100 for Golf, 10 for Baseball, 5 for Derby).
+   * @returns {number}
+   */
+  getQuickFillScale() {
+    return 1000;
+  }
+
+  /**
    * Calculates quick-fill suggested values for a machine.
    * @param {Object} machineData { targetEasy, targetMed, targetHard }
    * @param {string} type 'easy', 'med', or 'hard'
@@ -448,11 +458,30 @@ export class ScoringEngine {
   }
 
   /**
+   * Returns the maximum number of balls allowed per turn/round.
+   * Default: 3 for Bowling, Golf, H2H Baseball. 1 for Home Run Derby.
+   * @returns {number}
+   */
+  getMaxBallsPerRound() { return 3; }
+
+  /**
    * Returns the number of machines required per round.
    * Baseball uses 2 (top and bottom of inning), others use 1.
    * @returns {number}
    */
   getMachinesPerRound() { return 1; }
+
+  /**
+   * Returns the 1-based round index for a given zero-based turn index.
+   * Groups turns into rounds based on getMachinesPerRound() (e.g. 2 turns per inning for H2H Baseball).
+   * @param {number} turnIndex Zero-based turn index.
+   * @param {Array} [_machines] Optional list of machines.
+   * @returns {number} 1-based round number.
+   */
+  getRoundIndexForTurn(turnIndex, _machines) {
+    const machinesPerRound = this.getMachinesPerRound() || 1;
+    return Math.floor(turnIndex / machinesPerRound) + 1;
+  }
 
   /**
    * Returns the maximum number of players allowed on a session roster.
@@ -721,7 +750,7 @@ export class ScoringEngine {
     return false;
   }
   requiresHeadToHead() {
-    return this.constructor.requiresHeadToHead();
+    return isHead2Head(this.options?.competitionFormat) || isHead2Head(this.config?.competitionFormat) || this.constructor.requiresHeadToHead();
   }
 
   static getDefaultCompetitionFormat() {

@@ -30,7 +30,8 @@ export const FormatBranding = {
       thresholdPrefix: settings.thresholdPrefix || def.thresholdPrefix,
       scoringHint: settings.hint || def.hint,
       lastFrameHint: settings.lastFrameHint || def.lastFrameHint,
-      scoringDescription: settings.logic || def.logic || ''
+      scoringDescription: settings.logic || def.logic || '',
+      scoreColumnLabel: settings.scoreColumnLabel || def.scoreColumnLabel || 'Score'
     };
   }
 };

@@ -188,7 +188,9 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
       const isBallLockedForSec = sec.isActiveParticipant && !isTDOrAdmin;
       const perBallPlayers = sec.perBallPlayers || [];
 
-      for (let ball = 1; ball <= 3; ball += 1) {
+      const maxBalls = typeof engine.getMaxBallsPerRound === 'function' ? engine.getMaxBallsPerRound() : 3;
+
+      for (let ball = 1; ball <= maxBalls; ball += 1) {
         const value = sec.isActiveParticipant ? turnValues?.[`ball${ball}`] : opponentScores?.[`ball${ball}`];
         const displayValue = (value !== undefined && value !== null && value !== 0) ? value : '';
         const isBallLocked = isBallLockedForSec && !!lockedBalls[`ball${ball}`];
@@ -228,9 +230,10 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
       }
     });
   } else {
-    // Non-matchup format (Bowling / Golf)
+    // Non-matchup format (Bowling / Golf / Home Run Derby)
+    const maxBalls = typeof engine.getMaxBallsPerRound === 'function' ? engine.getMaxBallsPerRound() : 3;
     const inputsContainer = row.querySelector('.round-inputs-container');
-    for (let ball = 1; ball <= 3; ball += 1) {
+    for (let ball = 1; ball <= maxBalls; ball += 1) {
       const value = turnValues?.[`ball${ball}`] ?? '';
       const isBallLocked = !!lockedBalls[`ball${ball}`];
 

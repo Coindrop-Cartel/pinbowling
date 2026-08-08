@@ -9,7 +9,7 @@ class PlayoffService extends BasePlayoffService
 {
     protected function alternateHomeAway(): bool
     {
-        return false;
+        return true;
     }
 
     protected function createGameSlots(

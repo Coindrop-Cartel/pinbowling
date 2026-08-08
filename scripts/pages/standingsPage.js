@@ -319,62 +319,66 @@ export async function initStandingsPage() {
             let homeName = 'TBD';
             let awayWins = 0;
             let homeWins = 0;
+            let finished = false;
+            let homeClinched = false;
+            let awayClinched = false;
+            let gamesSummaryHtml = '';
 
             if (games.length > 0) {
               const firstGame = games[0];
-              awayName = isTeamLeague ? (firstGame.team2Name || 'BYE') : (firstGame.player2Name || 'BYE');
-              homeName = isTeamLeague ? (firstGame.team1Name || 'TBD') : (firstGame.player1Name || 'TBD');
+              const seriesParticipant1Id = isTeamLeague ? Number(firstGame.team1Id ?? firstGame.team1_id) : Number(firstGame.player1Id ?? firstGame.player1_id);
+              const seriesParticipant2Id = isTeamLeague ? Number(firstGame.team2Id ?? firstGame.team2_id) : Number(firstGame.player2Id ?? firstGame.player2_id);
+              awayName = isTeamLeague ? (firstGame.team2Name || firstGame.team2_name || 'BYE') : (firstGame.player2Name || firstGame.player2_name || 'BYE');
+              homeName = isTeamLeague ? (firstGame.team1Name || firstGame.team1_name || 'TBD') : (firstGame.player1Name || firstGame.player1_name || 'TBD');
 
               games.forEach(g => {
                 if (g.status === 'completed') {
-                  const wid = g.winnerId ?? g.teamWinnerId;
-                  const p1Id = isTeamLeague ? g.team1Id : g.player1Id;
-                  const p2Id = isTeamLeague ? g.team2Id : g.player2Id;
-                  if (wid === p1Id) homeWins++;
-                  else if (wid === p2Id) awayWins++;
+                  const wid = Number(g.teamWinnerId ?? g.team_winner_id ?? g.winnerId ?? g.player_winner_id);
+                  if (wid === seriesParticipant1Id) homeWins++;
+                  else if (wid === seriesParticipant2Id) awayWins++;
                 }
               });
-            }
 
-            const seriesLength = Number(league?.playoffSeriesLength || league?.playoff_series_length || event?.playoffSeriesLength || event?.playoff_series_length || 3);
-            const clinchCount = Math.ceil(seriesLength / 2);
-            const finished = (homeWins >= clinchCount || awayWins >= clinchCount);
-            const homeClinched = homeWins >= clinchCount;
-            const awayClinched = awayWins >= clinchCount;
+              const seriesLength = Number(league?.playoffSeriesLength || league?.playoff_series_length || event?.playoffSeriesLength || event?.playoff_series_length || 3);
+              const clinchCount = Math.ceil(seriesLength / 2);
+              finished = (homeWins >= clinchCount || awayWins >= clinchCount);
+              homeClinched = homeWins >= clinchCount;
+              awayClinched = awayWins >= clinchCount;
 
-            let runningHomeWins = 0;
-            let runningAwayWins = 0;
+              let runningHomeWins = 0;
+              let runningAwayWins = 0;
 
-            const gamesSummaryHtml = games.map(g => {
-              const p1Id = isTeamLeague ? g.team1Id : g.player1Id;
-              const p2Id = isTeamLeague ? g.team2Id : g.player2Id;
-              const p1Score = isTeamLeague ? Number(g.team1Score ?? 0) : Number(g.player1Score ?? 0);
-              const p2Score = isTeamLeague ? Number(g.team2Score ?? 0) : Number(g.player2Score ?? 0);
-              const wid = g.winnerId ?? g.teamWinnerId;
+              gamesSummaryHtml = games.map(g => {
+                const p1Id = isTeamLeague ? Number(g.team1Id ?? g.team1_id) : Number(g.player1Id ?? g.player1_id);
+                const p2Id = isTeamLeague ? Number(g.team2Id ?? g.team2_id) : Number(g.player2Id ?? g.player2_id);
+                const p1Score = isTeamLeague ? Number(g.team1Score ?? g.team1_score ?? 0) : Number(g.player1Score ?? g.player1_score ?? 0);
+                const p2Score = isTeamLeague ? Number(g.team2Score ?? g.team2_score ?? 0) : Number(g.player2Score ?? g.player2_score ?? 0);
+                const wid = Number(g.teamWinnerId ?? g.team_winner_id ?? g.winnerId ?? g.player_winner_id);
 
-              const isUnnecessary = (runningHomeWins >= clinchCount || runningAwayWins >= clinchCount);
+                const isUnnecessary = (runningHomeWins >= clinchCount || runningAwayWins >= clinchCount);
 
-              if (g.status === 'completed') {
-                if (wid === p1Id) runningHomeWins++;
-                else if (wid === p2Id) runningAwayWins++;
-              }
+                if (g.status === 'completed') {
+                  if (wid === seriesParticipant1Id) runningHomeWins++;
+                  else if (wid === seriesParticipant2Id) runningAwayWins++;
+                }
 
-              if (isUnnecessary) {
+                if (isUnnecessary) {
+                  return `
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8em; padding: 2px 4px; margin-top: 2px; background: #eee; border-radius: 3px; opacity: 0.5; color: #777;">
+                      <span>Game ${g.gameNumber}</span>
+                      <span>Not Needed</span>
+                    </div>
+                  `;
+                }
+
                 return `
-                  <div style="display: flex; justify-content: space-between; font-size: 0.8em; padding: 2px 4px; margin-top: 2px; background: #eee; border-radius: 3px; opacity: 0.5; color: #777;">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.8em; padding: 2px 4px; margin-top: 2px; background: #f9f9f9; border-radius: 3px;">
                     <span>Game ${g.gameNumber}</span>
-                    <span>Not Needed</span>
+                    <span>${g.status === 'completed' ? `${p2Score} - ${p1Score}` : 'Pending'}</span>
                   </div>
                 `;
-              }
-
-              return `
-                <div style="display: flex; justify-content: space-between; font-size: 0.8em; padding: 2px 4px; margin-top: 2px; background: #f9f9f9; border-radius: 3px;">
-                  <span>Game ${g.gameNumber}</span>
-                  <span>${g.status === 'completed' ? `${p2Score} - ${p1Score}` : 'Pending'}</span>
-                </div>
-              `;
-            }).join('');
+              }).join('');
+            }
 
             cardsHtml.push(`
               <div class="bracket-series-card" style="padding: 12px; margin: 10px 0; border: 1px solid ${finished ? '#2e7d32' : (games.length > 0 ? '#2196f3' : '#ccc')}; border-radius: 6px; background: ${games.length > 0 ? '#fff' : '#f5f5f5'}; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-width: 200px;">
@@ -555,6 +559,7 @@ export async function initStandingsPage() {
 
       return {
         player,
+        entity: player,
         turnResults,
         total: playedTurns.length > 0 ? total : weeklyTotal,
         totalDisplay: playedTurns.length > 0 ? totalDisplay : (weeklyTotal ? String(weeklyTotal) : '0'),

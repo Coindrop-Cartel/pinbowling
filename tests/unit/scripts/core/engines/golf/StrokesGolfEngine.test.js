@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from 'vitest';
-import { GolfEngine } from '@core/engines/GolfEngine.js';
+import { GolfEngine, StrokesGolfEngine } from '@core/engines/golf/index.js';
 import { FormatBranding } from '@services/scoringFormatBranding.js';
 
 describe('GolfEngine', () => {

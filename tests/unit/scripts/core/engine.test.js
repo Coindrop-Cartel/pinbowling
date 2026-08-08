@@ -1,9 +1,9 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getScoringEngine, SCORING_FORMATS } from '@core/engine.js';
-import { BowlingEngine } from '@core/engines/BowlingEngine.js';
-import { GolfEngine } from '@core/engines/GolfEngine.js';
-import { BaseballEngine } from '@core/engines/BaseballEngine.js';
+import { BowlingEngine } from '@core/engines/bowling/index.js';
+import { GolfEngine } from '@core/engines/golf/index.js';
+import { BaseballEngine } from '@core/engines/baseball/index.js';
 
 describe('Scoring Engine Factory (engine.js)', () => {
   beforeEach(() => { document.cookie = ''; });
@@ -76,11 +76,12 @@ describe('Scoring Engine Factory (engine.js)', () => {
   });
 
   describe('SCORING_FORMATS', () => {
-    it('should contain bowling, golf, and baseball format options', () => {
-      expect(SCORING_FORMATS).toHaveLength(3);
+    it('should contain bowling, golf, baseball, and homerunderby format options', () => {
+      expect(SCORING_FORMATS).toHaveLength(4);
       expect(SCORING_FORMATS[0].value).toBe('bowling');
       expect(SCORING_FORMATS[1].value).toBe('golf');
       expect(SCORING_FORMATS[2].value).toBe('baseball');
+      expect(SCORING_FORMATS[3].value).toBe('homerunderby');
     });
 
     it('should have label strings for each format', () => {

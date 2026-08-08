@@ -66,8 +66,10 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, is
   matchupsList.innerHTML = Object.entries(seriesMap).map(([sId, games]) => {
     games.sort((a, b) => a.gameNumber - b.gameNumber);
     const firstGame = games[0];
-    const p1Name = isTeamMode ? firstGame.team1Name : firstGame.player1Name;
-    const p2Name = isTeamMode ? firstGame.team2Name : firstGame.player2Name;
+    const seriesParticipant1Id = isTeamMode ? Number(firstGame.team1Id ?? firstGame.team1_id) : Number(firstGame.player1Id ?? firstGame.player1_id);
+    const seriesParticipant2Id = isTeamMode ? Number(firstGame.team2Id ?? firstGame.team2_id) : Number(firstGame.player2Id ?? firstGame.player2_id);
+    const p1Name = isTeamMode ? (firstGame.team1Name || firstGame.team1_name) : (firstGame.player1Name || firstGame.player1_name);
+    const p2Name = isTeamMode ? (firstGame.team2Name || firstGame.team2_name) : (firstGame.player2Name || firstGame.player2_name);
     const homeName = escapeHTML(p1Name || 'Home');
     const awayName = escapeHTML(p2Name || 'Away');
     
@@ -76,12 +78,10 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, is
     let homeWins = 0;
     let awayWins = 0;
     games.forEach(g => {
-      const p1Id = isTeamMode ? g.team1Id : g.player1Id;
-      const p2Id = isTeamMode ? g.team2Id : g.player2Id;
       if (g.status === 'completed') {
-        const wid = g.winnerId ?? g.teamWinnerId;
-        if (wid === p1Id) homeWins++;
-        else if (wid === p2Id) awayWins++;
+        const wid = Number(g.teamWinnerId ?? g.team_winner_id ?? g.winnerId ?? g.player_winner_id);
+        if (wid === seriesParticipant1Id) homeWins++;
+        else if (wid === seriesParticipant2Id) awayWins++;
       }
     });
 
@@ -92,23 +92,23 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, is
     let runningAwayWins = 0;
     
     const gamesHtml = games.map(g => {
-      const p1Id = isTeamMode ? g.team1Id : g.player1Id;
-      const p2Id = isTeamMode ? g.team2Id : g.player2Id;
+      const p1Id = isTeamMode ? Number(g.team1Id ?? g.team1_id) : Number(g.player1Id ?? g.player1_id);
+      const p2Id = isTeamMode ? Number(g.team2Id ?? g.team2_id) : Number(g.player2Id ?? g.player2_id);
       const p1Score = isTeamMode
-        ? Number(g.team1Score ?? 0)
-        : Number(g.player1Score ?? 0);
+        ? Number(g.team1Score ?? g.team1_score ?? 0)
+        : Number(g.player1Score ?? g.player1_score ?? 0);
       const p2Score = isTeamMode
-        ? Number(g.team2Score ?? 0)
-        : Number(g.player2Score ?? 0);
-      const wid = g.winnerId ?? g.teamWinnerId;
+        ? Number(g.team2Score ?? g.team2_score ?? 0)
+        : Number(g.player2Score ?? g.player2_score ?? 0);
+      const wid = Number(g.teamWinnerId ?? g.team_winner_id ?? g.winnerId ?? g.player_winner_id);
       const winnerHome = g.status === 'completed' && wid === p1Id;
       const winnerAway = g.status === 'completed' && wid === p2Id;
 
       const isUnnecessary = (runningHomeWins >= clinchWins || runningAwayWins >= clinchWins);
 
       if (g.status === 'completed') {
-        if (wid === p1Id) runningHomeWins++;
-        else if (wid === p2Id) runningAwayWins++;
+        if (wid === seriesParticipant1Id) runningHomeWins++;
+        else if (wid === seriesParticipant2Id) runningAwayWins++;
       }
 
       if (isUnnecessary) {
@@ -151,10 +151,10 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, is
 
     const headerBadge = isClinched
       ? `<span class="badge completed font-bold" style="background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">
-           ✓ ${seriesWinnerName} won series (${awayName}: ${awayWins}, ${homeName}: ${homeWins})
+           ✓ ${seriesWinnerName} won series (${homeName}: ${homeWins}, ${awayName}: ${awayWins})
          </span>`
       : `<span class="badge completed font-bold" style="background: #e3f2fd; color: #0d47a1; padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">
-           ${awayName} (${awayWins}) vs ${homeName} (${homeWins})
+           ${homeName} (${homeWins}) vs ${awayName} (${awayWins})
          </span>`;
     
     return `

@@ -4,8 +4,8 @@ import {
   TeamAssignmentStrategy, 
   getPlayerAssignmentStrategy 
 } from '../../../../scripts/core/PlayerAssignmentStrategy.js';
-import { GolfEngine } from '../../../../scripts/core/engines/GolfEngine.js';
-import { BowlingEngine } from '../../../../scripts/core/engines/BowlingEngine.js';
+import { GolfEngine } from '../../../../scripts/core/engines/golf/index.js';
+import { BowlingEngine } from '../../../../scripts/core/engines/bowling/index.js';
 
 describe('PlayerAssignmentStrategy', () => {
   const golfEngine = new GolfEngine();

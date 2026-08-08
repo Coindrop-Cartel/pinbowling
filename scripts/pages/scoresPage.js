@@ -1162,13 +1162,12 @@ export async function initScoresPage() {
     playerSelectionCard.classList.remove('hidden');
     await refreshPlayerSelection();
 
-    // Update the results table header to use the engine's round label
+    // Update the results table headers to use the engine's round & score labels
     const resultsTableHeader = resultsPanel.querySelector('table.data-table thead tr');
     if (resultsTableHeader) {
-      const roundHeader = resultsTableHeader.querySelector('th:first-child');
-      if (roundHeader) {
-        roundHeader.textContent = branding.roundLabel;
-      }
+      const ths = resultsTableHeader.querySelectorAll('th');
+      if (ths[0]) ths[0].textContent = branding.roundLabel || 'Round';
+      if (ths[2]) ths[2].textContent = branding.scoreColumnLabel || 'Score';
     }
   };
 

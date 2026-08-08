@@ -4,8 +4,8 @@ import {
   HeadToHeadCompetitionStrategy, 
   getCompetitionFormatStrategy 
 } from '../../../../scripts/core/CompetitionFormatStrategy.js';
-import { GolfEngine } from '../../../../scripts/core/engines/GolfEngine.js';
-import { BowlingEngine } from '../../../../scripts/core/engines/BowlingEngine.js';
+import { GolfEngine } from '../../../../scripts/core/engines/golf/index.js';
+import { BowlingEngine } from '../../../../scripts/core/engines/bowling/index.js';
 
 describe('CompetitionFormatStrategy', () => {
   const golfEngine = new GolfEngine();

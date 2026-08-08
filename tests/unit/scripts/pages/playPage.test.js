@@ -57,6 +57,7 @@ const engineMock = vi.hoisted(() => ({
   filterThresholds: vi.fn((v) => v),
   getRoundCountOptions: vi.fn(() => [3, 5, 10]),
   getMachinesPerRound: vi.fn(() => 1),
+  requiresHeadToHead: vi.fn(() => false),
   generateValue2Defaults: vi.fn(() => []),
   getMaxRosterSize: vi.fn(() => Infinity),
   availableSpots: vi.fn(() => Infinity),
@@ -720,6 +721,7 @@ describe('Play Page (playPage.js)', () => {
       PB_API.sessions.getAll.mockResolvedValue([]);
 
       // Enable baseball format
+      engineMock.requiresHeadToHead.mockReturnValue(true);
       engineMock.getMatchupDescription.mockReturnValue({
         description: 'Head to Head Baseball',
         details: []

@@ -238,8 +238,8 @@ class ScoreService
                         $bottomOrderNum = ($round - 1) * 2 + 2;
 
                         $isLastRound = ($round === $roundsCount);
-                        $topPlayed = (isset($scoreMap[$player1Id][$topOrderNum]) || isset($scoreMap[$player2Id][$topOrderNum]));
-                        $bottomPlayed = (isset($scoreMap[$player1Id][$bottomOrderNum]) || isset($scoreMap[$player2Id][$bottomOrderNum]));
+                        $topPlayed = isset($scoreMap[$player2Id][$topOrderNum]);
+                        $bottomPlayed = isset($scoreMap[$player1Id][$bottomOrderNum]);
 
                         if ($isLastRound && $topPlayed && !$bottomPlayed && $player1Score > $player2Score) {
                             $isWalkoff = true;
@@ -298,26 +298,21 @@ class ScoreService
         }
 
         $scores = $this->getMatchupScores($eventMatchupId);
-
-
         $scoreMap = [];
         foreach ($scores as $s) {
-            $idKey = (int) ($s['player_id'] ?? 0);
-            $scoreMap[$idKey][(int) $s['order_number']] = $s;
+            $idKey = (int) $s['player_id'];
+            $orderNum = (int) $s['order_number'];
+            $scoreMap[$idKey][$orderNum] = $s;
         }
 
-        $stmt = $pdo->prepare(
-            'SELECT ts.*, m.machine_name 
-             FROM target_scores ts 
-             JOIN machines m ON ts.machine_id = m.id
-             WHERE ts.event_id = ? AND ts.matchup_ref_id = ?'
-        );
-        $stmt->execute([$matchup['event_id'], $eventMatchupId]);
-        $machines = $stmt->fetchAll();
-
-        // Fallback: if no matchup-scoped rows exist, try legacy rows (matchup_ref_id = 0)
-        if (empty($machines)) {
-            $stmt->execute([$matchup['event_id'], 0]);
+        $matchupRows = $this->getMatchupMachines($eventMatchupId);
+        if (empty($matchupRows)) {
+            $stmt = $pdo->prepare('SELECT DISTINCT order_number FROM scores WHERE event_id = ?');
+            $stmt->execute([$matchup['event_id']]);
+            $machines = $stmt->fetchAll();
+        } else {
+            $stmt = $pdo->prepare('SELECT order_number, value1, value2 FROM event_matchup_machines WHERE event_id = ? AND is_deleted = 0');
+            $stmt->execute([$matchup['event_id']]);
             $machines = $stmt->fetchAll();
         }
         $machineMap = [];
@@ -354,16 +349,17 @@ class ScoreService
             $topTarget    = $machineMap[$topOrderNum]    ?? $defaultTarget;
             $bottomTarget = $machineMap[$bottomOrderNum] ?? $defaultTarget;
 
-            $topPlayed = isset($scoreMap[$player1Id][$topOrderNum]) && isset($scoreMap[$player2Id][$topOrderNum]);
+            $topPlayed = isset($scoreMap[$player2Id][$topOrderNum]);
+            $bottomPlayed = isset($scoreMap[$player1Id][$bottomOrderNum]);
 
-            if ($topTarget) {
+            if ($topTarget && $topPlayed) {
                 $runs = $this->calculateRunsForHalfRound($topTarget, $p2TopEntry, $p1TopEntry);
                 $player2Score += $runs;
             }
 
-            if ($bottomTarget) {
+            if ($bottomTarget && $topPlayed && $bottomPlayed) {
                 $isLastRound = ($round === $roundsCount);
-                if ($isLastRound && $topPlayed && $player1Score > $player2Score) {
+                if ($isLastRound && $player1Score > $player2Score) {
                     $isWalkoff = true;
                 } else {
                     $runs = $this->calculateRunsForHalfRound($bottomTarget, $p1BottomEntry, $p2BottomEntry);

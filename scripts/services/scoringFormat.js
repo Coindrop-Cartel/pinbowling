@@ -1,12 +1,7 @@
 /**
  * Central source of truth for scoring format identifiers.
  *
- * The strings `'bowling'`, `'golf'`, and `'baseball'` were previously hardcoded
- * as raw literals across ~30+ files. This module centralizes them so that:
- *  - There is a single validated list of supported formats.
- *  - Default fallbacks always reference {@link ScoringFormats.DEFAULT}.
- *  - Cookie/URL/DB values can be validated with {@link ScoringFormats.isValid}
- *    before being trusted.
+ * Single source of truth for supported formats (bowling, golf, baseball, homerunderby).
  *
  * @module services/scoringFormat
  */
@@ -18,37 +13,34 @@ export const ScoringFormats = {
   BOWLING: 'bowling',
   GOLF: 'golf',
   BASEBALL: 'baseball',
+  HOME_RUN_DERBY: 'homerunderby',
   /** @type {readonly string[]} */
-  ALL: Object.freeze(['bowling', 'golf', 'baseball']),
+  ALL: Object.freeze(['bowling', 'golf', 'baseball', 'homerunderby']),
   /** @type {string} */
   DEFAULT: 'bowling',
 
   /**
    * Validate that a value is a recognized scoring format identifier.
    *
-   * Coerces `null`/`undefined` to an empty string so that missing values
-   * (cookies, URL params, DB columns) are treated as invalid rather than
-   * crashing on `.includes(undefined)`.
-   *
-   * @param {*} value - Any value to test (typically a string from a cookie, URL, or DB).
+   * @param {*} value - Any value to test.
    * @returns {boolean} `true` if `value` is one of {@link ScoringFormats.ALL}.
    */
   isValid(value) {
-    return this.ALL.includes(String(value ?? ''));
+    const valStr = String(value ?? '').toLowerCase();
+    return this.ALL.includes(valStr) || valStr === 'derby';
   },
 
   /**
    * Coerce a value into a valid scoring format identifier, falling back to
    * {@link ScoringFormats.DEFAULT} when the value is missing or unrecognized.
    *
-   * Use this in place of bare `|| 'bowling'` fallbacks so that invalid values
-   * (e.g. a corrupted cookie) are rejected rather than silently passed through.
-   *
    * @param {*} value - Raw value from a cookie, URL param, or DB column.
    * @returns {string} A guaranteed-valid format identifier.
    */
   resolve(value) {
-    return this.isValid(value) ? String(value) : this.DEFAULT;
+    const valStr = String(value ?? '').toLowerCase();
+    if (valStr === 'derby' || valStr === 'homerunderby') return this.HOME_RUN_DERBY;
+    return this.isValid(value) ? valStr : this.DEFAULT;
   }
 };
 
@@ -90,6 +82,7 @@ export const FORMAT_TERMINOLOGY = Object.freeze({
     value1Label: 'Target Score',
     value2Label: 'Base Score',
     thresholdPrefix: 'Pins',
+    scoreColumnLabel: 'Score',
     hint: "Enter your score after each ball. When you hit the strike score you can stop entering scores for that frame and move on to the next frame. DO NOT PLAY EXTRA BALLS",
     lastFrameHint: "In the last frame, you can get up to 3 strikes. Keep playing until you hit the additional target scores or you run out of balls."
   }),
@@ -105,6 +98,7 @@ export const FORMAT_TERMINOLOGY = Object.freeze({
     value1Label: 'Target Score',
     value2Label: 'Par',
     thresholdPrefix: 'Strokes',
+    scoreColumnLabel: 'Score',
     hint: "Enter your score after each ball. When you hit the target score you can stop entering scores for that round and move on to the next hole. DO NOT PLAY EXTRA BALLS",
     lastFrameHint: ""
   }),
@@ -120,7 +114,25 @@ export const FORMAT_TERMINOLOGY = Object.freeze({
     value1Label: 'Baseline Score',
     value2Label: 'Multiplier',
     thresholdPrefix: 'Runs',
+    scoreColumnLabel: 'Score',
     hint: "Enter your score after each ball.  There is no limit to how many runs you can score, so do not stop unless it's the bottom of the last inning and you have taken the lead.  DO NOT PLAY EXTRA BALLS",
     lastFrameHint: ""
+  }),
+  [ScoringFormats.HOME_RUN_DERBY]: Object.freeze({
+    brand: 'Home Run Derby',
+    logo: 'pinderby.png',
+    cta: "Play Derby!",
+    themeClass: 'theme-baseball',
+    roundLabel: 'At Bat',
+    pluralRoundLabel: 'At Bats',
+    turnHeaderPrefix: 'At Bat',
+    primaryTargetLabel: 'Run Baseline',
+    value1Label: 'Baseline Score',
+    value2Label: 'Multiplier',
+    thresholdPrefix: 'Runs',
+    scoreColumnLabel: 'HRs',
+    hint: "Enter your score after each ball. Your score maps to runs scored based on the machine thresholds. DO NOT PLAY EXTRA BALLS",
+    lastFrameHint: "",
+    logic: "Individual card scoring based on baseball run thresholds. Players compete individually across At Bats to accumulate the highest total runs."
   })
 });

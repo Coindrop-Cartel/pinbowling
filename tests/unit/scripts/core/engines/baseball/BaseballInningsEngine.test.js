@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach } from 'vitest';
-import { BaseballEngine } from '@core/engines/BaseballEngine.js';
+import { BaseballEngine, BaseballInningsEngine } from '@core/engines/baseball/index.js';
 import { FormatBranding } from '@services/scoringFormatBranding.js';
 import { renderHead2HeadScoreboard } from '@scripts/renderers/scoreboardRenderer.js';
 
-describe('BaseballEngine', () => {
+describe('BaseballInningsEngine', () => {
   beforeEach(() => {
     window.PB_ENGINE_META = {
       baseball: {
@@ -14,7 +14,7 @@ describe('BaseballEngine', () => {
     };
   });
 
-  const engine = new BaseballEngine({
+  const engine = new BaseballInningsEngine({
     brand: 'PinBaseball',
     cta: 'Play Ball!',
     logo: 'pinbaseball.png',
@@ -1091,5 +1091,38 @@ describe('BaseballEngine', () => {
     const enriched = engine.enrichScoreMap({}, context);
     expect(enriched.isPlayer1).toBe(true);
     expect(enriched.isTeamMode).toBe(true);
+  });
+
+  test('getRoundIndexForTurn pairs turns into innings for head-to-head baseball', () => {
+    expect(engine.getRoundIndexForTurn(0)).toBe(1); // Top 1st -> Inning 1
+    expect(engine.getRoundIndexForTurn(1)).toBe(1); // Bottom 1st -> Inning 1
+    expect(engine.getRoundIndexForTurn(2)).toBe(2); // Top 2nd -> Inning 2
+    expect(engine.getRoundIndexForTurn(3)).toBe(2); // Bottom 2nd -> Inning 2
+  });
+
+  test('formatMatchupScore preserves batter runs over pitcher 0 runs', () => {
+    const batterTurn = { isBatter: true, played: true, score: 6 };
+    const pitcherTurn = { isBatter: false, played: true, score: 0 };
+
+    const score1 = engine.formatMatchupScore(batterTurn, undefined);
+    expect(score1).toBe('6');
+
+    const score2 = engine.formatMatchupScore(pitcherTurn, score1);
+    expect(score2).toBe('6');
+  });
+
+  test('sortStandings handles season summary rows with entity objects', () => {
+    const rows = [
+      { entity: { id: 1, playerName: 'Player 1' }, hasScores: true, totalSeasonPoints: 5 },
+      { entity: { id: 2, playerName: 'Player 2' }, hasScores: true, totalSeasonPoints: 10 }
+    ];
+    const head2headRecordsMap = {
+      1: { winRate: 0.5, scoreDiff: 2 },
+      2: { winRate: 0.75, scoreDiff: 5 }
+    };
+
+    const sorted = engine.sortStandings(rows, { head2headRecordsMap });
+    expect(sorted[0].entity.id).toBe(2);
+    expect(sorted[1].entity.id).toBe(1);
   });
 });

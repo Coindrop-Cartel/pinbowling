@@ -114,6 +114,7 @@ export async function finalizeSession(options) {
 }
 
 async function pickOpponent(showPlayerSelectionDialog, PB_API, allPlayersCache, engine, generatedFrames) {
+  if (!engine?.requiresHeadToHead?.()) return null;
   const currentUser = await PB_API.auth.me();
   if (!currentUser?.player_id) return null;
   const matchupInfo = engine?.getMatchupDescription?.(generatedFrames?.length ?? 0);

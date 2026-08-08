@@ -1,6 +1,7 @@
-import { BowlingEngine } from '@core/engines/BowlingEngine.js';
-import { GolfEngine } from '@core/engines/GolfEngine.js';
-import { BaseballEngine } from '@core/engines/BaseballEngine.js';
+import { TraditionalBowlingEngine } from '@core/engines/bowling/scoring/TraditionalBowlingEngine.js';
+import { StrokesGolfEngine } from '@core/engines/golf/scoring/StrokesGolfEngine.js';
+import { BaseballInningsEngine } from '@core/engines/baseball/scoring/BaseballInningsEngine.js';
+import { HomeRunDerbyEngine } from '@core/engines/baseball/scoring/HomeRunDerbyEngine.js';
 import { ScoringEngine } from '@core/ScoringEngine.js';
 import { ScoringFormats } from '@services/scoringFormat.js';
 
@@ -11,15 +12,16 @@ export const SCORING_FORMATS = ScoringFormats.ALL.map(value => {
   const labels = {
     [ScoringFormats.BOWLING]: 'Bowling (Marks & Frames)',
     [ScoringFormats.GOLF]: 'Golf (Strokes vs Par)',
-    [ScoringFormats.BASEBALL]: 'Baseball (Head-to-Head Runs)'
+    [ScoringFormats.BASEBALL]: 'Baseball (Head-to-Head Runs)',
+    [ScoringFormats.HOME_RUN_DERBY]: 'Home Run Derby (Individual Runs)'
   };
-  return { value, label: labels[value] };
+  return { value, label: labels[value] || value };
 });
 
 /**
  * Factory function to retrieve the active scoring engine. 
  * 
- * @param {string|null} [format=null] - The format key ('bowling', 'golf', or 'baseball').
+ * @param {string|null} [format=null] - The format key ('bowling', 'golf', 'baseball', or 'homerunderby').
  * @param {Object} [settings={}] - Terminology settings config map.
  * @param {Object} [options={}] - Strategy configuration.
  * @returns {ScoringEngine} An instance of a class extending ScoringEngine.
@@ -34,12 +36,14 @@ export function getScoringEngine(format = null, settings = null, options = {}) {
   const resolvedSettings = settings || (typeof window !== 'undefined' ? window['PB_SETTINGS'] : {}) || {};
 
   switch (activeFormat) {
+    case ScoringFormats.HOME_RUN_DERBY:
+      return new HomeRunDerbyEngine(resolvedSettings.homerunderby || resolvedSettings.baseball, options);
     case ScoringFormats.GOLF:
-      return new GolfEngine(resolvedSettings.golf, options);
+      return new StrokesGolfEngine(resolvedSettings.golf, options);
     case ScoringFormats.BASEBALL:
-      return new BaseballEngine(resolvedSettings.baseball, options);
+      return new BaseballInningsEngine(resolvedSettings.baseball, options);
     case ScoringFormats.BOWLING:
     default:
-      return new BowlingEngine(resolvedSettings.bowling, options);
+      return new TraditionalBowlingEngine(resolvedSettings.bowling, options);
   }
 }

@@ -140,8 +140,17 @@ abstract class BasePlayoffService
         $roundName = $matchup['round_name'];
         $seriesId = (int)$matchup['series_id'];
         $gameNumber = (int)$matchup['game_number'];
-        $homeId = (int)$matchup[$this->homeCol];
-        $awayId = (int)$matchup[$this->awayCol];
+
+        // Anchor seriesHomeId and seriesAwayId to Game 1 of the series to prevent alternating home/away shifts
+        $firstGameStmt = $this->db->prepare(
+            "SELECT {$this->homeCol}, {$this->awayCol} FROM {$this->entryTable}
+             WHERE event_id = ? AND round_name = ? AND series_id = ? AND game_number = 1"
+        );
+        $firstGameStmt->execute([$eventId, $roundName, $seriesId]);
+        $firstGame = $firstGameStmt->fetch(PDO::FETCH_ASSOC);
+
+        $seriesHomeId = $firstGame ? (int)$firstGame[$this->homeCol] : (int)$matchup[$this->homeCol];
+        $seriesAwayId = $firstGame ? (int)$firstGame[$this->awayCol] : (int)$matchup[$this->awayCol];
 
         $leagueStmt = $this->db->prepare('SELECT playoff_series_length, rounds_per_game, matchups_per_round FROM leagues WHERE id = ?');
         $leagueStmt->execute([$leagueId]);
@@ -157,23 +166,23 @@ abstract class BasePlayoffService
         $seriesStmt->execute([$eventId, $roundName, $seriesId]);
         $games = $seriesStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $homeWins = 0;
-        $awayWins = 0;
+        $team1Wins = 0;
+        $team2Wins = 0;
         foreach ($games as $g) {
             $winId = isset($g[$this->winnerCol]) ? (int)$g[$this->winnerCol] : null;
-            if ($winId === $homeId) {
-                $homeWins++;
-            } elseif ($winId === $awayId) {
-                $awayWins++;
+            if ($winId === $seriesHomeId) {
+                $team1Wins++;
+            } elseif ($winId === $seriesAwayId) {
+                $team2Wins++;
             }
         }
 
         $clinchCount = (int)ceil($seriesLength / 2);
         $seriesWinnerId = null;
-        if ($homeWins >= $clinchCount) {
-            $seriesWinnerId = $homeId;
-        } elseif ($awayWins >= $clinchCount) {
-            $seriesWinnerId = $awayId;
+        if ($team1Wins >= $clinchCount) {
+            $seriesWinnerId = $seriesHomeId;
+        } elseif ($team2Wins >= $clinchCount) {
+            $seriesWinnerId = $seriesAwayId;
         }
 
         if ($seriesWinnerId !== null) {
@@ -259,12 +268,12 @@ abstract class BasePlayoffService
                 return;
             }
 
-            if ($this->alternateHomeAway()) {
-                $nextHomeId = ($nextGameNumber % 2 === 0) ? $awayId : $homeId;
-                $nextAwayId = ($nextGameNumber % 2 === 0) ? $homeId : $awayId;
+            if ($this->alternateHomeAway() && ($nextGameNumber % 2 === 0)) {
+                $nextHomeId = $seriesAwayId;
+                $nextAwayId = $seriesHomeId;
             } else {
-                $nextHomeId = $homeId;
-                $nextAwayId = $awayId;
+                $nextHomeId = $seriesHomeId;
+                $nextAwayId = $seriesAwayId;
             }
 
             $insertStmt = $this->db->prepare(

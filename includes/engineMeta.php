@@ -64,6 +64,23 @@ $engineMeta = [
                     scoring table.  Once a threshold is reached for a ball, the next ball must pass that total to score any more runs (if you've earned 1 run on ball 1, you
                     must hit the threshold for 2 runs on ball 2.  The difference between what has been scored so far and the value for that ball is used to determine the runs
                     for that specific ball."
+    ],
+    'homerunderby' => [
+        'brand' => 'Home Run Derby',
+        'logo'  => 'pinderby.png',
+        'cta'   => "Play Derby!",
+        'themeClass' => 'theme-baseball',
+        'roundLabel' => 'At Bat',
+        'turnHeaderPrefix' => 'At Bat',
+        'primaryTargetLabel' => 'Run Baseline',
+        'value1Label' => 'Baseline Score',
+        'value2Label' => 'Multiplier',
+        'scoreColumnLabel' => 'HRs',
+        'hint'  => "Enter your score after each ball. Your score maps to runs scored based on the machine thresholds. DO NOT PLAY EXTRA BALLS",
+        'lastFrameHint' => "",
+        'thresholdStart' => 1,
+        'thresholdEnd' => 10,
+        'logic' => "Individual card scoring based on baseball run thresholds. Players compete individually across At Bats to accumulate the highest total runs."
     ]
 ];
 
