@@ -18,7 +18,7 @@ import { escapeHTML } from '@scripts/utils.js';
  * @param {boolean} [options.isAdmin=false] Whether the current user is admin/TD.
  * @param {Function} [options.onSetupMatchup] Callback with (matchupId, eventId) when Setup is clicked (admin only).
  */
-export function renderMatchupSchedule(matchupsList, event, { onPlayMatchup, isAdmin = false, onSetupMatchup }) {
+export function renderMatchupSchedule(matchupsList, event, { onPlayMatchup, isAdmin = false, onSetupMatchup, league } = {}) {
   const matchups = event?.matchups || [];
 
   if (matchups.length === 0) {
@@ -29,7 +29,7 @@ export function renderMatchupSchedule(matchupsList, event, { onPlayMatchup, isAd
   const isPlayoffs = event?.eventName && event.eventName.startsWith('Playoffs:');
 
   if (isPlayoffs) {
-    _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, isAdmin, onSetupMatchup);
+    _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, isAdmin, onSetupMatchup, { league });
   } else {
     _renderRegularSchedule(matchupsList, matchups, onPlayMatchup, isAdmin, onSetupMatchup, event);
   }
@@ -53,7 +53,7 @@ export function renderMatchupSchedule(matchupsList, event, { onPlayMatchup, isAd
  * Renders the playoff series schedule with grouped games.
  * @private
  */
-function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, isAdmin, onSetupMatchup) {
+function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, isAdmin, onSetupMatchup, options = {}) {
   const isTeamMode = event?.isTeam || (matchups.length > 0 && matchups[0].team1Id !== null && matchups[0].team1Id !== undefined);
 
   const seriesMap = {};
@@ -73,7 +73,17 @@ function _renderPlayoffSchedule(matchupsList, matchups, event, onPlayMatchup, is
     const homeName = escapeHTML(p1Name || 'Home');
     const awayName = escapeHTML(p2Name || 'Away');
     
-    const seriesLength = Number(event?.playoffSeriesLength || event?.playoff_series_length || firstGame?.playoffSeriesLength || firstGame?.playoff_series_length || 3);
+    const seriesLength = Number(
+      options?.league?.playoffSeriesLength ||
+      options?.league?.playoff_series_length ||
+      event?.league?.playoffSeriesLength ||
+      event?.league?.playoff_series_length ||
+      event?.playoffSeriesLength ||
+      event?.playoff_series_length ||
+      firstGame?.playoffSeriesLength ||
+      firstGame?.playoff_series_length ||
+      3
+    );
     const clinchWins = Math.ceil(seriesLength / 2);
     let homeWins = 0;
     let awayWins = 0;

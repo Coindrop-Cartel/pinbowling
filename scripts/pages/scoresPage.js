@@ -1117,6 +1117,7 @@ export async function initScoresPage() {
         const isAdmin = await can(PERMISSIONS.MANAGE_LEAGUES);
         const isTeamMode = league?.participationType === 'team';
         renderMatchupSchedule(matchupsList, event, {
+          league,
           onPlayMatchup: (matchupId, evId) => {
             setActiveLeagueIdSilent(league.id);
             setActiveEventIdSilent(evId);

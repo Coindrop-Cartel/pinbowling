@@ -52,4 +52,41 @@ describe('renderMatchupSchedule - Playoff Alternating Home/Away Series', () => {
     expect(html).not.toContain('won series');
     expect(html).not.toContain('Not Needed');
   });
+
+  it('correctly displays series winner for best-of-1 series when league is passed in options', () => {
+    const container = document.createElement('ul');
+    const league = {
+      id: 1,
+      playoffSeriesLength: 1
+    };
+    const event = {
+      isTeam: true,
+      eventName: 'Playoffs: Finals',
+      matchups: [
+        {
+          id: 1,
+          eventId: 10,
+          seriesId: 1,
+          gameNumber: 1,
+          team1Id: 101,
+          team1Name: 'Pin Pals',
+          team2Id: 102,
+          team2Name: 'The Holy Rollers',
+          team1Score: 2,
+          team2Score: 4,
+          teamWinnerId: 102,
+          status: 'completed'
+        }
+      ]
+    };
+
+    renderMatchupSchedule(container, event, {
+      league,
+      onPlayMatchup: () => {},
+      isAdmin: false
+    });
+
+    const html = container.innerHTML;
+    expect(html).toContain('✓ The Holy Rollers won series');
+  });
 });
