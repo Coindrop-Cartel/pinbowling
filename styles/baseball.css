@@ -76,7 +76,6 @@
 
 /* Scoreboard Grid — baseball-style results table */
 .theme-baseball .scoreboard-grid {
-  display: table;
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9em;

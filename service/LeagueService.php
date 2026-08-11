@@ -577,4 +577,14 @@ class LeagueService {
     public function startTeamPlayoffs(int $leagueId, array $seeds, int $seriesLength): bool {
         return $this->teamPlayoffService->startPlayoffs($leagueId, $seeds, $seriesLength);
     }
+
+    public function advancePlayoffs(int $leagueId): bool {
+        $stmt = $this->db->prepare('SELECT participation_type FROM leagues WHERE id = ?');
+        $stmt->execute([$leagueId]);
+        $type = $stmt->fetchColumn();
+        if ($type === 'team') {
+            return $this->teamPlayoffService->advancePlayoffs($leagueId);
+        }
+        return $this->playoffService->advancePlayoffs($leagueId);
+    }
 }

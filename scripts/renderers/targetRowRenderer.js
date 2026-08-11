@@ -40,6 +40,23 @@ export function wireTargetRow(row, frame, options) {
     frame.scaling = scaling;
   }
 
+  const updateQFillHighlight = (selectedType = null) => {
+    let targets = null;
+    if (options.getMachineTargets) {
+      targets = options.getMachineTargets(frame.machineId);
+    } else {
+      targets = frame.targets;
+    }
+    const currentVal = frame.value1;
+    row.querySelectorAll('.qfill').forEach(btn => {
+      const type = btn.dataset.type;
+      const targetVal = targets ? targets[type] : null;
+      const isSelected = selectedType ? selectedType === type : (Boolean(targetVal) && targetVal === currentVal);
+      btn.classList.toggle('btn-standard', Boolean(isSelected));
+      btn.classList.toggle('secondary', !isSelected);
+    });
+  };
+
   const updateValues = () => {
     if (s10) frame.value1 = parseFormattedNumber(s10.value);
     if (s1) frame.value2 = parseFormattedNumber(s1.value, engine.getValue2AllowsDecimal?.() === true);
@@ -49,6 +66,7 @@ export function wireTargetRow(row, frame, options) {
     if (container) {
       container.innerHTML = renderThresholdGrid(engine.filterThresholds(frame.values), formatNumber, engine, frame.value1, frame.value2);
     }
+    updateQFillHighlight();
     if (options.onUpdate) {
       options.onUpdate(frame);
     }
@@ -73,7 +91,24 @@ export function wireTargetRow(row, frame, options) {
           if (options.onSelectMachine) {
             options.onSelectMachine(frame, match);
           }
+          let selectedType = null;
+          if (options.getMachineTargets) {
+            const targets = options.getMachineTargets(frame.machineId);
+            if (targets?.med) selectedType = 'med';
+            else if (targets?.easy) selectedType = 'easy';
+            else if (targets?.hard) selectedType = 'hard';
+
+            const defaultVal = selectedType ? targets[selectedType] : null;
+            if (defaultVal) {
+              const { value1, value2 } = engine.getInitialValues(defaultVal);
+              frame.value1 = value1;
+              frame.value2 = value2;
+              if (s10) s10.value = formatNumber(frame.value1);
+              if (s1) s1.value = formatNumber(frame.value2);
+            }
+          }
           updateValues();
+          updateQFillHighlight(selectedType);
           if (options.afterSelectMachine) {
             options.afterSelectMachine(frame);
           }
@@ -117,12 +152,14 @@ export function wireTargetRow(row, frame, options) {
           s1.setAttribute('value', v2);
         }
         updateValues();
+        updateQFillHighlight(type);
         if (options.afterQFill) {
           options.afterQFill(frame);
         }
       }
     };
   });
+  updateQFillHighlight();
 
   row.querySelectorAll('.scaling-btn').forEach(btn => {
     btn.onclick = () => {

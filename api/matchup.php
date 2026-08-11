@@ -124,12 +124,25 @@ class MatchupController extends ApiController {
 
                 $this->validateTDAccess();
 
+                $task = isset($_GET['task']) ? $_GET['task'] : ($this->input['task'] ?? null);
+                if ($task === 'add_extra_inning' || $task === 'extra_inning') {
+                    $matchupId = (int)($this->input['matchupId'] ?? $_GET['matchupId'] ?? 0);
+                    $isTeam = !empty($this->input['isTeam']) || !empty($_GET['isTeam']);
+                    if (!$matchupId) {
+                        $this->sendError('matchupId is required', 400);
+                    }
+                    $extraRoundsService = $this->container->get(\App\Service\ExtraRoundsService::class);
+                    $res = $extraRoundsService->addExtraInning($matchupId, $isTeam);
+                    $this->sendJson($res);
+                    return;
+                }
+
                 $eventMatchupId = null;
                 $__lg = function ($msg) { error_log("[pinbowling] $msg\n", 3, sys_get_temp_dir() . '/pinbowling-debug.log'); };
                 $__lg("matchup POST: eventId=$eventId scoringFormat=$scoringFormat matchups=" . json_encode(array_map(function($m) { return ['teamId' => $m['teamId'] ?? null, 'playerId' => $m['playerId'] ?? null, 'eventMatchupId' => $m['eventMatchupId'] ?? null]; }, $matchups)));
 
-                // For baseball session/quickplay games, automatically create/resolve the event_matchup record
-                if ($scoringFormat === 'baseball') {
+                // For baseball or golf_skins session/quickplay games, automatically create/resolve the event_matchup record
+                if ($scoringFormat === 'baseball' || $scoringFormat === 'golf_skins') {
                     $providedMatchupId = isset($firstMatchup['eventMatchupId']) ? (int)$firstMatchup['eventMatchupId'] : 0;
                     if ($providedMatchupId) {
                         $eventMatchupId = $providedMatchupId;
@@ -145,29 +158,30 @@ class MatchupController extends ApiController {
                             $eventMatchupId = (int)$existingId;
                             $__lg("RESOLVED existing event_matchup id=$eventMatchupId for eventId=$eventId");
                         } else {
-                            // Individual baseball: find home (playerOrder=1) and away (playerOrder=2) players
-                            $homePlayerId = 0;
-                            $awayPlayerId = 0;
-                            foreach ($matchups as $m) {
-                                $pOrder = (int)($m['playerOrder'] ?? $m['player_order'] ?? 1);
-                                $pId = (int)($m['playerId'] ?? $m['player_id'] ?? 0);
-                                if ($pOrder === 1 && !$homePlayerId) {
-                                    $homePlayerId = $pId;
-                                } else if ($pOrder === 2 && !$awayPlayerId) {
-                                    $awayPlayerId = $pId;
+                            $p1 = (int)($firstMatchup['player1Id'] ?? $firstMatchup['player1_id'] ?? 0);
+                            $p2 = (int)($firstMatchup['player2Id'] ?? $firstMatchup['player2_id'] ?? 0);
+                            $p3 = (int)($firstMatchup['player3Id'] ?? $firstMatchup['player3_id'] ?? 0);
+                            $p4 = (int)($firstMatchup['player4Id'] ?? $firstMatchup['player4_id'] ?? 0);
+
+                            if (!$p1 || !$p2) {
+                                foreach ($matchups as $m) {
+                                    $pOrder = (int)($m['playerOrder'] ?? $m['player_order'] ?? 1);
+                                    $pId = (int)($m['playerId'] ?? $m['player_id'] ?? 0);
+                                    if ($pOrder === 1 && !$p1) $p1 = $pId;
+                                    else if ($pOrder === 2 && !$p2) $p2 = $pId;
                                 }
                             }
 
-                            if ($homePlayerId && $awayPlayerId) {
+                            if ($p1 && $p2) {
                                 $stmt = $pdo->prepare(
-                                    'INSERT INTO event_matchups (event_id, player1_id, player2_id, status, game_number)
-                                     VALUES (?, ?, ?, \'pending\', 1)'
+                                    'INSERT INTO event_matchups (event_id, player1_id, player2_id, player3_id, player4_id, status, game_number)
+                                     VALUES (?, ?, ?, ?, ?, \'pending\', 1)'
                                 );
-                                $stmt->execute([$eventId, $homePlayerId, $awayPlayerId]);
+                                $stmt->execute([$eventId, $p1, $p2, $p3 ?: null, $p4 ?: null]);
                                 $eventMatchupId = (int)$pdo->lastInsertId();
-                                $__lg("CREATED individual event_matchup id=$eventMatchupId p1=$homePlayerId p2=$awayPlayerId");
+                                $__lg("CREATED individual event_matchup id=$eventMatchupId p1=$p1 p2=$p2 p3=$p3 p4=$p4");
                             } else {
-                                $__lg("FAILED to create individual event_matchup: homePlayerId=$homePlayerId awayPlayerId=$awayPlayerId");
+                                $__lg("FAILED to create individual event_matchup: p1=$p1 p2=$p2");
                             }
                         }
                     }

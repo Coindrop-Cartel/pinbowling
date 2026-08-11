@@ -5,46 +5,51 @@ import { filterPlayersForUser } from './auth.js';
  */
 export function resolvePlayersForMatchupParticipant(participantId, participantName, allPlayers = [], allLeaguesCache = [], isTeamMode = null) {
   if (!participantId) return [];
-  const pIdStr = String(participantId);
-
-  // 1. If explicitly team mode (or if not specified, check team mode leagues first ONLY if no player matches in allPlayers)
   if (isTeamMode === true) {
-    for (const league of allLeaguesCache) {
-      if (league?.participationType === 'team') {
-        const team = (league?.teams || []).find(t => String(t.id) === pIdStr);
-        if (team?.members?.length) {
-          return team.members;
-        }
+    return resolveTeamParticipant(participantId, participantName, allLeaguesCache);
+  }
+  if (isTeamMode === false) {
+    return resolveIndividualParticipant(participantId, participantName, allPlayers);
+  }
+  // If isTeamMode is unspecified, check if a direct player match exists in allPlayers first
+  const pIdStr = String(participantId);
+  const directPlayer = allPlayers.find(p => String(p.id) === pIdStr);
+  if (directPlayer) {
+    return [directPlayer];
+  }
+  const teamResult = resolveTeamParticipant(participantId, participantName, allLeaguesCache);
+  if (teamResult.length > 0 && teamResult[0].playerName !== `Team ${participantId}`) {
+    return teamResult;
+  }
+  return resolveIndividualParticipant(participantId, participantName, allPlayers);
+}
+
+export function resolveTeamParticipant(participantId, participantName, allLeaguesCache = []) {
+  if (!participantId) return [];
+  const pIdStr = String(participantId);
+  for (const league of allLeaguesCache) {
+    if (league?.participationType === 'team') {
+      const team = (league?.teams || []).find(t => String(t.id) === pIdStr);
+      if (team?.members?.length) {
+        return team.members;
       }
     }
   }
+  return [{ id: Number(participantId) || participantId, playerName: participantName || `Team ${participantId}` }];
+}
 
-  // 2. Direct match in allPlayers (for individual mode or when isTeamMode is false/unspecified)
-  if (isTeamMode !== true) {
-    const directPlayer = allPlayers.find(p => String(p.id) === pIdStr);
-    if (directPlayer) return [directPlayer];
-  }
+export function resolveIndividualParticipant(participantId, participantName, allPlayers = []) {
+  if (!participantId) return [];
+  const pIdStr = String(participantId);
+  const directPlayer = allPlayers.find(p => String(p.id) === pIdStr);
+  if (directPlayer) return [directPlayer];
 
-  // 3. Fallback: If isTeamMode was unspecified (null) and no direct player was found, check team leagues
-  if (isTeamMode === null) {
-    for (const league of allLeaguesCache) {
-      if (league?.participationType === 'team') {
-        const team = (league?.teams || []).find(t => String(t.id) === pIdStr);
-        if (team?.members?.length) {
-          return team.members;
-        }
-      }
-    }
-  }
-
-  // 4. Fallback to name match in allPlayers
   if (participantName) {
     const nameMatch = allPlayers.find(p => p.playerName?.toLowerCase() === participantName.toLowerCase());
     if (nameMatch) return [nameMatch];
   }
 
-  // 5. Return fallback object
-  return [{ id: Number(participantId) || participantId, playerName: participantName || `Participant ${participantId}` }];
+  return [{ id: Number(participantId) || participantId, playerName: participantName || `Player ${participantId}` }];
 }
 
 /**
@@ -89,8 +94,8 @@ export function isPlayerInMatchup(playerId, matchup, allLeaguesCache = [], isTea
     : (matchup.team1Id !== undefined && matchup.team1Id !== null) || (matchup.team2Id !== undefined && matchup.team2Id !== null);
 
   if (isTeam) {
-    const t1Id = String(matchup.team1Id ?? matchup.player1Id ?? '');
-    const t2Id = String(matchup.team2Id ?? matchup.player2Id ?? '');
+    const t1Id = String(matchup.team1Id ?? '');
+    const t2Id = String(matchup.team2Id ?? '');
 
     for (const league of allLeaguesCache) {
       if (league?.participationType === 'team') {
@@ -102,9 +107,11 @@ export function isPlayerInMatchup(playerId, matchup, allLeaguesCache = [], isTea
     }
     return false;
   } else {
-    const p1Id = String(matchup.player1Id ?? matchup.team1Id ?? '');
-    const p2Id = String(matchup.player2Id ?? matchup.team2Id ?? '');
-    return p1Id === curId || p2Id === curId;
+    const p1Id = String(matchup.player1Id ?? '');
+    const p2Id = String(matchup.player2Id ?? '');
+    const p3Id = String(matchup.player3Id ?? '');
+    const p4Id = String(matchup.player4Id ?? '');
+    return curId === p1Id || curId === p2Id || (p3Id !== '' && curId === p3Id) || (p4Id !== '' && curId === p4Id);
   }
 }
 

@@ -186,67 +186,9 @@ abstract class BasePlayoffService
         }
 
         if ($seriesWinnerId !== null) {
-            $expectedSeriesCount = 1;
-            if ($roundName === 'Quarterfinals') {
-                $expectedSeriesCount = 4;
-            } elseif ($roundName === 'Semifinals') {
-                $expectedSeriesCount = 2;
-            }
-
-            $allRoundStmt = $this->db->prepare(
-                "SELECT series_id, {$this->winnerCol}, {$this->homeCol}, {$this->awayCol} FROM {$this->entryTable}
-                 WHERE event_id = ? AND round_name = ? AND status = 'completed'"
-            );
-            $allRoundStmt->execute([$eventId, $roundName]);
-            $allRoundGames = $allRoundStmt->fetchAll(PDO::FETCH_ASSOC);
-
-            $seriesWinners = [];
-            foreach ($allRoundGames as $g) {
-                $sId = (int)$g['series_id'];
-                $hId = (int)$g[$this->homeCol];
-                $aId = (int)$g[$this->awayCol];
-
-                if (!isset($seriesWinners[$sId])) {
-                    $specStmt = $this->db->prepare(
-                        "SELECT {$this->winnerCol} FROM {$this->entryTable}
-                         WHERE event_id = ? AND round_name = ? AND series_id = ? AND status = 'completed'"
-                    );
-                    $specStmt->execute([$eventId, $roundName, $sId]);
-                    $specGames = $specStmt->fetchAll(PDO::FETCH_ASSOC);
-
-                    $sHomeWins = 0;
-                    $sAwayWins = 0;
-                    foreach ($specGames as $sg) {
-                        $sgWinId = isset($sg[$this->winnerCol]) ? (int)$sg[$this->winnerCol] : null;
-                        if ($sgWinId === $hId) {
-                            $sHomeWins++;
-                        } elseif ($sgWinId === $aId) {
-                            $sAwayWins++;
-                        }
-                    }
-
-                    if ($sHomeWins >= $clinchCount) {
-                        $seriesWinners[$sId] = $hId;
-                    } elseif ($sAwayWins >= $clinchCount) {
-                        $seriesWinners[$sId] = $aId;
-                    }
-                }
-            }
-
-            if (count($seriesWinners) === $expectedSeriesCount) {
-                if ($roundName === 'Quarterfinals') {
-                    $this->advanceToPlayoffRound($leagueId, 'Semifinals', [
-                        ['home' => $seriesWinners[1], 'away' => $seriesWinners[2], 'series_id' => 1],
-                        ['home' => $seriesWinners[3], 'away' => $seriesWinners[4], 'series_id' => 2],
-                    ], $rounds, $matchupsPerRound, $seriesLength);
-                } elseif ($roundName === 'Semifinals') {
-                    $this->advanceToPlayoffRound($leagueId, 'Finals', [
-                        ['home' => $seriesWinners[1], 'away' => $seriesWinners[2], 'series_id' => 1],
-                    ], $rounds, $matchupsPerRound, $seriesLength);
-                } else {
-                    $stmt = $this->db->prepare('UPDATE leagues SET status = \'completed\' WHERE id = ?');
-                    $stmt->execute([$leagueId]);
-                }
+            if ($roundName === 'Finals') {
+                $stmt = $this->db->prepare('UPDATE leagues SET status = \'completed\' WHERE id = ?');
+                $stmt->execute([$leagueId]);
             }
         } else {
             $nextGameNumber = $gameNumber + 1;
@@ -291,6 +233,113 @@ abstract class BasePlayoffService
         }
     }
 
+    public function advancePlayoffs(int $leagueId): bool
+    {
+        $db = $this->db;
+
+        $leagueStmt = $db->prepare('SELECT playoff_series_length, rounds_per_game, matchups_per_round FROM leagues WHERE id = ?');
+        $leagueStmt->execute([$leagueId]);
+        $league = $leagueStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$league) {
+            throw new \Exception('League not found.');
+        }
+
+        $seriesLength = (int)($league['playoff_series_length'] ?? 1);
+        $rounds = (int)($league['rounds_per_game'] ?? 2);
+        $matchupsPerRound = (int)($league['matchups_per_round'] ?? 2);
+        $clinchCount = (int)ceil($seriesLength / 2);
+
+        $eventsStmt = $db->prepare(
+            "SELECT id, event_name FROM events WHERE league_id = ? AND event_name LIKE 'Playoffs:%' ORDER BY id ASC"
+        );
+        $eventsStmt->execute([$leagueId]);
+        $playoffEvents = $eventsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($playoffEvents)) {
+            throw new \Exception('No playoff events found for this league.');
+        }
+
+        $latestEvent = end($playoffEvents);
+        $latestEventId = (int)$latestEvent['id'];
+        $eventName = $latestEvent['event_name'];
+        $currentRoundName = str_replace('Playoffs: ', '', $eventName);
+
+        $expectedSeriesCount = 1;
+        if ($currentRoundName === 'Quarterfinals') {
+            $expectedSeriesCount = 4;
+        } elseif ($currentRoundName === 'Semifinals') {
+            $expectedSeriesCount = 2;
+        } elseif ($currentRoundName === 'Finals') {
+            $expectedSeriesCount = 1;
+        }
+
+        $gamesStmt = $db->prepare(
+            "SELECT series_id, game_number, {$this->homeCol}, {$this->awayCol}, {$this->winnerCol}, status
+             FROM {$this->entryTable}
+             WHERE event_id = ?"
+        );
+        $gamesStmt->execute([$latestEventId]);
+        $allGames = $gamesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $seriesGamesMap = [];
+        foreach ($allGames as $g) {
+            $sId = (int)$g['series_id'];
+            $seriesGamesMap[$sId] = $seriesGamesMap[$sId] ?? [];
+            $seriesGamesMap[$sId][] = $g;
+        }
+
+        $seriesWinners = [];
+        foreach ($seriesGamesMap as $sId => $games) {
+            $g1 = null;
+            foreach ($games as $g) {
+                if ((int)$g['game_number'] === 1) {
+                    $g1 = $g;
+                    break;
+                }
+            }
+            if (!$g1) continue;
+
+            $sHomeId = (int)$g1[$this->homeCol];
+            $sAwayId = (int)$g1[$this->awayCol];
+
+            $team1Wins = 0;
+            $team2Wins = 0;
+            foreach ($games as $g) {
+                if ($g['status'] === 'completed') {
+                    $winId = isset($g[$this->winnerCol]) ? (int)$g[$this->winnerCol] : null;
+                    if ($winId === $sHomeId) $team1Wins++;
+                    elseif ($winId === $sAwayId) $team2Wins++;
+                }
+            }
+
+            if ($team1Wins >= $clinchCount) {
+                $seriesWinners[$sId] = $sHomeId;
+            } elseif ($team2Wins >= $clinchCount) {
+                $seriesWinners[$sId] = $sAwayId;
+            }
+        }
+
+        if (count($seriesWinners) < $expectedSeriesCount) {
+            throw new \Exception("Cannot advance playoffs: Not all {$currentRoundName} series have been decided yet.");
+        }
+
+        if ($currentRoundName === 'Quarterfinals') {
+            $this->advanceToPlayoffRound($leagueId, 'Semifinals', [
+                ['home' => $seriesWinners[1], 'away' => $seriesWinners[2], 'series_id' => 1],
+                ['home' => $seriesWinners[3], 'away' => $seriesWinners[4], 'series_id' => 2],
+            ], $rounds, $matchupsPerRound, $seriesLength);
+        } elseif ($currentRoundName === 'Semifinals') {
+            $this->advanceToPlayoffRound($leagueId, 'Finals', [
+                ['home' => $seriesWinners[1], 'away' => $seriesWinners[2], 'series_id' => 1],
+            ], $rounds, $matchupsPerRound, $seriesLength);
+        } elseif ($currentRoundName === 'Finals') {
+            $stmt = $db->prepare('UPDATE leagues SET status = \'completed\' WHERE id = ?');
+            $stmt->execute([$leagueId]);
+        }
+
+        return true;
+    }
+
     protected function advanceToPlayoffRound(
         int $leagueId,
         string $nextRoundName,
@@ -300,7 +349,6 @@ abstract class BasePlayoffService
         int $seriesLength
     ): void {
         $db = $this->db;
-
         $stmt = $db->prepare('SELECT id FROM events WHERE league_id = ? AND event_name = ?');
         $stmt->execute([$leagueId, 'Playoffs: ' . $nextRoundName]);
         $nextEventId = $stmt->fetchColumn();
@@ -308,8 +356,10 @@ abstract class BasePlayoffService
         if ($nextEventId) {
             $nextEventId = (int)$nextEventId;
         } else {
-            $league = $this->leagueService->getLeague($leagueId);
-            $format = !empty($league['scoring_format']) ? $league['scoring_format'] : (!empty($league['scoringFormat']) ? $league['scoringFormat'] : 'bowling');
+            $stmtLeague = $db->prepare('SELECT scoring_format FROM leagues WHERE id = ?');
+            $stmtLeague->execute([$leagueId]);
+            $leagueRow = $stmtLeague->fetch(PDO::FETCH_ASSOC);
+            $format = !empty($leagueRow['scoring_format']) ? $leagueRow['scoring_format'] : 'bowling';
             $event = $this->eventService->createEvent($leagueId, 'Playoffs: ' . $nextRoundName, null, null, $format);
             $nextEventId = (int)$event['id'];
         }

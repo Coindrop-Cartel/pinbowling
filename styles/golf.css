@@ -67,3 +67,40 @@
   color: var(--pb-white);
   border: 2px solid var(--pb-black);
 }
+
+/* Scoreboard Grid — Golf / Skins results table */
+.theme-golf .scoreboard-grid,
+.skins-scoreboard {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.theme-golf .scoreboard-row,
+.skins-scoreboard .scoreboard-row {
+  display: table-row;
+}
+
+.theme-golf .scoreboard-row.header,
+.skins-scoreboard .scoreboard-row.header {
+  font-weight: bold;
+  background: #004d00 !important;
+  color: #ffffff !important;
+}
+
+.theme-golf .scoreboard-row.header > span,
+.skins-scoreboard .scoreboard-row.header > span,
+.theme-golf .scoreboard-row.player-row > span,
+.skins-scoreboard .scoreboard-row.player-row > span {
+  display: table-cell;
+  padding: 6px 10px;
+  text-align: center;
+  border: 1px solid var(--pb-gray, #dcedc8);
+}
+
+.theme-golf table.data-table th,
+.skins-scoreboard table.data-table th {
+  background-color: #004d00 !important;
+  border-color: #004d00 !important;
+  color: #ffffff !important;
+}

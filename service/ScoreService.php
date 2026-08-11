@@ -305,16 +305,9 @@ class ScoreService
             $scoreMap[$idKey][$orderNum] = $s;
         }
 
-        $matchupRows = $this->getMatchupMachines($eventMatchupId);
-        if (empty($matchupRows)) {
-            $stmt = $pdo->prepare('SELECT DISTINCT order_number FROM scores WHERE event_id = ?');
-            $stmt->execute([$matchup['event_id']]);
-            $machines = $stmt->fetchAll();
-        } else {
-            $stmt = $pdo->prepare('SELECT order_number, value1, value2 FROM event_matchup_machines WHERE event_id = ? AND is_deleted = 0');
-            $stmt->execute([$matchup['event_id']]);
-            $machines = $stmt->fetchAll();
-        }
+        $stmt = $pdo->prepare('SELECT order_number, value1, value2 FROM target_scores WHERE event_id = ? ORDER BY order_number ASC');
+        $stmt->execute([$matchup['event_id']]);
+        $machines = $stmt->fetchAll();
         $machineMap = [];
         foreach ($machines as $mac) {
             $machineMap[(int) $mac['order_number']] = $mac;

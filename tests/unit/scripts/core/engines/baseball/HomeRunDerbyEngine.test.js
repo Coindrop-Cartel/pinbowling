@@ -69,7 +69,7 @@ describe('HomeRunDerbyEngine', () => {
   test('FormatBranding returns derby terminology and individual description', () => {
     const branding = FormatBranding.get('homerunderby');
     expect(branding.brandName).toBe('Home Run Derby');
-    expect(branding.playActionLabel).toBe('Play Derby!');
+    expect(branding.playActionLabel).toBe('Play Ball!');
     expect(branding.themeClass).toBe('theme-baseball');
     expect(branding.roundLabel).toBe('At Bat');
     expect(branding.scoreColumnLabel).toBe('HRs');

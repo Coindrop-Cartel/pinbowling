@@ -158,6 +158,7 @@ export function renderLeagueList(container, filteredLeagues, {
   onAddPlayer,
   onRemovePlayer,
   onStartPlayoffs,
+  onAdvancePlayoffs,
   onUpdateSeason,
   onPrintSeasonResults,
   onArchiveLeague,
@@ -195,13 +196,68 @@ export function renderLeagueList(container, filteredLeagues, {
       }
     }
 
+    const playoffEvents = (league.events || []).filter(e => e.eventName && e.eventName.startsWith('Playoffs:'));
+    const hasPlayoffsStarted = playoffEvents.length > 0;
+    let nextPlayoffRoundBtnLabel = null;
+
+    if (hasPlayoffsStarted && league.status === 'active') {
+      const latestPlayoffEvent = playoffEvents[playoffEvents.length - 1];
+      const eventName = latestPlayoffEvent.eventName || '';
+      const roundName = eventName.replace('Playoffs:', '').trim();
+
+      const games = latestPlayoffEvent.matchups || [];
+      if (games.length > 0) {
+        const seriesLength = Number(league.playoffSeriesLength || league.playoff_series_length || 3);
+        const clinchWins = Math.ceil(seriesLength / 2);
+        const isTeamMode = league.participationType === 'team';
+
+        const seriesMap = {};
+        games.forEach(g => {
+          const sId = g.seriesId || 1;
+          seriesMap[sId] = seriesMap[sId] || [];
+          seriesMap[sId].push(g);
+        });
+
+        let allSeriesDecided = true;
+        Object.values(seriesMap).forEach(sGames => {
+          const firstGame = sGames[0];
+          const p1Id = isTeamMode ? Number(firstGame.team1Id ?? firstGame.team1_id) : Number(firstGame.player1Id ?? firstGame.player1_id);
+          const p2Id = isTeamMode ? Number(firstGame.team2Id ?? firstGame.team2_id) : Number(firstGame.player2Id ?? firstGame.player2_id);
+
+          let p1Wins = 0;
+          let p2Wins = 0;
+          sGames.forEach(g => {
+            if (g.status === 'completed') {
+              const wid = Number(g.teamWinnerId ?? g.team_winner_id ?? g.winnerId ?? g.player_winner_id);
+              if (wid === p1Id) p1Wins++;
+              else if (wid === p2Id) p2Wins++;
+            }
+          });
+
+          if (p1Wins < clinchWins && p2Wins < clinchWins) {
+            allSeriesDecided = false;
+          }
+        });
+
+        if (allSeriesDecided) {
+          if (roundName === 'Quarterfinals' && !playoffEvents.some(e => e.eventName === 'Playoffs: Semifinals')) {
+            nextPlayoffRoundBtnLabel = 'Start Semifinals';
+          } else if (roundName === 'Semifinals' && !playoffEvents.some(e => e.eventName === 'Playoffs: Finals')) {
+            nextPlayoffRoundBtnLabel = 'Start Finals';
+          }
+        }
+      }
+    }
+
     let seasonActionHtml = '';
     if (isAuthorized && isH2H) {
       if (league.status === 'setup') {
         seasonActionHtml = '<button class="season-action-btn primary btn-row">Start Season</button>';
-      } else if (showStartPlayoffsBtn) {
+      } else if (showStartPlayoffsBtn && !hasPlayoffsStarted) {
         seasonActionHtml = '<button class="season-action-btn primary btn-row">Start Playoffs</button>';
-      } else if (league.status === 'active') {
+      } else if (nextPlayoffRoundBtnLabel) {
+        seasonActionHtml = `<button class="season-action-btn primary btn-row">${nextPlayoffRoundBtnLabel}</button>`;
+      } else if (league.status === 'active' && !hasPlayoffsStarted) {
         seasonActionHtml = '<button class="season-action-btn primary btn-row">Update Season</button>';
       }
     }
@@ -282,6 +338,8 @@ export function renderLeagueList(container, filteredLeagues, {
             }
           } else if (text === 'Start Playoffs') {
             if (onStartPlayoffs) onStartPlayoffs(league.id);
+          } else if (text === 'Start Semifinals' || text === 'Start Finals' || text.startsWith('Start ')) {
+            if (onAdvancePlayoffs) onAdvancePlayoffs(league.id, text.replace('Start ', '').trim());
           } else if (text === 'Update Season') {
             if (onUpdateSeason) onUpdateSeason(league.id);
           }

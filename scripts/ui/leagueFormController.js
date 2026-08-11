@@ -57,13 +57,10 @@ export function createLeagueFormController(elements, options) {
       locationsSummary.textContent = 'No locations selected';
       return;
     }
-    console.log('[Locations] updateLocationsSummary, allLocations:', allLocations.length, 'selectedLocationIds:', JSON.stringify(selectedLocationIds));
     const names = selectedLocationIds.map(id => {
       const loc = allLocations.find(l => String(l.id) === String(id));
-      console.log('[Locations] find id:', id, '->', loc ? loc.name : 'NOT FOUND');
       return loc ? loc.name : null;
     }).filter(Boolean);
-    console.log('[Locations] resolved names:', JSON.stringify(names), 'count match:', names.length === selectedLocationIds.length);
     if (names.length === selectedLocationIds.length) {
       locationsSummary.innerHTML = names.map(name =>
         `<span style="display: inline-block; background: #e0e0e0; border-radius: 3px; padding: 2px 8px; margin: 2px 4px 2px 0; font-size: 0.85rem;">${name}</span>`
@@ -74,7 +71,6 @@ export function createLeagueFormController(elements, options) {
   };
 
   const openLocationsDialog = async () => {
-    console.log('[Locations] Opening dialog, selectedLocationIds:', JSON.stringify(selectedLocationIds), 'type:', typeof selectedLocationIds, Array.isArray(selectedLocationIds) ? selectedLocationIds.map(id => typeof id) : 'N/A');
     if (allLocations.length === 0) {
       try {
         allLocations = await options.PB_API.locations.getAll();
@@ -84,7 +80,6 @@ export function createLeagueFormController(elements, options) {
         return;
       }
     }
-    console.log('[Locations] allLocations loaded:', allLocations.length, 'items, sample IDs:', allLocations.slice(0, 3).map(l => ({ id: l.id, name: l.name })));
     const result = await showMultiSelectDialog({
       title: 'Select Locations',
       showSelectAll: false,
@@ -94,10 +89,8 @@ export function createLeagueFormController(elements, options) {
       })),
       selected: selectedLocationIds
     });
-    console.log('[Locations] Dialog returned:', JSON.stringify(result), 'type:', typeof result, Array.isArray(result) ? result.map(id => typeof id) : 'N/A');
     if (result === null) return;
     selectedLocationIds = result;
-    console.log('[Locations] Updated selectedLocationIds:', JSON.stringify(selectedLocationIds));
     updateLocationsSummary();
   };
 
@@ -227,7 +220,6 @@ export function createLeagueFormController(elements, options) {
     if (participantsRow) participantsRow.classList.remove('hidden');
 
     selectedLocationIds = (league.locationIds || []).map(String);
-    console.log('[Locations] editLeague set selectedLocationIds from league:', JSON.stringify(league.locationIds), '->', JSON.stringify(selectedLocationIds));
     updateLocationsSummary();
 
     // Rebuild format options with the correct competition type first,
@@ -360,7 +352,6 @@ export function createLeagueFormController(elements, options) {
     }
 
     const locationIds = selectedLocationIds.map(Number);
-    console.log('[Locations] Save - selectedLocationIds:', JSON.stringify(selectedLocationIds), 'mapped locationIds:', JSON.stringify(locationIds));
 
     try {
       const payload = {

@@ -128,6 +128,15 @@ class LeagueController extends ApiController {
                     );
                     $this->sendJson(['success' => true]);
 
+                } else if ($this->task === 'advance_playoffs') {
+                    if (empty($this->input['leagueId'])) {
+                        $this->sendError('leagueId is required', 400);
+                    }
+
+                    $this->validateTDAccess();
+                    $this->leagueService->advancePlayoffs((int)$this->input['leagueId']);
+                    $this->sendJson(['success' => true]);
+
                 } else if ($this->task === 'fixture') {
                     if (empty($this->input['leagueId']) || empty($this->input['eventName'])) {
                         $this->sendError('leagueId and eventName are required', 400);

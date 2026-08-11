@@ -31,11 +31,15 @@ export function printMachineScores(machines, format = ScoringFormats.DEFAULT) {
     let extraTargets = '';
     if (m.orderNumber === maxOrder) {
       const { t1, t2 } = Engine.getBonusTargets(m);
-      extraTargets = `
-        <div class="print-extra-targets">
-          <div>Target 1: ${formatNumber(t1)}</div>
-          <div>Target 2: ${formatNumber(t2)}</div>
-        </div>`;
+      if (t1 > 0 || t2 > 0) {
+        const parts = [];
+        if (t1 > 0) parts.push(`<div>Target 1: ${formatNumber(t1)}</div>`);
+        if (t2 > 0) parts.push(`<div>Target 2: ${formatNumber(t2)}</div>`);
+        extraTargets = `
+          <div class="print-extra-targets">
+            ${parts.join('')}
+          </div>`;
+      }
     }
 
     return `

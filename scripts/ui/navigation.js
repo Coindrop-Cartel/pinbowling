@@ -43,7 +43,8 @@ export const initNavigation = (containerSelector = '.nav-container') => {
     const navLinks = container.querySelector('.nav-links');
     if (navLinks) navLinks.classList.remove('dropdown-active');
 
-    if (document.activeElement instanceof HTMLElement) {
+    // Only blur active elements that are inside the navigation container
+    if (document.activeElement instanceof HTMLElement && container.contains(document.activeElement)) {
       document.activeElement.blur();
     }
   };
@@ -134,8 +135,8 @@ export const initNavigation = (containerSelector = '.nav-container') => {
       return;
     }
 
-    // 3. Handle Dropdown Toggles (Mobile View)
-    if (dropbtn && window.innerWidth <= 768) {
+    // 3. Handle Dropdown Toggles (All Viewports & Touch Screens)
+    if (dropbtn) {
       const dropdown = dropbtn.closest('.nav-item.dropdown');
       if (dropdown) {
         e.preventDefault();
@@ -161,13 +162,15 @@ export const initNavigation = (containerSelector = '.nav-container') => {
       }
     }
   });
-  
-  // Close hamburger menu when clicking outside the navbar
+
+  // Close dropdowns and hamburger menu when clicking outside the navbar
   document.addEventListener('click', (e) => {
-    if (!hamburgerBtn || !navCollapse) return;
-    if (!navCollapse.classList.contains('nav-menu-open')) return;
     if (!container.contains(e.target)) {
-      collapseAll();
+      const hasOpenDropdown = !!container.querySelector('.nav-item.dropdown.is-open');
+      const isMobileOpen = !!navCollapse?.classList.contains('nav-menu-open');
+      if (hasOpenDropdown || isMobileOpen) {
+        collapseAll();
+      }
     }
   });
 

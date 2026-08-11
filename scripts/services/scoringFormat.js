@@ -12,10 +12,11 @@
 export const ScoringFormats = {
   BOWLING: 'bowling',
   GOLF: 'golf',
+  GOLF_SKINS: 'golf_skins',
   BASEBALL: 'baseball',
   HOME_RUN_DERBY: 'homerunderby',
   /** @type {readonly string[]} */
-  ALL: Object.freeze(['bowling', 'golf', 'baseball', 'homerunderby']),
+  ALL: Object.freeze(['bowling', 'golf', 'golf_skins', 'baseball', 'homerunderby']),
   /** @type {string} */
   DEFAULT: 'bowling',
 
@@ -89,7 +90,7 @@ export const FORMAT_TERMINOLOGY = Object.freeze({
   [ScoringFormats.GOLF]: Object.freeze({
     brand: 'PinGolf',
     logo: 'pingolf.png',
-    cta: "Let's Golf!",
+    cta: "Fore!",
     themeClass: 'theme-golf',
     roundLabel: 'Hole',
     pluralRoundLabel: 'Holes',
@@ -100,6 +101,22 @@ export const FORMAT_TERMINOLOGY = Object.freeze({
     thresholdPrefix: 'Strokes',
     scoreColumnLabel: 'Score',
     hint: "Enter your score after each ball. When you hit the target score you can stop entering scores for that round and move on to the next hole. DO NOT PLAY EXTRA BALLS",
+    lastFrameHint: ""
+  }),
+  [ScoringFormats.GOLF_SKINS]: Object.freeze({
+    brand: 'PinGolf Skins',
+    logo: 'pingolf.png',
+    cta: "Fore!",
+    themeClass: 'theme-golf',
+    roundLabel: 'Hole',
+    pluralRoundLabel: 'Holes',
+    turnHeaderPrefix: 'Hole',
+    primaryTargetLabel: 'Par',
+    value1Label: 'Target Score',
+    value2Label: 'Par',
+    thresholdPrefix: 'Strokes',
+    scoreColumnLabel: 'Skins',
+    hint: "Groups of 2 to 4 play a set number of holes. Lowest strokes on a hole wins a skin. Ties carry over to the next hole!",
     lastFrameHint: ""
   }),
   [ScoringFormats.BASEBALL]: Object.freeze({
@@ -115,13 +132,13 @@ export const FORMAT_TERMINOLOGY = Object.freeze({
     value2Label: 'Multiplier',
     thresholdPrefix: 'Runs',
     scoreColumnLabel: 'Score',
-    hint: "Enter your score after each ball.  There is no limit to how many runs you can score, so do not stop unless it's the bottom of the last inning and you have taken the lead.  DO NOT PLAY EXTRA BALLS",
+    hint: "Enter your score after each ball. Standard little league 10 run rules apply, so if you have scored that much already on a ball you do not need to play the rest of your balls. DO NOT PLAY EXTRA BALLS",
     lastFrameHint: ""
   }),
   [ScoringFormats.HOME_RUN_DERBY]: Object.freeze({
     brand: 'Home Run Derby',
     logo: 'pinderby.png',
-    cta: "Play Derby!",
+    cta: "Play Ball!",
     themeClass: 'theme-baseball',
     roundLabel: 'At Bat',
     pluralRoundLabel: 'At Bats',

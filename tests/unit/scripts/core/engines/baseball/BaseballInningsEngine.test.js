@@ -1125,4 +1125,16 @@ describe('BaseballInningsEngine', () => {
     expect(sorted[0].entity.id).toBe(2);
     expect(sorted[1].entity.id).toBe(1);
   });
+
+  test('Tie policy and Extra Innings support', () => {
+    expect(engine.allowsTies()).toBe(false);
+    expect(engine.supportsExtraRounds()).toBe(true);
+
+    const extraConfig = engine.getExtraRoundConfig();
+    expect(extraConfig).toEqual({
+      roundsToAdd: 2,
+      label: 'Extra Inning',
+      roundName: 'Extra Inning'
+    });
+  });
 });

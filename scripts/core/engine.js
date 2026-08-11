@@ -1,5 +1,6 @@
 import { TraditionalBowlingEngine } from '@core/engines/bowling/scoring/TraditionalBowlingEngine.js';
 import { StrokesGolfEngine } from '@core/engines/golf/scoring/StrokesGolfEngine.js';
+import { SkinsGolfEngine } from '@core/engines/golf/scoring/SkinsGolfEngine.js';
 import { BaseballInningsEngine } from '@core/engines/baseball/scoring/BaseballInningsEngine.js';
 import { HomeRunDerbyEngine } from '@core/engines/baseball/scoring/HomeRunDerbyEngine.js';
 import { ScoringEngine } from '@core/ScoringEngine.js';
@@ -12,6 +13,7 @@ export const SCORING_FORMATS = ScoringFormats.ALL.map(value => {
   const labels = {
     [ScoringFormats.BOWLING]: 'Bowling (Marks & Frames)',
     [ScoringFormats.GOLF]: 'Golf (Strokes vs Par)',
+    [ScoringFormats.GOLF_SKINS]: 'Golf Skins (Group Match Play)',
     [ScoringFormats.BASEBALL]: 'Baseball (Head-to-Head Runs)',
     [ScoringFormats.HOME_RUN_DERBY]: 'Home Run Derby (Individual Runs)'
   };
@@ -38,6 +40,8 @@ export function getScoringEngine(format = null, settings = null, options = {}) {
   switch (activeFormat) {
     case ScoringFormats.HOME_RUN_DERBY:
       return new HomeRunDerbyEngine(resolvedSettings.homerunderby || resolvedSettings.baseball, options);
+    case ScoringFormats.GOLF_SKINS:
+      return new SkinsGolfEngine(resolvedSettings.golf_skins || resolvedSettings.golf, options);
     case ScoringFormats.GOLF:
       return new StrokesGolfEngine(resolvedSettings.golf, options);
     case ScoringFormats.BASEBALL:

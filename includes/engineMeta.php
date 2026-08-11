@@ -28,7 +28,7 @@ $engineMeta = [
         'golf' => [
         'brand' => 'PinGolf',
         'logo'  => 'pingolf.png',
-        'cta'   => "Let's Golf!",
+        'cta'   => "Fore!",
         'themeClass' => 'theme-golf',
         'roundLabel' => 'Hole',
         'turnHeaderPrefix' => 'Hole',
@@ -44,6 +44,23 @@ $engineMeta = [
                     as your score for the hole (1, 2, 3).  If you don't reach the target score after your 3rd ball, then your score is assigned by whatever score you did 
                     reach, given the target score (4-10)."
     ],
+    'golf_skins' => [
+        'brand' => 'PinGolf Skins',
+        'logo'  => 'pingolf.png',
+        'cta'   => "Fore!",
+        'themeClass' => 'theme-golf',
+        'roundLabel' => 'Hole',
+        'turnHeaderPrefix' => 'Hole',
+        'primaryTargetLabel' => 'Par',
+        'value1Label' => 'Target Score',
+        'value2Label' => 'Par',
+        'scoreColumnLabel' => 'Skins',
+        'hint'  => "Groups of 2 to 4 play a set number of holes. Lowest strokes on a hole wins a skin. Ties carry over to the next hole!",
+        'lastFrameHint' => "",
+        'thresholdStart' => 3,
+        'thresholdEnd' => 10,
+        'logic' => "Groups of up to 4 players compete on each hole. The player with the lowest stroke score on a hole wins the skin. If 2 or more players tie for lowest score, the skin carries over to the next hole."
+    ],
     'baseball' => [
         'brand' => 'PinBaseball',
         'logo'  => 'pinbaseball.png',
@@ -54,8 +71,7 @@ $engineMeta = [
         'primaryTargetLabel' => 'Run Baseline',
         'value1Label' => 'Baseline Score',
         'value2Label' => 'Multiplier',
-        'hint'  => "Enter your score after each ball.  There is no limit to how many runs you can score, so do not stop unless it's the bottom of the last inning and you have
-        taken the lead.  DO NOT PLAY EXTRA BALLS",
+        'hint'  => "Enter your score after each ball. Standard little league 10 run rules apply, so if you have scored that much already on a ball you do not need to play the rest of your balls. DO NOT PLAY EXTRA BALLS",
         'lastFrameHint' => "",
         'thresholdStart' => 1, // Display ranks from 1 (1 run) up to 10
         'thresholdEnd' => 10,
@@ -68,7 +84,7 @@ $engineMeta = [
     'homerunderby' => [
         'brand' => 'Home Run Derby',
         'logo'  => 'pinderby.png',
-        'cta'   => "Play Derby!",
+        'cta'   => "Play Ball!",
         'themeClass' => 'theme-baseball',
         'roundLabel' => 'At Bat',
         'turnHeaderPrefix' => 'At Bat',

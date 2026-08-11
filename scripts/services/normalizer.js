@@ -182,13 +182,46 @@ export function buildScoreMapFromDOM(container) {
   const rows = container.querySelectorAll('.round-row');
   rows.forEach(row => {
     const orderNum = Number(row.dataset.orderNumber);
-    const ball1El = row.querySelector('[data-ball="1"]');
-    const ball2El = row.querySelector('[data-ball="2"]');
-    const ball3El = row.querySelector('[data-ball="3"]');
+    const bySection = {};
+    const byPlayer = {};
+
+    const participantSections = row.querySelectorAll('.participant-section');
+    if (participantSections.length > 0) {
+      participantSections.forEach(secEl => {
+        const secInput = secEl.querySelector('input[data-section-key]');
+        const sectionKey = secInput ? secInput.dataset.sectionKey : (secEl.classList.contains('player1-section') ? 'player1' : 'player2');
+        const playerId = secInput?.dataset.playerId;
+
+        const b1El = secEl.querySelector('[data-ball="1"]');
+        const b2El = secEl.querySelector('[data-ball="2"]');
+        const b3El = secEl.querySelector('[data-ball="3"]');
+        const ball1 = b1El ? Number(String(b1El.value || '').replace(/\D/g, '')) || 0 : 0;
+        const ball2 = b2El ? Number(String(b2El.value || '').replace(/\D/g, '')) || 0 : 0;
+        const ball3 = b3El ? Number(String(b3El.value || '').replace(/\D/g, '')) || 0 : 0;
+        const entry = { ball1, ball2, ball3 };
+
+        bySection[sectionKey] = entry;
+        if (playerId) {
+          byPlayer[playerId] = entry;
+        }
+      });
+    }
+
+    // Default ball1, ball2, ball3 for flat lookup
+    // Prefer input with data-is-active-participant="true" if present
+    let ball1El = row.querySelector('input[data-is-active-participant="true"][data-ball="1"]') || row.querySelector('[data-ball="1"]');
+    let ball2El = row.querySelector('input[data-is-active-participant="true"][data-ball="2"]') || row.querySelector('[data-ball="2"]');
+    let ball3El = row.querySelector('input[data-is-active-participant="true"][data-ball="3"]') || row.querySelector('[data-ball="3"]');
+
     const ball1 = ball1El ? Number(String(ball1El.value || '').replace(/\D/g, '')) || 0 : 0;
     const ball2 = ball2El ? Number(String(ball2El.value || '').replace(/\D/g, '')) || 0 : 0;
     const ball3 = ball3El ? Number(String(ball3El.value || '').replace(/\D/g, '')) || 0 : 0;
-    map[orderNum] = { ball1, ball2, ball3 };
+
+    const entry = { ball1, ball2, ball3 };
+    Object.defineProperty(entry, 'bySection', { value: bySection, enumerable: false, writable: true, configurable: true });
+    Object.defineProperty(entry, 'byPlayer', { value: byPlayer, enumerable: false, writable: true, configurable: true });
+
+    map[orderNum] = entry;
   });
   return map;
 }

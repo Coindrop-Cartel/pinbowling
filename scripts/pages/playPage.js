@@ -168,15 +168,13 @@ export async function initPlayPage() {
           const notAlreadyJoined = allPlayersCache.filter(p => !joinedIds.has(p.id));
           const currentSpots = engine.availableSpots(joinedIds.size);
           const available = filterPlayersForUser(notAlreadyJoined, currentUser);
-          const usable = currentSpots === Infinity
-            ? available
-            : available.slice(0, currentSpots);
-          const options = usable.map(p => ({ value: p.id, label: p.playerName }));
 
-          if (options.length === 0) {
+          if (currentSpots <= 0 || available.length === 0) {
             showDialog({title: 'Session Full', message: 'No available roster spots remaining for this session format.', confirmText: 'OK' , hideCancel: true });
             return;
           }
+
+          const options = available.map(p => ({ value: p.id, label: p.playerName }));
 
           selectedId = await showPlayerSelectionDialog('Join Session', 'Add player to session:', options, 'Add');
         } else {

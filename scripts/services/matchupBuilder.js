@@ -148,11 +148,25 @@ export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups, tea
     return { matchup: null, isPlayer1: true, isTop: true, opponentName: '', displayRoundNumber: '' };
   }
 
+  const { allPlayersCache = [], activeLeague } = teamContext;
+  const isTeamMode = activeLeague?.participationType === 'team';
   const targetMatchup = eventMatchups.find(m => {
-    const p1 = Number(m.player1Id ?? m.player1_id ?? m.team1Id ?? m.team1_id ?? 0);
-    const p2 = Number(m.player2Id ?? m.player2_id ?? m.team2Id ?? m.team2_id ?? 0);
     const cur = Number(playerId);
-    return p1 === cur || p2 === cur;
+    if (isTeamMode) {
+      const t1 = Number(m.team1Id ?? m.team1_id ?? 0);
+      const t2 = Number(m.team2Id ?? m.team2_id ?? 0);
+      if ((!t1 || !t2) && (m.player1Id || m.player2Id)) {
+        console.warn('[matchupBuilder] resolveMatchupRole team mode evaluated player fields:', m);
+      }
+      return t1 === cur || t2 === cur || Number(m.player1Id ?? 0) === cur || Number(m.player2Id ?? 0) === cur;
+    } else {
+      const p1 = Number(m.player1Id ?? m.player1_id ?? 0);
+      const p2 = Number(m.player2Id ?? m.player2_id ?? 0);
+      if ((!p1 || !p2) && (m.team1Id || m.team2Id)) {
+        console.warn('[matchupBuilder] resolveMatchupRole individual mode evaluated team fields:', m);
+      }
+      return p1 === cur || p2 === cur || Number(m.team1Id ?? 0) === cur || Number(m.team2Id ?? 0) === cur;
+    }
   }) || eventMatchups[0];
 
   let item = entries.find((m) =>
@@ -172,9 +186,7 @@ export function resolveMatchupRole(playerId, roundIdentifier, eventMatchups, tea
   let isPlayer2 = false;
   let opponentName = '';
 
-  const { allPlayersCache = [], activeLeague } = teamContext;
   const leagues = activeLeague ? [activeLeague] : [];
-  const isTeamMode = activeLeague?.participationType === 'team' || (targetMatchup.team1Id !== undefined && targetMatchup.team1Id !== null);
 
   const p1Players = resolvePlayersForMatchupParticipant(p1Id, targetMatchup.player1Name, allPlayersCache, leagues, isTeamMode);
   const p2Players = resolvePlayersForMatchupParticipant(p2Id, targetMatchup.player2Name, allPlayersCache, leagues, isTeamMode);

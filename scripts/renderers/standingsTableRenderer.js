@@ -67,16 +67,20 @@ export function renderStandingsTable({
   teamResultMap = {},
   tvModeManager = null,
   lastScoreState = new Map(),
-  currentScoreState = new Map()
+  currentScoreState = new Map(),
+  scoresByPlayer = {}
 }) {
   const playerLabel = isTeamLeague ? 'Team' : 'Player';
   const isTvMode = tvModeManager?.isTvMode === true || (tvModeManager && typeof tvModeManager.isTvModeActive === 'function' ? tvModeManager.isTvModeActive() : false);
   const finalMatchupScoreMap = (matchupScoreMap && Object.keys(matchupScoreMap).length > 0) ? matchupScoreMap : (event?.matchupScoreMap || {});
   const finalTeamResultMap = (teamResultMap && Object.keys(teamResultMap).length > 0) ? teamResultMap : (event?.teamResultMap || {});
 
+  const isSkinsFormat = engine?.config?.format === 'golf_skins' || event?.scoringFormat === 'golf_skins' || league?.scoringFormat === 'golf_skins';
+  const effectiveSupportsMatchups = supportsMatchups && !isSkinsFormat;
+
   if (isSummary) {
     // --- SEASON SUMMARY RENDER PATHS ---
-    if (supportsMatchups) {
+    if (effectiveSupportsMatchups) {
       // 1. Head-to-Head / Baseball Season Summary
       if (headerEl) {
         headerEl.innerHTML = `
@@ -126,7 +130,7 @@ export function renderStandingsTable({
             <th class="text-center">#</th>
             <th class="text-center">${playerLabel}</th>
             ${columns.map((e, i) => `<th class="text-center">${i + 1}</th>`).join('')}
-            ${supportsMatchups ? '<th class="text-center">W-L</th>' : ''}
+            ${effectiveSupportsMatchups ? '<th class="text-center">W-L</th>' : ''}
             <th class="text-center">Total</th>
           </tr>
         `;
@@ -149,9 +153,9 @@ export function renderStandingsTable({
             ? `${res.totalSeasonPoints} pts`
             : engine.formatTotalScore(res.totalSeasonPoints);
 
-          const recordCell = supportsMatchups && res.displayRecord
+          const recordCell = effectiveSupportsMatchups && res.displayRecord
             ? `<td class="standings-record text-center">${res.displayRecord}</td>`
-            : (supportsMatchups ? '<td class="standings-record text-center">-</td>' : '');
+            : (effectiveSupportsMatchups ? '<td class="standings-record text-center">-</td>' : '');
 
           return `
             <tr>
@@ -167,8 +171,94 @@ export function renderStandingsTable({
     }
   } else {
     // --- EVENT SCOREBOARD RENDER PATHS ---
+    if (isSkinsFormat) {
+      const pScoresSource = (scoresByPlayer && Object.keys(scoresByPlayer).length > 0) ? scoresByPlayer : {};
+      const scoreMapByPlayer = {};
+      rows.forEach(res => {
+        const pId = Number(res.player?.id || res.entity?.id || 0);
+        if (!pId) return;
+        const pScores = pScoresSource[pId] || res.scores || res.turnResults || [];
+        const pMap = {};
+        pScores.forEach(t => {
+          const orderStr = String(t.orderNumber ?? t.order_number ?? '');
+          if (orderStr) {
+            pMap[orderStr] = {
+              ball1: Number(t.ball1 || 0),
+              ball2: Number(t.ball2 || 0),
+              ball3: Number(t.ball3 || 0)
+            };
+          }
+        });
+        scoreMapByPlayer[pId] = pMap;
+      });
+
+      const skinsCalc = engine.calculateSkinsResults(columns, scoreMapByPlayer);
+      const { holeResults, skinsWon, totalStrokes } = skinsCalc;
+
+      const skinsRows = rows.map(res => {
+        const pId = Number(res.player?.id || res.entity?.id || 0);
+        return {
+          ...res,
+          pId,
+          totalSkins: skinsWon[pId] || 0,
+          totalStrokes: totalStrokes[pId] || 0
+        };
+      });
+
+      skinsRows.sort((a, b) => {
+        if (b.totalSkins !== a.totalSkins) return b.totalSkins - a.totalSkins;
+        return a.totalStrokes - b.totalStrokes;
+      });
+
+      const isTie = (a, b) => a.totalSkins === b.totalSkins && a.totalStrokes === b.totalStrokes;
+      const ranks = computeRanks(skinsRows, isTie);
+
+      if (headerEl) {
+        headerEl.innerHTML = `
+          <tr>
+            <th class="text-center">#</th>
+            <th class="text-left">${playerLabel}</th>
+            ${columns.map(m => `<th class="text-center">Hole ${m.orderNumber}</th>`).join('')}
+            <th class="text-center">Total</th>
+          </tr>
+        `;
+      }
+
+      if (bodyEl) {
+        bodyEl.innerHTML = skinsRows.map((res, idx) => {
+          const pId = res.pId;
+          const playerName = res.player?.playerName || res.entity?.playerName || 'Player';
+
+          const holesHtml = columns.map(m => {
+            const hr = holeResults.find(h => h.orderNumber === m.orderNumber);
+            const strokes = hr?.strokes?.[pId];
+            if (strokes === null || strokes === undefined) return '<td class="standings-round">-</td>';
+
+            const isWinner = hr.winnerId === pId;
+            let cellText = `${strokes}`;
+            if (isWinner) {
+              cellText += ` <span style="color: #2e7d32; font-weight: bold;">(+${hr.skinsAwarded})</span>`;
+            } else if (hr.tied) {
+              cellText += ` <span style="color: #757575;">(-)</span>`;
+            }
+            return `<td class="standings-round ${isWinner ? 'font-bold' : ''}">${cellText}</td>`;
+          }).join('');
+
+          return `
+            <tr>
+              <td class="text-center">${ranks[idx]}</td>
+              <td class="player-name-cell">${escapeHTML(playerName)}</td>
+              ${holesHtml}
+              <td class="standings-total text-center">${res.totalSkins} ${res.totalSkins === 1 ? 'Skin' : 'Skins'}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+      return;
+    }
+
     if (headerEl) {
-      if (supportsMatchups) {
+      if (effectiveSupportsMatchups) {
         headerEl.innerHTML = `
           <tr>
             <th class="text-center">#</th>
@@ -184,7 +274,7 @@ export function renderStandingsTable({
             <th class="text-center">#</th>
             <th class="text-center">${playerLabel}</th>
             ${columns.map(m => `<th class="text-center">${m.orderNumber}</th>`).join('')}
-            ${supportsMatchups ? '<th class="text-center">W-L</th>' : ''}
+            ${effectiveSupportsMatchups ? '<th class="text-center">W-L</th>' : ''}
             <th class="text-center">Total</th>
           </tr>
         `;

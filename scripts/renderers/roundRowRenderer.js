@@ -1,5 +1,5 @@
 import { formatNumber, applyScoreFormatting, renderThresholdGrid, escapeHTML } from '../utils.js';
-import { showAlert } from '../ui/dialogs.js';
+import { showAlert, showDialog } from '../ui/dialogs.js';
 import { getScoreAccessLevel } from '../services/auth.js';
 
 /**
@@ -41,7 +41,6 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   const row = document.createElement('div');
   
   const turnValues = scoreMap?.[String(round.orderNumber)] || null;
-  const opponentScores = scoreMap?.opponent?.[String(round.orderNumber)] || null;
   let isTargetInRoster = false;
   const isSession = activeLeague?.isSession === true;
   if (activeLeague) {
@@ -105,7 +104,7 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
 
   if (rowContext?.isWalkOff) {
     effectiveAccessDenied = false;
-    statusMsg = rowContext.walkOffNotice || 'Walk-off: Home team is leading. Save this round to complete the game.';
+    statusMsg = rowContext.walkOffNotice || 'Walk-off: Home team is leading in the bottom of the last inning. No need to play extra balls. Save this round to complete the game.';
   } else if (rowContext?.isDisabled) {
     effectiveAccessDenied = true;
     statusMsg = 'This round is locked.';
@@ -126,9 +125,11 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
 
   let sectionsHtml = '';
   if (hasMatchup) {
+    const isAllScoresMode = Boolean(engineContext?.isAllScoresMode);
     sectionsHtml = sections.map(sec => {
-      const isDisabled = sec.isActiveParticipant ? effectiveAccessDenied : opponentAccessDenied;
-      const containerClass = sec.isActiveParticipant ? 'round-inputs-container' : 'opponent-inputs-container';
+      const canEditSec = (sec.isActiveParticipant || isAllScoresMode) && !effectiveAccessDenied;
+      const isDisabled = !canEditSec;
+      const containerClass = canEditSec ? 'round-inputs-container' : 'opponent-inputs-container';
       return `
         <div class="participant-section ${sec.key}-section ${containerClass} ${isDisabled ? 'round-inputs-disabled' : ''}">
           ${sec.roleLabel || sec.displayName ? `
@@ -167,7 +168,16 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   `;
 
   const saveBtn = row.querySelector('.save-round-button');
-  if (rowContext?.isWalkOff) {
+  const hasSavedScoreInRound = sections.some(sec => {
+    const secId = Number(sec.teamId ?? sec.playerId ?? 0);
+    const orderStr = String(round.orderNumber);
+    const secScoreRow = isTeamMode
+      ? (scoreMap?.byTeam?.[secId]?.[orderStr] || scoreMap?.byTeam?.[String(secId)]?.[orderStr])
+      : (scoreMap?.byPlayer?.[secId]?.[orderStr] || scoreMap?.byPlayer?.[String(secId)]?.[orderStr]);
+    return Boolean(secScoreRow);
+  });
+
+  if (rowContext?.isWalkOff && !hasSavedScoreInRound) {
     saveBtn.disabled = false;
   }
 
@@ -184,14 +194,23 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
       const sectionRow = row.querySelector(`.${sec.key}-row`);
       if (!sectionRow) return;
 
-      const canEditSection = sec.isActiveParticipant && !effectiveAccessDenied;
+      const isAllScoresMode = Boolean(engineContext?.isAllScoresMode);
+      const canEditSection = (sec.isActiveParticipant || isAllScoresMode) && !effectiveAccessDenied;
       const isBallLockedForSec = sec.isActiveParticipant && !isTDOrAdmin;
       const perBallPlayers = sec.perBallPlayers || [];
 
       const maxBalls = typeof engine.getMaxBallsPerRound === 'function' ? engine.getMaxBallsPerRound() : 3;
 
       for (let ball = 1; ball <= maxBalls; ball += 1) {
-        const value = sec.isActiveParticipant ? turnValues?.[`ball${ball}`] : opponentScores?.[`ball${ball}`];
+        const secId = Number(sec.teamId ?? sec.playerId ?? 0);
+        const orderStr = String(round.orderNumber);
+
+        // Direct lookup by participant ID in byTeam or byPlayer map
+        const secScoreRow = isTeamMode
+          ? (scoreMap?.byTeam?.[secId]?.[orderStr] || scoreMap?.byTeam?.[String(secId)]?.[orderStr])
+          : (scoreMap?.byPlayer?.[secId]?.[orderStr] || scoreMap?.byPlayer?.[String(secId)]?.[orderStr]);
+
+        const value = secScoreRow ? secScoreRow[`ball${ball}`] : undefined;
         const displayValue = (value !== undefined && value !== null && value !== 0) ? value : '';
         const isBallLocked = isBallLockedForSec && !!lockedBalls[`ball${ball}`];
 
@@ -209,6 +228,8 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
 
         const input = createRollInput(round.orderNumber, ball, round.machineId, displayValue, `Ball ${ball}`, { isOpponent: !canEditSection });
         input.dataset.sectionKey = sec.key;
+        input.dataset.playerId = sec.playerId;
+        input.dataset.isActiveParticipant = sec.isActiveParticipant ? 'true' : 'false';
 
         if (isBallLocked) {
           input.readOnly = true;
@@ -220,6 +241,7 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
 
         if (canEditSection) {
           input.addEventListener('input', () => {
+            delete input.dataset.savedValue;
             saveBtn.disabled = false;
             saveBtn.classList.add('is-dirty');
           });
@@ -250,6 +272,7 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
       }
 
       input.addEventListener('input', () => {
+        delete input.dataset.savedValue;
         saveBtn.disabled = false;
         saveBtn.classList.add('is-dirty');
       });
@@ -260,63 +283,76 @@ export async function buildRoundRow(round, scoreMap, isLastRound = false, target
   }
 
   saveBtn.addEventListener('click', async (e) => {
-    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    if (!saveScoreCallback || saveBtn.disabled) return;
     const currentPlayerId = getCurrentPlayerId() || (typeof engineContext?.getActiveTeamId === 'function' ? engineContext.getActiveTeamId() : null);
-    if (!currentPlayerId) return;
-
-    const activeSec = sections.find(s => s.isActiveParticipant);
-    const activeSectionSelector = activeSec ? `.${activeSec.key}-row` : '';
-    const getBallValue = (ballNum) => {
-      const input = activeSectionSelector
-        ? row.querySelector(`${activeSectionSelector} [data-ball="${ballNum}"]`)
-        : row.querySelector(`[data-ball="${ballNum}"]`);
-      if (input && input.dataset.savedValue !== undefined) {
-        return Number(String(input.dataset.savedValue).replace(/\D/g, '')) || 0;
-      }
-      return Number(input?.value.replace(/\D/g, '')) || 0;
-    };
-
-    const ball1 = getBallValue(1);
-    const ball2 = getBallValue(2);
-    const ball3 = getBallValue(3);
-
-    if (window.PB_DEBUG_MODE) {
-      const sectionKey = activeSec?.key ?? 'unknown';
-      console.log(`[RoundRow] Save clicked — section=${sectionKey} order=${round.orderNumber} machine=${round.machineId} balls=${ball1}/${ball2}/${ball3}`, {
-        perBallPlayers: activeSec?.perBallPlayers,
-        isTeamMode,
-        round
-      });
-    }
 
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
 
     try {
       if (saveScoreCallback) {
-        let ball1PlayerId = null;
-        let ball2PlayerId = null;
-        let ball3PlayerId = null;
+        const isAllScoresMode = Boolean(engineContext?.isAllScoresMode) || String(currentPlayerId) === 'all';
+        const sectionsToSave = (sections && sections.length > 0)
+          ? sections.filter(sec => (sec.isActiveParticipant || isAllScoresMode) && !effectiveAccessDenied)
+          : [null];
 
-        if (isTeamMode && activeSec?.perBallPlayers?.length) {
-          ball1PlayerId = activeSec.perBallPlayers[0]?.id ? Number(activeSec.perBallPlayers[0].id) : null;
-          ball2PlayerId = activeSec.perBallPlayers[1]?.id ? Number(activeSec.perBallPlayers[1].id) : null;
-          ball3PlayerId = activeSec.perBallPlayers[2]?.id ? Number(activeSec.perBallPlayers[2].id) : null;
+        for (const sec of sectionsToSave) {
+          const secSelector = sec ? `.${sec.key}-row` : '';
+          const getSecBallValue = (ballNum) => {
+            const input = secSelector
+              ? row.querySelector(`${secSelector} [data-ball="${ballNum}"]`)
+              : row.querySelector(`[data-ball="${ballNum}"]`);
+            if (!input) return 0;
+            const valStr = input.value !== undefined && input.value !== null && input.value.trim() !== ''
+              ? input.value
+              : (input.dataset.savedValue ?? '');
+            return Number(String(valStr).replace(/\D/g, '')) || 0;
+          };
+
+          const ball1 = getSecBallValue(1);
+          const ball2 = getSecBallValue(2);
+          const ball3 = getSecBallValue(3);
+
+          // If in multi-section view (e.g. All Teams/Players or dual row) and this section has no non-zero scores and no dirty inputs, skip saving empty 0-scores
+          if (sectionsToSave.length > 1 && ball1 === 0 && ball2 === 0 && ball3 === 0) {
+            const secRow = secSelector ? row.querySelector(secSelector) : row;
+            const isDirty = secRow?.querySelector('.is-dirty');
+            if (!isDirty) continue;
+          }
+
+          let ball1PlayerId = null;
+          let ball2PlayerId = null;
+          let ball3PlayerId = null;
+
+          if (isTeamMode && sec?.perBallPlayers?.length) {
+            ball1PlayerId = sec.perBallPlayers[0]?.id ? Number(sec.perBallPlayers[0].id) : null;
+            ball2PlayerId = sec.perBallPlayers[1]?.id ? Number(sec.perBallPlayers[1].id) : null;
+            ball3PlayerId = sec.perBallPlayers[2]?.id ? Number(sec.perBallPlayers[2].id) : null;
+          }
+
+          let targetSecPlayerId = sec?.playerId ? Number(sec.playerId) : Number(currentPlayerId);
+          if (isNaN(targetSecPlayerId) && sec?.key) {
+            const keyIdx = sec.key === 'player1' ? 1 : (sec.key === 'player2' ? 2 : (sec.key === 'player3' ? 3 : 4));
+            const wrapper = engineContext?.eventMatchups?.[0] || {};
+            targetSecPlayerId = Number(wrapper[`player${keyIdx}Id`] ?? wrapper[`player${keyIdx}_id`] ?? wrapper[`team${keyIdx}Id`] ?? 0);
+          }
+
+          const savePayload = {
+            teamId: targetSecPlayerId,
+            playerId: targetSecPlayerId,
+            orderNumber: Number(round.orderNumber),
+            machineId: Number(round.machineId),
+            ball1,
+            ball2,
+            ball3,
+            ball1PlayerId,
+            ball2PlayerId,
+            ball3PlayerId
+          };
+          if (window.PB_DEBUG_MODE) console.log('[RoundRow] Calling saveScoreCallback with:', JSON.stringify(savePayload));
+          await saveScoreCallback(savePayload);
         }
-
-        const savePayload = {
-          playerId: Number(currentPlayerId),
-          orderNumber: Number(round.orderNumber),
-          machineId: Number(round.machineId),
-          ball1,
-          ball2,
-          ball3,
-          ball1PlayerId,
-          ball2PlayerId,
-          ball3PlayerId
-        };
-        if (window.PB_DEBUG_MODE) console.log('[RoundRow] Calling saveScoreCallback with:', JSON.stringify(savePayload));
-        await saveScoreCallback(savePayload);
       }
       saveBtn.classList.remove('is-dirty');
       if (refreshCallback) {

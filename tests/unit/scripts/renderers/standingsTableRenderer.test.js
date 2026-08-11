@@ -113,5 +113,72 @@ describe('standingsTableRenderer', () => {
       // Verify row 4: Rank 4, Adam Yates, Loss, Score 2-5, Record 0-1
       expect(rowsText[3]).toEqual(['4', 'Adam Yates', 'Loss', '2-5', '0-1']);
     });
+
+    it('renders Golf Skins standings table with per-hole scores and total skins ranking', () => {
+      const headerEl = document.createElement('thead');
+      const bodyEl = document.createElement('tbody');
+
+      const rows = [
+        { player: { id: 1, playerName: 'Kyle Voorhees' } },
+        { player: { id: 2, playerName: 'Adam Bowman' } }
+      ];
+
+      const columns = [
+        { orderNumber: 1, machineName: 'Hole 1' },
+        { orderNumber: 2, machineName: 'Hole 2' }
+      ];
+
+      const scoresByPlayer = {
+        1: [ { orderNumber: 1, ball1: 3 }, { orderNumber: 2, ball1: 2 } ],
+        2: [ { orderNumber: 1, ball1: 3 }, { orderNumber: 2, ball1: 4 } ]
+      };
+
+      const engine = {
+        config: { format: 'golf_skins' },
+        calculateSkinsResults: () => ({
+          holeResults: [
+            { orderNumber: 1, winnerId: null, skinsAwarded: 0, carryover: 1, tied: true, strokes: { 1: 3, 2: 3 } },
+            { orderNumber: 2, winnerId: 1, skinsAwarded: 2, carryover: 0, tied: false, strokes: { 1: 2, 2: 4 } }
+          ],
+          skinsWon: { 1: 2, 2: 0 },
+          totalStrokes: { 1: 5, 2: 7 }
+        })
+      };
+
+      renderStandingsTable({
+        headerEl,
+        bodyEl,
+        isSummary: false,
+        league: { participationType: 'individual', scoringFormat: 'golf_skins' },
+        event: { scoringFormat: 'golf_skins' },
+        isTeamLeague: false,
+        rows,
+        columns,
+        engine,
+        supportsMatchups: true,
+        scoresByPlayer
+      });
+
+      const headerText = Array.from(headerEl.querySelectorAll('th')).map(th => th.textContent.trim());
+      expect(headerText).toEqual(['#', 'Player', 'Hole 1', 'Hole 2', 'Total']);
+
+      const rowsText = Array.from(bodyEl.querySelectorAll('tr')).map(tr =>
+        Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim())
+      );
+
+      // Rank 1: Kyle Voorhees with 2 Skins (Hole 1: 3 (-), Hole 2: 2 (+2))
+      expect(rowsText[0][0]).toBe('1');
+      expect(rowsText[0][1]).toBe('Kyle Voorhees');
+      expect(rowsText[0][2]).toContain('3 (-)');
+      expect(rowsText[0][3]).toContain('2 (+2)');
+      expect(rowsText[0][4]).toBe('2 Skins');
+
+      // Rank 2: Adam Bowman with 0 Skins (Hole 1: 3 (-), Hole 2: 4)
+      expect(rowsText[1][0]).toBe('2');
+      expect(rowsText[1][1]).toBe('Adam Bowman');
+      expect(rowsText[1][2]).toContain('3 (-)');
+      expect(rowsText[1][3]).toBe('4');
+      expect(rowsText[1][4]).toBe('0 Skins');
+    });
   });
 });

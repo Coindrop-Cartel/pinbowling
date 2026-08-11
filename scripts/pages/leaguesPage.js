@@ -12,6 +12,7 @@ import { createLeagueFormController } from '@ui/leagueFormController.js';
 import { createEventFormController } from '@ui/eventFormController.js';
 import {
   startPlayoffsFlow as _startPlayoffsFlow,
+  advancePlayoffsFlow as _advancePlayoffsFlow,
   updateSeasonFlow as _updateSeasonFlow,
   printSeasonResultsFlow as _printSeasonResultsFlow,
   addPlayerToLeague as _addPlayerToLeague,
@@ -177,6 +178,7 @@ export async function initLeaguesPage() {
     onRemoveTeam: (leagueId, teamId, teamName) => removeTeamFromLeagueLocal(leagueId, teamId, teamName),
     onRemovePlayer: (leagueId, playerId, playerName) => removePlayerFromLeague(leagueId, playerId, playerName),
     onStartPlayoffs: startPlayoffsFlow,
+    onAdvancePlayoffs: advancePlayoffsFlow,
     onUpdateSeason: updateSeasonFlow,
     onPrintSeasonResults: printSeasonResultsFlow,
     getParticipantMeta,
@@ -334,6 +336,10 @@ export async function initLeaguesPage() {
 
   async function startPlayoffsFlow(leagueId) {
     await _startPlayoffsFlow({ leagueId, allLeagues, loaderParent: leaguesList, onComplete: refresh });
+  }
+
+  async function advancePlayoffsFlow(leagueId, nextRoundName) {
+    await _advancePlayoffsFlow({ leagueId, nextRoundName, loaderParent: leaguesList, onComplete: refresh });
   }
 
   async function updateSeasonFlow(leagueId) {

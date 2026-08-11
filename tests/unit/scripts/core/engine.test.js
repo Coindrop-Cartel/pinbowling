@@ -76,12 +76,13 @@ describe('Scoring Engine Factory (engine.js)', () => {
   });
 
   describe('SCORING_FORMATS', () => {
-    it('should contain bowling, golf, baseball, and homerunderby format options', () => {
-      expect(SCORING_FORMATS).toHaveLength(4);
+    it('should contain bowling, golf, golf_skins, baseball, and homerunderby format options', () => {
+      expect(SCORING_FORMATS).toHaveLength(5);
       expect(SCORING_FORMATS[0].value).toBe('bowling');
       expect(SCORING_FORMATS[1].value).toBe('golf');
-      expect(SCORING_FORMATS[2].value).toBe('baseball');
-      expect(SCORING_FORMATS[3].value).toBe('homerunderby');
+      expect(SCORING_FORMATS[2].value).toBe('golf_skins');
+      expect(SCORING_FORMATS[3].value).toBe('baseball');
+      expect(SCORING_FORMATS[4].value).toBe('homerunderby');
     });
 
     it('should have label strings for each format', () => {

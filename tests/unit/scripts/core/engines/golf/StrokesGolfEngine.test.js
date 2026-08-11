@@ -325,7 +325,7 @@ describe('GolfEngine', () => {
     expect(branding.roundLabel).toBe('Hole');
     expect(branding.turnHeaderPrefix).toBe('Hole');
     expect(branding.primaryTargetLabel).toBe('Par');
-    expect(branding.playActionLabel).toBe("Let's Golf!");
+    expect(branding.playActionLabel).toBe("Fore!");
     expect(branding.brandName).toBe('PinGolf');
     expect(branding.value1Label).toBe('Target Score');
     expect(branding.value2Label).toBe('Par');

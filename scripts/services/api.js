@@ -155,6 +155,7 @@ export const PB_API = {
     },
     save: (matchups) => fetchJSON('api/matchup.php', { method: 'POST', body: JSON.stringify(matchups) }),
     clear: (eventId) => fetchJSON(`api/matchup.php?eventId=${eventId}`, { method: 'DELETE' }),
+    addExtraInning: (matchupId, isTeam = false) => fetchJSON('api/matchup.php?task=extra_inning', { method: 'POST', body: JSON.stringify({ matchupId, isTeam }) }),
   },
 
   teamScores: {
@@ -194,6 +195,7 @@ export const PB_API = {
     updateSeason: (leagueId) => fetchJSON('api/league.php?task=update_season', { method: 'POST', body: JSON.stringify({ leagueId }) }),
     startPlayoffs: (leagueId, seeds, seriesLength) => fetchJSON('api/league.php?task=start_playoffs', { method: 'POST', body: JSON.stringify({ leagueId, seeds, seriesLength }) }),
     startTeamPlayoffs: (leagueId, seeds, seriesLength) => fetchJSON('api/league.php?task=start_team_playoffs', { method: 'POST', body: JSON.stringify({ leagueId, seeds, seriesLength }) }),
+    advancePlayoffs: (leagueId) => fetchJSON('api/league.php?task=advance_playoffs', { method: 'POST', body: JSON.stringify({ leagueId }) }),
     updateStatus: (id, status) => fetchJSON(`api/league.php?id=${id}&task=updateStatus`, { method: 'PUT', body: JSON.stringify({ status }) }),
   },
 

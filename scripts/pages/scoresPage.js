@@ -88,6 +88,21 @@ export async function initScoresPage() {
   let activeLeague = null;
   let activeSession = null;
   const isSessionMode = () => !!activeSession;
+  const getActiveCompetition = () => {
+    const container = activeSession || activeLeague;
+    if (!container) return null;
+    return {
+      id: container.id,
+      name: container.name || container.leagueName || activeLeague?.name || '',
+      isSession: !!activeSession,
+      participationType: container.participationType || 'individual',
+      isTeamMode: container.participationType === 'team',
+      competitionFormat: activeLeague?.competitionFormat || container.competitionFormat || activeFormat || 'round_robin',
+      teams: container.teams || [],
+      players: container.players || [],
+      raw: container
+    };
+  };
   const getSessionName = () => activeSession?.name || '';
   const getSessionPlayers = () => activeSession?.players || [];
   let allPlayersCache = [];
@@ -162,17 +177,10 @@ export async function initScoresPage() {
     playerSummary.classList.add('hidden');
     scoringCard.classList.add('hidden');
     resultsCard.classList.add('hidden');
-
-    // Clear selection context when manually changing players.
-    // Use the silent variant to avoid triggering pb:pageChanged, which would
-    // cause main.js to re-run initApp() and re-initialize this page.
-    setCurrentPlayerIdSilent('');
-    const playerSearch = document.getElementById('player-search');
-    if (playerSearch) playerSearch.value = '';
-    if (playerSelect) playerSelect.value = '';
-
-    if (playerSearchInstance) {
-      playerSearchInstance.updateOptions('');
+    const searchInput = document.getElementById('player-search');
+    if (searchInput) {
+      searchInput.value = '';
+      searchInput.focus();
     }
   };
 
@@ -196,7 +204,8 @@ export async function initScoresPage() {
       allPlayersCache.length = 0;
       allPlayersCache.push(...allPlayers);
 
-      const isTeamMode = (isSessionMode() ? activeSession?.participationType : activeLeague?.participationType) === 'team';
+      const comp = getActiveCompetition();
+      const isTeamMode = comp?.isTeamMode ?? false;
       const currentPlayerId = getCurrentPlayerId();
 
       const headingEl = playerSelectorUI?.querySelector('h2');
@@ -210,13 +219,14 @@ export async function initScoresPage() {
           eventMatchups,
           allLeaguesCache,
           leagueId,
-          sessionTeams: isSessionMode() ? activeSession?.teams : undefined
+          sessionTeams: comp?.teams
         });
         selectablePlayers = selectableTeams.map(t => ({
           id: t.id,
           playerName: `Team: ${t.name}`,
           members: t.members || [],
-          _team: t
+          _team: t,
+          isTeam: true
         }));
       } else {
         selectablePlayers = getSelectablePlayers({
@@ -227,8 +237,23 @@ export async function initScoresPage() {
           eventMatchups,
           currentUser,
           currentPlayerId,
-          sessionPlayers: isSessionMode() ? getSessionPlayers() : undefined
+          sessionPlayers: comp?.players
         });
+      }
+
+      const isTDOrAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'td');
+      const compFormat = activeLeague?.competitionFormat || activeFormat;
+      const isH2HFormat = isHead2Head(compFormat) || (Engine && typeof Engine.requiresHeadToHead === 'function' ? Engine.requiresHeadToHead() : false);
+
+      if (isTDOrAdmin && isH2HFormat) {
+        const allOption = {
+          id: 'all',
+          playerName: isTeamMode ? 'All Teams' : 'All Players',
+          isAll: true
+        };
+        if (!selectablePlayers.some(p => String(p.id) === 'all')) {
+          selectablePlayers.unshift(allOption);
+        }
       }
 
       if (!playerSearchInstance) {
@@ -290,14 +315,21 @@ export async function initScoresPage() {
     const selectedId = Number(player?.id);
     const normalized = normalizeScores(scoreRows || []);
 
-    const myScores = isTeamMode
-      ? normalized.filter(s => Number(s.teamId ?? 0) === selectedId)
-      : normalized.filter(s => Number(s.playerId ?? 0) === selectedId);
+    const isAllMode = String(player?.id) === 'all';
+    const myScores = isAllMode
+      ? normalized
+      : (isTeamMode
+          ? normalized.filter(s => Number(s.teamId ?? 0) === selectedId)
+          : normalized.filter(s => Number(s.playerId ?? 0) === selectedId));
 
     const scoreMap = myScores.reduce((map, row) => {
-      map[String(row.orderNumber ?? row.order_number)] = row;
+      const key = String(row.orderNumber ?? row.order_number);
+      if (!map[key]) map[key] = row;
       return map;
     }, {});
+
+    const allNormalized = (allEventScores && allEventScores.length > 0) ? normalizeScores(allEventScores) : normalized;
+    scoreMap.byPlayer = groupScoresByPlayer(allNormalized);
 
     // Enrich with opponent data for baseball head-to-head matchups
     const enriched = Engine.enrichScoreMap(scoreMap, getEngineContext());
@@ -332,7 +364,13 @@ export async function initScoresPage() {
           }
 
           if (isTeamMode) {
-            const selectedTeamId = Number(getActiveTeamId() || getCurrentPlayerId());
+            const rawTeamId = scoreData.teamId ?? scoreData.playerId ?? getActiveTeamId() ?? getCurrentPlayerId();
+            let selectedTeamId = Number(rawTeamId);
+            if (!selectedTeamId || isNaN(selectedTeamId)) {
+              const activeMatchupId = getActiveTeamEventMatchupId() || getActiveEventMatchupId();
+              const match = (eventMatchups || []).find(m => String(m.id) === String(activeMatchupId)) || eventMatchups?.[0];
+              selectedTeamId = Number(match?.team1Id ?? 0);
+            }
             const activeTemId = getActiveTeamEventMatchupId();
             const gameTemId = activeTemId
               ? Number(activeTemId)
@@ -431,8 +469,9 @@ export async function initScoresPage() {
    */
   async function refreshPlayerSelection(options = {}) {
     const { skipSkeleton = false } = options;
+    const comp = getActiveCompetition();
+    const isTeamMode = comp?.isTeamMode ?? false;
     const activeEventMatchupId = getActiveEventMatchupId();
-    const isTeamMode = (isSessionMode() ? activeSession?.participationType : activeLeague?.participationType) === 'team';
 
     // ── TEAM MODE ──────────────────────────────────────────────────────────
     if (isTeamMode) {
@@ -467,8 +506,11 @@ export async function initScoresPage() {
         return;
       }
 
-      const teamsPool = isSessionMode() ? (activeSession?.teams || []) : (activeLeague?.teams || []);
-      const selectedTeam = teamsPool.find(t => String(t.id) === String(activeTeamId));
+      const isAllMode = String(activeTeamId) === 'all';
+      const teamsPool = comp?.teams || [];
+      const selectedTeam = isAllMode
+        ? { id: 'all', playerName: 'All Teams', name: 'All Teams', isAll: true, isTeam: true, members: [] }
+        : teamsPool.find(t => String(t.id) === String(activeTeamId));
       if (!selectedTeam) return;
 
       const loader = skipSkeleton ? null : createSkeletonLoader(roundsInput, { count: 5 });
@@ -489,10 +531,13 @@ export async function initScoresPage() {
         warning.classList.add('hidden');
         playerSelectorUI?.classList.add('hidden');
         playerSummary?.classList.remove('hidden');
-        renderActionSummary(playerSummary, `Team: ${selectedTeam.name}`, [
+        renderActionSummary(playerSummary, isAllMode ? 'Team: All Teams' : `Team: ${selectedTeam.name}`, [
           { text: 'Change', onclick: handlePlayerChange }
         ]);
 
+        if (isAllMode) {
+          scoringCard.querySelector('.team-actions-bar')?.remove();
+        } else {
         // Check if scores have already been entered for this team in this matchup
         const teamHasScores = (allEventScores || []).some(s =>
           Number(s.teamId ?? 0) === Number(selectedTeam.id) &&
@@ -582,6 +627,7 @@ export async function initScoresPage() {
             });
           });
         }
+        }
 
         renderCurrentResults();
         updateTournamentSummary();
@@ -594,22 +640,24 @@ export async function initScoresPage() {
     // ── INDIVIDUAL PLAYER MODE ─────────────────────────────────────────────
     let activePlayerId = await renderPlayerSelect();
     
-    const autoId = getAutoSelectedPlayerId({
-      activePlayerId,
-      currentUser,
-      allPlayersCache,
-      activeMatchupId: activeEventMatchupId,
-      eventMatchups,
-      selectablePlayers
-    });
+    if (activePlayerId !== 'all') {
+      const autoId = getAutoSelectedPlayerId({
+        activePlayerId,
+        currentUser,
+        allPlayersCache,
+        activeMatchupId: activeEventMatchupId,
+        eventMatchups,
+        selectablePlayers
+      });
 
-    if (autoId && autoId !== activePlayerId) {
-      activePlayerId = autoId;
-      setCurrentPlayerIdSilent(activePlayerId);
-      if (playerSelect) playerSelect.value = activePlayerId;
-      const search = document.getElementById('player-search');
-      const pObj = allPlayersCache.find(p => String(p.id) === activePlayerId);
-      if (search && pObj) search.value = pObj.playerName;
+      if (autoId && autoId !== activePlayerId) {
+        activePlayerId = autoId;
+        setCurrentPlayerIdSilent(activePlayerId);
+        if (playerSelect) playerSelect.value = activePlayerId;
+        const search = document.getElementById('player-search');
+        const pObj = allPlayersCache.find(p => String(p.id) === activePlayerId);
+        if (search && pObj) search.value = pObj.playerName;
+      }
     }
 
     if (!activePlayerId) {
@@ -625,14 +673,44 @@ export async function initScoresPage() {
       return;
     }
 
-    const player = allPlayersCache.find(p => String(p.id) === String(activePlayerId));
+    const isAllMode = String(activePlayerId) === 'all';
+    const player = isAllMode
+      ? { id: 'all', playerName: isTeamMode ? 'All Teams' : 'All Players', isAll: true }
+      : (isTeamMode
+          ? selectablePlayers.find(p => String(p.id) === String(activePlayerId))
+          : (selectablePlayers.find(p => String(p.id) === String(activePlayerId)) || allPlayersCache.find(p => String(p.id) === String(activePlayerId))));
 
     const loader = createSkeletonLoader(roundsInput, { count: 5 });
     try {
       const activeMatchupId = activeEventMatchupId || getActiveEventMatchupId();
-      const scores = activeMatchupId 
-        ? await PB_API.scores.get({ playerId: Number(activePlayerId), eventMatchupId: Number(activeMatchupId) })
-        : await PB_API.scores.get({ playerId: Number(activePlayerId), eventId: Number(getActiveEventId()) });
+      if (!allEventScores || allEventScores.length === 0) {
+        try {
+          if (isTeamMode) {
+            allEventScores = activeMatchupId
+              ? await PB_API.teamScores.get({ teamEventMatchupId: Number(activeMatchupId) })
+              : await PB_API.teamScores.get({ eventId: Number(getActiveEventId()) });
+          } else {
+            allEventScores = activeMatchupId
+              ? await PB_API.scores.get({ eventMatchupId: Number(activeMatchupId) })
+              : await PB_API.scores.get({ eventId: Number(getActiveEventId()) });
+          }
+        } catch (e) {
+          console.warn('[ScoresPage] Failed to fetch allEventScores:', e);
+        }
+      }
+
+      let scores = [];
+      if (isAllMode) {
+        scores = allEventScores || [];
+      } else if (isTeamMode) {
+        scores = activeMatchupId
+          ? await PB_API.teamScores.get({ teamId: Number(activePlayerId), teamEventMatchupId: Number(activeMatchupId) })
+          : await PB_API.teamScores.get({ teamId: Number(activePlayerId), eventId: Number(getActiveEventId()) });
+      } else {
+        scores = activeMatchupId 
+          ? await PB_API.scores.get({ playerId: Number(activePlayerId), eventMatchupId: Number(activeMatchupId) })
+          : await PB_API.scores.get({ playerId: Number(activePlayerId), eventId: Number(getActiveEventId()) });
+      }
       await loadScoresIntoForm(scores, player);
 
       const isTD = await can(PERMISSIONS.UPDATE_ANY_SCORE);
@@ -648,26 +726,25 @@ export async function initScoresPage() {
       scoringCard.classList.remove('hidden');
       resultsCard.classList.remove('hidden');
 
+      const playerLabelText = isAllMode
+        ? (isTeamMode ? 'Team: All Teams' : 'Player: All Players')
+        : `${isTeamMode ? 'Team' : 'Player'}: ${player?.playerName || 'Selected'}`;
+
       if (isSpectator) {
-        // Show the compact player summary with a "Change" button, just like
-        // non-spectator mode. The selector dropdown stays hidden until "Change"
-        // is clicked, which reveals it so the spectator can switch players.
         playerSelectorUI?.classList.add('hidden');
         playerSummary?.classList.remove('hidden');
-        renderActionSummary(playerSummary, `Player: ${player?.playerName || 'Selected'}`, [
+        renderActionSummary(playerSummary, playerLabelText, [
           { text: 'Change', onclick: handlePlayerChange }
         ]);
         
         const activeMatchupIdVal = activeEventMatchupId || getActiveTeamEventMatchupId() || getActiveEventMatchupId();
         const matchup = eventMatchups.find(m => String(m.id) === String(activeMatchupIdVal)) || eventMatchups[0];
-        const isTeamMode = activeLeague?.participationType === 'team';
         const awayName = isTeamMode ? (matchup?.team2Name || 'BYE') : (matchup?.player2Name || 'BYE');
         const homeName = isTeamMode ? (matchup?.team1Name || 'Unknown') : (matchup?.player1Name || 'Unknown');
         warning.innerHTML = `<strong>Spectator Mode:</strong> Viewing matchup in progress between ${escapeHTML(awayName)} and ${escapeHTML(homeName)}.`;
         warning.classList.remove('hidden');
         
         if (canEditSelected) {
-          // Unregistered guest player — allow score entry
           warning.innerHTML += ' <span class="meta-muted">(You may enter scores for this unregistered player.)</span>';
           roundsInput.querySelectorAll('input').forEach((input) => {
             input.disabled = false;
@@ -676,7 +753,6 @@ export async function initScoresPage() {
           const saveBtns = roundsInput.querySelectorAll('.save-round-button');
           saveBtns.forEach(btn => btn.style.display = '');
         } else {
-          // Registered player — view only
           roundsInput.querySelectorAll('input').forEach((input) => {
             input.disabled = true;
             input.readOnly = true;
@@ -688,11 +764,10 @@ export async function initScoresPage() {
         warning.classList.add('hidden');
         playerSelectorUI?.classList.add('hidden');
         playerSummary?.classList.remove('hidden');
-        renderActionSummary(playerSummary, `Player: ${player?.playerName || 'Selected'}`, [
+        renderActionSummary(playerSummary, playerLabelText, [
           { text: 'Change', onclick: handlePlayerChange }
         ]);
         roundsInput.querySelectorAll('input').forEach((input) => (input.disabled = false));
-        // Remove any leftover team bar (shouldn't exist in individual mode)
         scoringCard.querySelector('.team-actions-bar')?.remove();
       }
 
@@ -709,9 +784,11 @@ export async function initScoresPage() {
    * branching on activeFormat.
    */
   function getEngineContext() {
-    const isTeamMode = (isSessionMode() ? activeSession?.participationType : activeLeague?.participationType) === 'team';
+    const comp = getActiveCompetition();
+    const isTeamMode = comp?.isTeamMode ?? false;
+    const activeMatchupId = isTeamMode ? getActiveTeamEventMatchupId() : getActiveEventMatchupId();
     const activeParticipantId = isTeamMode ? (getActiveTeamId() || getCurrentPlayerId()) : getCurrentPlayerId();
-    const teamsPool = isSessionMode() ? (activeSession?.teams || []) : (activeLeague?.teams || []);
+    const teamsPool = comp?.teams || [];
     const selectedTeam = isTeamMode ? teamsPool.find(t => String(t.id) === String(activeParticipantId)) : null;
     const selectedTeamIdStr = selectedTeam ? String(selectedTeam.id) : null;
 
@@ -724,8 +801,16 @@ export async function initScoresPage() {
       : {};
 
     const isTDOrAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'td');
+    const isAllScoresMode = isTDOrAdmin && String(activeParticipantId) === 'all';
 
     return {
+      activeCompetition: comp,
+      activeMatchupId,
+      activeTeamEventMatchupId: getActiveTeamEventMatchupId(),
+      activeEventMatchupId: getActiveEventMatchupId(),
+      activeParticipantId,
+      activeTeamEventMatchupId: getActiveTeamEventMatchupId(),
+      activeEventMatchupId: getActiveEventMatchupId(),
       activeParticipantId,
       allEventScores,
       eventMatchups,
@@ -748,7 +833,8 @@ export async function initScoresPage() {
       pitcherAssignments: teamRoleAssignments,
       battingOrdersByTeam: rosterOrdersByTeam,
       activeTeamMembers: selectedTeam?.members || [],
-      isTDOrAdmin
+      isTDOrAdmin,
+      isAllScoresMode
     };
   }
 
@@ -792,6 +878,82 @@ export async function initScoresPage() {
         resultsEmpty
       });
     }
+
+    checkAndRenderExtraInningBtn(calcResult, engineContext);
+  }
+
+  async function checkAndRenderExtraInningBtn(calcResult, engineContext) {
+    let extraContainer = resultsPanel.querySelector('.extra-innings-btn-container');
+    if (extraContainer) extraContainer.remove();
+
+    const isAdmin = await can(PERMISSIONS.MANAGE_LEAGUES);
+    if (!isAdmin || !Engine || (typeof Engine.allowsTies === 'function' && Engine.allowsTies())) {
+      return;
+    }
+
+    if (typeof Engine.supportsExtraRounds !== 'function' || !Engine.supportsExtraRounds()) {
+      return;
+    }
+
+    const isTeamMode = engineContext.isTeamMode;
+    const homeScore = isTeamMode ? (calcResult.teamTotals?.home ?? 0) : (calcResult.homeScore ?? 0);
+    const awayScore = isTeamMode ? (calcResult.teamTotals?.away ?? 0) : (calcResult.awayScore ?? 0);
+
+    if (homeScore !== awayScore) {
+      return;
+    }
+
+    const turnResults = calcResult.turnResults || [];
+    if (turnResults.length < machines.length) {
+      return;
+    }
+
+    const allPlayed = turnResults.every(t => t.played || t.isWalkOff);
+    if (!allPlayed) {
+      return;
+    }
+
+    extraContainer = document.createElement('div');
+    extraContainer.className = 'extra-innings-btn-container mt-15 text-center';
+
+    const extraConfig = (typeof Engine.getExtraRoundConfig === 'function' ? Engine.getExtraRoundConfig() : null) || { label: 'Extra Inning' };
+    const btnText = `+ Add ${extraConfig.label || 'Extra Inning'}`;
+
+    extraContainer.innerHTML = `
+      <button type="button" class="btn btn-primary add-extra-inning-btn" style="padding: 8px 16px; font-weight: bold; margin-top: 10px;">
+        ${escapeHTML(btnText)}
+      </button>
+      <div class="muted small mt-5">The game is currently tied. Click to generate an extra inning with a random machine.</div>
+    `;
+
+    resultsPanel.appendChild(extraContainer);
+
+    const btn = extraContainer.querySelector('.add-extra-inning-btn');
+    btn.onclick = async () => {
+      const activeMatchupId = getActiveEventMatchupId() || getActiveTeamEventMatchupId();
+      if (!activeMatchupId) return;
+
+      const confirmed = await showConfirm(
+        `Are you sure you want to add an Extra Inning to this tied matchup? A random machine from the location will be selected.`,
+        'Add Extra Inning'
+      );
+      if (!confirmed) return;
+
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Adding...';
+        await PB_API.matchups.addExtraInning(Number(activeMatchupId), isTeamMode);
+
+        const navParams = isTeamMode
+          ? { leagueId: engineContext.activeLeague?.id, eventId: getActiveEventId(), teamEventMatchupId: activeMatchupId }
+          : { leagueId: engineContext.activeLeague?.id, eventId: getActiveEventId(), eventMatchupId: activeMatchupId };
+        loadPage(ROUTE_PATHS.SCORES(navParams));
+      } catch (err) {
+        showAlert(`Failed to add extra inning: ${err.message}`, 'Extra Innings');
+        btn.disabled = false;
+        btn.textContent = btnText;
+      }
+    };
   }
 
   /**
@@ -929,8 +1091,14 @@ export async function initScoresPage() {
     // then fetch it generically — no format-specific branching required.
     const requiredData = Engine.getRequiredEventData(eventId, PB_API) || {};
     const isTeamMode = (isSessionMode() ? activeSession?.participationType : league?.participationType) === 'team';
-    if (activeEventMatchupId || activeTeamEventMatchupId || isTeamMode) {
-      const matchupId = activeTeamEventMatchupId || getActiveTeamEventMatchupId();
+    const isH2HFormat = Engine?.requiresHeadToHead?.() || Engine?.hasHead2HeadScoring?.();
+    if (activeEventMatchupId || activeTeamEventMatchupId || isTeamMode || isH2HFormat) {
+      const matchupId = isTeamMode 
+        ? (activeTeamEventMatchupId || getActiveTeamEventMatchupId())
+        : (activeEventMatchupId || getActiveEventMatchupId());
+      if (!matchupId && (activeTeamEventMatchupId || activeEventMatchupId)) {
+        console.warn('[ScoresPage] Cross-mode matchupId fallback evaluated:', { isTeamMode, activeTeamEventMatchupId, activeEventMatchupId });
+      }
       if (isTeamMode) {
         if (matchupId) {
           requiredData.eventMatchups = PB_API.teamMatchups.get(null, Number(matchupId)).then(m => Array.isArray(m) ? m : (m ? [m] : [])).catch(() => []);
@@ -939,9 +1107,14 @@ export async function initScoresPage() {
           requiredData.eventMatchups = PB_API.teamMatchups.get(eventId).catch(() => []);
           requiredData.allEventScores = PB_API.teamScores.get(eventId).catch(() => []);
         }
-      } else if (activeEventMatchupId) {
-        requiredData.eventMatchups = PB_API.matchups.get(null, Number(activeEventMatchupId)).then(m => Array.isArray(m) ? m : (m ? [m] : []));
-        requiredData.allEventScores = PB_API.scores.get(null, null, null, Number(activeEventMatchupId));
+      } else {
+        if (matchupId) {
+          requiredData.eventMatchups = PB_API.matchups.get(null, Number(matchupId)).then(m => Array.isArray(m) ? m : (m ? [m] : [])).catch(() => []);
+          requiredData.allEventScores = PB_API.scores.get({ eventMatchupId: Number(matchupId) }).catch(() => []);
+        } else if (eventId) {
+          requiredData.eventMatchups = PB_API.matchups.get(eventId).catch(() => []);
+          requiredData.allEventScores = PB_API.scores.get({ eventId: Number(eventId) }).catch(() => []);
+        }
       }
     }
     const requiredKeys = Object.keys(requiredData);
@@ -957,6 +1130,10 @@ export async function initScoresPage() {
     // Clear any keys not declared by this engine
     if (!requiredKeys.includes('eventMatchups')) eventMatchups = [];
     if (!requiredKeys.includes('allEventScores') && !requiredKeys.includes('scores')) allEventScores = [];
+
+    if (isH2HFormat && (!eventMatchups || eventMatchups.length === 0)) {
+      console.warn('[ScoresPage] No eventMatchups found for H2H format eventId:', eventId);
+    }
 
     // Customize the target machines list to be matchup-specific if deep-linked
     let machinesNormalized = normalizeTargets(eventTargets);

@@ -219,7 +219,7 @@ describe('Navigation Utility (navigation.js)', () => {
       expect(btn.getAttribute('aria-expanded')).toBe('false');
     });
 
-    it('should not toggle dropdown on desktop (innerWidth > 768)', () => {
+    it('should toggle dropdown on desktop and tablets (innerWidth > 768)', () => {
       vi.stubGlobal('location', {
         origin: 'http://localhost',
         pathname: '/',
@@ -231,7 +231,7 @@ describe('Navigation Utility (navigation.js)', () => {
       const dropdown = document.querySelector('.nav-item.dropdown');
       const btn = dropdown.querySelector('.dropbtn');
       btn.click();
-      expect(dropdown.classList.contains('is-open')).toBe(false);
+      expect(dropdown.classList.contains('is-open')).toBe(true);
     });
 
     it('should close other dropdowns when opening one (accordion)', () => {

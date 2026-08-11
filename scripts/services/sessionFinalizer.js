@@ -25,13 +25,13 @@ export async function finalizeSession(options) {
   const engine = getScoringEngine(currentSessionFormat);
 
   let teamIds = null;
-  let opponentId = null;
+  let sessionPlayerIds = null;
   if (participationType === 'team') {
     teamIds = await pickTeams(showPlayerSelectionDialog, PB_API, engine, generatedFrames);
     if (teamIds === undefined) return;
   } else {
-    opponentId = await pickOpponent(showPlayerSelectionDialog, PB_API, allPlayersCache, engine, generatedFrames);
-    if (opponentId === undefined) return;
+    sessionPlayerIds = await pickSessionPlayers(showPlayerSelectionDialog, PB_API, allPlayersCache, engine, generatedFrames);
+    if (sessionPlayerIds === undefined) return;
   }
 
   const newSession = await PB_API.sessions.create({
@@ -91,14 +91,20 @@ export async function finalizeSession(options) {
   }
 
   const currentUser = await PB_API.auth.me();
-  if (currentUser?.player_id) await PB_API.sessions.addPlayer(newSession.id, currentUser.player_id);
-  if (opponentId) await PB_API.sessions.addPlayer(newSession.id, opponentId);
+  if (sessionPlayerIds && sessionPlayerIds.length > 0) {
+    for (const pId of sessionPlayerIds) {
+      await PB_API.sessions.addPlayer(newSession.id, pId);
+    }
+  } else if (currentUser?.player_id) {
+    await PB_API.sessions.addPlayer(newSession.id, currentUser.player_id);
+  }
 
   let eventMatchupId = null;
   const matchupInfo = engine.getMatchupDescription(generatedFrames.length);
   if (matchupInfo) {
-    const sessionData = opponentId ? { players: [{ id: currentUser.player_id }, { id: opponentId }] } : await PB_API.sessions.get(newSession.id);
-    const finalRoster = sessionData?.players || [];
+    const finalRoster = sessionPlayerIds && sessionPlayerIds.length >= 2
+      ? sessionPlayerIds.map(id => ({ id }))
+      : [{ id: currentUser?.player_id }];
     if (finalRoster.length >= 2) {
       const inningCount = generatedFrames.length / engine.getMachinesPerRound();
       const machines = generatedFrames.map(f => ({ machineId: f.machineId }));
@@ -113,16 +119,56 @@ export async function finalizeSession(options) {
   loadPage(ROUTE_PATHS.SCORES({ eventId: event.id, sessionId: newSession.id, eventMatchupId: eventMatchupId || '', playerId: currentUser?.player_id }));
 }
 
-async function pickOpponent(showPlayerSelectionDialog, PB_API, allPlayersCache, engine, generatedFrames) {
+async function pickSessionPlayers(showPlayerSelectionDialog, PB_API, allPlayersCache, engine, generatedFrames) {
   if (!engine?.requiresHeadToHead?.()) return null;
   const currentUser = await PB_API.auth.me();
   if (!currentUser?.player_id) return null;
-  const matchupInfo = engine?.getMatchupDescription?.(generatedFrames?.length ?? 0);
-  if (!matchupInfo) return null;
-  const opponentOptions = allPlayersCache.filter(p => p.id !== currentUser.player_id).map(p => ({ value: p.id, label: p.playerName }));
-  if (opponentOptions.length === 0) return null;
-  const opponentId = await showPlayerSelectionDialog('Select Opponent', 'This format requires at least 2 players. Choose an opponent:', opponentOptions, 'Add & Continue');
-  return opponentId ? Number(opponentId) : undefined;
+
+  const maxRoster = engine.getMaxRosterSize() || 2;
+  const selectedPlayerIds = [Number(currentUser.player_id)];
+
+  if (maxRoster <= 2) {
+    const opponentOptions = allPlayersCache
+      .filter(p => Number(p.id) !== Number(currentUser.player_id))
+      .map(p => ({ value: p.id, label: p.playerName }));
+    if (opponentOptions.length === 0) return selectedPlayerIds;
+    const opponentId = await showPlayerSelectionDialog('Select Opponent', 'This format requires at least 2 players. Choose an opponent:', opponentOptions, 'Add & Continue');
+    if (!opponentId) return undefined;
+    selectedPlayerIds.push(Number(opponentId));
+    return selectedPlayerIds;
+  }
+
+  // 2 to 4 Player Group Matchup (Golf Skins)
+  let availablePool = allPlayersCache.filter(p => Number(p.id) !== Number(currentUser.player_id));
+
+  while (selectedPlayerIds.length < maxRoster && availablePool.length > 0) {
+    const isMinMet = selectedPlayerIds.length >= 2;
+    const currentCount = selectedPlayerIds.length;
+
+    const options = availablePool.map(p => ({ value: p.id, label: p.playerName }));
+    if (isMinMet) {
+      options.unshift({ value: 'DONE', label: '✔ Done (Start session with selected players)' });
+    }
+
+    const promptTitle = `Select Player ${currentCount + 1}`;
+    const promptMsg = isMinMet
+      ? `Choose Player ${currentCount + 1} for this ${engine.config?.format === 'golf_skins' ? 'Golf Skins' : 'Matchup'} group (2 to 4 players), or select Done:`
+      : `Golf Skins requires at least 2 players. Choose Player ${currentCount + 1}:`;
+
+    const pickedId = await showPlayerSelectionDialog(promptTitle, promptMsg, options, 'Add Player');
+    if (!pickedId || pickedId === 'DONE') {
+      if (!isMinMet) return undefined; // Canceled before meeting minimum required 2 players
+      break;
+    }
+
+    const numPicked = Number(pickedId);
+    if (numPicked > 0 && !selectedPlayerIds.includes(numPicked)) {
+      selectedPlayerIds.push(numPicked);
+      availablePool = availablePool.filter(p => Number(p.id) !== numPicked);
+    }
+  }
+
+  return selectedPlayerIds;
 }
 
 async function pickTeams(showPlayerSelectionDialog, PB_API, engine, generatedFrames) {

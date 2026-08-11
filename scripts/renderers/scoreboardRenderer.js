@@ -1,4 +1,4 @@
-import { escapeHTML } from '@scripts/utils.js';
+import { escapeHTML, getInitials } from '@scripts/utils.js';
 import { flattenMatchupEntries } from '@services/normalizer.js';
 import { resolvePlayersForMatchupParticipant } from '@services/playerSelector.js';
 
@@ -21,8 +21,15 @@ export function renderStandardScoreboard(calcResult, domRefs) {
   if (resultsTable) resultsTable.classList.remove('hidden');
 
   // Remove any format-specific grid from a previous render
-  const existingGrid = resultsPanel.querySelector('.scoreboard-grid');
-  if (existingGrid) existingGrid.remove();
+  if (typeof resultsPanel?.querySelectorAll === 'function') {
+    resultsPanel.querySelectorAll('.scoreboard-grid, .skins-scoreboard').forEach(el => el.remove());
+  }
+  if (typeof resultsPanel?.querySelector === 'function') {
+    const grid1 = resultsPanel.querySelector('.scoreboard-grid');
+    if (grid1 && grid1.remove) grid1.remove();
+    const grid2 = resultsPanel.querySelector('.skins-scoreboard');
+    if (grid2 && grid2.remove) grid2.remove();
+  }
 
   resultsBody.innerHTML = (turnResults || [])
     .map(result => {
@@ -64,13 +71,26 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
     return;
   }
 
-  const resultsTable = resultsPanel.querySelector('table.data-table');
-  if (resultsTable) resultsTable.classList.add('hidden');
-  const existingGrid = resultsPanel.querySelector('.scoreboard-grid');
-  if (existingGrid) existingGrid.remove();
+  const resultsTable = typeof resultsPanel?.querySelector === 'function' ? resultsPanel.querySelector('table.data-table') : null;
+  if (resultsTable && resultsTable.classList) resultsTable.classList.add('hidden');
+
+  if (typeof resultsPanel?.querySelectorAll === 'function') {
+    resultsPanel.querySelectorAll('.scoreboard-grid, .skins-scoreboard').forEach(el => el.remove());
+  }
+  if (typeof resultsPanel?.querySelector === 'function') {
+    const grid1 = resultsPanel.querySelector('.scoreboard-grid');
+    if (grid1 && grid1.remove) grid1.remove();
+    const grid2 = resultsPanel.querySelector('.skins-scoreboard');
+    if (grid2 && grid2.remove) grid2.remove();
+  }
 
   if (isTeamMode && calcResult.teamTotals) {
     _renderTeamScoreboard(calcResult, machines, context, domRefs, engine);
+    return;
+  }
+
+  if (typeof engine.calculateSkinsResults === 'function' || engine.config?.format === 'golf_skins') {
+    _renderSkinsScoreboard(calcResult, machines, context, domRefs, engine);
     return;
   }
 
@@ -142,31 +162,62 @@ export function renderHead2HeadScoreboard(calcResult, machines, context, domRefs
     roundGroups.push({ roundNumber: i });
   }
 
-  let scoreboardHTML = '<div class="scoreboard-grid">';
-
-  // 1. Header Row
-  scoreboardHTML += '<div class="scoreboard-row header"><span class="player-col">Player</span>';
+  // 1. Desktop Grid (horizontal line score)
+  let desktopHTML = '<div class="scoreboard-grid desktop-grid">';
+  desktopHTML += '<div class="scoreboard-row header"><span class="player-col">Player</span>';
   for (const rg of roundGroups) {
-    scoreboardHTML += `<span class="round-header">${rg.roundNumber}</span>`;
+    desktopHTML += `<span class="round-header">${rg.roundNumber}</span>`;
   }
-  scoreboardHTML += '<span class="total-header">TOTAL</span></div>';
+  desktopHTML += '<span class="total-header">TOTAL</span></div>';
 
-  // 2. Player Rows
   playerResults.forEach(pResult => {
     const playerIdNum = Number(pResult.id);
     const totalScoreValue = playerTotalScores[playerIdNum] || 0;
     const homeAwayLabel = pResult.isHome ? 'Home' : 'Away';
 
-    scoreboardHTML += '<div class="scoreboard-row player-row">';
-    scoreboardHTML += `<span class="player-name"><span class="home-away-label">${homeAwayLabel}:</span> ${escapeHTML(pResult.name)}</span>`;
+    desktopHTML += '<div class="scoreboard-row player-row">';
+    desktopHTML += `<span class="player-name"><span class="home-away-label">${homeAwayLabel}:</span> ${escapeHTML(pResult.name)}</span>`;
     for (const rg of roundGroups) {
       const score = roundScores[String(rg.roundNumber)]?.[playerIdNum] || '-';
-      scoreboardHTML += `<span class="round-score">${score}</span>`;
+      desktopHTML += `<span class="round-score">${score}</span>`;
     }
-    scoreboardHTML += `<span class="total-score">${totalScoreValue}</span></div>`;
+    desktopHTML += `<span class="total-score">${totalScoreValue}</span></div>`;
+  });
+  desktopHTML += '</div>';
+
+  // 2. Mobile Grid (vertical transposed line score: Inning | Away | Home)
+  const roundLabelName = engine?.getRoundLabel ? engine.getRoundLabel() : 'Inning';
+  let mobileHTML = '<div class="scoreboard-grid mobile-grid">';
+  mobileHTML += '<div class="scoreboard-row header">';
+  mobileHTML += `<span class="player-col">${escapeHTML(roundLabelName)}</span>`;
+  playerResults.forEach(pResult => {
+    const homeAwayLabel = pResult.isHome ? 'Home' : 'Away';
+    const initials = getInitials(pResult.name);
+    mobileHTML += `<span class="round-header" title="${homeAwayLabel}: ${escapeHTML(pResult.name)}">${escapeHTML(initials)}</span>`;
+  });
+  mobileHTML += '</div>';
+
+  roundGroups.forEach(rg => {
+    mobileHTML += '<div class="scoreboard-row player-row">';
+    mobileHTML += `<span class="player-name">${roundLabelName} ${rg.roundNumber}</span>`;
+    playerResults.forEach(pResult => {
+      const playerIdNum = Number(pResult.id);
+      const score = roundScores[String(rg.roundNumber)]?.[playerIdNum] || '-';
+      mobileHTML += `<span class="round-score">${score}</span>`;
+    });
+    mobileHTML += '</div>';
   });
 
-  scoreboardHTML += '</div>';
+  mobileHTML += '<div class="scoreboard-row player-row font-bold" style="background: rgba(0,0,0,0.05);">';
+  mobileHTML += '<span class="player-name">TOTAL</span>';
+  playerResults.forEach(pResult => {
+    const playerIdNum = Number(pResult.id);
+    const totalScoreValue = playerTotalScores[playerIdNum] || 0;
+    mobileHTML += `<span class="total-score font-bold">${totalScoreValue}</span>`;
+  });
+  mobileHTML += '</div></div>';
+
+  const scoreboardHTML = desktopHTML + mobileHTML;
 
   resultsBody.innerHTML = '';
   const totalScoreDiv = resultsPanel.querySelector('.total-score');
@@ -224,40 +275,238 @@ function _renderTeamScoreboard(calcResult, machines, context, domRefs, engine) {
     });
   }
 
-  let scoreboardHTML = '<div class="scoreboard-grid">';
-
-  // Header row
+  // 1. Desktop Grid
+  let desktopHTML = '<div class="scoreboard-grid desktop-grid">';
   const roundLabel = engine.getRoundLabel();
-  scoreboardHTML += '<div class="scoreboard-row header"><span class="player-col">Team</span>';
+  desktopHTML += '<div class="scoreboard-row header"><span class="player-col">Team</span>';
   roundGroups.forEach(rg => {
-    scoreboardHTML += `<span class="round-header" style="min-width: 80px;">${roundLabel} ${rg.roundNumber}</span>`;
+    desktopHTML += `<span class="round-header" style="min-width: 80px;">${roundLabel} ${rg.roundNumber}</span>`;
   });
-  scoreboardHTML += '<span class="total-header">TOTAL</span></div>';
+  desktopHTML += '<span class="total-header">TOTAL</span></div>';
 
   // Away team row
-  scoreboardHTML += '<div class="scoreboard-row player-row">';
-  scoreboardHTML += `<span class="player-name"><span class="home-away-label">Away:</span> ${escapeHTML(awayTeamName)}</span>`;
+  desktopHTML += '<div class="scoreboard-row player-row">';
+  desktopHTML += `<span class="player-name"><span class="home-away-label">Away:</span> ${escapeHTML(awayTeamName)}</span>`;
   roundGroups.forEach(rg => {
     const topRuns = rg.top?.entries.reduce((sum, e) => sum + (e.played ? e.score : 0), 0) ?? '-';
-    scoreboardHTML += `<span class="round-score">${topRuns === 0 && !rg.top?.entries.some(e => e.played) ? '-' : topRuns}</span>`;
+    desktopHTML += `<span class="round-score">${topRuns === 0 && !rg.top?.entries.some(e => e.played) ? '-' : topRuns}</span>`;
   });
-  scoreboardHTML += `<span class="total-score">${teamTotals.away}</span></div>`;
+  desktopHTML += `<span class="total-score">${teamTotals.away}</span></div>`;
 
   // Home team row
-  scoreboardHTML += '<div class="scoreboard-row player-row">';
-  scoreboardHTML += `<span class="player-name"><span class="home-away-label">Home:</span> ${escapeHTML(homeTeamName)}</span>`;
+  desktopHTML += '<div class="scoreboard-row player-row">';
+  desktopHTML += `<span class="player-name"><span class="home-away-label">Home:</span> ${escapeHTML(homeTeamName)}</span>`;
   roundGroups.forEach(rg => {
     const bottomRuns = rg.bottom?.entries.reduce((sum, e) => sum + (e.played ? e.score : 0), 0) ?? '-';
-    scoreboardHTML += `<span class="round-score">${bottomRuns === 0 && !rg.bottom?.entries.some(e => e.played) ? '-' : bottomRuns}</span>`;
+    desktopHTML += `<span class="round-score">${bottomRuns === 0 && !rg.bottom?.entries.some(e => e.played) ? '-' : bottomRuns}</span>`;
   });
-  scoreboardHTML += `<span class="total-score">${teamTotals.home}</span></div>`;
+  desktopHTML += `<span class="total-score">${teamTotals.home}</span></div>`;
+  desktopHTML += '</div>';
 
-  scoreboardHTML += '</div>';
+  // 2. Mobile Grid (vertical transposed)
+  let mobileHTML = '<div class="scoreboard-grid mobile-grid">';
+  mobileHTML += '<div class="scoreboard-row header">';
+  mobileHTML += `<span class="player-col">${escapeHTML(roundLabel)}</span>`;
+  mobileHTML += `<span class="round-header"><span class="home-away-label">Away:</span> ${escapeHTML(awayTeamName)}</span>`;
+  mobileHTML += `<span class="round-header"><span class="home-away-label">Home:</span> ${escapeHTML(homeTeamName)}</span>`;
+  mobileHTML += '</div>';
+
+  roundGroups.forEach(rg => {
+    const topRuns = rg.top?.entries.reduce((sum, e) => sum + (e.played ? e.score : 0), 0) ?? '-';
+    const bottomRuns = rg.bottom?.entries.reduce((sum, e) => sum + (e.played ? e.score : 0), 0) ?? '-';
+    const topStr = topRuns === 0 && !rg.top?.entries.some(e => e.played) ? '-' : topRuns;
+    const botStr = bottomRuns === 0 && !rg.bottom?.entries.some(e => e.played) ? '-' : bottomRuns;
+
+    mobileHTML += '<div class="scoreboard-row player-row">';
+    mobileHTML += `<span class="player-name">${roundLabel} ${rg.roundNumber}</span>`;
+    mobileHTML += `<span class="round-score">${topStr}</span>`;
+    mobileHTML += `<span class="round-score">${botStr}</span>`;
+    mobileHTML += '</div>';
+  });
+
+  mobileHTML += '<div class="scoreboard-row player-row font-bold" style="background: rgba(0,0,0,0.05);">';
+  mobileHTML += '<span class="player-name">TOTAL</span>';
+  mobileHTML += `<span class="total-score font-bold">${teamTotals.away}</span>`;
+  mobileHTML += `<span class="total-score font-bold">${teamTotals.home}</span>`;
+  mobileHTML += '</div></div>';
+
+  const scoreboardHTML = desktopHTML + mobileHTML;
 
   resultsBody.innerHTML = '';
   resultsPanel.insertAdjacentHTML('beforeend', scoreboardHTML);
 
   totalScore.innerHTML = `<span class="away-label">Away:</span> ${escapeHTML(awayTeamName)} ${teamTotals.away} &nbsp; <span class="home-label">Home:</span> ${escapeHTML(homeTeamName)} ${teamTotals.home}`;
+
+  resultsEmpty.classList.add('hidden');
+  resultsPanel.classList.remove('hidden');
+}
+
+/**
+ * Renders a Golf Skins multi-player scoreboard showing per-hole strokes, skin winners, carryovers, and total skins won.
+ * @private
+ */
+function _renderSkinsScoreboard(calcResult, machines, context, domRefs, engine) {
+  const { resultsPanel, resultsBody, totalScore, resultsEmpty } = domRefs;
+  const { allEventScores, eventMatchups, normalizeScores, groupScoresByPlayer } = context;
+
+  const wrapper = eventMatchups[0] || {};
+  const scoresByPlayer = groupScoresByPlayer(normalizeScores(allEventScores));
+
+  const players = [];
+  const addedIds = new Set();
+  const addP = (id, name) => {
+    const numId = Number(id);
+    if (numId > 0 && !addedIds.has(numId)) {
+      addedIds.add(numId);
+      players.push({ id: numId, name: name || `Player ${numId}` });
+    }
+  };
+
+  if (wrapper?.players && Array.isArray(wrapper.players)) {
+    wrapper.players.forEach(p => addP(p.id || p.player_id, p.name || p.playerName));
+  } else {
+    ['player1', 'player2', 'player3', 'player4'].forEach((key, idx) => {
+      const pId = Number(wrapper[`${key}Id`] ?? wrapper[`player${idx+1}_id`]);
+      const pName = wrapper[`${key}Name`] ?? wrapper[`player${idx+1}_name`];
+      if (pId > 0) {
+        addP(pId, pName);
+      }
+    });
+  }
+
+  if (players.length < 2 && context?.activeSession?.players?.length) {
+    context.activeSession.players.forEach(p => {
+      addP(p.id || p.player_id, p.playerName || p.name);
+    });
+  }
+
+  if (players.length < 2 && allEventScores?.length) {
+    Object.keys(scoresByPlayer).forEach(pIdStr => {
+      const pId = Number(pIdStr);
+      if (pId > 0) {
+        const pCache = context.allPlayersCache?.find(p => Number(p.id) === pId);
+        addP(pId, pCache?.playerName || pCache?.name);
+      }
+    });
+  }
+
+  if (players.length === 0) {
+    renderStandardScoreboard(calcResult, domRefs);
+    return;
+  }
+
+  const scoreMapByPlayer = {};
+  players.forEach(p => {
+    const pId = Number(p.id);
+    const pScores = scoresByPlayer[pId] || [];
+    const pMap = {};
+    pScores.forEach(row => {
+      const orderStr = String(row.orderNumber ?? row.order_number);
+      pMap[orderStr] = {
+        ball1: Number(row.ball1 || 0),
+        ball2: Number(row.ball2 || 0),
+        ball3: Number(row.ball3 || 0)
+      };
+    });
+    scoreMapByPlayer[pId] = pMap;
+  });
+
+  const skinsCalc = engine.calculateSkinsResults(machines, scoreMapByPlayer);
+  const { holeResults, skinsWon } = skinsCalc;
+
+  // 1. Desktop Grid
+  let desktopHTML = '<div class="scoreboard-grid desktop-grid skins-scoreboard">';
+  desktopHTML += '<div class="scoreboard-row header"><span class="player-col">Player</span>';
+  machines.forEach((m, idx) => {
+    const holeNum = m.orderNumber ?? (idx + 1);
+    desktopHTML += `<span class="round-header">Hole ${holeNum}</span>`;
+  });
+  desktopHTML += '<span class="total-header">TOTAL</span></div>';
+
+  players.forEach(p => {
+    const pId = Number(p.id);
+    const totalSkins = skinsWon[pId] || 0;
+    desktopHTML += '<div class="scoreboard-row player-row">';
+    desktopHTML += `<span class="player-name">${escapeHTML(p.name)}</span>`;
+    holeResults.forEach(hr => {
+      const strokes = hr.strokes[pId];
+      if (strokes === null || strokes === undefined) {
+        desktopHTML += '<span class="round-score">-</span>';
+      } else {
+        const isWinner = hr.winnerId === pId;
+        let cellText = `${strokes}`;
+        if (isWinner) {
+          cellText += ` <span style="color: #2e7d32; font-weight: bold;">(+${hr.skinsAwarded})</span>`;
+        } else if (hr.tied) {
+          cellText += ` <span style="color: #757575;">(-)</span>`;
+        }
+        desktopHTML += `<span class="round-score ${isWinner ? 'font-bold' : ''}">${cellText}</span>`;
+      }
+    });
+    desktopHTML += `<span class="total-score font-bold">${totalSkins} ${totalSkins === 1 ? 'Skin' : 'Skins'}</span></div>`;
+  });
+
+  desktopHTML += '</div>';
+
+  // 2. Mobile Grid (vertical transposed: Hole | K.V. | A.B.)
+  let mobileHTML = '<div class="scoreboard-grid mobile-grid skins-scoreboard">';
+  mobileHTML += '<div class="scoreboard-row header"><span class="player-col">Hole</span>';
+  players.forEach(p => {
+    const initials = getInitials(p.name);
+    mobileHTML += `<span class="round-header" title="${escapeHTML(p.name)}">${escapeHTML(initials)}</span>`;
+  });
+  mobileHTML += '</div>';
+
+  holeResults.forEach((hr, idx) => {
+    const holeNum = hr.orderNumber ?? (idx + 1);
+    mobileHTML += '<div class="scoreboard-row player-row">';
+    mobileHTML += `<span class="player-name">Hole ${holeNum}</span>`;
+    players.forEach(p => {
+      const pId = Number(p.id);
+      const strokes = hr.strokes[pId];
+      if (strokes === null || strokes === undefined) {
+        mobileHTML += '<span class="round-score">-</span>';
+      } else {
+        const isWinner = hr.winnerId === pId;
+        let cellText = `${strokes}`;
+        if (isWinner) {
+          cellText += ` <span style="color: #2e7d32; font-weight: bold;">(+${hr.skinsAwarded})</span>`;
+        } else if (hr.tied) {
+          cellText += ` <span style="color: #757575;">(-)</span>`;
+        }
+        mobileHTML += `<span class="round-score ${isWinner ? 'font-bold' : ''}">${cellText}</span>`;
+      }
+    });
+    mobileHTML += '</div>';
+  });
+
+  mobileHTML += '<div class="scoreboard-row player-row font-bold" style="background: rgba(0,0,0,0.05);">';
+  mobileHTML += '<span class="player-name">TOTAL</span>';
+  players.forEach(p => {
+    const pId = Number(p.id);
+    const totalSkins = skinsWon[pId] || 0;
+    mobileHTML += `<span class="total-score font-bold">${totalSkins} ${totalSkins === 1 ? 'Skin' : 'Skins'}</span>`;
+  });
+  mobileHTML += '</div></div>';
+
+  const scoreboardHTML = desktopHTML + mobileHTML;
+
+  if (typeof resultsPanel?.querySelectorAll === 'function') {
+    resultsPanel.querySelectorAll('.skins-scoreboard').forEach(el => el.remove());
+  }
+  const dataTable = typeof resultsPanel?.querySelector === 'function' ? resultsPanel.querySelector('table.data-table') : null;
+  if (dataTable) dataTable.classList.add('hidden');
+
+  resultsBody.innerHTML = '';
+  const totalScoreDiv = resultsPanel.querySelector('.total-score');
+  if (totalScoreDiv) {
+    totalScoreDiv.insertAdjacentHTML('beforebegin', scoreboardHTML);
+  } else {
+    resultsPanel.insertAdjacentHTML('beforeend', scoreboardHTML);
+  }
+
+  const summaryParts = players.map(p => `${escapeHTML(p.name)}: ${skinsWon[Number(p.id)] || 0} Skins`);
+  totalScore.innerHTML = summaryParts.join(' &nbsp;|&nbsp; ');
 
   resultsEmpty.classList.add('hidden');
   resultsPanel.classList.remove('hidden');

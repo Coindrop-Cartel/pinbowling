@@ -11,7 +11,7 @@ const buildUrl = (path, params = {}) => {
   }
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
+    if (value !== undefined && value !== null && value !== '' && String(value) !== 'undefined') {
       searchParams.append(key, value);
     }
   });

@@ -596,7 +596,8 @@ export async function initStandingsPage() {
       matchupScoreMap,
       tvModeManager,
       lastScoreState,
-      currentScoreState
+      currentScoreState,
+      scoresByPlayer
     });
 
     lastScoreState = currentScoreState;

@@ -451,4 +451,36 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
     expect(warningEl.classList.contains('hidden')).toBe(false);
     expect(warningEl.textContent).toContain('Spectator Mode');
   });
+
+  it('adds All Players option to player dropdown for Admin in H2H format', async () => {
+    Utils.getActiveLeagueId.mockReturnValue(1);
+    Utils.getActiveEventId.mockReturnValue(101);
+    Utils.getActiveEventMatchupId.mockReturnValue(50);
+    Utils.getCurrentPlayerId.mockReturnValue('all');
+
+    PB_API.leagues.getAll.mockResolvedValue([
+      { 
+        id: 1, 
+        name: 'H2H Skins League', 
+        competitionFormat: 'head2head', participationType: 'individual', 
+        scoringFormat: 'golf_skins',
+        events: [{ id: 101, eventName: 'Skins Event' }] 
+      }
+    ]);
+    PB_API.players.getAll.mockResolvedValue([
+      { id: 10, playerName: 'Kyle Voorhees' },
+      { id: 20, playerName: 'Adam Bowman' }
+    ]);
+    PB_API.matchups.get.mockResolvedValue([
+      { id: 50, eventId: 101, player1Id: 10, player1Name: 'Kyle Voorhees', player2Id: 20, player2Name: 'Adam Bowman', status: 'pending', entries: [{ id: 1, orderNumber: 1, machineId: 5, machineName: 'Hole 1' }] }
+    ]);
+    PB_API.auth.me.mockResolvedValue({ player_id: 10, role: 'admin' });
+
+    await initScoresPage();
+
+    const playerSummary = document.getElementById('player-summary');
+    expect(playerSummary.textContent).toContain('All Players');
+    const disabledSections = document.querySelectorAll('.participant-section.round-inputs-disabled');
+    expect(disabledSections.length).toBe(0);
+  });
 });

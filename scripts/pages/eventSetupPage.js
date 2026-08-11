@@ -153,7 +153,7 @@ export async function initEventSetupPage() {
   const getMachineTargets = (machineName, machineId, format) => {
     const locMachine = currentSuggestedMachines.find(m => 
       (machineId && String(m.machineId || m.id) === String(machineId)) || 
-      (machineName && m.machineName === machineName)
+      (machineName && m.machineName && m.machineName.toLowerCase() === machineName.toLowerCase())
     );
     
     if (locMachine) {
@@ -176,7 +176,7 @@ export async function initEventSetupPage() {
 
     const masterMach = masterMachines.find(mm => 
       (machineId && String(mm.id) === String(machineId)) || 
-      (machineName && mm.machineName === machineName)
+      (machineName && mm.machineName && mm.machineName.toLowerCase() === machineName.toLowerCase())
     );
     
     if (masterMach) {
@@ -201,13 +201,41 @@ export async function initEventSetupPage() {
     return eng?.getDefaultQuickFillTargets?.() || null;
   };
 
-  const updateQuickFillState = (machineName) => {
+  const updateQuickFillHighlight = (activeType = null) => {
+    const currentVal = parseFormattedNumber(score10Input.value);
+    [
+      { btn: btnEasy, val: selectedMachineTargets?.easy, type: 'easy' },
+      { btn: btnMed, val: selectedMachineTargets?.med, type: 'med' },
+      { btn: btnHard, val: selectedMachineTargets?.hard, type: 'hard' }
+    ].forEach(({ btn, val, type }) => {
+      if (!btn) return;
+      const isSelected = activeType ? activeType === type : (Boolean(val) && val === currentVal);
+      btn.classList.toggle('btn-standard', isSelected);
+      btn.classList.toggle('secondary', !isSelected);
+    });
+  };
+
+  const updateQuickFillState = (machineName, autoFill = false) => {
     const format = ScoringFormats.resolve(eventMatch?.scoringFormat || league?.scoringFormat);
     selectedMachineTargets = getMachineTargets(machineName, null, format);
     
     btnEasy.disabled = !selectedMachineTargets?.easy;
     btnMed.disabled = !selectedMachineTargets?.med;
     btnHard.disabled = !selectedMachineTargets?.hard;
+
+    let activeType = null;
+    if (autoFill && selectedMachineTargets) {
+      if (selectedMachineTargets.med) activeType = 'med';
+      else if (selectedMachineTargets.easy) activeType = 'easy';
+      else if (selectedMachineTargets.hard) activeType = 'hard';
+
+      const defaultVal = activeType ? selectedMachineTargets[activeType] : null;
+      if (defaultVal) {
+        score10Input.value = formatNumber(defaultVal);
+        updatePreviewAndDirty();
+      }
+    }
+    updateQuickFillHighlight(activeType);
   };
 
   machineSearch = createSearchableSelect(document.getElementById('machine-name'), machineSelect, currentSuggestedMachines, {
@@ -215,7 +243,7 @@ export async function initEventSetupPage() {
     labelKey: 'machineName',
     placeholder: '-- Choose machine --',
     onSelect: (val) => {
-      updateQuickFillState(val);
+      updateQuickFillState(val, true);
       markDirty();
     }
   });
@@ -226,6 +254,7 @@ export async function initEventSetupPage() {
       const val = selectedMachineTargets?.[type];
       if (val) {
         score10Input.value = formatNumber(val);
+        updateQuickFillHighlight(type);
         updatePreviewAndDirty();
       }
     });
@@ -254,9 +283,22 @@ export async function initEventSetupPage() {
     updateScalingUI();
   }
 
-  score10Input.addEventListener('input', updatePreviewAndDirty);
+  score10Input.addEventListener('input', () => {
+    updateQuickFillHighlight();
+    updatePreviewAndDirty();
+  });
   score1Input.addEventListener('input', updatePreviewAndDirty);
-  document.getElementById('machine-name').addEventListener('input', markDirty);
+  document.getElementById('machine-name').addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    const match = currentSuggestedMachines.find(m => m.machineName && m.machineName.toLowerCase() === val.toLowerCase()) ||
+                  masterMachines.find(mm => mm.machineName && mm.machineName.toLowerCase() === val.toLowerCase());
+    if (match) {
+      updateQuickFillState(match.machineName, true);
+    } else {
+      updateQuickFillState(val, false);
+      markDirty();
+    }
+  });
 
   // Initialize dragging listeners on the container once
   setupSortableList(roundsList, {

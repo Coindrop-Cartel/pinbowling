@@ -22,6 +22,18 @@ export function escapeHTML(str) {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * Extracts initials from a full name (e.g. "Kyle Voorhees" -> "K.V.").
+ * @param {string} name Full player name.
+ * @returns {string} Formatted initials string.
+ */
+export function getInitials(name) {
+  if (!name) return '?';
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length === 1) return `${parts[0].substring(0, 2).toUpperCase()}.`;
+  return parts.map(p => `${p.charAt(0).toUpperCase()}.`).join('');
+}
+
 /** @param {string|null} playerId - Sets the active player ID in the URL. */
 export function setCurrentPlayerId(playerId) {
   setUrlParam('playerId', playerId);
@@ -55,8 +67,11 @@ export function getCookie(name) {
 function setUrlParam(key, value) {
   const url = new URL(window.location.href);
   
-  if (value) url.searchParams.set(key, value);
-  else url.searchParams.delete(key);
+  if (value && String(value) !== 'undefined' && String(value) !== 'null') {
+    url.searchParams.set(key, value);
+  } else {
+    url.searchParams.delete(key);
+  }
   window.history.replaceState({}, '', url);
   
   // Notify the app that state has changed. main.js listens for this to refresh UI/Navigation.
@@ -77,8 +92,11 @@ export function setActiveLeagueId(id) {
  */
 export function setActiveLeagueIdSilent(id) {
   const url = new URL(window.location.href);
-  if (id) url.searchParams.set('leagueId', id);
-  else url.searchParams.delete('leagueId');
+  if (id && String(id) !== 'undefined' && String(id) !== 'null') {
+    url.searchParams.set('leagueId', id);
+  } else {
+    url.searchParams.delete('leagueId');
+  }
   window.history.replaceState({}, '', url);
 }
 
@@ -272,12 +290,12 @@ export function renderPreview(highScoreInput, lowScoreInput, previewValues, Engi
   let bonusHtml = '';
   if (isLastRound && typeof Engine.getBonusTargets === 'function') {
     const targets = Engine.getBonusTargets({ values });
-    if (targets) {
+    if (targets && (targets.t1 > 0 || targets.t2 > 0)) {
       const parts = [];
-      if (targets.t1 !== undefined) {
+      if (targets.t1 > 0) {
         parts.push(`Target 1: <strong>${formatNumber(targets.t1)}</strong>`);
       }
-      if (targets.t2 !== undefined) {
+      if (targets.t2 > 0) {
         parts.push(`Target 2: <strong>${formatNumber(targets.t2)}</strong>`);
       }
       if (parts.length > 0) {

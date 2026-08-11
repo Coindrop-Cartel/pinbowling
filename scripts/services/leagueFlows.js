@@ -141,6 +141,41 @@ export async function startPlayoffsFlow({ leagueId, allLeagues, loaderParent, on
 }
 
 /**
+ * Advances the active playoff bracket to the next round (e.g., Semifinals or Finals).
+ *
+ * @param {Object} options
+ * @param {number} options.leagueId The league to advance playoffs for.
+ * @param {string} [options.nextRoundName='Next Round'] Name of the round to start.
+ * @param {HTMLElement} options.loaderParent DOM element to attach the loader to.
+ * @param {Function} options.onComplete Callback invoked after successful completion.
+ */
+export async function advancePlayoffsFlow({ leagueId, nextRoundName = 'Next Round', loaderParent, onComplete }) {
+  const confirmed = await showConfirm(
+    `Are you sure you want to start the ${nextRoundName}? This will lock the results of the previous round and generate the ${nextRoundName} matchups.`,
+    `Start ${nextRoundName}`
+  );
+  if (!confirmed) return;
+
+  const loader = createSkeletonLoader(loaderParent, { count: 3 });
+  try {
+    await PB_API.leagues.advancePlayoffs(leagueId);
+    if (onComplete) await onComplete();
+    await showDialog({
+      title: `${nextRoundName} Started!`,
+      message: `The ${nextRoundName} matchups have been generated successfully.`
+    });
+  } catch (err) {
+    console.error(err);
+    await showDialog({
+      title: `Error starting ${nextRoundName}`,
+      message: err.message || 'An error occurred.'
+    });
+  } finally {
+    if (loader && loader.remove) loader.remove();
+  }
+}
+
+/**
  * Updates the season schedule for a league (deletes pending matchups and recreates them).
  *
  * @param {Object} options

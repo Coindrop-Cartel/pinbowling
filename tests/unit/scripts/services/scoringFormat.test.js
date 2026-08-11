@@ -10,7 +10,7 @@ describe('ScoringFormats service', () => {
   });
 
   it('provides an immutable ALL array of all formats', () => {
-    expect(ScoringFormats.ALL).toEqual(['bowling', 'golf', 'baseball', 'homerunderby']);
+    expect(ScoringFormats.ALL).toEqual(['bowling', 'golf', 'golf_skins', 'baseball', 'homerunderby']);
     expect(() => {
       ScoringFormats.ALL.push('test');
     }).toThrow();

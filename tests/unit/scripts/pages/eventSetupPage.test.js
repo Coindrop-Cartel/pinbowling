@@ -211,7 +211,7 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
     expect(btnFlat.classList.contains('secondary')).toBe(true);
   });
 
-  it('should handle quick fill buttons', async () => {
+  it('should handle quick fill buttons and default to medium score when machine is selected', async () => {
     const machine = { id: 1, machineName: 'Iron Maiden', format: 'bowling', targetEasy: 1000, targetMed: 2000, targetHard: 3000 };
     // Ensure machines are returned before initialization
     PB_API.machines.getAll.mockResolvedValue([machine]);
@@ -222,6 +222,9 @@ describe('Event Setup Page (eventSetupPage.js)', () => {
     // Manually trigger onSelect of the searchable select to set selectedMachineTargets
     const onSelect = uiMocks.createSearchableSelect.mock.calls[0][3].onSelect;
     onSelect('Iron Maiden');
+
+    // Should default to medium score upon selection
+    expect(document.getElementById('value-10').value).toBe('2000');
 
     const btnEasy = document.getElementById('fill-easy');
     btnEasy.click();

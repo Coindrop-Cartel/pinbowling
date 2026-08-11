@@ -27,6 +27,7 @@ use App\Service\MatchupService;
 use App\Service\TeamMatchupService;
 use App\Service\CleanupService;
 use App\Service\SessionService;
+use App\Service\ExtraRoundsService;
 
 // 1. Create a Settings object from the Configuration singleton
 $dbConfig = $config->getDbConfig();
@@ -86,6 +87,9 @@ $container->set(PlayoffService::class, function (Container $c) {
 });
 $container->set(TeamPlayoffService::class, function (Container $c) {
     return new TeamPlayoffService($c->get(DatabaseService::class), $c->get(EventService::class));
+});
+$container->set(ExtraRoundsService::class, function (Container $c) {
+    return new ExtraRoundsService($c->get(DatabaseService::class));
 });
 $container->set(LeagueService::class, function (Container $c) {
     return new LeagueService(

@@ -50,6 +50,30 @@ export class ScoringEngine {
   }
 
   /**
+   * Returns whether this scoring format allows tied matchups.
+   * @returns {boolean} True if ties are allowed, false if tiebreakers/extra rounds are required.
+   */
+  allowsTies() {
+    return true;
+  }
+
+  /**
+   * Returns whether this scoring format supports generating extra rounds (e.g. Extra Innings).
+   * @returns {boolean}
+   */
+  supportsExtraRounds() {
+    return false;
+  }
+
+  /**
+   * Returns configuration for extra round generation.
+   * @returns {Object|null}
+   */
+  getExtraRoundConfig() {
+    return null;
+  }
+
+  /**
    * Returns formatted score string for a single turn in a head-to-head scoreboard cell.
    * @param {Object} turn The turn object calculated by calculateTurnResults.
    * @param {string} [existingScore] Any score previously recorded in this round cell.
@@ -589,8 +613,58 @@ export class ScoringEngine {
    * @returns {Object} The enriched score map.
    */
   enrichScoreMap(scoreMap, context) {
-    if (!context || !this._isHeadToHead(context)) return scoreMap;
-    this._attachOpponentScores(scoreMap, context);
+    if (!context) return scoreMap;
+    const isTeamMode = context?.activeCompetition?.isTeamMode ?? (context?.isTeamMode || context?.activeLeague?.participationType === 'team' || context?.activeSession?.participationType === 'team');
+
+    scoreMap.byPlayer = scoreMap.byPlayer || {};
+    scoreMap.byTeam = scoreMap.byTeam || {};
+
+    const scoresByPlayer = context.groupScoresByPlayer?.(context.normalizeScores?.(context.allEventScores || []) || []) || {};
+    Object.entries(scoresByPlayer).forEach(([pId, rows]) => {
+      const numId = Number(pId);
+      if (!numId) return;
+      const pMap = {};
+      (rows || []).forEach(r => {
+        const order = r.orderNumber ?? r.order_number;
+        if (order !== undefined) {
+          pMap[String(order)] = {
+            ball1: Number(r.ball1 || 0),
+            ball2: Number(r.ball2 || 0),
+            ball3: Number(r.ball3 || 0)
+          };
+        }
+      });
+      if (isTeamMode) {
+        scoreMap.byTeam[numId] = pMap;
+        scoreMap.byTeam[String(numId)] = pMap;
+      } else {
+        scoreMap.byPlayer[numId] = pMap;
+        scoreMap.byPlayer[String(numId)] = pMap;
+      }
+    });
+
+    // Merge transient DOM input scores into byTeam or byPlayer map
+    Object.entries(scoreMap).forEach(([orderStr, entry]) => {
+      if (!entry?.byPlayer) return;
+      Object.entries(entry.byPlayer).forEach(([pId, pRow]) => {
+        const numId = Number(pId);
+        if (!numId) return;
+        const targetMap = isTeamMode ? scoreMap.byTeam : scoreMap.byPlayer;
+        if (!targetMap[numId]) targetMap[numId] = {};
+        if (!targetMap[String(numId)]) targetMap[String(numId)] = targetMap[numId];
+        if (pRow.ball1 > 0 || pRow.ball2 > 0 || pRow.ball3 > 0) {
+          targetMap[numId][orderStr] = {
+            ball1: pRow.ball1 || 0,
+            ball2: pRow.ball2 || 0,
+            ball3: pRow.ball3 || 0
+          };
+        }
+      });
+    });
+
+    if (this._isHeadToHead(context)) {
+      this._attachOpponentScores(scoreMap, context);
+    }
     return scoreMap;
   }
 
@@ -613,7 +687,7 @@ export class ScoringEngine {
     if (context?.activeParticipantId !== undefined && context?.activeParticipantId !== null) {
       return Number(context.activeParticipantId);
     }
-    const isTeamMode = context?.isTeamMode || context?.activeLeague?.participationType === 'team' || context?.activeSession?.participationType === 'team';
+    const isTeamMode = context?.activeCompetition?.isTeamMode ?? (context?.isTeamMode || context?.activeLeague?.participationType === 'team' || context?.activeSession?.participationType === 'team');
     if (isTeamMode) {
       return Number(context?.getActiveTeamId?.() || context?.getCurrentPlayerId?.() || 0);
     }
@@ -621,30 +695,142 @@ export class ScoringEngine {
   }
 
   _resolveActiveMatchup(context) {
+    const isTeamMode = context?.activeCompetition?.isTeamMode ?? (context?.isTeamMode || context?.activeLeague?.participationType === 'team' || context?.activeSession?.participationType === 'team');
+    return isTeamMode
+      ? this._resolveTeamActiveMatchup(context)
+      : this._resolveIndividualActiveMatchup(context);
+  }
+
+  _resolveTeamActiveMatchup(context) {
     const matchups = context?.eventMatchups || [];
+    const activeMatchupId = context?.activeMatchupId || context?.activeTeamEventMatchupId || context?.matchupId;
+    if (activeMatchupId) {
+      const match = matchups.find(m => String(m.id) === String(activeMatchupId));
+      if (match) return match;
+    }
     const currentId = this._resolveActiveParticipantId(context);
-    return matchups.find(m => {
-      const a = Number(m.team1Id ?? m.team1_id ?? m.player1Id ?? m.player1_id);
-      const b = Number(m.team2Id ?? m.team2_id ?? m.player2Id ?? m.player2_id);
-      return currentId === a || currentId === b;
-    }) || matchups[0] || null;
+    if (currentId && String(currentId) !== 'all') {
+      const match = matchups.find(m => {
+        const t1 = Number(m.team1Id ?? 0);
+        const t2 = Number(m.team2Id ?? 0);
+        return currentId === t1 || currentId === t2;
+      });
+      if (match) return match;
+    }
+    return matchups[0] || null;
+  }
+
+  _resolveIndividualActiveMatchup(context) {
+    const matchups = context?.eventMatchups || [];
+    const activeMatchupId = context?.activeMatchupId || context?.activeEventMatchupId || context?.matchupId;
+    if (activeMatchupId) {
+      const match = matchups.find(m => String(m.id) === String(activeMatchupId));
+      if (match) return match;
+    }
+    const currentId = this._resolveActiveParticipantId(context);
+    if (currentId && String(currentId) !== 'all') {
+      const match = matchups.find(m => {
+        const a = Number(m.player1Id ?? 0);
+        const b = Number(m.player2Id ?? 0);
+        const c = Number(m.player3Id ?? 0);
+        const d = Number(m.player4Id ?? 0);
+        return currentId === a || currentId === b || currentId === c || currentId === d;
+      });
+      if (match) return match;
+    }
+    return matchups[0] || null;
   }
 
   /**
    * Attaches the opponent's saved per-round scores to the map under `scoreMap.opponent`.
-   * The opponent is the other participant in the selected player's matchup.
+   * Delegates to team or individual helper methods based on participation type.
    */
   _attachOpponentScores(scoreMap, context) {
-    const scoresByPlayer = context?.groupScoresByPlayer?.(context?.normalizeScores?.(context?.allEventScores || []) || []) || {};
+    const isTeamMode = context?.activeCompetition?.isTeamMode ?? (context?.isTeamMode || context?.activeLeague?.participationType === 'team' || context?.activeSession?.participationType === 'team');
+    return isTeamMode
+      ? this._attachTeamOpponentScores(scoreMap, context)
+      : this._attachIndividualOpponentScores(scoreMap, context);
+  }
+
+  _attachTeamOpponentScores(scoreMap, context) {
+    const normalized = context?.normalizeScores?.(context?.allEventScores || []) || [];
+    const scoresByTeam = {};
+    normalized.forEach(s => {
+      const tId = String(s.teamId ?? 0);
+      if (!scoresByTeam[tId]) scoresByTeam[tId] = [];
+      scoresByTeam[tId].push(s);
+    });
+
+    scoreMap.byTeam = scoreMap.byTeam || {};
+    Object.entries(scoresByTeam).forEach(([tId, rows]) => {
+      const numId = Number(tId);
+      if (!numId) return;
+      const tMap = {};
+      (rows || []).forEach(r => {
+        const order = r.orderNumber ?? r.order_number;
+        if (order !== undefined) {
+          tMap[String(order)] = {
+            ball1: Number(r.ball1 || 0),
+            ball2: Number(r.ball2 || 0),
+            ball3: Number(r.ball3 || 0)
+          };
+        }
+      });
+      scoreMap.byTeam[numId] = tMap;
+      scoreMap.byTeam[String(numId)] = tMap;
+    });
 
     const currentId = this._resolveActiveParticipantId(context);
-    const matchup = this._resolveActiveMatchup(context);
-    if (!matchup || !currentId) return;
+    const matchup = this._resolveTeamActiveMatchup(context);
+    if (!matchup) return;
 
-    const p1 = Number(matchup.team1Id ?? matchup.team1_id ?? matchup.player1Id ?? matchup.player1_id);
-    const p2 = Number(matchup.team2Id ?? matchup.team2_id ?? matchup.player2Id ?? matchup.player2_id);
-    const opponentId = currentId === p1 ? p2 : currentId === p2 ? p1 : null;
-    if (opponentId === null) return;
+    const p1 = Number(matchup.team1Id ?? 0);
+    const p2 = Number(matchup.team2Id ?? 0);
+    const opponentId = (currentId && currentId === p1) ? p2 : p1;
+
+    const oScores = scoresByTeam[opponentId] || scoresByTeam[String(opponentId)] || [];
+    const opponent = {};
+    oScores.forEach(s => {
+      const order = s?.orderNumber ?? s?.order_number;
+      if (order === undefined) return;
+      opponent[String(order)] = {
+        ball1: Number(s?.ball1 || 0),
+        ball2: Number(s?.ball2 || 0),
+        ball3: Number(s?.ball3 || 0)
+      };
+    });
+    scoreMap.opponent = opponent;
+  }
+
+  _attachIndividualOpponentScores(scoreMap, context) {
+    const scoresByPlayer = context?.groupScoresByPlayer?.(context?.normalizeScores?.(context?.allEventScores || []) || []) || {};
+
+    scoreMap.byPlayer = scoreMap.byPlayer || {};
+    Object.entries(scoresByPlayer).forEach(([pId, rows]) => {
+      const numId = Number(pId);
+      if (!numId) return;
+      const pMap = {};
+      (rows || []).forEach(r => {
+        const order = r.orderNumber ?? r.order_number;
+        if (order !== undefined) {
+          pMap[String(order)] = {
+            ball1: Number(r.ball1 || 0),
+            ball2: Number(r.ball2 || 0),
+            ball3: Number(r.ball3 || 0)
+          };
+        }
+      });
+      scoreMap.byPlayer[numId] = pMap;
+      scoreMap.byPlayer[String(numId)] = pMap;
+    });
+
+    const currentId = this._resolveActiveParticipantId(context);
+    const matchup = this._resolveIndividualActiveMatchup(context);
+    if (!matchup) return;
+
+    const p1 = Number(matchup.player1Id ?? 0);
+    const p2 = Number(matchup.player2Id ?? 0);
+    const opponentId = (currentId && currentId === p1) ? p2 : p1;
 
     const oScores = scoresByPlayer[opponentId] || scoresByPlayer[String(opponentId)] || [];
     const opponent = {};

@@ -100,7 +100,7 @@
   display: block;
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .dropdown:hover .dropdown-content {
     display: block;
   }
@@ -634,4 +634,24 @@ body.theme-baseball .hero-logo-btn[data-format="golf"] {
   font-weight: 500;
   font-size: 0.8rem;
   letter-spacing: 0.5px;
+}
+
+/* Responsive Scoreboard Grid Layouts */
+.scoreboard-grid.desktop-grid {
+  display: table;
+  width: 100%;
+}
+.scoreboard-grid.mobile-grid {
+  display: none;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .scoreboard-grid.desktop-grid {
+    display: none !important;
+  }
+  .scoreboard-grid.mobile-grid {
+    display: table !important;
+    width: 100%;
+  }
 }
