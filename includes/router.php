@@ -116,7 +116,7 @@ class Router {
 
     private function isManagementRoute(string $route): bool {
         $checkRoute = str_replace('.php', '', $route);
-        $managementRoutes = ['config', 'machines', 'teams', 'management'];
+        $managementRoutes = ['config', 'machines', 'teams', 'management', 'wppr'];
         return in_array($checkRoute, $managementRoutes);
     }
 

@@ -20,13 +20,25 @@
           <label for="player-email">Email Address</label>
           <input id="player-email" data-testid="player-email-input" type="email" placeholder="Enter email address" />
         </div>
-        <div id="player-ifpa-row" data-testid="player-ifpa-row" class="form-row hidden">
-          <label for="ifpa-id">IFPA ID (Optional)</label>
-          <input id="ifpa-id" data-testid="ifpa-id-input" type="text" placeholder="e.g., 12345" />
+        <div id="player-ifpa-row" data-testid="player-ifpa-row" class="form-row-group form-row-grid hidden">
+          <div class="form-group">
+            <label for="ifpa-id">IFPA ID (Optional)</label>
+            <input id="ifpa-id" data-testid="ifpa-id-input" type="text" placeholder="e.g., 88590" />
+          </div>
+          <div class="form-group">
+            <label for="ifpa-ranking">IFPA Ranking (Optional)</label>
+            <input id="ifpa-ranking" data-testid="ifpa-ranking-input" type="number" step="1" min="1" placeholder="e.g., 2892" />
+          </div>
         </div>
-        <div id="player-matchplay-row" data-testid="player-matchplay-row" class="form-row hidden">
-          <label for="matchplay-id">Matchplay ID (Optional)</label>
-          <input id="matchplay-id" data-testid="matchplay-id-input" type="text" placeholder="e.g., 67890" />
+        <div id="player-matchplay-row" data-testid="player-matchplay-row" class="form-row-group form-row-grid hidden">
+          <div class="form-group">
+            <label for="matchplay-id">Matchplay ID (Optional)</label>
+            <input id="matchplay-id" data-testid="matchplay-id-input" type="text" placeholder="e.g., 67890" />
+          </div>
+          <div class="form-group">
+            <label for="ifpa-rating">Match Play Rating (Optional)</label>
+            <input id="ifpa-rating" data-testid="ifpa-rating-input" type="number" step="0.01" min="0" placeholder="e.g., 1502.87" />
+          </div>
         </div>
         <div id="player-format-row" data-testid="player-format-row" class="form-row hidden">
           <label for="player-scoring-format">Preferred Scoring Format</label>

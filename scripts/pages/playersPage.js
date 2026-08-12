@@ -44,7 +44,9 @@ export async function initPlayersPage() {
   const editingPlayerIdInput = document.getElementById('editing-player-id');
   const playerNameInput = document.getElementById('player-name');
   const ifpaIdInput = document.getElementById('ifpa-id');
+  const ifpaRatingInput = document.getElementById('ifpa-rating');
   const matchplayIdInput = document.getElementById('matchplay-id');
+  const ifpaRankingInput = document.getElementById('ifpa-ranking');
   const usernameRow = document.getElementById('player-username-row');
   const usernameInput = document.getElementById('player-username');
   const emailRow = document.getElementById('player-email-row');
@@ -143,8 +145,10 @@ export async function initPlayersPage() {
             ${p.username ? `<div><strong>Username:</strong> ${escapeHTML(p.username)}</div>` : ''}
             ${p.email ? `<div><strong>Email:</strong> ${escapeHTML(p.email)}</div>` : ''}
             ${p.ifpaId ? `<div><strong>IFPA ID:</strong> ${escapeHTML(p.ifpaId)}</div>` : ''}
+            ${p.ifpaRanking ? `<div><strong>IFPA Ranking:</strong> #${parseInt(p.ifpaRanking, 10)}</div>` : ''}
             ${p.matchplayId ? `<div><strong>MatchPlay ID:</strong> ${escapeHTML(p.matchplayId)}</div>` : ''}
-            ${!p.ifpaId && !p.matchplayId ? '<div class="muted-italic">No external IDs linked.</div>' : ''}
+            ${p.ifpaRating ? `<div><strong>Match Play Rating:</strong> ${parseFloat(p.ifpaRating).toFixed(2)}</div>` : ''}
+            ${!p.ifpaId && !p.matchplayId && !p.ifpaRating && !p.ifpaRanking ? '<div class="muted-italic">No external IDs or ratings linked.</div>' : ''}
             <div class="small-action-buttons mt-10">
               ${canEdit ? `<button type="button" class="edit-player-btn secondary btn-row">Edit</button>` : ''}
               ${isAdmin ? `<button type="button" class="merge-player-btn secondary btn-row">Merge</button>` : ''}
@@ -200,7 +204,9 @@ export async function initPlayersPage() {
 
   // Ensure validation and button states are updated when metadata fields change
   ifpaIdInput.addEventListener('input', () => filterInstance.performFilter());
+  if (ifpaRatingInput) ifpaRatingInput.addEventListener('input', () => filterInstance.performFilter());
   matchplayIdInput.addEventListener('input', () => filterInstance.performFilter());
+  if (ifpaRankingInput) ifpaRankingInput.addEventListener('input', () => filterInstance.performFilter());
 
   async function refresh(data = null) {
     const players = Array.isArray(data) ? data : await PB_API.players.getAll();
@@ -225,7 +231,9 @@ export async function initPlayersPage() {
     editingPlayerIdInput.value = '';
     playerNameInput.value = '';
     ifpaIdInput.value = '';
+    if (ifpaRatingInput) ifpaRatingInput.value = '';
     matchplayIdInput.value = '';
+    if (ifpaRankingInput) ifpaRankingInput.value = '';
     if (usernameRow) usernameRow.classList.add('hidden');
     if (usernameInput) {
       usernameInput.value = '';
@@ -277,7 +285,9 @@ export async function initPlayersPage() {
     playerNameInput.disabled = !hasElevatedPrivileges;
     
     ifpaIdInput.value = player.ifpaId || '';
+    if (ifpaRatingInput) ifpaRatingInput.value = player.ifpaRating || '';
     matchplayIdInput.value = player.matchplayId || '';
+    if (ifpaRankingInput) ifpaRankingInput.value = player.ifpaRanking || '';
     
     const hasAccount = !!player.userId;
     if (hasAccount) {
@@ -359,7 +369,9 @@ export async function initPlayersPage() {
     const id = editingPlayerIdInput.value ? Number(editingPlayerIdInput.value) : null;
     const name = playerNameInput.value.trim();
     const ifpaId = ifpaIdInput.value.trim() || null;
+    const ifpaRating = ifpaRatingInput && ifpaRatingInput.value ? parseFloat(ifpaRatingInput.value) : null;
     const matchplayId = matchplayIdInput.value.trim() || null;
+    const ifpaRanking = ifpaRankingInput && ifpaRankingInput.value ? parseInt(ifpaRankingInput.value, 10) : null;
     const username = usernameInput ? usernameInput.value.trim() : '';
     const email = emailInput ? emailInput.value.trim() : '';
 
@@ -377,7 +389,9 @@ export async function initPlayersPage() {
     const payload = { 
       playerName: name, 
       ifpaId: ifpaId, 
+      ifpaRating: ifpaRating,
       matchplayId: matchplayId,
+      ifpaRanking: ifpaRanking,
       username: username || null,
       email: email || null
     };

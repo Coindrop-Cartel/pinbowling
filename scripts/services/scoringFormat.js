@@ -11,7 +11,9 @@
  */
 export const ScoringFormats = {
   BOWLING: 'bowling',
+  PINBOWLING: 'bowling',
   GOLF: 'golf',
+  PINGOLF: 'golf',
   GOLF_SKINS: 'golf_skins',
   BASEBALL: 'baseball',
   HOME_RUN_DERBY: 'homerunderby',
@@ -28,6 +30,7 @@ export const ScoringFormats = {
    */
   isValid(value) {
     const valStr = String(value ?? '').toLowerCase();
+    if (valStr === 'pingolf' || valStr === 'pinbowling') return true;
     return this.ALL.includes(valStr) || valStr === 'derby';
   },
 
@@ -41,6 +44,8 @@ export const ScoringFormats = {
   resolve(value) {
     const valStr = String(value ?? '').toLowerCase();
     if (valStr === 'derby' || valStr === 'homerunderby') return this.HOME_RUN_DERBY;
+    if (valStr === 'pingolf') return this.GOLF;
+    if (valStr === 'pinbowling') return this.BOWLING;
     return this.isValid(value) ? valStr : this.DEFAULT;
   }
 };

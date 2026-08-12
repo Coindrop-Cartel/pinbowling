@@ -19,6 +19,8 @@ class Serializer {
             'playerName' => $row['player_name'] ?? null,
             'ifpaId' => $row['ifpa_id'] ?? null,
             'matchplayId' => $row['matchplay_id'] ?? null,
+            'ifpaRating' => isset($row['ifpa_rating']) && $row['ifpa_rating'] !== null ? (float)$row['ifpa_rating'] : null,
+            'ifpaRanking' => isset($row['ifpa_ranking']) && $row['ifpa_ranking'] !== null ? (int)$row['ifpa_ranking'] : null,
             'userRole' => $row['role'] ?? null,
             'username' => $row['username'] ?? null,
             'email' => $row['email'] ?? null,

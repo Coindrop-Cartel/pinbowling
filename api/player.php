@@ -52,9 +52,11 @@ class PlayerController extends ApiController {
 
                 $ifpa_id = $this->input['ifpaId'] ?? null;
                 $matchplay_id = $this->input['matchplayId'] ?? null;
+                $ifpa_rating = isset($this->input['ifpaRating']) ? (float)$this->input['ifpaRating'] : null;
+                $ifpa_ranking = isset($this->input['ifpaRanking']) ? (int)$this->input['ifpaRanking'] : null;
 
                 try {
-                    $player = $this->playerService->createPlayer($this->input['playerName'], $ifpa_id, $matchplay_id);
+                    $player = $this->playerService->createPlayer($this->input['playerName'], $ifpa_id, $matchplay_id, $ifpa_rating, $ifpa_ranking);
                     $this->sendJson(Serializer::player($player));
                 } catch (\PDOException $error) {
                     if ($error->errorInfo[1] === 1062) {
@@ -84,8 +86,10 @@ class PlayerController extends ApiController {
                 $isOwner = $currentUser && !empty($existing['user_id']) && $currentUser['id'] == $existing['user_id'];
 
                 $newName = $this->input['playerName'] ?? $existing['player_name'];
-                $ifpa_id = $this->input['ifpaId'] ?? $existing['ifpa_id'];
-                $matchplay_id = $this->input['matchplayId'] ?? $existing['matchplay_id'];
+                $ifpa_id = array_key_exists('ifpaId', $this->input) ? $this->input['ifpaId'] : $existing['ifpa_id'];
+                $matchplay_id = array_key_exists('matchplayId', $this->input) ? $this->input['matchplayId'] : $existing['matchplay_id'];
+                $ifpa_rating = array_key_exists('ifpaRating', $this->input) ? (float)$this->input['ifpaRating'] : (isset($existing['ifpa_rating']) ? (float)$existing['ifpa_rating'] : null);
+                $ifpa_ranking = array_key_exists('ifpaRanking', $this->input) ? (int)$this->input['ifpaRanking'] : (isset($existing['ifpa_ranking']) ? (int)$existing['ifpa_ranking'] : null);
                 $newUsername = $this->input['username'] ?? null;
                 $newEmail = $this->input['email'] ?? null;
                 $newRole = $this->input['userRole'] ?? null;
@@ -119,7 +123,7 @@ class PlayerController extends ApiController {
                     }
                     $this->playerService->updateUserEmail((int)$existing['user_id'], $newEmail);
                 }
-                $player = $this->playerService->updatePlayer($id, $newName, $ifpa_id, $matchplay_id);
+                $player = $this->playerService->updatePlayer($id, $newName, $ifpa_id, $matchplay_id, $ifpa_rating, $ifpa_ranking);
                 $this->sendJson(Serializer::player($player));
                 break;
 

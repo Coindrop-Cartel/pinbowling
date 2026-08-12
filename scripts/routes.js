@@ -34,6 +34,7 @@ export const ROUTE_PATHS = {
   MACHINES: (params = {}) => buildUrl('/machines', params),
   PLAY: (params = {}) => buildUrl('/play', params),
   MAINTENANCE: (params = {}) => buildUrl('/management', params),
+  WPPR: (params = {}) => buildUrl('/wppr', params),
 };
 
 export const ROUTES = [
@@ -47,5 +48,6 @@ export const ROUTES = [
   { path: ROUTE_PATHS.SCORES(), label: 'Scores' },
   { path: ROUTE_PATHS.LEAGUE_SETUP(), label: 'Setup' },
   { path: ROUTE_PATHS.PLAY(), label: 'Play' },
-  { path: ROUTE_PATHS.MAINTENANCE(), label: 'Maintenance' }
+  { path: ROUTE_PATHS.MAINTENANCE(), label: 'Maintenance' },
+  { path: ROUTE_PATHS.WPPR(), label: 'WPPR Estimator' }
 ];

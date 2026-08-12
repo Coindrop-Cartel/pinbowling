@@ -25,6 +25,7 @@ $displayName = htmlspecialchars($user['player_name'] ?? ($user['username'] ?? 'U
             <a id="nav-scores" href="<?php echo $baseUrl; ?>/scores" class="nav-link" data-route="SCORES">Scores</a>
             <a id="nav-leagues" href="<?php echo $baseUrl; ?>/leagues" class="nav-link" data-route="LEAGUES">Manage</a>
             <a id="nav-standings" href="<?php echo $baseUrl; ?>/standings" class="nav-link" data-route="STANDINGS">Scoreboard</a>
+            <a id="nav-wppr" href="<?php echo $baseUrl; ?>/wppr" class="nav-link <?php echo $isManagement ? '' : 'hidden'; ?>" data-route="WPPR">WPPR Estimator</a>
           </div>
         </li>
         <li id="admin-nav-item" class="nav-item dropdown <?php echo $isManagement ? '' : 'hidden'; ?>">

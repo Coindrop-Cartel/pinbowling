@@ -15,6 +15,7 @@ import { initStandingsPage } from '@pages/standingsPage.js';
 import { initLeaguesPage } from '@pages/leaguesPage.js';
 import { initPlayPage } from '@pages/playPage.js';
 import { initManagementPage } from '@pages/managementPage.js';
+import { initWpprPage } from '@pages/wpprPage.js';
 import { getDebugEnabled } from '@services/state.js';
 import { initAuthHeader } from '@services/auth.js';
 import { applyPreferredTheme, fitTVModeToScreen } from '@ui/branding.js';
@@ -118,6 +119,7 @@ export function initApp() {
     'leagues-list': initLeaguesPage,
     'quick-play-form': initPlayPage,
     'management-tools': initManagementPage,
+    'wppr-calculator': initWpprPage,
   };
 
   // Detect and run initialization for the current page based on element presence

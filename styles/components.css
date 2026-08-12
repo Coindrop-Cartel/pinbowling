@@ -51,6 +51,30 @@ input:focus, select:focus {
   gap: 8px;
 }
 
+.form-row-group {
+  margin-bottom: 20px;
+}
+
+.form-row-group.form-row-grid {
+  display: flex;
+  flex-direction: row;
+  gap: 15px;
+}
+
+.form-row-group.form-row-grid .form-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .form-row-group.form-row-grid {
+    flex-direction: column;
+    gap: 15px;
+  }
+}
+
 label {
   font-weight: bold;
   text-transform: uppercase;
@@ -165,6 +189,21 @@ button:disabled {
   gap: 4px;
 }
 
+/* Responsive Table Container for Horizontal Mobile Scrolling */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .table-responsive > table,
+  .table-responsive > .data-table {
+    min-width: 650px;
+  }
+}
+
 /* Tables */
 table {
   width: 100%;
@@ -189,11 +228,25 @@ td {
 }
 
 /* Notice & Hint Blocks */
-.notice, .hint {
+.notice, div.hint, p.hint {
   background-color: var(--pb-gray);
   border-left: 8px solid var(--pb-accent);
   padding: 20px;
   margin: 20px 0;
+}
+
+/* Inline & Form Field Hints */
+small.hint,
+.form-group .hint,
+.form-hint {
+  background: none !important;
+  border: none !important;
+  padding: 4px 0 0 0 !important;
+  margin: 4px 0 0 0 !important;
+  font-size: 0.82rem;
+  color: var(--pb-text-muted, #666);
+  display: block;
+  line-height: 1.35;
 }
 
 /* Custom Interactive components */

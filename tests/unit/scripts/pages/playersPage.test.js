@@ -172,11 +172,11 @@ describe('Player Management Page (playersPage.js)', () => {
       expect(list.innerHTML).toContain('MatchPlay ID:</strong> 456');
     });
 
-    it('should render "No external IDs linked" for players without IDs', async () => {
+    it('should render "No external IDs or ratings linked" for players without IDs', async () => {
       PB_API.players.getAll.mockResolvedValue([{ id: 12, playerName: 'Charlie' }]);
       await initPlayersPage();
       const list = document.getElementById('player-list');
-      expect(list.innerHTML).toContain('No external IDs linked');
+      expect(list.innerHTML).toContain('No external IDs or ratings linked');
     });
 
     it('should show role badge for players with userRole', async () => {

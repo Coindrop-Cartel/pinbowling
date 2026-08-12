@@ -67,10 +67,16 @@ class PlayerService {
      * @return array Created player data with user_id and role
      * @throws \PDOException on duplicate name (error code 1062)
      */
-    public function createPlayer(string $playerName, ?string $ifpaId = null, ?string $matchplayId = null): array {
+    public function createPlayer(
+        string $playerName,
+        ?string $ifpaId = null,
+        ?string $matchplayId = null,
+        ?float $ifpaRating = null,
+        ?int $ifpaRanking = null
+    ): array {
         $pdo = $this->db;
-        $stmt = $pdo->prepare("INSERT INTO players (player_name, ifpa_id, matchplay_id) VALUES (?, ?, ?)");
-        $stmt->execute([$playerName, $ifpaId, $matchplayId]);
+        $stmt = $pdo->prepare("INSERT INTO players (player_name, ifpa_id, matchplay_id, ifpa_rating, ifpa_ranking) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$playerName, $ifpaId, $matchplayId, $ifpaRating, $ifpaRanking]);
         $id = (int)$pdo->lastInsertId();
 
         $stmt = $pdo->prepare(
@@ -96,9 +102,18 @@ class PlayerService {
      * @param string|null $playerName
      * @param string|null $ifpaId
      * @param string|null $matchplayId
+     * @param float|null $ifpaRating
+     * @param int|null $ifpaRanking
      * @return array Updated player data
      */
-    public function updatePlayer(int $playerId, ?string $playerName = null, ?string $ifpaId = null, ?string $matchplayId = null): array {
+    public function updatePlayer(
+        int $playerId,
+        ?string $playerName = null,
+        ?string $ifpaId = null,
+        ?string $matchplayId = null,
+        ?float $ifpaRating = null,
+        ?int $ifpaRanking = null
+    ): array {
         $fields = [];
         $params = [];
 
@@ -113,6 +128,14 @@ class PlayerService {
         if ($matchplayId !== null) {
             $fields[] = "matchplay_id = ?";
             $params[] = $matchplayId;
+        }
+        if ($ifpaRating !== null) {
+            $fields[] = "ifpa_rating = ?";
+            $params[] = $ifpaRating;
+        }
+        if ($ifpaRanking !== null) {
+            $fields[] = "ifpa_ranking = ?";
+            $params[] = $ifpaRanking;
         }
 
         if (empty($fields)) {

@@ -44,6 +44,7 @@ const ROLE_PERMISSIONS = {
  */
 const NAV_PERMISSIONS = {
   '#nav-leagues': null, // Visible to all; internal actions restricted by role
+  '#nav-wppr': null,    // Visible to all users
   '#nav-machines': PERMISSIONS.CREATE_SESSION,
   '#nav-locations': PERMISSIONS.JOIN_SESSION, // Visible to any registered user
   '#nav-players': PERMISSIONS.JOIN_SESSION,   // Visible to any registered user

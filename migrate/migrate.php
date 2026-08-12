@@ -61,7 +61,9 @@ function initializeDatabaseSchema($pdo) {
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `player_name` VARCHAR(255) NOT NULL UNIQUE,
         `ifpa_id` VARCHAR(50) DEFAULT NULL,
-        `matchplay_id` VARCHAR(50) DEFAULT NULL
+        `matchplay_id` VARCHAR(50) DEFAULT NULL,
+        `ifpa_rating` FLOAT DEFAULT NULL,
+        `ifpa_ranking` INT DEFAULT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS `leagues` (
@@ -343,6 +345,21 @@ function alignTableColumns($pdo) {
             }
         }
 
+    }
+
+    // --- players ---
+    $checkTable = $pdo->query("SHOW TABLES LIKE 'players'")->fetch();
+    if ($checkTable) {
+        $cols = [
+            'ifpa_rating'  => "ALTER TABLE `players` ADD COLUMN `ifpa_rating` FLOAT DEFAULT NULL",
+            'ifpa_ranking' => "ALTER TABLE `players` ADD COLUMN `ifpa_ranking` INT DEFAULT NULL",
+        ];
+        foreach ($cols as $col => $sql) {
+            $exists = $pdo->query("SHOW COLUMNS FROM `players` LIKE '$col'")->fetch();
+            if (!$exists) {
+                $pdo->exec($sql);
+            }
+        }
     }
 
     // --- teams ---

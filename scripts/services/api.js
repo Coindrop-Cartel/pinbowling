@@ -94,6 +94,7 @@ export const PB_API = {
     logout: () => fetchJSON('api/auth.php?task=logout', { method: 'POST' }),
     register: (data) => fetchJSON('api/auth.php?task=register', { method: 'POST', body: JSON.stringify(data) }),
     me: () => fetchJSON('api/auth.php?task=me'),
+    getCurrentUser: () => fetchJSON('api/auth.php?task=me').catch(() => null),
     forgotPassword: (email) => fetchJSON('api/auth.php?task=forgot', { method: 'POST', body: JSON.stringify({ email }) }),
     resetWithToken: (token, password) => fetchJSON('api/auth.php?task=reset_with_token', { method: 'POST', body: JSON.stringify({ token, password }) }),
   },

@@ -6,3 +6,4 @@
 export { printMachineScores } from './printing/printMachineScores.js';
 export { printBlankScoreSheet, printScoreSheet } from './printing/printScoreSheet.js';
 export { printSeasonResults } from './printing/printSeasonSummary.js';
+export { printWpprResults } from './printing/printWpprResults.js';
