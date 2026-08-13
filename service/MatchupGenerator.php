@@ -160,7 +160,7 @@ class MatchupGenerator {
         }
     }
 
-    private static function insertTargetScore(
+    public static function insertTargetScore(
         \PDOStatement $tsStmt,
         DatabaseService $db,
         int $machineId,

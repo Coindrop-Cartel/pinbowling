@@ -105,20 +105,36 @@ describe('Standings Page (standingsPage.js)', () => {
     Element.prototype.scrollIntoView = vi.fn();
   });
 
-  it('should render event standings when an event is selected', async () => {
+  it('should render event standings when an event is selected and players have scores', async () => {
     getActiveLeagueId.mockReturnValue('1');
     getActiveEventId.mockReturnValue('101');
     PB_API.leagues.getAll.mockResolvedValue([{ 
       id: '1', name: 'L1', players: [{ id: '7', playerName: 'Kyle' }], events: [{ id: '101', eventName: 'W1' }] 
     }]);
     PB_API.machines.getTargets.mockResolvedValue([{ orderNumber: 1, machineName: 'M1' }]);
-    PB_API.scores.get.mockResolvedValue([]);
+    PB_API.scores.get.mockResolvedValue([{ eventId: '101', playerId: '7', orderNumber: 1, ball1: 10 }]);
 
     await initStandingsPage();
 
     expect(document.getElementById('standings-header').innerHTML).toContain('>1<');
     expect(document.getElementById('standings-body').innerHTML).toContain('Kyle');
     expect(document.getElementById('standings-wrapper').classList.contains('hidden')).toBe(false);
+  });
+
+  it('should not show players who have no scores entered for that week', async () => {
+    getActiveLeagueId.mockReturnValue('1');
+    getActiveEventId.mockReturnValue('101');
+    PB_API.leagues.getAll.mockResolvedValue([{ 
+      id: '1', name: 'L1', players: [{ id: '7', playerName: 'Kyle' }, { id: '8', playerName: 'Bob' }], events: [{ id: '101', eventName: 'W1' }] 
+    }]);
+    PB_API.machines.getTargets.mockResolvedValue([{ orderNumber: 1, machineName: 'M1' }]);
+    // Only Kyle has scores, Bob does not
+    PB_API.scores.get.mockResolvedValue([{ eventId: '101', playerId: '7', orderNumber: 1, ball1: 10 }]);
+
+    await initStandingsPage();
+
+    expect(document.getElementById('standings-body').innerHTML).toContain('Kyle');
+    expect(document.getElementById('standings-body').innerHTML).not.toContain('Bob');
   });
 
   it('should render league summary when "summary" event is selected', async () => {

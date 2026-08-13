@@ -112,7 +112,8 @@ export function printWpprResults({
   `;
 
   if (pgmBannerText) {
-    html += `<div class="pgm-box"><strong>Pin-Golf / Pin-Bowling PGM Calculation:</strong> ${escapeHTML(pgmBannerText)}</div>`;
+    const pgmFormatLabel = (eventStats && eventStats.format === 'golf') ? 'Pin-Golf' : 'Pin-Bowling';
+    html += `<div class="pgm-box"><strong>${pgmFormatLabel} PGM Calculation:</strong> ${escapeHTML(pgmBannerText)}</div>`;
   }
 
   // 1. Event stats table (if event is imported)
@@ -126,7 +127,7 @@ export function printWpprResults({
           <th style="width: 40px;" class="text-center">Pos.</th>
           <th>Player Name</th>
           <th class="text-right">${isGolf ? 'Total Score (Strokes)' : 'Total Score'}</th>
-          <th class="text-center">${isGolf ? 'Strokes Played' : 'Balls Played'}</th>
+          <th class="text-center">${isGolf ? 'Strokes Played' : 'Pins Left'}</th>
           <th class="text-center">${isGolf ? 'Avg / Hole' : 'Avg / Frame'}</th>
           <th class="text-center">${isGolf ? '1' : 'X'}</th>
           <th class="text-center">${isGolf ? '2' : '9/'}</th>

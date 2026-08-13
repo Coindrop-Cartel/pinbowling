@@ -19,11 +19,11 @@
         <select id="wppr-event-select" class="form-control">
           <option value="">-- Select Completed Event --</option>
         </select>
-        <small class="hint">Imports players in finishing order and auto-calculates TGP % based on PGM rules (holes played & average score).</small>
+        <small class="hint">Imports players in finishing order and auto-calculates TGP % based on PGM rules (frames/holes played & average score).</small>
       </div>
 
       <div id="wppr-pgm-banner" class="alert alert-info hidden mb-15">
-        <strong>Pin-Golf PGM Calculation:</strong> <span id="wppr-pgm-text"></span>
+        <strong id="wppr-pgm-label">PGM Calculation:</strong> <span id="wppr-pgm-text"></span>
       </div>
 
       <form id="wppr-params-form" class="wppr-form">

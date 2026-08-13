@@ -5,7 +5,7 @@ import { getActiveLeagueId, getActiveEventId, setActiveLeagueIdSilent, setActive
 import { getScoringEngine } from '@core/engine.js';
 import { ScoringFormats, isHead2Head } from '@services/scoringFormat.js';
 import { createSearchableSelect, renderActionSummary, initTournamentSelector, createSkeletonLoader } from '@ui/selectors.js';
-import { showDialog, showRosterOrderDialog, showRoleAssignmentDialog } from '@ui/dialogs.js';
+import { showDialog, showConfirm, showAlert, showRosterOrderDialog, showRoleAssignmentDialog } from '@ui/dialogs.js';
 import { normalizeScores, normalizeTargets, groupScoresByPlayer, buildScoreMapFromDOM } from '@services/normalizer.js';
 import { enrichTeamMatchupEntries } from '@services/matchupBuilder.js';
 import { applyPreferredTheme } from '@ui/branding.js';

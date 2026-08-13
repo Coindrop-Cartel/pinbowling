@@ -18,7 +18,7 @@ class ExtraRoundsService
 
     /**
      * Adds an extra inning (2 half-inning slots: Top and Bottom) to a head-to-head matchup.
-     * Picks a random machine from the league's assigned location pool.
+     * Picks random machines from the league's assigned location pool for Top and Bottom half-innings.
      *
      * @param int $matchupId ID of the event_matchup or team_event_matchup.
      * @param bool $isTeam Whether this is a team matchup.
@@ -27,8 +27,6 @@ class ExtraRoundsService
      */
     public function addExtraInning(int $matchupId, bool $isTeam = false): array
     {
-        $db = $this->db;
-
         if ($isTeam) {
             return $this->addTeamExtraInning($matchupId);
         }
@@ -45,9 +43,10 @@ class ExtraRoundsService
 
         // 1. Fetch event matchup details
         $stmt = $db->prepare(
-            'SELECT em.id, em.event_id, em.player1_id, em.player2_id, e.league_id, e.location_id
+            'SELECT em.id, em.event_id, em.player1_id, em.player2_id, e.league_id, e.location_id, e.scoring_format as event_format, l.scoring_format as league_format
              FROM event_matchups em
              JOIN events e ON em.event_id = e.id
+             LEFT JOIN leagues l ON e.league_id = l.id
              WHERE em.id = ?'
         );
         $stmt->execute([$matchupId]);
@@ -61,6 +60,8 @@ class ExtraRoundsService
         $eventId = (int)$em['event_id'];
         $p1Id = isset($em['player1_id']) ? (int)$em['player1_id'] : null;
         $p2Id = isset($em['player2_id']) ? (int)$em['player2_id'] : null;
+        $locationId = !empty($em['location_id']) ? (int)$em['location_id'] : null;
+        $format = !empty($em['event_format']) ? $em['event_format'] : (!empty($em['league_format']) ? $em['league_format'] : 'baseball');
 
         // 2. Determine max current order_number in matchups
         $maxStmt = $db->prepare(
@@ -69,8 +70,13 @@ class ExtraRoundsService
         $maxStmt->execute([$matchupId]);
         $maxOrder = (int)($maxStmt->fetchColumn() ?: 0);
 
-        // 3. Select a random machine from the assigned location pool
-        $machineId = $this->getRandomLocationMachine($leagueId);
+        // 3. Select 2 machine slots from location pool (Top and Bottom)
+        $machines = MatchupGenerator::selectMachines($this->getLocationMachinePool($leagueId), 2);
+        $topMachineId = $machines[0];
+        $bottomMachineId = $machines[1] ?? $machines[0];
+
+        $topOrder = $maxOrder + 1;
+        $bottomOrder = $maxOrder + 2;
 
         // 4. Insert Top and Bottom of Extra Inning (2 order_numbers)
         $insertStmt = $db->prepare(
@@ -78,24 +84,29 @@ class ExtraRoundsService
              VALUES (?, ?, ?, ?, ?)'
         );
 
-        $topOrder = $maxOrder + 1;
-        $bottomOrder = $maxOrder + 2;
-
-        $insertStmt->execute([$matchupId, $topOrder, $machineId, $p1Id, $p2Id]);
-        $insertStmt->execute([$matchupId, $bottomOrder, $machineId, $p1Id, $p2Id]);
+        $insertStmt->execute([$matchupId, $topOrder, $topMachineId, $p1Id, $p2Id]);
+        $insertStmt->execute([$matchupId, $bottomOrder, $bottomMachineId, $p1Id, $p2Id]);
 
         // 5. Populate target scores for the new extra inning slots
-        $eventLocationId = !empty($em['location_id']) ? (int)$em['location_id'] : null;
-        MatchupGenerator::createMatchupSlots(
-            $db,
-            $matchupId,
-            1, // 1 extra inning (2 half-innings)
-            2,
-            [$machineId, $machineId],
-            [],
-            [$p1Id, $p1Id],
-            [$p2Id, $p2Id]
+        $tsStmt = $db->prepare(
+            'INSERT INTO target_scores
+                (event_id, matchup_ref_id, machine_id, order_number, value1, value2,
+                 score1, score2, score3, score4, score5,
+                 score6, score7, score8, score9, score10)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                machine_id = VALUES(machine_id),
+                value1 = VALUES(value1),
+                value2 = VALUES(value2),
+                score1 = VALUES(score1),  score2  = VALUES(score2),
+                score3 = VALUES(score3),  score4  = VALUES(score4),
+                score5 = VALUES(score5),  score6  = VALUES(score6),
+                score7 = VALUES(score7),  score8  = VALUES(score8),
+                score9 = VALUES(score9),  score10 = VALUES(score10)'
         );
+
+        MatchupGenerator::insertTargetScore($tsStmt, $db, $topMachineId, $eventId, $topOrder, $format, $locationId, $matchupId);
+        MatchupGenerator::insertTargetScore($tsStmt, $db, $bottomMachineId, $eventId, $bottomOrder, $format, $locationId, $matchupId);
 
         $extraInningNumber = (int)floor($topOrder / 2) + 1;
 
@@ -105,7 +116,8 @@ class ExtraRoundsService
             'extraInning' => $extraInningNumber,
             'topOrderNumber' => $topOrder,
             'bottomOrderNumber' => $bottomOrder,
-            'machineId' => $machineId
+            'topMachineId' => $topMachineId,
+            'bottomMachineId' => $bottomMachineId
         ];
     }
 
@@ -132,8 +144,9 @@ class ExtraRoundsService
 
         $leagueId = (int)$tem['league_id'];
         $eventId = (int)$tem['event_id'];
-        $team1Id = isset($tem['team1_id']) ? (int)$tem['team1_id'] : null;
-        $team2Id = isset($tem['team2_id']) ? (int)$tem['team2_id'] : null;
+        $team1Id = isset($tem['team1_id']) ? (int)$tem['team1_id'] : null; // Home team
+        $team2Id = isset($tem['team2_id']) ? (int)$tem['team2_id'] : null; // Away team
+        $locationId = !empty($tem['location_id']) ? (int)$tem['location_id'] : null;
 
         // 2. Determine max current order_number in team_matchups
         $maxStmt = $db->prepare(
@@ -142,22 +155,37 @@ class ExtraRoundsService
         $maxStmt->execute([$matchupId]);
         $maxOrder = (int)($maxStmt->fetchColumn() ?: 0);
 
-        // 3. Select a random machine from the assigned location pool
-        $machineId = $this->getRandomLocationMachine($leagueId);
+        // 3. Select 2 machine slots from location pool (Top and Bottom)
+        $machines = MatchupGenerator::selectMachines($this->getLocationMachinePool($leagueId), 2);
+        $topMachineId = $machines[0];
+        $bottomMachineId = $machines[1] ?? $machines[0];
 
         // 4. Insert Top and Bottom of Extra Inning (2 order_numbers)
         $topOrder = $maxOrder + 1;
         $bottomOrder = $maxOrder + 2;
 
+        // Top half-inning: Home team ($team1Id) pitches/defends, Away team ($team2Id) bats
         MatchupGenerator::createTeamMatchups(
             $db,
             $matchupId,
-            [$machineId, $machineId],
+            [$topMachineId],
             $eventId,
-            $tem['location_id'] ? (int)$tem['location_id'] : null,
-            $team1Id,
-            $team2Id,
+            $locationId,
+            $team1Id, // Pitcher
+            $team2Id, // Batter
             $topOrder
+        );
+
+        // Bottom half-inning: Away team ($team2Id) pitches/defends, Home team ($team1Id) bats
+        MatchupGenerator::createTeamMatchups(
+            $db,
+            $matchupId,
+            [$bottomMachineId],
+            $eventId,
+            $locationId,
+            $team2Id, // Pitcher
+            $team1Id, // Batter
+            $bottomOrder
         );
 
         $extraInningNumber = (int)floor($topOrder / 2) + 1;
@@ -168,19 +196,20 @@ class ExtraRoundsService
             'extraInning' => $extraInningNumber,
             'topOrderNumber' => $topOrder,
             'bottomOrderNumber' => $bottomOrder,
-            'machineId' => $machineId
+            'topMachineId' => $topMachineId,
+            'bottomMachineId' => $bottomMachineId
         ];
     }
 
     /**
-     * Selects a random machine ID from the machines assigned to the league's designated location.
-     * Falls back to any available machine if no location machines are configured.
+     * Gets array of available machine IDs assigned to the league's designated location(s).
+     * Falls back to all available machines if no location machines are configured.
      *
      * @param int $leagueId
-     * @return int Machine ID.
+     * @return array Array of machine IDs.
      * @throws \Exception If no machines are available in the system.
      */
-    private function getRandomLocationMachine(int $leagueId): int
+    private function getLocationMachinePool(int $leagueId): array
     {
         $db = $this->db;
 
@@ -210,8 +239,6 @@ class ExtraRoundsService
             throw new \Exception('No machines available to select for extra inning.');
         }
 
-        // Pick one random machine from pool
-        $randomKey = array_rand($machinePool);
-        return (int)$machinePool[$randomKey];
+        return array_map('intval', $machinePool);
     }
 }

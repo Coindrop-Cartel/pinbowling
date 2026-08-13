@@ -3,8 +3,8 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { initScoresPage } from '@pages/scoresPage.js';
 import { PB_API } from '@services/api.js';
 import * as Utils from '@scripts/utils.js';
-import { getScoreAccessLevel } from '@services/auth.js';
-import { showAlert } from '@ui/dialogs.js';
+import { can, getScoreAccessLevel } from '@services/auth.js';
+import { showAlert, showConfirm } from '@ui/dialogs.js';
 import { printBlankScoreSheet } from '@ui/printing.js';
 
 vi.mock('@services/api.js', () => ({
@@ -16,7 +16,7 @@ vi.mock('@services/api.js', () => ({
     players: { getAll: vi.fn().mockResolvedValue([]) },
     machines: { getTargets: vi.fn() },
     scores: { get: vi.fn(), save: vi.fn() },
-    matchups: { get: vi.fn(), save: vi.fn() },
+    matchups: { get: vi.fn(), save: vi.fn(), addExtraInning: vi.fn() },
     teamMatchups: { get: vi.fn().mockResolvedValue([]), clear: vi.fn() },
     teamScores: { get: vi.fn().mockResolvedValue([]), save: vi.fn() },
     sessions: { get: vi.fn() },
@@ -44,6 +44,7 @@ vi.mock('@scripts/utils.js', () => ({
   loadPage: vi.fn(),
   escapeHTML: vi.fn(str => str),
   getUrlParam: vi.fn(() => null),
+  getInitials: vi.fn((str) => (str ? str.charAt(0) : '')),
 }));
 
 vi.mock('@services/auth.js', () => ({
@@ -123,6 +124,7 @@ vi.mock('@ui/dialogs.js', async (importOriginal) => {
   return {
     ...actual,
     showAlert: vi.fn(),
+    showConfirm: vi.fn().mockResolvedValue(true),
     showDialog: vi.fn().mockResolvedValue(false),
   };
 });
@@ -482,5 +484,79 @@ describe('Scoring Entry Page (scoresPage.js)', () => {
     expect(playerSummary.textContent).toContain('All Players');
     const disabledSections = document.querySelectorAll('.participant-section.round-inputs-disabled');
     expect(disabledSections.length).toBe(0);
+  });
+
+  it('triggers showConfirm and calls addExtraInning when add extra inning button is clicked', async () => {
+    can.mockResolvedValue(true);
+    Utils.getActiveLeagueId.mockReturnValue(1);
+    Utils.getActiveEventId.mockReturnValue(101);
+    Utils.getActiveEventMatchupId.mockReturnValue(50);
+    Utils.getCurrentPlayerId.mockReturnValue('all');
+
+    PB_API.leagues.getAll.mockResolvedValue([
+      {
+        id: 1,
+        name: 'H2H League',
+        competitionFormat: 'head2head',
+        participationType: 'individual',
+        scoringFormat: 'golf_skins',
+        events: [{ id: 101, eventName: 'Event 1' }]
+      }
+    ]);
+    PB_API.players.getAll.mockResolvedValue([
+      { id: 10, playerName: 'Kyle' },
+      { id: 20, playerName: 'Adam' }
+    ]);
+    PB_API.matchups.get.mockResolvedValue([
+      { id: 50, eventId: 101, player1Id: 10, player1Name: 'Kyle', player2Id: 20, player2Name: 'Adam', status: 'pending', entries: [{ id: 1, orderNumber: 1, machineId: 5, machineName: 'Hole 1' }] }
+    ]);
+    PB_API.auth.me.mockResolvedValue({ player_id: 10, role: 'admin' });
+    PB_API.matchups.addExtraInning.mockResolvedValue({ id: 50 });
+
+    const { getScoringEngine } = await import('@core/engine.js');
+    getScoringEngine.mockReturnValue({
+      allowsTies: () => false,
+      supportsExtraRounds: () => true,
+      calculateTurnResults: vi.fn(() => ({
+        turnResults: [{ played: true }],
+        homeScore: 10,
+        awayScore: 10
+      })),
+      buildRoundValues: () => ({ 10: 100 }),
+      getRoundLabel: () => 'Inning',
+      getExtraRoundConfig: () => ({ label: 'Extra Inning' }),
+      getPrimaryTargetLabel: () => 'Target',
+      getRoundRowContext: () => ({}),
+      getRequiredEventData: () => ({ eventMatchups: Promise.resolve([]), allEventScores: Promise.resolve([]) }),
+      enrichScoreMap: (sm) => sm || ({}),
+      renderResults: () => ({}),
+      getRowSummaryHtml: () => '<div></div>',
+      getRowSummaryData: () => ({ label: '', value: 0 }),
+      getBonusTargets: () => ({}),
+      getMarkFormatting: () => '',
+      formatMark: (t) => t,
+      filterThresholds: v => v,
+      formatTotalScore: (t) => String(t),
+      getLastFrameHint: () => '',
+      getMatchupDescription: () => ({ description: '', details: [] }),
+      buildPlayerScoreMap: () => ({})
+    });
+
+    await initScoresPage();
+
+    await vi.waitFor(() => {
+      const addBtn = document.querySelector('.add-extra-inning-btn');
+      expect(addBtn).not.toBeNull();
+    });
+
+    const addBtn = document.querySelector('.add-extra-inning-btn');
+
+    await addBtn.onclick();
+
+    expect(showConfirm).toHaveBeenCalledWith(
+      expect.stringContaining('Are you sure you want to add an Extra Inning'),
+      'Add Extra Inning'
+    );
+    expect(PB_API.matchups.addExtraInning).toHaveBeenCalledWith(50, false);
   });
 });

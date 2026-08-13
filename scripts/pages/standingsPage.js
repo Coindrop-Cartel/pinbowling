@@ -10,6 +10,7 @@ import { normalizeTargets, normalizeScores, groupScoresByPlayer, groupMatchupsBy
 import { calculateSeasonSummary, fetchSeasonData } from '@services/seasonCalculator.js';
 import { TvModeManager } from '@ui/tvMode.js';
 import { renderStandingsTable } from '@scripts/renderers/standingsTableRenderer.js';
+import { convertBowlingToGolf, convertAllBowlingToGolf } from '@services/bowlingToGolfConverter.js';
 
 /**
  * Logic for the Standings/Scoreboard page showing player rankings and season summaries.
@@ -46,6 +47,7 @@ export async function initStandingsPage() {
 
   let selectedPlayerIds = []; // Not preserved in localStorage per request
   let lastScoreState = new Map(); // Tracks playerId-orderNumber -> ballString for change detection
+  let showAsPinGolf = false; // Toggle state for viewing bowling as PinGolf
 
   let Engine = getScoringEngine(ScoringFormats.DEFAULT);
 
@@ -92,7 +94,7 @@ export async function initStandingsPage() {
     refresh();
   }
 
-  function renderFilterUI(players) {
+  function renderFilterUI(players, format = null) {
     if (!playerFilterContainer || tvModeManager.isTvMode) return;
     playerFilterContainer.innerHTML = '';
 
@@ -100,9 +102,21 @@ export async function initStandingsPage() {
       ? `Viewing ${selectedPlayerIds.length} Player(s)` 
       : 'Showing Everyone';
 
-    renderActionSummary(playerFilterContainer, filterText, [
+    const actions = [
       { text: 'Select Players / Groups', onclick: () => openPlayerFilterDialog(players) }
-    ]);
+    ];
+
+    if (format === ScoringFormats.BOWLING) {
+      actions.push({
+        text: showAsPinGolf ? 'Show as PinBowling' : 'Show as PinGolf',
+        onclick: () => {
+          showAsPinGolf = !showAsPinGolf;
+          refresh();
+        }
+      });
+    }
+
+    renderActionSummary(playerFilterContainer, filterText, actions);
   }
 
   /**
@@ -203,6 +217,7 @@ export async function initStandingsPage() {
     // is shown for the new context.
     if (eventId !== lastEventId) {
       selectedPlayerIds = [];
+      showAsPinGolf = false;
       lastEventId = eventId;
     }
 
@@ -504,7 +519,7 @@ export async function initStandingsPage() {
       }
     }
 
-    renderFilterUI(players);
+    renderFilterUI(players, format);
 
     const filteredPlayers = selectedPlayerIds.length > 0 ? players.filter(p => selectedPlayerIds.includes(String(p.id))) : players;
 
@@ -519,18 +534,18 @@ export async function initStandingsPage() {
         currentScoreState.set(`${s.playerId}-${s.orderNumber}`, `${s.ball1}-${s.ball2}-${s.ball3}`);
       });
 
-      const { turnResults, total, totalDisplay } = Engine.calculateTurnResults(machines, scoreMap);
+      const { turnResults: bowlingTurnResults, total: bowlingTotal, totalDisplay: bowlingTotalDisplay } = Engine.calculateTurnResults(machines, scoreMap);
 
-      const playedTurns = turnResults.filter(t => t.played);
+      const playedTurns = bowlingTurnResults.filter(t => t.played);
       const totalPar = playedTurns.reduce((sum, t) => {
         const machine = machines.find(m => m.orderNumber === t.orderNumber);
         return sum + Number(machine?.value2 || 3);
       }, 0);
-      const parDiff = playedTurns.length > 0 ? total - totalPar : 0;
+      const parDiff = playedTurns.length > 0 ? bowlingTotal - totalPar : 0;
 
       // Determine weekly result for matchup-based formats
       let result = null;
-      let weeklyTotal = total;
+      let weeklyTotal = bowlingTotal;
       if (supportsMatchups) {
         const playerMatchup = eventMatchups.find(m => {
           if (m.status !== 'completed') return false;
@@ -557,18 +572,31 @@ export async function initStandingsPage() {
         }
       }
 
+      const hasScores = ordersWithScores.size > 0 || (supportsMatchups && result !== null);
+
       return {
         player,
         entity: player,
-        turnResults,
-        total: playedTurns.length > 0 ? total : weeklyTotal,
-        totalDisplay: playedTurns.length > 0 ? totalDisplay : (weeklyTotal ? String(weeklyTotal) : '0'),
+        turnResults: bowlingTurnResults,
+        total: ordersWithScores.size > 0 ? bowlingTotal : weeklyTotal,
+        totalDisplay: ordersWithScores.size > 0 ? bowlingTotalDisplay : (weeklyTotal ? String(weeklyTotal) : '0'),
+        bowlingTotal: bowlingTotal,
         ordersWithScores,
         parDiff,
-        hasScores: playedTurns.length > 0 || result !== null,
+        hasScores,
         result
       };
-    });
+    }).filter(row => row.hasScores);
+
+    let activeEngine = Engine;
+    if (format === ScoringFormats.BOWLING && showAsPinGolf) {
+      activeEngine = getScoringEngine(ScoringFormats.GOLF, {
+        participationType: league?.participationType,
+        competitionFormat: league?.competitionFormat
+      });
+
+      convertAllBowlingToGolf(rows, machines);
+    }
 
     renderStandingsTable({
       headerEl: standingsHeader,
@@ -579,7 +607,7 @@ export async function initStandingsPage() {
       isTeamLeague,
       rows,
       columns: machines,
-      engine: Engine,
+      engine: activeEngine,
       supportsMatchups,
       head2headRecordsMap: supportsMatchups
         ? (() => {

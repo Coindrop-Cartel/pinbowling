@@ -112,7 +112,7 @@ function renderEventStatsTable() {
         <th style="width: 50px;" class="text-center">Pos.</th>
         <th>Player Name</th>
         <th class="text-right">${isGolf ? 'Total Score (Strokes)' : 'Total Score'}</th>
-        <th class="text-center">${isGolf ? 'Strokes Played' : 'Balls Played'}</th>
+        <th class="text-center">${isGolf ? 'Strokes Played' : 'Pins Left'}</th>
         <th class="text-center">${isGolf ? 'Avg / Hole' : 'Avg / Frame'}</th>
         <th class="text-center">${isGolf ? '1' : 'X'}</th>
         <th class="text-center">${isGolf ? '2' : '9/'}</th>
@@ -463,9 +463,16 @@ async function handleEventImport(eventKey) {
 
     // Show PGM explanation banner
     const pgmBanner = document.getElementById('wppr-pgm-banner');
+    const pgmLabel = document.getElementById('wppr-pgm-label');
     const pgmText = document.getElementById('wppr-pgm-text');
     if (pgmBanner && pgmText) {
-      pgmText.textContent = `${numHoles} Frames/Holes Played | Avg Balls/Strokes: ${pgmResult.avgScore} | Course Avg: ${pgmResult.courseAverage} | PGM: ${pgmResult.pgm} => Auto-set TGP to ${pgmResult.tgpPercent}%`;
+      const isGolf = format === ScoringFormats.GOLF;
+      const unitLabel = isGolf ? 'Holes' : 'Frames';
+      const metricLabel = isGolf ? 'Avg Strokes' : 'Avg Pins Left';
+      const perUnitLabel = isGolf ? 'Course Avg' : 'Frame Avg';
+      const formatLabel = isGolf ? 'Pin-Golf' : 'Pin-Bowling';
+      if (pgmLabel) pgmLabel.textContent = `${formatLabel} PGM Calculation:`;
+      pgmText.textContent = `${numHoles} ${unitLabel} Played | ${metricLabel}: ${pgmResult.avgScore} | ${perUnitLabel}: ${pgmResult.courseAverage} | PGM: ${pgmResult.pgm} => Auto-set TGP to ${pgmResult.tgpPercent}%`;
       pgmBanner.classList.remove('hidden');
     }
 
