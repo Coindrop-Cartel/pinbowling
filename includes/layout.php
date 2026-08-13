@@ -1,9 +1,24 @@
+<?php
+$isDarkMode = isset($_COOKIE['pb_dark_mode']) && $_COOKIE['pb_dark_mode'] === 'true';
+$bodyClasses = array_filter([$bodyClass ?? '', $isDarkMode ? 'dark-mode' : '']);
+$bodyClassString = implode(' ', $bodyClasses);
+$htmlClassString = $isDarkMode ? 'class="dark-mode"' : '';
+?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" <?php echo $htmlClassString; ?>>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title><?php echo isset($pageTitle) ? "Pinball And Stuff - Don't say \"and stuff\"" : "Pinball And Stuff"; ?></title>
+  <script>
+    (function() {
+      try {
+        if (localStorage.getItem('pb_dark_mode') === 'true' || (document.cookie && document.cookie.indexOf('pb_dark_mode=true') !== -1)) {
+          document.documentElement.classList.add('dark-mode');
+        }
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" id="theme-stylesheet" href="<?php echo versionedAsset($baseUrl . '/styles/styles.css'); ?>" />
   <link rel="icon" type="image/png" href="<?php echo versionedAsset($baseUrl . '/images/' . $active['logo']); ?>" />
   <script>
@@ -24,7 +39,7 @@
   }
   </script>
 </head>
-<body class="<?php echo $bodyClass ?? ''; ?>">
+<body class="<?php echo $bodyClassString; ?>">
   <?php include __DIR__ . '/header.php'; ?>
 
   <?php echo $pageContent; ?>

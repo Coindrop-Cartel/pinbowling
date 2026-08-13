@@ -9,9 +9,9 @@
   gap: 1rem;
   padding: 8px 12px;
   margin-bottom: 5px;
-  background: #f9f9f9;
+  background: var(--pb-gray);
   border-radius: 4px;
-  border: 1px solid #eee;
+  border: 1px solid var(--pb-border-color, #eee);
 }
 
 .round-info {
@@ -310,11 +310,11 @@
 }
 
 .summary-box {
-  background: #f9f9f9;
+  background: var(--pb-gray);
   padding: 10px 15px;
   border-radius: 4px;
   margin-bottom: 15px;
-  border: 1px solid #eee;
+  border: 1px solid var(--pb-border-color, #eee);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -323,7 +323,7 @@
 .generator-options {
   display: flex;
   gap: 15px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--pb-border-color, #eee);
   padding-top: 20px;
   margin-top: 20px;
 }
@@ -333,7 +333,7 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 5px;
-  background: #f9f9f9;
+  background: var(--pb-gray);
   padding: 5px 10px;
   border-radius: 4px;
 }
@@ -393,7 +393,7 @@
   padding: 25px;
   border: 3px solid var(--pb-primary) !important;
   margin-bottom: 20px;
-  background-color: white;
+  background-color: var(--pb-white);
 }
 
 .event-item, .player-item {
@@ -651,7 +651,7 @@
 }
 
 .stat-card {
-  background: var(--pb-card-bg, #ffffff);
+  background: var(--pb-card-bg, var(--pb-white));
   border: 1px solid var(--pb-border-color, #e0e0e0);
   border-radius: 8px;
   padding: 14px 12px;

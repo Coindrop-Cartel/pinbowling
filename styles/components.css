@@ -2,7 +2,7 @@
 
 /* Cards */
 .card {
-  background: white;
+  background: var(--pb-card-bg, var(--pb-white));
   border: var(--pb-border);
   box-shadow: var(--pb-shadow);
   padding: 30px;
@@ -24,7 +24,8 @@ input, select {
   font-family: inherit;
   font-size: 1rem;
   margin-bottom: 10px;
-  background: white;
+  background: var(--pb-white);
+  color: var(--pb-black);
 }
 
 input[type="checkbox"] {
@@ -263,7 +264,7 @@ small.hint,
   border: 1px solid #ddd;
   border-radius: 4px;
   overflow: hidden;
-  background: #fff;
+  background: var(--pb-white);
   list-style: none;
 }
 
@@ -272,7 +273,7 @@ small.hint,
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
-  background: #f9f9f9;
+  background: var(--pb-gray);
   cursor: pointer;
 }
 

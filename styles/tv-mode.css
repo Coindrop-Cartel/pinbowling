@@ -25,7 +25,7 @@ body.tv-mode-active .page-container {
 }
 
 body.tv-mode-active .card {
-  background: white;
+  background: var(--pb-white);
   border: var(--pb-border);
   box-shadow: var(--pb-shadow);
 }
@@ -36,7 +36,7 @@ body.tv-mode-active #tv-title {
   text-align: center;
   margin-bottom: 40px;
   color: var(--pb-black) !important;
-  background: white;
+  background: var(--pb-white);
   border: var(--pb-border);
   box-shadow: var(--pb-shadow);
   padding: 30px;

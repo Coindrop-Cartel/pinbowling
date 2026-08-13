@@ -5,6 +5,7 @@
  */
 
 import { initNavigation } from '@ui/navigation.js';
+import { initDarkMode } from '@ui/darkMode.js';
 import { initMachinesPage } from '@pages/machinesPage.js';
 import { initLocationsPage } from '@pages/locationsPage.js';
 import { initEventSetupPage } from '@pages/eventSetupPage.js';
@@ -104,6 +105,7 @@ export function initApp() {
   initHeroLogoCarousel();
 
   initNavigation('.nav-container'); 
+  initDarkMode();
   applyPreferredTheme();
 
   initAuthHeader();

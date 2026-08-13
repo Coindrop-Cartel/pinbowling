@@ -20,6 +20,29 @@
   --pb-header-hover-bg: var(--pb-shadow-color);
 }
 
+/* Dark Mode: Swap white with black and vice versa, dark gray backgrounds */
+html.dark-mode,
+body.dark-mode,
+body.dark-mode.theme-bowling,
+body.dark-mode.theme-golf,
+body.dark-mode.theme-baseball {
+  --pb-white: #000000;
+  --pb-black: #ffffff;
+  --pb-gray: #1f1f1f;
+  --pb-background: #000000;
+  --pb-card-bg: #000000;
+  --pb-bg-light: #1f1f1f;
+  --pb-primary-light: #182838;
+  --pb-header-text: #000000;
+  --pb-border-color: #444444;
+  --pb-shadow-color: color-mix(in srgb, var(--pb-primary, #000000), #000000 35%);
+}
+
+html {
+  background-color: var(--pb-white);
+  color: var(--pb-black);
+}
+
 * {
   box-sizing: border-box;
 }

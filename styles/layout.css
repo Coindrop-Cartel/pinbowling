@@ -2,13 +2,83 @@
 
 /* Header & Navigation Layout */
 .navbar {
-  --pb-header-bg: var(--pb-primary, #000000);
   background: var(--pb-header-bg);
   border-bottom: 5px solid var(--pb-primary);
   padding: 0;
   position: sticky;
   top: 0;
   z-index: 9999;
+}
+
+/* Explicit Dark Mode Header & Navigation Overrides */
+body.dark-mode .navbar {
+  background: var(--pb-header-bg, var(--pb-primary, #000000));
+  border-bottom: 5px solid var(--pb-primary);
+}
+
+body.dark-mode .navbar .nav-logo,
+body.dark-mode .navbar .nav-logo span,
+body.dark-mode .navbar .nav-link,
+body.dark-mode .navbar .dropbtn,
+body.dark-mode .navbar .auth-user-greeting,
+body.dark-mode .navbar .hamburger-btn {
+  color: #000000 !important;
+}
+
+body.dark-mode .navbar .dropdown-content {
+  background-color: #000000 !important;
+  border: 2px solid var(--pb-primary) !important;
+  box-shadow: 6px 6px 0px var(--pb-shadow-color);
+}
+
+body.dark-mode .navbar .dropdown-content a {
+  color: #ffffff !important;
+}
+
+body.dark-mode .navbar .dropdown-content a:hover {
+  background-color: #1a1a1a !important;
+  color: #ffffff !important;
+}
+
+body.dark-mode .navbar .dropdown-content a.active {
+  color: var(--pb-primary, #ffffff) !important;
+  font-weight: 900;
+}
+
+body.dark-mode .navbar .nav-link:hover,
+body.dark-mode .navbar .dropbtn:hover {
+  background: rgba(0, 0, 0, 0.15) !important;
+  color: #000000 !important;
+}
+
+body.dark-mode .navbar .nav-link.active,
+body.dark-mode .navbar .dropbtn.active,
+body.dark-mode .navbar .nav-link.active:hover,
+body.dark-mode .navbar .dropbtn.active:hover {
+  background: #000000 !important;
+  color: var(--pb-primary, #ffffff) !important;
+  border-radius: 4px;
+}
+
+body.dark-mode #header-login-btn,
+body.dark-mode #header-logout-btn,
+body.dark-mode .kofi-header-btn,
+body.dark-mode .theme-toggle-btn {
+  background-color: #000000 !important;
+  color: var(--pb-primary, #ffffff) !important;
+  border: none !important;
+}
+
+body.dark-mode #header-login-btn:hover,
+body.dark-mode #header-logout-btn:hover,
+body.dark-mode .kofi-header-btn:hover,
+body.dark-mode .theme-toggle-btn:hover {
+  background-color: #1a1a1a !important;
+  color: var(--pb-primary, #ffffff) !important;
+}
+
+body.dark-mode .kofi-cup-icon {
+  filter: none;
 }
 
 .nav-container {
@@ -174,6 +244,35 @@
   background-color: #333;
 }
 
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--pb-white) !important;
+  color: var(--pb-primary);
+  border: none;
+  padding: 8px 10px;
+  font-size: 1rem;
+  font-weight: 800;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+  min-width: 36px;
+  transition: background-color 0.2s, color 0.2s, transform 0.1s;
+}
+
+.theme-toggle-btn:hover {
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+
+.theme-toggle-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
 .dropbtn::after {
   content: ' ▼';
   font-size: 0.6rem;
@@ -245,7 +344,7 @@
 }
 
 .hero-brand-selector {
-  background: white;
+  background: var(--pb-white);
   display: flex;
   flex-direction: column;
   align-items: center;
